@@ -724,6 +724,23 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
         return fail();
     }
 
+    // Sections within lists (the reference app's tasksections, confirmed in a 4.21 database).
+    QHash<QString, qint64> sectionByUid;
+    if (!rows("tasksections", "COALESCE(isdeleted,0)=0", "displayorder", [&](const Row &r) {
+            const qint64 listId = listByUid.value(r.str("calendaruid"), 0);
+            if (!listId)
+                return;
+            ListSection sec;
+            sec.id = store.nextId("sections");
+            sec.listId = listId;
+            sec.name = r.str("sectionname").isEmpty() ? QStringLiteral("Section") : r.str("sectionname");
+            sec.order = r.dbl("displayorder", sec.id);
+            store.putSection(sec);
+            sectionByUid.insert(r.str("uid"), sec.id);
+        })) {
+        return fail();
+    }
+
     // Tasks. Ids are assigned up front so parents resolve by uid.
     QList<Task> tasks;
     QHash<QString, qint64> taskByUid;
@@ -732,6 +749,7 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
             Task t;
             t.id = store.nextId("tasks");
             t.listId = listByUid.contains(r.str("calendaruid")) ? listByUid.value(r.str("calendaruid")) : fallbackList();
+            t.sectionId = sectionByUid.value(r.str("sectionuid"), 0);
             t.title = r.str("title");
             t.notes = r.str("notes");
             // the reference app's tasktype: 0 task, 1 checklist, 2 project (ours: Project=1, Checklist=2).
@@ -1280,11 +1298,44 @@ ImportResult importTickTick(Store &store, const QString &path) {
         if (commonZone.isEmpty() || it.value() > zoneCounts.value(commonZone))
             commonZone = it.key();
 
-    QSet<QString> existingUids;
+    QHash<QString, qint64> existingByUid;
     for (const auto &t : store.tasks())
-        existingUids.insert(t.uid);
+        existingByUid.insert(t.uid, t.id);
 
     store.begin("Import from TickTick");
+
+    // TickTick's sections ("Column Name", ordered by "Column Order") become
+    // sections of the list; a list that gains sections sorts by them.
+    QHash<QString, qint64> sectionIds;
+    auto sectionFor = [&](qint64 listId, const QString &rawName, double order) -> qint64 {
+        const QString name = rawName.trimmed();
+        if (name.isEmpty() || !listId)
+            return 0;
+        const QString key = QString::number(listId) + "\n" + name.toLower();
+        if (sectionIds.contains(key))
+            return sectionIds.value(key);
+        qint64 id = 0;
+        for (const auto &sec : store.sectionsOf(listId))
+            if (sec.name.compare(name, Qt::CaseInsensitive) == 0)
+                id = sec.id;
+        if (!id) {
+            ListSection sec;
+            sec.id = store.nextId("sections");
+            sec.listId = listId;
+            sec.name = name;
+            sec.order = order;
+            store.putSection(sec);
+            id = sec.id;
+            TaskList list = store.list(listId);
+            if (list.sortField != SortField::Section) {
+                list.sortField = SortField::Section;
+                list.separated = true;
+                store.putList(list);
+            }
+        }
+        sectionIds.insert(key, id);
+        return id;
+    };
 
     auto groupFor = [&](const QString &name) -> qint64 {
         if (name.trimmed().isEmpty())
@@ -1361,13 +1412,23 @@ ImportResult importTickTick(Store &store, const QString &path) {
         if (title.trimmed().isEmpty() && col(row, "Content").trimmed().isEmpty())
             continue;
         const QString uid = "TICKTICK-" + (tickId.isEmpty() ? QString::number(i) : tickId);
-        if (existingUids.contains(uid))
-            continue;  // Imported before.
+        if (existingByUid.contains(uid)) {
+            // Imported before. Fill in a section it didn't get then (older
+            // imports didn't know sections), but change nothing else.
+            Task earlier = store.task(existingByUid.value(uid));
+            if (earlier.id && !earlier.sectionId && !col(row, "Column Name").trimmed().isEmpty()) {
+                earlier.sectionId = sectionFor(earlier.listId, col(row, "Column Name"), col(row, "Column Order").toDouble());
+                store.putTask(earlier);
+                ++result.updated;
+            }
+            continue;
+        }
 
         Task t;
         t.id = store.nextId("tasks");
         t.uid = uid;
         t.listId = listFor(col(row, "Folder Name"), col(row, "List Name"));
+        t.sectionId = sectionFor(t.listId, col(row, "Column Name"), col(row, "Column Order").toDouble());
         t.title = title.trimmed().isEmpty() ? QStringLiteral("Untitled") : title.trimmed().left(1000);
         const QString status = col(row, "Status").trimmed();
 

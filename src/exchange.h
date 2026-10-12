@@ -15,6 +15,7 @@ struct ImportResult {
     int tasks = 0;
     int tags = 0;
     int alarms = 0;
+    int updated = 0;  // Already-imported tasks that were filled in (e.g. their section).
     QString error;  // Empty on success.
 };
 

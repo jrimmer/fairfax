@@ -31,6 +31,23 @@ Menu {
         MenuItem { text: "To Checklist"; onTriggered: backend.convertSelection(2) }
     }
     Menu {
+        id: sectionMenu
+        title: "Move to Section"
+        readonly property var info: backend.taskInfo(root.row.taskId || 0)
+        readonly property var choices: info.listId ? backend.sectionChoices(info.listId) : []
+        enabled: choices.length > 0
+        Repeater {
+            model: sectionMenu.choices
+            MenuItem {
+                required property var modelData
+                text: modelData.name
+                onTriggered: backend.moveSelectionToSection(modelData.id)
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "No Section"; onTriggered: backend.moveSelectionToSection(0) }
+    }
+    Menu {
         title: root.row.type === 2 ? "Sort Checklist" : "Sort Project"
         enabled: root.row.type === 1 || root.row.type === 2
         Repeater {

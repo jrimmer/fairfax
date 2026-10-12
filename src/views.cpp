@@ -298,7 +298,8 @@ void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
         case SortField::Modified: return a.modified == b.modified ? 0 : (a.modified > b.modified ? -1 : 1);
         case SortField::Duration: return a.duration - b.duration;
         case SortField::Completion: return a.completedAt == b.completedAt ? 0 : (a.completedAt > b.completedAt ? -1 : 1);
-        case SortField::Manual: return a.order == b.order ? 0 : (a.order < b.order ? -1 : 1);
+        case SortField::Manual:
+        case SortField::Section: return a.order == b.order ? 0 : (a.order < b.order ? -1 : 1);
         default: return 0;
         }
     };
@@ -344,6 +345,13 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
             if (!t.startDate.isValid()) return {"nostart", "No Start Date", {}, -1, RankLast};
             if (t.startDate < m_today) return {"started", "Started", {}, -1, RankFirst};
             return {"s:" + t.startDate.toString(Qt::ISODate), dayTitle(t.startDate, m_today), {}, -1, t.startDate.toJulianDay()};
+        case SortField::Section: {
+            // Tasks outside any section come first, then each section in order.
+            if (!t.sectionId || !m_store.sections().contains(t.sectionId) || m_store.sections().value(t.sectionId).deleted)
+                return {"sec:0", "Not in a Section", {}, -1, RankFirst};
+            const ListSection sec = m_store.sections().value(t.sectionId);
+            return {QStringLiteral("sec:%1").arg(sec.id), sec.name, {}, -1, qint64(sec.order * 1000) + 1};
+        }
         case SortField::Status: {
             // the reference app's Status sort: what needs attention first.
             if (t.completed) return {"st:done", "Completed", {}, -1, 6};
@@ -477,6 +485,27 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
     }
 
     QVector<Section> sections = sectionize(items, source, sort, o);
+    if (sort.field == SortField::Section && sort.separated && source.kind == Source::List) {
+        for (const auto &sec : m_store.sectionsOf(source.id)) {
+            const QString key = QStringLiteral("sec:%1").arg(sec.id);
+            bool present = false;
+            for (const auto &s : sections)
+                present = present || s.key == key;
+            if (!present) {
+                Section empty;
+                empty.key = key;
+                empty.title = sec.name;
+                sections.append(empty);
+            }
+        }
+        std::stable_sort(sections.begin(), sections.end(), [this](const Section &a, const Section &b) {
+            auto rank = [this](const Section &s) {
+                const qint64 id = s.key.mid(4).toLongLong();
+                return id ? m_store.sections().value(id).order : -1e18;
+            };
+            return rank(a) < rank(b);
+        });
+    }
 
     // Expand each row with its nested children: checklist items and sub-tasks
     // everywhere, project children only where the project is their home.

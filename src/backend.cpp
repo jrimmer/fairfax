@@ -24,7 +24,7 @@ namespace {
 const QLocale English(QLocale::English, QLocale::UnitedKingdom);
 
 const QStringList TaskRoles{
-    "hasAlarm", "hasLocation", "hasAttachment", "pictureUrl", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
+    "sectionId", "hasAlarm", "hasLocation", "hasAttachment", "pictureUrl", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
     "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
@@ -194,6 +194,8 @@ QVariantList Backend::sortChoices() const {
                {SortField::Completion, "Completion"}, {SortField::Title, "Title"}};
     if (sourceIsSmart())
         all.removeIf([](const auto &choice) { return choice.first == SortField::Manual; });
+    if (m_source.kind == Source::List && !m_store->sectionsOf(m_source.id).isEmpty())
+        all.prepend({SortField::Section, "Section"});
     QVariantList result;
     for (const auto &[field, name] : all)
         result.append(QVariantMap{{"field", field}, {"name", name}});
@@ -556,6 +558,9 @@ void Backend::newTask(int type, bool subtask) {
         t.type = TaskType::Task;
     } else if (m_source.kind == Source::List) {
         t.listId = m_source.id;
+        // In a sectioned list a new task joins the section you're in.
+        if (sortSpec().field == SortField::Section && current.id && current.listId == t.listId)
+            t.sectionId = current.parentId ? m_store->task(current.parentId).sectionId : current.sectionId;
     } else if (m_source.kind == Source::Project) {
         t.listId = m_store->task(m_source.id).listId;
         t.parentId = m_source.id;
@@ -817,6 +822,8 @@ void Backend::moveSelectionToList(qint64 listId) {
     m_store->begin("Move to List");
     std::function<void(qint64)> move = [&](qint64 id) {
         Task t = m_store->task(id);
+        if (t.listId != listId)
+            t.sectionId = 0;
         t.listId = listId;
         if (ids.contains(id)) {
             // A moved sub-task leaves its parent unless the parent moves too.
@@ -1543,6 +1550,114 @@ void Backend::redo() {
 }
 
 
+
+// ---------------------------------------------------------------- sections
+
+qint64 Backend::newSection(qint64 listId, const QString &name) {
+    TaskList list = m_store->list(listId);
+    if (!list.id || list.kind == ListKind::Smart)
+        return 0;
+    ListSection sec;
+    sec.id = m_store->nextId("sections");
+    sec.listId = listId;
+    sec.name = name.trimmed().isEmpty() ? QStringLiteral("New Section") : name.trimmed().left(200);
+    double order = 0;
+    for (const auto &other : m_store->sectionsOf(listId))
+        order = qMax(order, other.order);
+    sec.order = order + 1;
+    m_store->begin("New Section");
+    m_store->putSection(sec);
+    // The first section switches the list to sorting by section, where the
+    // headings show.
+    if (list.sortField != SortField::Section && m_store->sectionsOf(listId).size() == 1) {
+        list.sortField = SortField::Section;
+        list.separated = true;
+        m_store->putList(list);
+    }
+    m_store->commit();
+    emit viewChanged();
+    return sec.id;
+}
+
+void Backend::renameSection(qint64 sectionId, const QString &name) {
+    ListSection sec = m_store->sections().value(sectionId);
+    if (!sec.id || name.trimmed().isEmpty() || sec.name == name.trimmed())
+        return;
+    sec.name = name.trimmed().left(200);
+    m_store->begin("Rename Section");
+    m_store->putSection(sec);
+    m_store->commit();
+}
+
+void Backend::deleteSection(qint64 sectionId) {
+    // The section goes; its tasks stay in the list, outside any section.
+    ListSection sec = m_store->sections().value(sectionId);
+    if (!sec.id)
+        return;
+    m_store->begin("Delete Section");
+    for (auto t : m_store->tasks()) {
+        if (t.sectionId == sectionId) {
+            t.sectionId = 0;
+            m_store->putTask(t);
+        }
+    }
+    sec.deleted = true;
+    m_store->putSection(sec);
+    m_store->commit();
+}
+
+void Backend::moveSection(qint64 sectionId, int delta) {
+    const ListSection moving = m_store->sections().value(sectionId);
+    if (!moving.id)
+        return;
+    QVector<ListSection> all = m_store->sectionsOf(moving.listId);
+    int i = -1;
+    for (int j = 0; j < all.size(); ++j)
+        if (all.at(j).id == sectionId) i = j;
+    const int target = i + delta;
+    if (i < 0 || target < 0 || target >= all.size())
+        return;
+    all.move(i, target);
+    m_store->begin("Move Section");
+    for (int j = 0; j < all.size(); ++j) {
+        ListSection sec = all.at(j);
+        sec.order = j + 1;
+        m_store->putSection(sec);
+    }
+    m_store->commit();
+}
+
+void Backend::moveSelectionToSection(qint64 sectionId) {
+    const ListSection sec = m_store->sections().value(sectionId);
+    const auto ids = targetIds();
+    if (ids.isEmpty())
+        return;
+    m_store->begin(sectionId ? "Move to Section" : "Remove from Section");
+    for (auto id : ids) {
+        Task t = m_store->task(id);
+        if (sectionId && t.listId != sec.listId) {
+            // Moving into another list's section moves the task there too.
+            t.listId = sec.listId;
+            t.parentId = 0;
+        }
+        t.sectionId = sectionId;
+        t.order = nextOrder(t.listId, t.parentId);
+        m_store->putTask(t);
+    }
+    m_store->commit();
+}
+
+void Backend::dropOnSection(const QString &sectionKey) {
+    if (sectionKey.startsWith("sec:"))
+        moveSelectionToSection(sectionKey.mid(4).toLongLong());
+}
+
+QVariantList Backend::sectionChoices(qint64 listId) const {
+    QVariantList result;
+    for (const auto &sec : m_store->sectionsOf(listId))
+        result.append(QVariantMap{{"id", sec.id}, {"name", sec.name}});
+    return result;
+}
 
 // ------------------------------------------------- sidebar & tags panel
 
@@ -2706,7 +2821,8 @@ void Backend::rebuildTasks(const ViewBuilder &views) {
         rows.append({{"key", "s:" + section.key}, {"kind", "section"}, {"sectionKey", section.key},
                      {"title", section.title}, {"tone", section.tone}, {"color", section.color},
                      {"count", section.openCount}, {"durationTotal", Schedule::durationTotal(section.durationTotal)},
-                     {"collapsed", section.collapsed}, {"isFirst", first}});
+                     {"collapsed", section.collapsed}, {"isFirst", first},
+                     {"sectionId", section.key.startsWith("sec:") ? section.key.mid(4).toLongLong() : -1}});
         first = false;
         if (section.collapsed)
             continue;

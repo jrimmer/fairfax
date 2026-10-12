@@ -45,6 +45,7 @@ enum {
     Tag = 9,
     Completion = 10,
     Status = 11,
+    Section = 12,
 };
 }
 
@@ -69,6 +70,7 @@ struct Task {
     QString uid;
     qint64 listId = 0;
     qint64 parentId = 0;
+    qint64 sectionId = 0;  // A heading within the list (the reference app's task sections, TickTick's columns).
     int type = TaskType::Task;
     QString title;
     QString notes;
@@ -224,5 +226,20 @@ struct Attachment {
 
     QVariantMap toMap() const;
     static Attachment fromMap(const QVariantMap &map);
+};
+
+// A heading inside a list that groups its tasks, after the reference app's task sections
+// (and TickTick's sections).
+struct ListSection {
+    qint64 id = 0;
+    QString uid;
+    qint64 listId = 0;
+    QString name;
+    double order = 0;
+    QDateTime modified;
+    bool deleted = false;
+
+    QVariantMap toMap() const;
+    static ListSection fromMap(const QVariantMap &map);
 };
 

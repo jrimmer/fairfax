@@ -95,7 +95,8 @@ int runHeadless(int argc, char *argv[]) {
             err << "precrime: import failed: " << r.error << Qt::endl;
             return 1;
         }
-        out << QStringLiteral("Imported %1 lists, %2 tasks, %3 tags, %4 alerts.").arg(r.lists).arg(r.tasks).arg(r.tags).arg(r.alarms) << Qt::endl;
+        out << QStringLiteral("Imported %1 lists, %2 tasks, %3 tags, %4 alerts").arg(r.lists).arg(r.tasks).arg(r.tags).arg(r.alarms)
+            << (r.updated ? QStringLiteral("; filled in %1 earlier imports").arg(r.updated) : QString()) << "." << Qt::endl;
         return 0;
     }
     Automation automation(store);

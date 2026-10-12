@@ -264,6 +264,15 @@ public:
     Q_INVOKABLE void deleteGroup(qint64 groupId);
     Q_INVOKABLE QVariantList archivedLists() const;
 
+    // Sections within a list (the reference app's task sections).
+    Q_INVOKABLE qint64 newSection(qint64 listId, const QString &name);
+    Q_INVOKABLE void renameSection(qint64 sectionId, const QString &name);
+    Q_INVOKABLE void deleteSection(qint64 sectionId);
+    Q_INVOKABLE void moveSection(qint64 sectionId, int delta);
+    Q_INVOKABLE void moveSelectionToSection(qint64 sectionId);
+    Q_INVOKABLE void dropOnSection(const QString &sectionKey);
+    Q_INVOKABLE QVariantList sectionChoices(qint64 listId) const;
+
     // Tags panel management.
     Q_INVOKABLE void renameTag(qint64 tagId, const QString &name);
     Q_INVOKABLE void deleteTag(qint64 tagId);

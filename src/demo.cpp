@@ -161,6 +161,28 @@ void Backend::seedDemo() {
     const qint64 read = s.task(office, "Read the platform RFC", NoDate, -1, 60, {"work"});
     s.edit(read, [](Task &t) { t.starred = true; });
 
+    // Sections in the Work list, like the reference app's task sections.
+    auto section = [&](const QString &name, double order) {
+        ListSection sec;
+        sec.id = m_store->nextId("sections");
+        sec.listId = office;
+        sec.name = name;
+        sec.order = order;
+        m_store->putSection(sec);
+        return sec.id;
+    };
+    const qint64 sprint = section("This Sprint", 1);
+    const qint64 backlog = section("Backlog", 2);
+    for (auto t : m_store->tasks()) {
+        if (t.listId != office || t.parentId)
+            continue;
+        t.sectionId = t.dueDate.isValid() && t.dueDate <= QDate::currentDate().addDays(5) ? sprint : backlog;
+        m_store->putTask(t);
+    }
+    TaskList officeList = m_store->list(office);
+    officeList.sortField = SortField::Section;
+    m_store->putList(officeList);
+
     TaskList important;
     important.id = m_store->nextId("lists");
     important.kind = ListKind::Smart;

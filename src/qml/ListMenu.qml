@@ -11,6 +11,7 @@ Menu {
     readonly property var info: listId ? backend.listInfo(listId) : ({})
 
     MenuItem { text: "Rename…"; onTriggered: root.rename() }
+    MenuItem { text: "New Section"; onTriggered: { backend.selectSource("list:" + root.listId); backend.newSection(root.listId, "") } }
     Menu {
         title: "Color"
         Repeater {

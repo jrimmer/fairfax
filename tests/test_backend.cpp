@@ -161,6 +161,30 @@ private slots:
         f.backend->undo();
         QVERIFY(!f.store.task(ids.at(1)).deleted);
     }
+
+    void sectionsGroupTasksAndUndo() {
+        Fixture f;
+        const qint64 list = f.firstList();
+        f.backend->selectSource("list:" + QString::number(list));
+        f.backend->newTask();
+        const qint64 id = f.backend->editingTaskId();
+        f.backend->setTitle(id, "Plan");
+        f.backend->endEdit();
+        const qint64 sec = f.backend->newSection(list, "Next Up");
+        QCOMPARE(f.store.list(list).sortField, int(SortField::Section));  // First section switches the sort.
+        f.backend->selectTask(id);
+        f.backend->moveSelectionToSection(sec);
+        QCOMPARE(f.store.task(id).sectionId, sec);
+        QStringList headings;
+        for (const auto &row : f.backend->tasks()->rows())
+            if (row.value("kind") == "section")
+                headings << row.value("title").toString();
+        QCOMPARE(headings, QStringList{"Next Up"});
+        f.backend->deleteSection(sec);
+        QCOMPARE(f.store.task(id).sectionId, qint64(0));  // Tasks stay, outside any section.
+        f.backend->undo();
+        QCOMPARE(f.store.task(id).sectionId, sec);
+    }
 };
 
 REGISTER_TEST(BackendTest)

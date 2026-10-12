@@ -76,6 +76,8 @@ exec-once = precrime --background
   that day. A duration with a due time makes the task show up ahead of its deadline.
 - **Projects and checklists.** A project's tasks keep their own dates and appear on their own
   in the focus lists; a checklist's items ride along with the checklist.
+- **Sections.** Split a list into headings (right-click a list → New Section, or + → New
+  Section): drag tasks onto a heading to move them, double-click a heading to rename it.
 - **Tags.** Group them, filter by them from the right panel, and *pause* one (right-click) to
   hide every task that carries it until you resume it.
 - **Smart Lists.** Type a search in the reference app's syntax (`type: hiprio tags: !work`,
@@ -148,8 +150,9 @@ list has focus. Press `?` in the app for the full list.
 - **From TickTick:** in TickTick's web app, Settings → Account → Generate Backup. Then in
   Precrime, Settings → Import & Export → From TickTick…, or from a terminal:
   `precrime import ~/Downloads/TickTick-backup-*.csv`. Lists, folders, tags, dates (in each
-  task's time zone), repeats, reminders, priorities, checklists, sub-tasks and completed
-  history come across, and importing the same backup again adds only what's new.
+  task's time zone), repeats, reminders, priorities, checklists, sub-tasks, sections and
+  completed history come across, and importing the same backup again adds only what's new
+  (and fills in sections for tasks an earlier import brought in).
 - **From the reference app:** `precrime import tasks.db` (or a `.taskdb` backup).
 - **From anything with iCalendar export:** `precrime import tasks.ics`.
 

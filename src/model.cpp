@@ -33,6 +33,7 @@ QVariantMap Task::toMap() const {
         {"uid", uid},
         {"list_id", listId},
         {"parent_id", parentId},
+        {"section_id", sectionId},
         {"type", type},
         {"title", title},
         {"notes", notes},
@@ -74,6 +75,7 @@ Task Task::fromMap(const QVariantMap &m) {
     t.uid = m.value("uid").toString();
     t.listId = m.value("list_id").toLongLong();
     t.parentId = m.value("parent_id").toLongLong();
+    t.sectionId = m.value("section_id").toLongLong();
     t.type = m.value("type").toInt();
     t.title = m.value("title").toString();
     t.notes = m.value("notes").toString();
@@ -266,5 +268,22 @@ Attachment Attachment::fromMap(const QVariantMap &m) {
     a.modified = stampFrom(m.value("modified"));
     a.deleted = m.value("deleted").toBool();
     return a;
+}
+
+QVariantMap ListSection::toMap() const {
+    return {{"id", id}, {"uid", uid}, {"list_id", listId}, {"name", name}, {"sort_order", order},
+            {"modified", stampValue(modified)}, {"deleted", deleted}};
+}
+
+ListSection ListSection::fromMap(const QVariantMap &m) {
+    ListSection s;
+    s.id = m.value("id").toLongLong();
+    s.uid = m.value("uid").toString();
+    s.listId = m.value("list_id").toLongLong();
+    s.name = m.value("name").toString();
+    s.order = m.value("sort_order").toDouble();
+    s.modified = stampFrom(m.value("modified"));
+    s.deleted = m.value("deleted").toBool();
+    return s;
 }
 

@@ -31,6 +31,8 @@ public:
     const QHash<qint64, TagGroup> &tagGroups() const { return m_tagGroups; }
     const QHash<qint64, Alarm> &alarms() const { return m_alarms; }
     const QHash<qint64, Location> &locations() const { return m_locations; }
+    const QHash<qint64, ListSection> &sections() const { return m_sections; }
+    QVector<ListSection> sectionsOf(qint64 listId) const;  // In order.
     const QHash<qint64, Attachment> &attachments() const { return m_attachments; }
     QVector<Attachment> attachmentsFor(qint64 taskId) const;
     QString attachmentsFolder() const;
@@ -66,6 +68,7 @@ public:
     void putTagGroup(const TagGroup &group);
     void putAlarm(const Alarm &alarm);
     void putLocation(const Location &location);
+    void putSection(const ListSection &section);
     void putAttachment(const Attachment &attachment);
     bool commit();
 
@@ -141,6 +144,7 @@ private:
     QHash<qint64, TagGroup> m_tagGroups;
     QHash<qint64, Alarm> m_alarms;
     QHash<qint64, Location> m_locations;
+    QHash<qint64, ListSection> m_sections;
     QHash<qint64, Attachment> m_attachments;
     QHash<QString, qint64> m_maxIds;
     QHash<QString, QVariant> m_settings;

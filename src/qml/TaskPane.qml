@@ -63,6 +63,11 @@ Item {
                     MenuItem { text: "New Project"; onTriggered: backend.newTask(1) }
                     MenuItem { text: "New Checklist"; onTriggered: backend.newTask(2) }
                     MenuItem { text: "New Sub-Task"; enabled: backend.currentTaskId > 0; onTriggered: backend.newTask(0, true) }
+                    MenuItem {
+                        text: "New Section"
+                        enabled: backend.sourceKey.startsWith("list:") && !backend.sourceIsSmart
+                        onTriggered: backend.newSection(Number(backend.sourceKey.split(":")[1]), "")
+                    }
                 }
             }
             Item { Layout.fillWidth: true }

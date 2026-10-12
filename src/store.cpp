@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 5;
+constexpr int SchemaVersion = 6;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -27,7 +27,7 @@ const char *SyncColumns = R"(
     remote_id TEXT
 )";
 
-const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments"};
+const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections"};
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
 
@@ -198,6 +198,17 @@ bool Store::migrate(QString *error) {
         QStringLiteral("ALTER TABLE lists ADD COLUMN smart_range TEXT NOT NULL DEFAULT ''"),
     };
 
+    // Version 6 adds sections within lists.
+    const QStringList version6{
+        QStringLiteral("ALTER TABLE tasks ADD COLUMN section_id INTEGER NOT NULL DEFAULT 0"),
+        QStringLiteral(R"(CREATE TABLE IF NOT EXISTS sections (
+            id INTEGER PRIMARY KEY,
+            list_id INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL DEFAULT '',
+            sort_order REAL NOT NULL DEFAULT 0,
+            %1))").arg(SyncColumns),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -209,6 +220,8 @@ bool Store::migrate(QString *error) {
         steps += version4;
     if (version < 5)
         steps += version5;
+    if (version < 6)
+        steps += version6;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();
@@ -232,6 +245,7 @@ void Store::reload() {
     m_alarms.clear();
     m_locations.clear();
     m_attachments.clear();
+    m_sections.clear();
     m_settings.clear();
     load();
     emit changed();
@@ -355,6 +369,26 @@ void Store::putLocation(const Location &l) {
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("locations", copy.id, cached("locations", copy.id), copy.toMap());
+}
+
+void Store::putSection(const ListSection &section) {
+    ListSection copy = section;
+    if (copy.uid.isEmpty())
+        copy.uid = newUid();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
+    record("sections", copy.id, cached("sections", copy.id), copy.toMap());
+}
+
+QVector<ListSection> Store::sectionsOf(qint64 listId) const {
+    QVector<ListSection> result;
+    for (const auto &s : m_sections)
+        if (s.listId == listId && !s.deleted)
+            result.append(s);
+    std::sort(result.begin(), result.end(), [](const ListSection &a, const ListSection &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    return result;
 }
 
 void Store::putAttachment(const Attachment &a) {
@@ -515,6 +549,8 @@ void Store::applyToCache(const QString &table, const QVariantMap &row, qint64 id
         if (row.isEmpty()) m_locations.remove(id); else m_locations.insert(id, Location::fromMap(row));
     } else if (table == "attachments") {
         if (row.isEmpty()) m_attachments.remove(id); else m_attachments.insert(id, Attachment::fromMap(row));
+    } else if (table == "sections") {
+        if (row.isEmpty()) m_sections.remove(id); else m_sections.insert(id, ListSection::fromMap(row));
     }
 }
 
@@ -527,6 +563,7 @@ QVariantMap Store::cached(const QString &table, qint64 id) const {
     if (table == "alarms" && m_alarms.contains(id)) return m_alarms.value(id).toMap();
     if (table == "locations" && m_locations.contains(id)) return m_locations.value(id).toMap();
     if (table == "attachments" && m_attachments.contains(id)) return m_attachments.value(id).toMap();
+    if (table == "sections" && m_sections.contains(id)) return m_sections.value(id).toMap();
     return {};
 }
 
