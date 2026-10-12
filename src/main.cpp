@@ -1,6 +1,10 @@
 // precrime — a keyboard-first task manager for Omarchy, modelled on the reference app.
 
 #include <QCommandLineParser>
+#include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTextStream>
 #include <QDir>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -17,13 +21,81 @@
 #include <QUrl>
 
 #include "alarms.h"
+#include "automation.h"
+#include "calendar.h"
+#include "markdown.h"
+#include "views.h"
 #include "backend.h"
 #include "filepicker.h"
 #include "gitsync.h"
 #include "store.h"
 #include "theme.h"
 
+namespace {
+
+QString databasePath(const QStringList &args) {
+    const int i = args.indexOf("--db");
+    if (i >= 0 && i + 1 < args.size())
+        return args.at(i + 1);
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/precrime/precrime.db";
+}
+
+// `precrime mcp`, `precrime ctl …` and `precrime --waybar` run without a
+// window against the same database, so scripts, Claude and the bar can use
+// Precrime while the app is open (SQLite's WAL mode keeps that safe).
+int runHeadless(int argc, char *argv[]) {
+    QCoreApplication app(argc, argv);
+    app.setApplicationName("precrime");
+    QStringList args = app.arguments();
+    const QString dbPath = databasePath(args);
+    if (const int i = args.indexOf("--db"); i >= 0)
+        args.remove(i, qMin<qsizetype>(2, args.size() - i));
+    Store store;
+    QString error;
+    QTextStream out(stdout), err(stderr);
+    if (!store.open(dbPath, &error)) {
+        err << "precrime: can't open the database: " << error << Qt::endl;
+        return 1;
+    }
+    const QString mode = args.value(1);
+    if (mode == "--waybar") {
+        // A Waybar custom module: overdue and due-today counts, like the reference app's
+        // Dock badge.
+        ScheduleSettings settings;
+        settings.todayIncludesOverdue = store.setting("today.overdue", true).toBool();
+        settings.todayIncludesStarred = store.setting("today.starred", false).toBool();
+        settings.todayIncludesStillWorking = store.setting("today.stillWorking", true).toBool();
+        const ViewBuilder views(store, QDateTime::currentDateTime(), settings);
+        const auto today = views.countsForFocus(Source::Today);
+        const QString text = today.overdue ? QStringLiteral("%1 | %2").arg(today.overdue).arg(today.undone)
+                                           : QString::number(today.undone);
+        const QJsonObject json{{"text", today.undone ? text : QString()},
+                               {"tooltip", QStringLiteral("%1 overdue, %2 in Today").arg(today.overdue).arg(today.undone)},
+                               {"class", today.overdue ? "overdue" : today.undone ? "due" : "clear"}};
+        out << QJsonDocument(json).toJson(QJsonDocument::Compact) << Qt::endl;
+        return 0;
+    }
+    Automation automation(store);
+    int status = 0;
+    if (mode == "mcp") {
+        McpServer server(automation, "0.1.0");
+        QTextStream in(stdin);
+        status = server.run(in, out);
+    } else {
+        status = automation.runCli(args.mid(2), out, err);
+    }
+    return status;
+}
+
+}  // namespace
+
 int main(int argc, char *argv[]) {
+    {
+        const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
+        if (first == "mcp" || first == "ctl" || first == "--waybar")
+            return runHeadless(argc, argv);
+    }
+
     QGuiApplication app(argc, argv);
     app.setApplicationName("precrime");
     app.setApplicationVersion("0.1.0");
@@ -49,7 +121,9 @@ int main(int argc, char *argv[]) {
     QCommandLineOption daemonOption("background", "Start without a window, to deliver alarms (for exec-once).");
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
                     daemonOption, quickTextOption});
+    cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
     cli.process(app);
+    const QString openUrl = cli.positionalArguments().value(0);
 
     // One instance per user and database: a second launch hands its request
     // to the running one (open Quick Entry, or bring the window forward) and
@@ -63,7 +137,10 @@ int main(int argc, char *argv[]) {
         if (probe.waitForConnected(300)) {
             if (cli.isSet(daemonOption))
                 return 0;
-            probe.write(cli.isSet(quickOption) ? "quick\n" : "show\n");
+            if (openUrl.startsWith("precrime:"))
+                probe.write(("url " + openUrl + "\n").toUtf8());
+            else
+                probe.write(cli.isSet(quickOption) ? "quick\n" : "show\n");
             probe.waitForBytesWritten(300);
             return 0;
         }
@@ -76,7 +153,7 @@ int main(int argc, char *argv[]) {
     if (cli.isSet(demoOption))
         dbPath = demoDir.filePath("demo.db");
     if (dbPath.isEmpty())
-        dbPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/precrime.db";
+        dbPath = databasePath({});
 
     Store store;
     QString error;
@@ -84,6 +161,34 @@ int main(int argc, char *argv[]) {
 
     Theme theme(cli.value(themeOption));
     Backend backend(&store);
+    NotesHighlighter::registerType();
+
+    CalendarFeed calendar;
+    calendar.setPalette(theme.listPalette());
+    calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
+    QObject::connect(&theme, &Theme::changed, &calendar, [&] { calendar.setPalette(theme.listPalette()); });
+
+    // The same command set scripts and Claude use, wired to this window.
+    Automation automation(store);
+    automation.selectSource = [&backend](const QString &key) { backend.selectSource(key); };
+    automation.openTask = [&backend](qint64 id) {
+        backend.requestWindow();
+        backend.revealInList(id);
+    };
+    automation.selectedTaskIds = [&backend] { return backend.selectedIds(); };
+    auto handleUrl = [&](const QString &url) {
+        const QJsonObject result = automation.handleUrl(QUrl(url));
+        if (result.value("quickEntry").toBool())
+            backend.requestQuickEntryWith(result.value("text").toString());
+        else if (result.contains("search"))
+            backend.setSearch(result.value("search").toString());
+        backend.requestWindow();
+    };
+
+    // Changes written by `precrime ctl` or the MCP server show up here.
+    QTimer externalChanges;
+    QObject::connect(&externalChanges, &QTimer::timeout, &store, [&store] { store.reloadIfChangedElsewhere(); });
+    externalChanges.start(1500);
     if (opened) {
         if (cli.isSet(demoOption))
             backend.seedDemo();
@@ -107,6 +212,7 @@ int main(int argc, char *argv[]) {
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("filePicker", &filePicker);
     engine.rootContext()->setContextProperty("gitSync", gitSync.get());
+    engine.rootContext()->setContextProperty("calendar", &calendar);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("storeError", opened ? QString() : dbPath + ": " + error);
@@ -122,10 +228,12 @@ int main(int argc, char *argv[]) {
         server.listen(socketName);
         QObject::connect(&server, &QLocalServer::newConnection, &app, [&] {
             while (QLocalSocket *client = server.nextPendingConnection()) {
-                QObject::connect(client, &QLocalSocket::readyRead, client, [client, &backend] {
+                QObject::connect(client, &QLocalSocket::readyRead, client, [client, &backend, handleUrl] {
                     const QByteArray request = client->readAll().trimmed();
                     if (request == "quick")
                         backend.requestQuickEntry();
+                    else if (request.startsWith("url "))
+                        handleUrl(QString::fromUtf8(request.mid(4)));
                     else
                         backend.requestWindow();
                     client->disconnectFromServer();
@@ -136,6 +244,8 @@ int main(int argc, char *argv[]) {
     }
     if (cli.isSet(quickOption))
         QTimer::singleShot(0, &backend, &Backend::requestQuickEntry);
+    if (openUrl.startsWith("precrime:"))
+        QTimer::singleShot(0, &backend, [handleUrl, openUrl] { handleUrl(openUrl); });
 
     // Alarms are delivered by this process, so like the reference app's Alarm Helper it
     // keeps running after the window closes; Q or Ctrl+Q quits for real.

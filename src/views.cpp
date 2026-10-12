@@ -66,6 +66,9 @@ ViewBuilder::ViewBuilder(const Store &store, const QDateTime &now, const Schedul
     for (const auto &tag : store.tags())
         if (tag.paused && !tag.deleted)
             m_pausedTags.insert(tag.id);
+    for (const auto &place : store.locations())
+        if (place.paused && !place.deleted)
+            m_pausedLocations.insert(place.id);
     for (const auto &task : store.tasks())
         if (!task.deleted && task.parentId)
             m_childrenOf[task.parentId].append(task.id);
@@ -74,6 +77,9 @@ ViewBuilder::ViewBuilder(const Store &store, const QDateTime &now, const Schedul
 bool ViewBuilder::isPaused(const Task &task) const {
     for (auto id : task.tagIds)
         if (m_pausedTags.contains(id))
+            return true;
+    for (auto id : task.locationIds)
+        if (m_pausedLocations.contains(id))
             return true;
     // A paused project hides its children with it.
     if (task.parentId && m_store.tasks().contains(task.parentId))
@@ -185,6 +191,13 @@ bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewO
         bool any = false;
         for (auto id : t.tagIds)
             any = any || o.tagFilter.contains(id);
+        if (!any)
+            return false;
+    }
+    if (!o.locationFilter.isEmpty()) {
+        bool any = false;
+        for (auto id : t.locationIds)
+            any = any || o.locationFilter.contains(id);
         if (!any)
             return false;
     }

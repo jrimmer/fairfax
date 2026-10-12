@@ -44,6 +44,11 @@ public:
     // service, a second window) has written to the database.
     void reload();
 
+    // Reloads when another process (precrime ctl, the MCP server) has
+    // committed to the database since we last looked, using SQLite's
+    // data_version, which only changes for other connections' writes.
+    bool reloadIfChangedElsewhere();
+
     // Ids are handed out here rather than by SQLite so a change can refer to
     // records it has not written yet, and undoing a creation is exact.
     qint64 nextId(const QString &table);
@@ -140,6 +145,7 @@ private:
     QHash<QString, qint64> m_maxIds;
     QHash<QString, QVariant> m_settings;
     bool m_inChange = false;
+    qint64 m_dataVersion = -1;
     Change m_pending;
     QVector<Change> m_undo;
     QVector<Change> m_redo;

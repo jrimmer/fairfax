@@ -110,7 +110,8 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+D` | Duplicate |
 | `Ctrl+1`…`Ctrl+5`, `Ctrl+0` | All, Today, Starred, Scheduled, Done; Inbox |
 | `Ctrl+↑` / `Ctrl+↓` | Previous / next list |
-| `Ctrl+Alt+↑` / `Ctrl+Alt+↓` | Move the task up / down |
+| `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Move the task up / down |
+| `Ctrl+Alt+↑` / `Ctrl+Alt+↓` | Collapse / expand every project |
 | `Ctrl+F` / `Ctrl+Shift+O` | Search / Quick Open |
 | `Ctrl+K` / `Ctrl+U` / `Ctrl+O` | Show scheduled / show paused / hide completed |
 | `Ctrl+Alt+J` | Project view |

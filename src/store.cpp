@@ -230,6 +230,18 @@ void Store::reload() {
     emit changed();
 }
 
+bool Store::reloadIfChangedElsewhere() {
+    QSqlQuery q(m_db);
+    if (!q.exec("PRAGMA data_version") || !q.next())
+        return false;
+    const qint64 version = q.value(0).toLongLong();
+    const bool changed = m_dataVersion >= 0 && version != m_dataVersion;
+    m_dataVersion = version;
+    if (changed)
+        reload();
+    return changed;
+}
+
 QVector<Alarm> Store::alarmsFor(qint64 taskId) const {
     QVector<Alarm> result;
     for (const auto &a : m_alarms)

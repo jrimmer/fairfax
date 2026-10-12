@@ -1,6 +1,9 @@
 #include "backend.h"
 
+#include <QClipboard>
 #include <QDesktopServices>
+#include <QGuiApplication>
+#include <QMimeDatabase>
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
@@ -10,6 +13,7 @@
 #include <algorithm>
 
 #include "dateparse.h"
+#include "automation.h"
 #include "exchange.h"
 #include "query.h"
 #include "recurrence.h"
@@ -29,6 +33,7 @@ const QStringList SidebarRoles{"kind", "sourceKey", "title", "icon", "overdue", 
                                "selected", "depth", "expandable", "expanded", "collapsed", "excluded",
                                "groupId", "listId", "taskId"};
 const QStringList TagRoles{"kind", "tagId", "groupId", "title", "count", "paused", "filtered", "collapsed"};
+const QStringList PlaceRoles{"kind", "locationId", "title", "address", "count", "paused", "filtered"};
 
 QDate isoDate(const QString &text) { return QDate::fromString(text, Qt::ISODate); }
 
@@ -37,7 +42,7 @@ QString focusKey(int kind) { return Source{kind, 0}.key(); }
 }  // namespace
 
 Backend::Backend(Store *store, QObject *parent)
-    : QObject(parent), m_store(store), m_sidebar(SidebarRoles), m_tasks(TaskRoles), m_tags(TagRoles) {
+    : QObject(parent), m_store(store), m_sidebar(SidebarRoles), m_tasks(TaskRoles), m_tags(TagRoles), m_places(PlaceRoles) {
     m_source = Source::fromKey(m_store->setting("ui.source", "today").toString());
     for (const auto &key : m_store->setting("ui.collapsedSections").toString().split('|', Qt::SkipEmptyParts))
         m_options.collapsedSections.insert(key);
@@ -419,6 +424,11 @@ void Backend::selectTask(qint64 id, int mode) {
         m_anchor = id;
     }
     m_cursor = id;
+    m_history.removeAll(id);
+    m_history.append(id);
+    if (m_history.size() > 50)
+        m_history.removeFirst();
+    m_historyStep = 0;
     rebuild();
     emit selectionChanged();
 }
@@ -1500,6 +1510,537 @@ void Backend::redo() {
 }
 
 
+
+// ------------------------------------------------- sidebar & tags panel
+
+void Backend::moveList(qint64 listId, qint64 beforeListId, qint64 groupId) {
+    // Dropped before another list (or at the end of a group when 0): the
+    // whole group is renumbered so manual order stays dense.
+    TaskList moving = m_store->list(listId);
+    if (!moving.id || moving.kind == ListKind::Inbox)
+        return;
+    if (beforeListId)
+        groupId = m_store->list(beforeListId).groupId;
+    QVector<TaskList> members;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind == ListKind::Normal && l.groupId == groupId && l.id != listId)
+            members.append(l);
+    std::sort(members.begin(), members.end(), [](const TaskList &a, const TaskList &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    int at = members.size();
+    for (int i = 0; i < members.size(); ++i)
+        if (members.at(i).id == beforeListId) at = i;
+    moving.groupId = groupId;
+    members.insert(at, moving);
+    m_store->begin("Move List");
+    for (int i = 0; i < members.size(); ++i) {
+        TaskList l = members.at(i);
+        if (l.order != i + 1 || l.id == listId) {
+            l.order = i + 1;
+            m_store->putList(l);
+        }
+    }
+    m_store->commit();
+}
+
+void Backend::moveGroup(qint64 groupId, qint64 beforeGroupId) {
+    QVector<ListGroup> groups;
+    for (const auto &g : m_store->groups())
+        if (!g.deleted && g.id != groupId)
+            groups.append(g);
+    std::sort(groups.begin(), groups.end(), [](const ListGroup &a, const ListGroup &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    int at = groups.size();
+    for (int i = 0; i < groups.size(); ++i)
+        if (groups.at(i).id == beforeGroupId) at = i;
+    groups.insert(at, m_store->groups().value(groupId));
+    m_store->begin("Move Group");
+    for (int i = 0; i < groups.size(); ++i) {
+        ListGroup g = groups.at(i);
+        g.order = i + 1;
+        m_store->putGroup(g);
+    }
+    m_store->commit();
+}
+
+void Backend::deleteGroup(qint64 groupId) {
+    // Deleting a group keeps its lists; they move out to the top level.
+    ListGroup g = m_store->groups().value(groupId);
+    if (!g.id)
+        return;
+    m_store->begin("Delete Group");
+    for (auto l : m_store->lists()) {
+        if (l.groupId == groupId) {
+            l.groupId = 0;
+            m_store->putList(l);
+        }
+    }
+    g.deleted = true;
+    m_store->putGroup(g);
+    m_store->commit();
+}
+
+QVariantList Backend::archivedLists() const {
+    QVariantList result;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && l.archived)
+            result.append(QVariantMap{{"id", l.id}, {"name", l.name}, {"color", l.color}});
+    return result;
+}
+
+void Backend::renameTag(qint64 tagId, const QString &name) {
+    Tag t = m_store->tag(tagId);
+    const QString clean = name.trimmed().remove(QRegularExpression("^#"));
+    if (!t.id || clean.isEmpty() || clean == t.name)
+        return;
+    t.name = clean;
+    m_store->begin("Rename Tag");
+    m_store->putTag(t);
+    m_store->commit();
+}
+
+void Backend::deleteTag(qint64 tagId) {
+    Tag tag = m_store->tag(tagId);
+    if (!tag.id)
+        return;
+    m_store->begin("Delete Tag");
+    for (auto t : m_store->tasks()) {
+        if (t.tagIds.removeAll(tagId))
+            m_store->putTask(t);
+    }
+    tag.deleted = true;
+    m_store->putTag(tag);
+    m_store->commit();
+    m_options.tagFilter.remove(tagId);
+}
+
+void Backend::setTagGroup(qint64 tagId, qint64 groupId) {
+    Tag t = m_store->tag(tagId);
+    if (!t.id || t.groupId == groupId)
+        return;
+    t.groupId = groupId;
+    m_store->begin("Move Tag");
+    m_store->putTag(t);
+    m_store->commit();
+}
+
+qint64 Backend::newTagGroup(const QString &name) {
+    TagGroup g;
+    g.id = m_store->nextId("tag_groups");
+    g.name = name.trimmed().isEmpty() ? QStringLiteral("New Group") : name.trimmed();
+    g.order = g.id;
+    m_store->begin("New Tag Group");
+    m_store->putTagGroup(g);
+    m_store->commit();
+    return g.id;
+}
+
+void Backend::renameTagGroup(qint64 groupId, const QString &name) {
+    TagGroup g = m_store->tagGroups().value(groupId);
+    if (!g.id || name.trimmed().isEmpty())
+        return;
+    g.name = name.trimmed();
+    m_store->begin("Rename Tag Group");
+    m_store->putTagGroup(g);
+    m_store->commit();
+}
+
+void Backend::deleteTagGroup(qint64 groupId) {
+    TagGroup g = m_store->tagGroups().value(groupId);
+    if (!g.id)
+        return;
+    m_store->begin("Delete Tag Group");
+    for (auto t : m_store->tags()) {
+        if (t.groupId == groupId) {
+            t.groupId = 0;
+            m_store->putTag(t);
+        }
+    }
+    g.deleted = true;
+    m_store->putTagGroup(g);
+    m_store->commit();
+}
+
+QVariantList Backend::tagGroupChoices() const {
+    QVariantList result{QVariantMap{{"id", 0}, {"name", "No Group"}}};
+    for (const auto &g : m_store->tagGroups())
+        if (!g.deleted)
+            result.append(QVariantMap{{"id", g.id}, {"name", g.name}});
+    return result;
+}
+
+void Backend::tagTask(qint64 taskId, qint64 tagId) {
+    editTasks("Tag", {taskId}, [&](Task &t) {
+        if (!t.tagIds.contains(tagId))
+            t.tagIds.append(tagId);
+    });
+}
+
+void Backend::dropOnTag(qint64 tagId) {
+    editTasks("Tag", targetIds(), [&](Task &t) {
+        if (!t.tagIds.contains(tagId))
+            t.tagIds.append(tagId);
+    });
+}
+
+void Backend::dropOnTagGroup(qint64 groupId) {
+    // Dropping tasks on a tag group applies every tag in it.
+    QList<qint64> members;
+    for (const auto &tag : m_store->tags())
+        if (!tag.deleted && tag.groupId == groupId)
+            members.append(tag.id);
+    editTasks("Tag", targetIds(), [&](Task &t) {
+        for (auto id : members)
+            if (!t.tagIds.contains(id))
+                t.tagIds.append(id);
+    });
+}
+
+// ------------------------------------------------------------- locations
+
+qint64 Backend::newLocation(const QString &name, const QString &address) {
+    if (name.trimmed().isEmpty())
+        return 0;
+    Location l;
+    l.id = m_store->nextId("locations");
+    l.name = name.trimmed();
+    l.address = address.trimmed();
+    m_store->begin("New Location");
+    m_store->putLocation(l);
+    m_store->commit();
+    return l.id;
+}
+
+void Backend::updateLocation(qint64 id, const QString &name, const QString &address) {
+    Location l = m_store->locations().value(id);
+    if (!l.id || name.trimmed().isEmpty())
+        return;
+    l.name = name.trimmed();
+    l.address = address.trimmed();
+    m_store->begin("Edit Location");
+    m_store->putLocation(l);
+    m_store->commit();
+}
+
+void Backend::deleteLocation(qint64 id) {
+    Location l = m_store->locations().value(id);
+    if (!l.id)
+        return;
+    m_store->begin("Delete Location");
+    for (auto t : m_store->tasks())
+        if (t.locationIds.removeAll(id))
+            m_store->putTask(t);
+    l.deleted = true;
+    m_store->putLocation(l);
+    m_store->commit();
+    m_options.locationFilter.remove(id);
+}
+
+void Backend::setLocationPaused(qint64 id, bool paused) {
+    Location l = m_store->locations().value(id);
+    if (!l.id)
+        return;
+    l.paused = paused;
+    m_store->begin(paused ? "Pause Location" : "Resume Location");
+    m_store->putLocation(l);
+    m_store->commit();
+}
+
+void Backend::toggleTaskLocation(qint64 taskId, qint64 locationId) {
+    editTasks("Change Location", {taskId}, [&](Task &t) {
+        if (!t.locationIds.removeAll(locationId))
+            t.locationIds.append(locationId);
+    });
+}
+
+void Backend::dropOnLocation(qint64 locationId) {
+    editTasks("Change Location", targetIds(), [&](Task &t) {
+        if (!t.locationIds.contains(locationId))
+            t.locationIds.append(locationId);
+    });
+}
+
+void Backend::toggleLocationFilter(qint64 locationId) {
+    if (!m_options.locationFilter.remove(locationId))
+        m_options.locationFilter.insert(locationId);
+    rebuild();
+    emit viewChanged();
+}
+
+QVariantList Backend::locationChoices() const {
+    QVariantList result;
+    for (const auto &l : m_store->locations())
+        if (!l.deleted)
+            result.append(QVariantMap{{"id", l.id}, {"name", l.name}, {"address", l.address}});
+    std::sort(result.begin(), result.end(), [](const QVariant &a, const QVariant &b) {
+        return QString::localeAwareCompare(a.toMap().value("name").toString(), b.toMap().value("name").toString()) < 0;
+    });
+    return result;
+}
+
+void Backend::rebuildPlaces(const ViewBuilder &views) {
+    QHash<qint64, int> counts;
+    for (const auto &t : m_store->tasks()) {
+        if (t.deleted || t.completed || !views.listVisible(t.listId))
+            continue;
+        for (auto id : t.locationIds)
+            counts[id]++;
+    }
+    QVector<QVariantMap> rows;
+    for (const auto &choice : locationChoices()) {
+        const auto m = choice.toMap();
+        const qint64 id = m.value("id").toLongLong();
+        const Location l = m_store->locations().value(id);
+        rows.append({{"key", QStringLiteral("l:%1").arg(id)}, {"kind", "location"}, {"locationId", id},
+                     {"title", l.name}, {"address", l.address}, {"count", counts.value(id)}, {"paused", l.paused},
+                     {"filtered", m_options.locationFilter.contains(id)}});
+    }
+    m_places.setRows(rows);
+}
+
+// ---------------------------------------------- sub-tasks, history, files
+
+qint64 Backend::addSubtask(qint64 parentId, const QString &title, qint64 afterId) {
+    const Task parent = m_store->task(parentId);
+    if (!parent.id || title.trimmed().isEmpty())
+        return 0;
+    Task t;
+    t.id = m_store->nextId("tasks");
+    t.listId = parent.listId;
+    t.parentId = parent.id;
+    t.title = title.trimmed().left(1000);
+    t.order = nextOrder(parent.listId, parent.id);
+    if (afterId) {
+        // Return on a sub-task's title puts the new one right after it.
+        const Task after = m_store->task(afterId);
+        double next = after.order + 1;
+        for (const auto &c : m_store->tasks())
+            if (c.parentId == parent.id && !c.deleted && c.order > after.order)
+                next = qMin(next, c.order);
+        t.order = (after.order + next) / 2;
+    }
+    m_store->begin("New Sub-Task");
+    m_store->putTask(t);
+    m_store->commit();
+    return t.id;
+}
+
+void Backend::setAllCollapsed(bool collapsed) {
+    // ⌥⌘↑/↓: fold or unfold every project and checklist in view.
+    QVector<qint64> parents;
+    for (const auto &row : m_tasks.rows())
+        if (row.value("hasChildren").toBool() && row.value("collapsed").toBool() != collapsed)
+            parents.append(row.value("taskId").toLongLong());
+    editTasks(collapsed ? "Collapse All" : "Expand All", parents, [&](Task &t) { t.collapsed = collapsed; });
+}
+
+void Backend::showLastSelected() {
+    // Walks backward through recently selected tasks, switching lists as
+    // needed, and wraps around at the oldest.
+    if (m_history.size() < 2)
+        return;
+    m_historyStep = (m_historyStep + 1) % m_history.size();
+    const qint64 id = m_history.at(m_history.size() - 1 - m_historyStep);
+    const QVector<qint64> saved = m_history;
+    const int step = m_historyStep;
+    if (m_visibleOrder.contains(id)) {
+        selectTask(id);
+        emit revealTask(id);
+    } else {
+        revealInList(id);
+    }
+    m_history = saved;  // Walking the history doesn't rewrite it.
+    m_historyStep = step;
+}
+
+void Backend::copySelection() {
+    // Plain text a person can paste anywhere: titles, with notes and
+    // sub-tasks indented under them.
+    QStringList lines;
+    std::function<void(const Task &, int)> add = [&](const Task &t, int depth) {
+        lines << QString(depth * 2, ' ') + (t.completed ? "✓ " : "") + t.title;
+        for (const auto &line : t.notes.split('\n', Qt::SkipEmptyParts))
+            lines << QString(depth * 2 + 4, ' ') + line;
+        ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+        for (const auto &c : views.children(t.id))
+            add(c, depth + 1);
+    };
+    for (auto id : targetIds())
+        add(m_store->task(id), 0);
+    if (lines.isEmpty())
+        return;
+    QGuiApplication::clipboard()->setText(lines.join('\n'));
+    setStatus(targetIds().size() == 1 ? "Copied" : QStringLiteral("Copied %1 tasks").arg(targetIds().size()));
+}
+
+void Backend::pasteTasks() {
+    // Each non-empty line of pasted text becomes a task in the current list,
+    // read with natural-language input like a typed title.
+    const QString text = QGuiApplication::clipboard()->text();
+    QStringList lines;
+    for (const auto &line : text.split('\n'))
+        if (!line.trimmed().isEmpty())
+            lines << line.trimmed().remove(QRegularExpression("^([-*•✓]|\\d+[.)])\\s+"));
+    if (lines.isEmpty())
+        return;
+    qint64 listId = m_source.kind == Source::List ? m_source.id
+                  : m_source.kind == Source::Project ? m_store->task(m_source.id).listId : defaultListId();
+    if (!listId || m_store->list(listId).kind == ListKind::Smart)
+        listId = defaultListId();
+    const qint64 parentId = m_source.kind == Source::Project ? m_source.id : 0;
+    QVector<qint64> created;
+    m_store->begin(lines.size() > 1 ? QStringLiteral("Paste %1 Tasks").arg(lines.size()) : QStringLiteral("Paste Task"));
+    for (const auto &line : lines.mid(0, 500)) {
+        Task t;
+        t.id = m_store->nextId("tasks");
+        t.listId = listId;
+        t.parentId = parentId;
+        t.title = line.left(1000);
+        t.order = nextOrder(listId, parentId);
+        if (m_source.kind == Source::Today) t.dueDate = QDate::currentDate();
+        if (m_source.kind == Source::Starred) t.starred = true;
+        if (m_store->setting("nl.editor", true).toBool())
+            applyParsed(t, NaturalLanguage::parse(line, QDateTime::currentDateTime(), listNames()));
+        m_store->putTask(t);
+        created.append(t.id);
+    }
+    m_store->commit();
+    for (auto id : created)
+        m_options.keepVisible.insert(id);
+    m_selected = created;
+    m_cursor = m_anchor = created.last();
+    rebuild();
+    emit selectionChanged();
+}
+
+void Backend::dropFiles(qint64 taskId, const QVariantList &urls) {
+    // A picture becomes the task's picture (one per task, the first wins);
+    // other files are linked in the notes. Dropped on empty space, the files
+    // make a new task named after the first.
+    QStringList paths;
+    for (const auto &u : urls) {
+        const QUrl url = u.toUrl().isValid() ? u.toUrl() : QUrl(u.toString());
+        if (url.isLocalFile())
+            paths << url.toLocalFile();
+    }
+    if (paths.isEmpty())
+        return;
+    m_store->begin("Add Files");
+    Task t = m_store->task(taskId);
+    if (!t.id) {
+        t.id = m_store->nextId("tasks");
+        t.listId = m_source.kind == Source::List && m_store->list(m_source.id).kind != ListKind::Smart ? m_source.id : defaultListId();
+        t.parentId = m_source.kind == Source::Project ? m_source.id : 0;
+        if (m_source.kind == Source::Project)
+            t.listId = m_store->task(m_source.id).listId;
+        t.title = QFileInfo(paths.first()).completeBaseName();
+        t.order = nextOrder(t.listId, t.parentId);
+    }
+    bool hasPicture = false;
+    for (const auto &a : m_store->attachmentsFor(t.id))
+        hasPicture = hasPicture || a.kind == Attachment::Image;
+    const QMimeDatabase mimes;
+    for (const auto &path : paths) {
+        const QFileInfo info(path);
+        const bool image = mimes.mimeTypeForFile(info).name().startsWith("image/");
+        const bool audio = mimes.mimeTypeForFile(info).name().startsWith("audio/");
+        if ((image && !hasPicture) || audio) {
+            Attachment a;
+            a.id = m_store->nextId("attachments");
+            a.uid = Store::newUid();
+            a.taskId = t.id;
+            a.kind = image ? Attachment::Image : Attachment::Audio;
+            a.name = info.fileName();
+            a.fileName = a.uid + (info.suffix().isEmpty() ? QString() : "." + info.suffix().toLower());
+            a.bytes = info.size();
+            QDir().mkpath(m_store->attachmentsFolder());
+            if (!QFile::copy(path, m_store->attachmentsFolder() + "/" + a.fileName)) {
+                setStatus("Couldn't copy " + info.fileName());
+                continue;
+            }
+            m_store->putAttachment(a);
+            hasPicture = hasPicture || image;
+        } else {
+            const QString link = QUrl::fromLocalFile(info.absoluteFilePath()).toString();
+            t.notes += (t.notes.isEmpty() || t.notes.endsWith('\n') ? "" : "\n") + QStringLiteral("[%1](%2)").arg(info.fileName(), link);
+        }
+    }
+    m_store->putTask(t);
+    m_store->commit();
+    m_options.keepVisible.insert(t.id);
+    selectTask(t.id);
+}
+
+void Backend::removeAttachment(qint64 attachmentId) {
+    Attachment a = m_store->attachments().value(attachmentId);
+    if (!a.id)
+        return;
+    // The file stays on disk so undo can bring the attachment back; backups
+    // and the next cleanup take care of orphans.
+    a.deleted = true;
+    m_store->begin("Remove Attachment");
+    m_store->putAttachment(a);
+    m_store->commit();
+}
+
+void Backend::openAttachment(qint64 attachmentId) {
+    const Attachment a = m_store->attachments().value(attachmentId);
+    if (a.id)
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_store->attachmentsFolder() + "/" + a.fileName));
+}
+
+void Backend::timeBlock(const QString &isoDate, int startMinute, int durationMinutes) {
+    // the reference app's time blocking: dropped on the day bar, the task is due when the
+    // block ends and takes the block's length, so its effective start is
+    // where it was dropped.
+    const QDate day = isoDate.isEmpty() ? QDate::currentDate() : QDate::fromString(isoDate, Qt::ISODate);
+    if (!day.isValid())
+        return;
+    const int end = qMin(24 * 60 - 1, startMinute + qMax(5, durationMinutes));
+    for (auto i : targetIds())
+        m_options.keepVisible.insert(i);
+    editTasks("Time Block", targetIds(), [&](Task &t) {
+        t.dueDate = day;
+        t.dueTime = end;
+        t.duration = end - startMinute;
+    });
+}
+
+void Backend::addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes) {
+    const QDate day = QDate::fromString(isoDate, Qt::ISODate);
+    if (!m_store->task(taskId).id || !day.isValid() || minutes < 0)
+        return;
+    Alarm a;
+    a.id = m_store->nextId("alarms");
+    a.taskId = taskId;
+    a.kind = Alarm::Absolute;
+    a.at = QDateTime(day, QTime(0, 0).addSecs(minutes * 60));
+    m_store->begin("Add Alert");
+    m_store->putAlarm(a);
+    m_store->commit();
+}
+
+void Backend::removeAlarm(qint64 alarmId) {
+    Alarm a = m_store->alarms().value(alarmId);
+    if (!a.id)
+        return;
+    a.deleted = true;
+    m_store->begin("Remove Alert");
+    m_store->putAlarm(a);
+    m_store->commit();
+}
+
+QString Backend::shareableLink(qint64 taskId) const { return Automation::shareableLink(m_store->task(taskId)); }
+
+void Backend::toggleSearchScope() {
+    m_searchAll = !m_searchAll;
+    rebuild();
+    emit viewChanged();
+    setStatus(m_searchAll ? "Searching all lists" : "Searching this list");
+}
+
 // ----------------------------------------------------- focus & smart lists
 
 bool Backend::focusOn() const { return m_store->setting(focusSettingKey() + ".on", false).toBool(); }
@@ -1852,6 +2393,7 @@ void Backend::rebuild() {
     rebuildSidebar(views);
     rebuildTasks(views);
     rebuildTags(views);
+    rebuildPlaces(views);
     rebuildEditor();
 }
 
@@ -2009,7 +2551,9 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
 
 void Backend::rebuildTasks(const ViewBuilder &views) {
     m_options.focusConditions = focusOn() ? focusConditions() : QStringList();
-    const auto sections = views.build(m_source, sortSpec(), m_options);
+    // With the scope set to all lists, a search looks everywhere.
+    const Source viewed = (m_searchAll && !m_options.search.isEmpty()) ? Source{Source::All, 0} : m_source;
+    const auto sections = views.build(viewed, sortSpec(), m_options);
     QVector<QVariantMap> rows;
     QVector<qint64> order;
     QSet<QString> seen;

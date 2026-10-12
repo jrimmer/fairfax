@@ -13,6 +13,64 @@ Rectangle {
     color: theme.sidebar
     property int renamingListId: 0
     property int renamingGroupId: 0
+    property var archived: backend.archivedLists()
+    property int dragListId: 0
+    property int dragGroupId: 0
+    property int deleteGroupId: 0
+    property string deleteGroupName
+
+    Connections {
+        target: backend
+        function onDataChanged() { root.archived = backend.archivedLists() }
+    }
+
+    // What follows the pointer while dragging a list or a group.
+    Rectangle {
+        id: dragPill
+        property string label
+        property bool grouping: false
+        parent: Overlay.overlay
+        visible: Drag.active
+        z: 1000
+        width: pillText.implicitWidth + 22
+        height: 26
+        radius: 13
+        color: theme.accent
+        opacity: 0.94
+        Drag.keys: grouping ? ["precrime-group"] : ["precrime-list"]
+        Drag.hotSpot.x: 10
+        Drag.hotSpot.y: 13
+        Text {
+            id: pillText
+            anchors.centerIn: parent
+            text: dragPill.label
+            color: theme.accentForeground
+            font.pixelSize: backend.fontSize - 2
+            font.weight: Font.DemiBold
+        }
+        function place(p) { if (!Drag.active) { x = p.x - 10; y = p.y - 13 } }
+        function begin(text, group) { label = text; grouping = group; Drag.active = true }
+        function end() {
+            if (!Drag.active) return
+            Drag.drop()
+            Drag.active = false
+            root.dragListId = 0
+            root.dragGroupId = 0
+        }
+    }
+
+    Dialog {
+        id: deleteGroupDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: "Delete group “" + root.deleteGroupName + "”?"
+        Label { text: "Its lists are kept and move out of the group." }
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        onAccepted: backend.deleteGroup(root.deleteGroupId)
+    }
+
+    ArchiveDialog { id: archiveDialog; lists: root.archived }
 
     function selectInbox() {
         for (let i = 0; i < backend.sidebar.count; ++i) {
@@ -64,6 +122,63 @@ Rectangle {
             model: backend.sidebar
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+            // Below the last list: drop a list here to ungroup it, and open
+            // the archive.
+            footer: Item {
+                width: lists.width
+                height: root.dragListId ? 44 : (root.archived.length > 0 ? 44 : 12)
+                DropArea {
+                    id: tailDrop
+                    anchors.fill: parent
+                    keys: ["precrime-list"]
+                    onDropped: if (root.dragListId) backend.moveList(root.dragListId, 0, 0)
+                    Rectangle {
+                        visible: tailDrop.containsDrag
+                        x: 16; y: 2
+                        width: parent.width - 32
+                        height: 2
+                        color: theme.accent
+                    }
+                }
+                Rectangle {
+                    visible: root.archived.length > 0
+                    anchors.fill: parent
+                    anchors.topMargin: 8
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    radius: 6
+                    color: archiveMouse.containsMouse ? theme.mix(theme.sidebar, theme.foreground, 0.05) : "transparent"
+                    Icon {
+                        x: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "done"
+                        size: 15
+                        color: theme.muted
+                    }
+                    Text {
+                        x: 42
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Archived"
+                        color: theme.muted
+                        font.pixelSize: backend.fontSize
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.archived.length
+                        color: theme.muted
+                        font.pixelSize: backend.fontSize - 2
+                    }
+                    MouseArea {
+                        id: archiveMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: archiveDialog.open()
+                    }
+                }
+            }
 
             delegate: Loader {
                 id: rowLoader
@@ -128,7 +243,23 @@ Rectangle {
 
     Component {
         id: gapRow
-        Item { height: 10 }
+        Item {
+            id: gap
+            height: 10
+            DropArea {
+                id: gapDrop
+                anchors.fill: parent
+                keys: ["precrime-list"]
+                onDropped: if (root.dragListId) backend.moveList(root.dragListId, 0, 0)
+                Rectangle {
+                    visible: gapDrop.containsDrag
+                    x: 16; y: parent.height - 2
+                    width: parent.width - 32
+                    height: 2
+                    color: theme.accent
+                }
+            }
+        }
     }
 
     Component {
@@ -158,21 +289,80 @@ Rectangle {
                 color: theme.faint
                 visible: groupMouse.containsMouse || header.row.collapsed
             }
+            readonly property bool isGroup: (header.row.groupId || 0) > 0
+
+            // Lists dropped on a header go to the end of its group; groups
+            // dropped on it land before it.
+            DropArea {
+                id: headerDrop
+                anchors.fill: parent
+                keys: ["precrime-list", "precrime-group"]
+                enabled: header.isGroup
+                onDropped: {
+                    if (root.dragGroupId && root.dragGroupId !== header.row.groupId)
+                        backend.moveGroup(root.dragGroupId, header.row.groupId)
+                    else if (root.dragListId)
+                        backend.moveList(root.dragListId, 0, header.row.groupId)
+                }
+                Rectangle {
+                    visible: headerDrop.containsDrag && root.dragGroupId > 0 && root.dragGroupId !== header.row.groupId
+                    x: 12; y: 0
+                    width: parent.width - 24
+                    height: 2
+                    color: theme.accent
+                }
+                Rectangle {
+                    visible: headerDrop.containsDrag && root.dragListId > 0
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    anchors.topMargin: 4
+                    radius: 6
+                    color: "transparent"
+                    border.width: 2
+                    border.color: theme.accent
+                }
+            }
+
             MouseArea {
                 id: groupMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: (mouse) => {
-                    if (mouse.button === Qt.RightButton) groupMenu.popup()
-                    else backend.toggleGroupCollapsed(header.row.groupId)
+                drag.target: header.isGroup ? dragPill : null
+                drag.threshold: 10
+                drag.onActiveChanged: {
+                    if (drag.active) {
+                        root.dragGroupId = header.row.groupId
+                        dragPill.begin(header.row.title || "Group", true)
+                    } else {
+                        dragPill.end()
+                    }
                 }
-                onDoubleClicked: root.renamingGroupId = header.row.groupId
+                onPressed: (m) => dragPill.place(mapToItem(null, m.x, m.y))
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.RightButton) { if (header.isGroup) groupMenu.popup() }
+                    else if (header.isGroup) backend.toggleGroupCollapsed(header.row.groupId)
+                }
+                onDoubleClicked: if (header.isGroup) root.renamingGroupId = header.row.groupId
             }
             Menu {
                 id: groupMenu
-                MenuItem { text: "Rename Group…"; onTriggered: root.renamingGroupId = header.row.groupId }
+                MenuItem { text: "Rename…"; onTriggered: root.renamingGroupId = header.row.groupId }
+                MenuItem {
+                    text: "New List in Group"
+                    onTriggered: {
+                        const id = backend.newList()
+                        backend.moveList(id, 0, header.row.groupId)
+                        root.renamingListId = id
+                    }
+                }
                 MenuItem { text: header.row.collapsed ? "Expand" : "Collapse"; onTriggered: backend.toggleGroupCollapsed(header.row.groupId) }
+                MenuSeparator {}
+                MenuItem {
+                    text: "Delete Group"
+                    onTriggered: { root.deleteGroupId = header.row.groupId; root.deleteGroupName = header.row.title || ""; deleteGroupDialog.open() }
+                }
             }
             InlineEditor {
                 anchors.left: parent.left
@@ -359,11 +549,39 @@ Rectangle {
                 }
             }
 
+            // Lists dropped on a list row land before it.
+            DropArea {
+                id: listDrop
+                anchors.fill: parent
+                keys: ["precrime-list"]
+                enabled: item.isList
+                onDropped: if (root.dragListId && root.dragListId !== item.row.listId)
+                               backend.moveList(root.dragListId, item.row.listId, item.row.groupId || 0)
+                Rectangle {
+                    visible: listDrop.containsDrag && root.dragListId !== item.row.listId
+                    x: 12; y: 0
+                    width: parent.width - 24
+                    height: 2
+                    color: theme.accent
+                }
+            }
+
             MouseArea {
                 id: mouse
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                drag.target: item.isList ? dragPill : null
+                drag.threshold: 10
+                drag.onActiveChanged: {
+                    if (drag.active) {
+                        root.dragListId = item.row.listId
+                        dragPill.begin(item.row.title || "List", false)
+                    } else {
+                        dragPill.end()
+                    }
+                }
+                onPressed: (m) => dragPill.place(mapToItem(null, m.x, m.y))
                 onClicked: (m) => {
                     if (item.row.sourceKey) backend.selectSource(item.row.sourceKey)
                     if (m.button === Qt.RightButton && item.isList) listMenu.popup()

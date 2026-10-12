@@ -34,6 +34,7 @@ struct ViewOptions {
     bool hideCompleted = false;
     int completedWindowMinutes = 24 * 60;  // -1 keeps completed tasks forever, 0 hides them at once.
     QSet<qint64> tagFilter;
+    QSet<qint64> locationFilter;
     QString search;  // the reference app search syntax; see query.h.
     bool soundex = false;
     QStringList focusConditions;  // Focus Filter conditions, OR-combined; empty when the filter is off.
@@ -106,5 +107,6 @@ private:
     QDate m_today;
     ScheduleSettings m_settings;
     QSet<qint64> m_pausedTags;
+    QSet<qint64> m_pausedLocations;
     QHash<qint64, QVector<qint64>> m_childrenOf;
 };

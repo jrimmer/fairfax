@@ -37,6 +37,12 @@ class Backend : public QObject {
     Q_PROPERTY(bool hasHidden READ hasHidden NOTIFY viewChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY viewChanged)
     Q_PROPERTY(bool soundex READ soundex WRITE setSoundex NOTIFY viewChanged)
+    Q_PROPERTY(bool searchAllLists READ searchAllLists NOTIFY viewChanged)
+    Q_PROPERTY(RowModel *places READ places CONSTANT)
+    Q_PROPERTY(int density READ density NOTIFY settingsChanged)
+    Q_PROPERTY(int contentWidth READ contentWidth NOTIFY settingsChanged)
+    Q_PROPERTY(bool showNotesPreview READ showNotesPreview NOTIFY settingsChanged)
+    Q_PROPERTY(bool showListNames READ showListNames NOTIFY settingsChanged)
     Q_PROPERTY(bool focusOn READ focusOn NOTIFY viewChanged)
     Q_PROPERTY(QStringList focusConditions READ focusConditions NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsSmart READ sourceIsSmart NOTIFY viewChanged)
@@ -66,6 +72,12 @@ public:
     RowModel *sidebar() { return &m_sidebar; }
     RowModel *tasks() { return &m_tasks; }
     RowModel *tags() { return &m_tags; }
+    RowModel *places() { return &m_places; }
+    bool searchAllLists() const { return m_searchAll; }
+    int density() const { return m_store->setting("appearance.density", 1).toInt(); }
+    int contentWidth() const { return m_store->setting("appearance.contentWidth", 980).toInt(); }
+    bool showNotesPreview() const { return m_store->setting("appearance.notesPreview", false).toBool(); }
+    bool showListNames() const { return m_store->setting("appearance.listNames", false).toBool(); }
 
     QString sourceKey() const { return m_source.key(); }
     QString sourceTitle() const;
@@ -220,6 +232,9 @@ public:
     Q_INVOKABLE QVariantMap setting(const QString &key) const;
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
     Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
+    void requestQuickEntryWith(const QString &text) { emit quickEntryTextRequested(text); }
+    QList<qint64> selectedIds() const { return QList<qint64>(m_selected.cbegin(), m_selected.cend()); }
+    Q_INVOKABLE QString shareableLink(qint64 taskId) const;
 
     // Backups: automatic every 24 or 48 hours, keeping the newest N, plus
     // Backup Now and restore. A restore first backs up what it replaces.
@@ -239,6 +254,60 @@ public:
     Q_INVOKABLE void setTagPaused(qint64 tagId, bool paused);
     Q_INVOKABLE qint64 newTag(const QString &name, qint64 groupId = 0);
 
+    // Sidebar arrangement and the archive.
+    Q_INVOKABLE void moveList(qint64 listId, qint64 beforeListId, qint64 groupId);
+    Q_INVOKABLE void moveGroup(qint64 groupId, qint64 beforeGroupId);
+    Q_INVOKABLE void deleteGroup(qint64 groupId);
+    Q_INVOKABLE QVariantList archivedLists() const;
+
+    // Tags panel management.
+    Q_INVOKABLE void renameTag(qint64 tagId, const QString &name);
+    Q_INVOKABLE void deleteTag(qint64 tagId);
+    Q_INVOKABLE void setTagGroup(qint64 tagId, qint64 groupId);
+    Q_INVOKABLE qint64 newTagGroup(const QString &name);
+    Q_INVOKABLE void renameTagGroup(qint64 groupId, const QString &name);
+    Q_INVOKABLE void deleteTagGroup(qint64 groupId);
+    Q_INVOKABLE QVariantList tagGroupChoices() const;
+    Q_INVOKABLE void tagTask(qint64 taskId, qint64 tagId);      // A tag dropped on a task.
+    Q_INVOKABLE void dropOnTag(qint64 tagId);                  // Tasks dropped on a tag (or 0 = tag group members).
+    Q_INVOKABLE void dropOnTagGroup(qint64 groupId);
+
+    // Locations.
+    Q_INVOKABLE qint64 newLocation(const QString &name, const QString &address);
+    Q_INVOKABLE void updateLocation(qint64 id, const QString &name, const QString &address);
+    Q_INVOKABLE void deleteLocation(qint64 id);
+    Q_INVOKABLE void setLocationPaused(qint64 id, bool paused);
+    Q_INVOKABLE void toggleTaskLocation(qint64 taskId, qint64 locationId);
+    Q_INVOKABLE void dropOnLocation(qint64 locationId);
+    Q_INVOKABLE void toggleLocationFilter(qint64 locationId);
+    Q_INVOKABLE QVariantList locationChoices() const;
+
+    // Sub-tasks edited inside a task's editor.
+    Q_INVOKABLE qint64 addSubtask(qint64 parentId, const QString &title, qint64 afterId = 0);
+    Q_INVOKABLE void setAllCollapsed(bool collapsed);
+
+    // Show Last Selected Task (Shift+F5): walks back through recent selections.
+    Q_INVOKABLE void showLastSelected();
+
+    // Clipboard: copy selected tasks as text, paste lines as new tasks.
+    Q_INVOKABLE void copySelection();
+    Q_INVOKABLE void pasteTasks();
+
+    // Files dropped on a task (or on empty space, making a new task).
+    Q_INVOKABLE void dropFiles(qint64 taskId, const QVariantList &urls);
+    Q_INVOKABLE void removeAttachment(qint64 attachmentId);
+    Q_INVOKABLE void openAttachment(qint64 attachmentId);
+
+    // Calendar Day Bar time blocking: the selection is due at that slot.
+    Q_INVOKABLE void timeBlock(const QString &isoDate, int startMinute, int durationMinutes);
+
+    // Alerts beyond the presets.
+    Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);
+    Q_INVOKABLE void removeAlarm(qint64 alarmId);
+
+    // Search everywhere rather than in the current list (the reference app's scope toggle).
+    Q_INVOKABLE void toggleSearchScope();
+
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
 
@@ -256,6 +325,7 @@ signals:
     void statusChanged();
     void revealTask(qint64 id);  // Asks the list to scroll a task into view.
     void quickEntryRequested();
+    void quickEntryTextRequested(const QString &text);
     void windowRequested();
 
 private:
@@ -287,6 +357,12 @@ private:
     RowModel m_sidebar;
     RowModel m_tasks;
     RowModel m_tags;
+    RowModel m_places;
+    bool m_searchAll = false;
+    QVector<qint64> m_history;
+    int m_historyStep = 0;
+    void rebuildPlaces(const ViewBuilder &views);
+    void completeAfterAutoDelete();
     Source m_source;
     ViewOptions m_options;
     QSet<qint64> m_expandedLists;

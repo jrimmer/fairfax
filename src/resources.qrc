@@ -2,6 +2,8 @@
     <qresource prefix="/">
         <file>qml/CommandPopup.qml</file>
         <file>qml/DateField.qml</file>
+        <file>qml/DatePicker.qml</file>
+        <file>qml/DayBar.qml</file>
         <file>qml/DragProxy.qml</file>
         <file>qml/EditorCard.qml</file>
         <file>qml/FocusButton.qml</file>
@@ -13,14 +15,17 @@
         <file>qml/ListMenu.qml</file>
         <file>qml/Main.qml</file>
         <file>qml/MiniCalendar.qml</file>
+        <file>qml/NotesArea.qml</file>
         <file>qml/PriorityPicker.qml</file>
         <file>qml/QuickEntry.qml</file>
         <file>qml/QuickLook.qml</file>
+        <file>qml/RepeatEditor.qml</file>
         <file>qml/SearchBox.qml</file>
         <file>qml/SectionHeader.qml</file>
         <file>qml/SettingsWindow.qml</file>
         <file>qml/ShortcutOverlay.qml</file>
         <file>qml/Sidebar.qml</file>
+        <file>qml/ArchiveDialog.qml</file>
         <file>qml/SortButton.qml</file>
         <file>qml/TagField.qml</file>
         <file>qml/TaskMenu.qml</file>

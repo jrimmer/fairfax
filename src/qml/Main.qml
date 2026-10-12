@@ -141,8 +141,10 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+5"; onActivated: backend.selectSource("done") }
     AppShortcut { sequence: "Ctrl+Up"; onActivated: backend.selectAdjacentSource(-1) }
     AppShortcut { sequence: "Ctrl+Down"; onActivated: backend.selectAdjacentSource(1) }
-    AppShortcut { sequence: "Ctrl+Alt+Up"; onActivated: backend.moveSelection(-1) }
-    AppShortcut { sequence: "Ctrl+Alt+Down"; onActivated: backend.moveSelection(1) }
+    AppShortcut { sequence: "Ctrl+Shift+Up"; onActivated: backend.moveSelection(-1) }
+    AppShortcut { sequence: "Ctrl+Alt+Up"; onActivated: backend.setAllCollapsed(true) }
+    AppShortcut { sequence: "Ctrl+Shift+Down"; onActivated: backend.moveSelection(1) }
+    AppShortcut { sequence: "Ctrl+Alt+Down"; onActivated: backend.setAllCollapsed(false) }
     AppShortcut { sequence: "Ctrl+."; onActivated: backend.toggleComplete() }
     AppShortcut { sequence: "Ctrl+Alt+."; onActivated: backend.setCompleted(false) }
     AppShortcut { sequence: "Ctrl+D"; onActivated: backend.duplicateSelection() }
