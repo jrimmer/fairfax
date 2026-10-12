@@ -619,7 +619,7 @@ Popup {
                         id: preview
                         objectName: "preview"
                         wrapMode: TextEdit.Wrap
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         font.pixelSize: backend.fontSize
                         color: theme.foreground
                         Text {

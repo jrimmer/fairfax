@@ -5,7 +5,13 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <cstdio>
+#if defined(Q_OS_WIN)
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
+#else
 #include <unistd.h>
+#endif
 
 #include "automation.h"
 #include "query.h"

@@ -7,8 +7,11 @@
 namespace {
 constexpr qint64 kThrottleMs = 80;
 
+// Linux plays freedesktop sound-theme files with PipeWire or PulseAudio;
+// macOS has afplay and its own system sounds. Windows has no command-line
+// player, so there sounds stay off (alarm notifications still chime).
 QString findPlayer() {
-    for (const char *name : {"pw-play", "paplay"}) {
+    for (const char *name : {"pw-play", "paplay", "afplay"}) {
         const QString path = QStandardPaths::findExecutable(QString::fromLatin1(name));
         if (!path.isEmpty())
             return path;
@@ -18,7 +21,12 @@ QString findPlayer() {
 } // namespace
 
 Sounds::Sounds(QObject *parent)
-    : QObject(parent), m_player(findPlayer()), m_dir(QStringLiteral("/usr/share/sounds/freedesktop/stereo")) {}
+    : QObject(parent), m_player(findPlayer()),
+#if defined(Q_OS_MACOS)
+      m_dir(QStringLiteral("/System/Library/Sounds")) {}
+#else
+      m_dir(QStringLiteral("/usr/share/sounds/freedesktop/stereo")) {}
+#endif
 
 Sounds::Sounds(const QString &playerPath, const QString &soundDir, QObject *parent)
     : QObject(parent), m_player(playerPath), m_dir(soundDir) {}
@@ -30,9 +38,9 @@ void Sounds::setEnabled(bool on) {
     emit enabledChanged();
 }
 
-void Sounds::complete() { play({"complete.oga", "message.oga", "bell.oga"}); }
-void Sounds::uncomplete() { play({"bell.oga", "message.oga"}); }
-void Sounds::alarm() { play({"alarm-clock-elapsed.oga", "phone-incoming-call.oga", "bell.oga"}); }
+void Sounds::complete() { play({"complete.oga", "message.oga", "bell.oga", "Glass.aiff"}); }
+void Sounds::uncomplete() { play({"bell.oga", "message.oga", "Pop.aiff"}); }
+void Sounds::alarm() { play({"alarm-clock-elapsed.oga", "phone-incoming-call.oga", "bell.oga", "Sosumi.aiff"}); }
 
 void Sounds::play(const QStringList &candidates) {
     if (!m_enabled || m_player.isEmpty())

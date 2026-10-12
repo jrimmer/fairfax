@@ -175,7 +175,7 @@ Item {
                 text: backend.smartQuery
                 color: theme.foreground
                 selectionColor: theme.selection
-                font.family: "monospace"
+                font.family: theme.monoFont
                 font.pixelSize: backend.fontSize - 2
                 clip: true
                 onEditingFinished: backend.setSmartQuery(Number(backend.sourceKey.split(":")[1]), text)
@@ -186,7 +186,7 @@ Item {
                 visible: !backend.sourceIsSmart
                 text: backend.search
                 color: theme.muted
-                font.family: "monospace"
+                font.family: theme.monoFont
                 font.pixelSize: backend.fontSize - 2
                 elide: Text.ElideRight
             }

@@ -2068,11 +2068,18 @@ void Backend::dropFiles(qint64 taskId, const QVariantList &urls) {
     // A picture becomes the task's picture (one per task, the first wins);
     // other files are linked in the notes. Dropped on empty space, the files
     // make a new task named after the first.
+    // Accepts file URLs (drag and drop) or plain paths (the file picker),
+    // which keeps Windows drive paths intact.
     QStringList paths;
     for (const auto &u : urls) {
-        const QUrl url = u.toUrl().isValid() ? u.toUrl() : QUrl(u.toString());
-        if (url.isLocalFile())
-            paths << url.toLocalFile();
+        const QString text = u.typeId() == QMetaType::QUrl ? u.toUrl().toString() : u.toString();
+        if (text.startsWith("file:")) {
+            const QUrl url(text);
+            if (url.isLocalFile())
+                paths << url.toLocalFile();
+        } else if (!text.isEmpty() && QFileInfo::exists(text)) {
+            paths << text;
+        }
     }
     if (paths.isEmpty())
         return;
@@ -2172,7 +2179,7 @@ void Backend::toggleRecording(qint64 taskId) {
     }
     const QString recorder = QStandardPaths::findExecutable("pw-record");
     if (recorder.isEmpty()) {
-        setStatus("Recording needs pw-record (PipeWire), which isn't installed.");
+        setStatus("Recording audio notes needs PipeWire's pw-record, available on Linux.");
         return;
     }
     QDir().mkpath(m_store->attachmentsFolder());

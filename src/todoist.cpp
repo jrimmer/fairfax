@@ -1,4 +1,5 @@
 #include "todoist.h"
+#include "keyring.h"
 
 #include <QDateTime>
 #include <QJsonDocument>
@@ -1049,8 +1050,7 @@ TodoistSync::TodoistSync(Store *store, QObject *parent) : QObject(parent), m_sto
 QString TodoistSync::token() const {
     if (!m_tokenLooked) {
         m_tokenLooked = true;
-        const Secret s = runSecret({"lookup", "service", "precrime", "account", "todoist"});
-        m_cachedToken = s.code == 0 ? s.out : QString();
+        m_cachedToken = Keyring::lookup("precrime", "todoist");
     }
     return m_cachedToken;
 }
@@ -1075,13 +1075,9 @@ void TodoistSync::connectAccount(const QString &tokenText) {
         setStatus("Paste your Todoist API token first");
         return;
     }
-    const Secret s = runSecret({"store", "--label=Precrime Todoist", "service", "precrime", "account", "todoist"}, t.toUtf8());
-    if (s.missing) {
-        setStatus("secret-tool is not installed; install libsecret to store the Todoist token");
-        return;
-    }
-    if (s.code != 0) {
-        setStatus("Could not store the token in the keyring");
+    QString error;
+    if (!Keyring::store("precrime", "todoist", t, &error)) {
+        setStatus(error);
         return;
     }
     m_cachedToken = t;
@@ -1094,7 +1090,7 @@ void TodoistSync::connectAccount(const QString &tokenText) {
 
 void TodoistSync::disconnectAccount() {
     if (!m_transport)
-        runSecret({"clear", "service", "precrime", "account", "todoist"});
+        Keyring::clear("precrime", "todoist");
     m_cachedToken.clear();
     m_tokenLooked = true;
     m_store->setSetting(SyncTokenSetting, QString());

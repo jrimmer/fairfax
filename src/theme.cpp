@@ -2,6 +2,9 @@
 #include "theme.h"
 
 #include <QDir>
+#include <QFontDatabase>
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -61,6 +64,10 @@ Theme::Theme(const QString &directory, QObject *parent)
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_debounce.start(); });
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_debounce.start(); });
     connect(&m_debounce, &QTimer::timeout, this, &Theme::reload);
+    // Without an Omarchy theme (macOS, Windows, other desktops), System
+    // follows the operating system's light or dark setting.
+    if (auto *app = qobject_cast<QGuiApplication *>(QCoreApplication::instance()))
+        connect(app->styleHints(), &QStyleHints::colorSchemeChanged, this, &Theme::reload);
     reload();
 }
 
@@ -89,7 +96,10 @@ QHash<QString, QColor> Theme::readColors(const QString &path, bool *dark) {
 
 QColor Theme::color(const QString &name) const {
     // A forced scheme that differs from the theme uses the built-in palette
-    // for that scheme, keeping only the theme's accent.
+    // for that scheme, keeping only the theme's accent. With no theme at all
+    // the built-in palette for the current scheme is used throughout.
+    if (m_colors.isEmpty() && !dark() && name != "accent")
+        return lightColors().value(name, fallbackColors().value(name, QColor("#888888")));
     if (dark() != m_dark && name != "accent") {
         const auto &palette = dark() ? fallbackColors() : lightColors();
         return palette.value(name, fallbackColors().value(name, QColor("#888888")));
@@ -148,6 +158,8 @@ QColor Theme::divider() const { return mix(background(), foreground(), dark() ? 
 QColor Theme::notes() const { return mix(surface(), color("yellow"), dark() ? 0.05 : 0.10); }
 QColor Theme::tagBubble() const { return mix(background(), color("blue"), dark() ? 0.16 : 0.13); }
 
+QString Theme::monoFont() const { return QFontDatabase::systemFont(QFontDatabase::FixedFont).family(); }
+
 QStringList Theme::listPalette() const {
     QStringList names;
     for (const auto &key : PaletteKeys)
@@ -179,6 +191,8 @@ void Theme::reload() {
 
     bool dark = true;
     const auto colors = readColors(m_directory + "/theme/colors.toml", &dark);
+    if (colors.isEmpty() && qobject_cast<QGuiApplication *>(QCoreApplication::instance()))
+        dark = QGuiApplication::styleHints()->colorScheme() != Qt::ColorScheme::Light;
     if (colors != m_colors || dark != m_dark) {
         m_colors = colors;
         m_dark = dark;

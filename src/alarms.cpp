@@ -1,8 +1,10 @@
 #include "alarms.h"
 
+#if defined(Q_OS_LINUX)
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusReply>
+#endif
 #include <QFileInfo>
 #include <QProcess>
 
@@ -34,10 +36,12 @@ AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_s
     m_timer.setSingleShot(true);
     connect(&m_timer, &QTimer::timeout, this, &AlarmService::check);
     connect(m_store, &Store::changed, this, &AlarmService::schedule);
+#if defined(Q_OS_LINUX)
     m_connected = QDBusConnection::sessionBus().connect(Service, Path, Interface, "ActionInvoked", this,
                                                         SLOT(onAction(uint, QString)));
     QDBusConnection::sessionBus().connect(Service, Path, Interface, "NotificationClosed", this,
                                           SLOT(onClosed(uint, uint)));
+#endif
     // Nagging, like the reference app's: an unanswered alert comes back every five minutes
     // until it's completed, snoozed or dismissed.
     m_nagTimer.setInterval(30 * 1000);
@@ -115,6 +119,11 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     if (!list.isEmpty())
         body = body.isEmpty() ? list : list + " · " + body;
 
+#if !defined(Q_OS_LINUX)
+    emit showFallback(t.title, body, t.id);
+    Q_UNUSED(moment);
+    return;
+#else
     QDBusMessage call = QDBusMessage::createMethodCall(Service, Path, Interface, "Notify");
     QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-precrime.alarm"},
                       {"desktop-entry", "precrime"}};
@@ -139,6 +148,7 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
             QProcess::startDetached("pw-play", {file});
     }
     Q_UNUSED(moment);
+#endif
 }
 
 void AlarmService::markFired(const Alarm &a, const QDateTime &moment) {

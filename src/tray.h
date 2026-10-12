@@ -27,6 +27,9 @@ public:
     std::function<bool()> canSync;
 
     void setVisible(bool visible);
+    // A notification from the tray icon, for alarms where the desktop has
+    // no freedesktop notification service; clicking it opens the task.
+    void showMessage(const QString &title, const QString &body, qint64 taskId);
 
 private:
     void rebuild();
@@ -36,4 +39,5 @@ private:
     QSystemTrayIcon *m_icon = nullptr;
     QMenu *m_menu = nullptr;
     QTimer m_refresh;
+    qint64 m_messageTask = 0;
 };

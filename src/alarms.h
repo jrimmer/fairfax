@@ -38,6 +38,9 @@ public:
 signals:
     void openTask(qint64 taskId);
     void completeTask(qint64 taskId);
+    // Where there's no freedesktop notification service (macOS, Windows),
+    // alarms are shown through this instead, by the tray icon.
+    void showFallback(const QString &title, const QString &body, qint64 taskId);
 
 private:
     void schedule();

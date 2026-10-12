@@ -1,9 +1,14 @@
 #include "filepicker.h"
 
+#if defined(Q_OS_LINUX)
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusObjectPath>
 #include <QDBusReply>
+#else
+#include <QFileDialog>
+#include <QStandardPaths>
+#endif
 #include <QUrl>
 #include <QUuid>
 
@@ -18,13 +23,28 @@ constexpr auto Chooser = "org.freedesktop.portal.FileChooser";
 FilePicker::FilePicker(QObject *parent) : QObject(parent) {}
 
 void FilePicker::open(const QString &title, const QString &purpose) {
+#if defined(Q_OS_LINUX)
     request("OpenFile", title, {}, purpose);
+#else
+    // macOS and Windows: the system's own dialog through Qt.
+    const QString path = QFileDialog::getOpenFileName(nullptr, title, QStandardPaths::writableLocation(QStandardPaths::HomeLocation));
+    if (!path.isEmpty())
+        emit picked(path, purpose);
+#endif
 }
 
 void FilePicker::save(const QString &title, const QString &suggestedName, const QString &purpose) {
+#if defined(Q_OS_LINUX)
     request("SaveFile", title, {{"current_name", suggestedName}}, purpose);
+#else
+    const QString path = QFileDialog::getSaveFileName(
+        nullptr, title, QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + suggestedName);
+    if (!path.isEmpty())
+        emit picked(path, purpose);
+#endif
 }
 
+#if defined(Q_OS_LINUX)
 void FilePicker::request(const QString &method, const QString &title, const QVariantMap &extra, const QString &purpose) {
     auto bus = QDBusConnection::sessionBus();
     // The portal answers on a Request object whose path we can predict from
@@ -58,3 +78,7 @@ void FilePicker::onResponse(uint response, const QVariantMap &results) {
         return;
     emit picked(QUrl(uris.first()).toLocalFile(), m_purpose);
 }
+#else
+void FilePicker::request(const QString &, const QString &, const QVariantMap &, const QString &) {}
+void FilePicker::onResponse(uint, const QVariantMap &) {}
+#endif

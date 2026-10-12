@@ -65,7 +65,7 @@ Popup {
                         RowLayout {
                             required property var modelData
                             spacing: 10
-                            Text { Layout.preferredWidth: 130; text: modelData[0]; color: theme.foreground; font.family: "monospace"; font.pixelSize: backend.fontSize - 3 }
+                            Text { Layout.preferredWidth: 130; text: modelData[0]; color: theme.foreground; font.family: theme.monoFont; font.pixelSize: backend.fontSize - 3 }
                             Text { Layout.fillWidth: true; text: modelData[1]; color: theme.muted; font.pixelSize: backend.fontSize - 2; wrapMode: Text.Wrap }
                         }
                     }

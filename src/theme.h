@@ -41,6 +41,8 @@ class Theme : public QObject {
     Q_PROPERTY(QColor notes READ notes NOTIFY changed)
     Q_PROPERTY(QColor tagBubble READ tagBubble NOTIFY changed)
     Q_PROPERTY(QStringList listPalette READ listPalette NOTIFY changed)
+    // The system's fixed-width font; "monospace" only resolves on Linux.
+    Q_PROPERTY(QString monoFont READ monoFont CONSTANT)
 
 public:
     explicit Theme(const QString &currentDirectory = {}, QObject *parent = nullptr);
@@ -70,6 +72,7 @@ public:
     QColor notes() const;
     QColor tagBubble() const;
     QStringList listPalette() const;
+    QString monoFont() const;
 
     Q_INVOKABLE QColor listColor(int index) const;
     Q_INVOKABLE QColor mix(const QColor &a, const QColor &b, double amount) const;

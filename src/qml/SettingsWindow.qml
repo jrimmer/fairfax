@@ -445,7 +445,7 @@ Window {
                             text: String(root.value("calendar.sources", ""))
                             placeholderText: "https://calendar.example.com/private.ics"
                             wrapMode: TextEdit.NoWrap
-                            font.family: "monospace"
+                            font.family: theme.monoFont
                             font.pixelSize: backend.fontSize - 2
                         }
                     }

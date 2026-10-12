@@ -91,7 +91,7 @@ ApplicationWindow {
         target: filePicker
         function onPicked(path, purpose) {
             if (purpose.startsWith("attach:"))
-                backend.dropFiles(Number(purpose.slice(7)), ["file://" + path])
+                backend.dropFiles(Number(purpose.slice(7)), [path])
         }
     }
 

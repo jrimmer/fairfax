@@ -14,9 +14,11 @@
 #include <QKeyEvent>
 #include <QProcess>
 #include <QThread>
+#if defined(Q_OS_LINUX)
 #include <csignal>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlApplicationEngine>
@@ -252,7 +254,8 @@ int main(int argc, char *argv[]) {
     // to the running one (open Quick Entry, or bring the window forward) and
     // exits, so a Hyprland bind on `precrime --quick` is instant.
     const bool offscreen = cli.isSet(shotOption) || cli.isSet(demoOption);
-    const QString socketName = QStringLiteral("precrime-%1").arg(qgetenv("USER").isEmpty() ? "user" : qgetenv("USER"))
+    const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME", "user"));
+    const QString socketName = QStringLiteral("precrime-%1").arg(user)
                                + (cli.isSet(dbOption) ? "-" + QString::number(qHash(cli.value(dbOption))) : QString());
     if (!offscreen) {
         QLocalSocket probe;
@@ -263,11 +266,13 @@ int main(int argc, char *argv[]) {
         if (probe.waitForConnected(300)) {
             // The peer's pid, read from the kernel now, while connected: an
             // old build closes the connection when it doesn't understand us.
+#if defined(Q_OS_LINUX)
             pid_t peer = 0;
             ucred cred{};
             socklen_t len = sizeof(cred);
             if (getsockopt(int(probe.socketDescriptor()), SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0)
                 peer = cred.pid;
+#endif
             probe.write("version\n");
             QString running;
             if (probe.waitForReadyRead(500))
@@ -279,6 +284,7 @@ int main(int argc, char *argv[]) {
                     quit.write("quit\n");
                     quit.waitForBytesWritten(300);
                 }
+#if defined(Q_OS_LINUX)
                 auto stillRunning = [&] { return peer > 0 && ::kill(peer, 0) == 0; };
                 for (int i = 0; i < 15 && stillRunning(); ++i)
                     QThread::msleep(100);
@@ -288,6 +294,11 @@ int main(int argc, char *argv[]) {
                     for (int i = 0; i < 20 && stillRunning(); ++i)
                         QThread::msleep(100);
                 }
+#else
+                // Elsewhere the old instance is only asked to quit; give it a
+                // moment to let go of the socket.
+                QThread::msleep(1500);
+#endif
                 probe.abort();
             } else {
                 probe.abort();
@@ -470,6 +481,8 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<AlarmService> alarms;
     if (!offscreen && opened) {
         alarms = std::make_unique<AlarmService>(&store);
+        if (tray)
+            QObject::connect(alarms.get(), &AlarmService::showFallback, tray.get(), &Tray::showMessage);
         QObject::connect(alarms.get(), &AlarmService::openTask, &backend, [&backend](qint64 id) {
             backend.requestWindow();
             backend.revealInList(id);

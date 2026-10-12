@@ -37,6 +37,11 @@ Tray::Tray(Store *store, Backend *backend, QObject *parent) : QObject(parent), m
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
             m_backend->requestWindow();
     });
+    connect(m_icon, &QSystemTrayIcon::messageClicked, this, [this] {
+        m_backend->requestWindow();
+        if (m_messageTask)
+            m_backend->revealInList(m_messageTask);
+    });
     // The day changes as tasks do and as the clock moves.
     m_refresh.setSingleShot(true);
     m_refresh.setInterval(300);
@@ -50,6 +55,13 @@ Tray::Tray(Store *store, Backend *backend, QObject *parent) : QObject(parent), m
 }
 
 Tray::~Tray() { delete m_menu; }
+
+void Tray::showMessage(const QString &title, const QString &body, qint64 taskId) {
+    if (!m_icon)
+        return;
+    m_messageTask = taskId;
+    m_icon->showMessage(title, body, QSystemTrayIcon::Information, 15000);
+}
 
 void Tray::setVisible(bool visible) {
     if (m_icon)
