@@ -61,6 +61,7 @@ QVariantMap Task::toMap() const {
         {"sort_order", order},
         {"collapsed", collapsed},
         {"tag_ids", idsToString(tagIds)},
+        {"location_ids", idsToString(locationIds)},
         {"created", stampValue(created)},
         {"modified", stampValue(modified)},
         {"deleted", deleted},
@@ -101,6 +102,7 @@ Task Task::fromMap(const QVariantMap &m) {
     t.order = m.value("sort_order").toDouble();
     t.collapsed = m.value("collapsed").toBool();
     t.tagIds = idsFromString(m.value("tag_ids").toString());
+    t.locationIds = idsFromString(m.value("location_ids").toString());
     t.created = stampFrom(m.value("created"));
     t.modified = stampFrom(m.value("modified"));
     t.deleted = m.value("deleted").toBool();
@@ -220,6 +222,45 @@ Alarm Alarm::fromMap(const QVariantMap &m) {
     a.sound = m.value("sound", true).toBool();
     a.snoozedUntil = stampFrom(m.value("snoozed_until"));
     a.firedFor = stampFrom(m.value("fired_for"));
+    a.modified = stampFrom(m.value("modified"));
+    a.deleted = m.value("deleted").toBool();
+    return a;
+}
+
+QVariantMap Location::toMap() const {
+    return {{"id", id}, {"uid", uid}, {"name", name}, {"address", address}, {"latitude", latitude},
+            {"longitude", longitude}, {"paused", paused}, {"modified", stampValue(modified)}, {"deleted", deleted}};
+}
+
+Location Location::fromMap(const QVariantMap &m) {
+    Location l;
+    l.id = m.value("id").toLongLong();
+    l.uid = m.value("uid").toString();
+    l.name = m.value("name").toString();
+    l.address = m.value("address").toString();
+    l.latitude = m.value("latitude").toDouble();
+    l.longitude = m.value("longitude").toDouble();
+    l.paused = m.value("paused").toBool();
+    l.modified = stampFrom(m.value("modified"));
+    l.deleted = m.value("deleted").toBool();
+    return l;
+}
+
+QVariantMap Attachment::toMap() const {
+    return {{"id", id}, {"uid", uid}, {"task_id", taskId}, {"kind", kind}, {"name", name}, {"file_name", fileName},
+            {"bytes", bytes}, {"created", stampValue(created)}, {"modified", stampValue(modified)}, {"deleted", deleted}};
+}
+
+Attachment Attachment::fromMap(const QVariantMap &m) {
+    Attachment a;
+    a.id = m.value("id").toLongLong();
+    a.uid = m.value("uid").toString();
+    a.taskId = m.value("task_id").toLongLong();
+    a.kind = m.value("kind").toInt();
+    a.name = m.value("name").toString();
+    a.fileName = m.value("file_name").toString();
+    a.bytes = m.value("bytes").toLongLong();
+    a.created = stampFrom(m.value("created"));
     a.modified = stampFrom(m.value("modified"));
     a.deleted = m.value("deleted").toBool();
     return a;

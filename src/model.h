@@ -87,6 +87,7 @@ struct Task {
     double order = 0;
     bool collapsed = false;
     QList<qint64> tagIds;
+    QList<qint64> locationIds;
     QDateTime created;
     QDateTime modified;
     bool deleted = false;
@@ -181,5 +182,42 @@ struct Alarm {
 
     QVariantMap toMap() const;
     static Alarm fromMap(const QVariantMap &map);
+};
+
+// A saved place, after the reference app's Locations: tasks can carry one or more, and a
+// location can be paused like a tag, hiding its tasks.
+struct Location {
+    qint64 id = 0;
+    QString uid;
+    QString name;
+    QString address;
+    double latitude = 0;
+    double longitude = 0;
+    bool paused = false;
+    QDateTime modified;
+    bool deleted = false;
+
+    QVariantMap toMap() const;
+    static Location fromMap(const QVariantMap &map);
+};
+
+// A picture, audio note or file kept with a task. The file itself lives in
+// the attachments folder beside the database, named by the attachment's uid.
+struct Attachment {
+    enum Kind { Image = 0, Audio = 1, File = 2 };
+
+    qint64 id = 0;
+    QString uid;
+    qint64 taskId = 0;
+    int kind = File;
+    QString name;       // The original file name, for display.
+    QString fileName;   // <uid>.<ext> inside the attachments folder.
+    qint64 bytes = 0;
+    QDateTime created;
+    QDateTime modified;
+    bool deleted = false;
+
+    QVariantMap toMap() const;
+    static Attachment fromMap(const QVariantMap &map);
 };
 

@@ -24,9 +24,10 @@
 
 namespace {
 
-enum Kind { KGroup, KList, KTagGroup, KTag, KTask, KAlarm, KindCount };
-const char *const Folders[KindCount] = {"list-groups", "lists", "tag-groups", "tags", "tasks", "alarms"};
-const char *const Tables[KindCount] = {"list_groups", "lists", "tag_groups", "tags", "tasks", "alarms"};
+// In dependency order: a record's references always point at earlier kinds.
+enum Kind { KGroup, KList, KTagGroup, KTag, KLocation, KTask, KAlarm, KAttachment, KindCount };
+const char *const Folders[KindCount] = {"list-groups", "lists", "tag-groups", "tags", "locations", "tasks", "alarms", "attachments"};
+const char *const Tables[KindCount] = {"list_groups", "lists", "tag_groups", "tags", "locations", "tasks", "alarms", "attachments"};
 constexpr int TombstoneDays = 60;
 
 struct Maps {
@@ -52,6 +53,8 @@ Maps buildMaps(const Store &s) {
     addMaps(m, KTag, s.tags());
     addMaps(m, KTask, s.tasks());
     addMaps(m, KAlarm, s.alarms());
+    addMaps(m, KLocation, s.locations());
+    addMaps(m, KAttachment, s.attachments());
     return m;
 }
 
@@ -60,16 +63,37 @@ void swapRef(QVariantMap &map, const char *idKey, const char *uidKey, const QHas
     map.insert(uidKey, rev.value(id));
 }
 
+QJsonArray uidList(const QString &ids, const QHash<qint64, QString> &rev) {
+    QJsonArray uids;
+    for (const auto &part : ids.split(',', Qt::SkipEmptyParts)) {
+        const QString u = rev.value(part.toLongLong());
+        if (!u.isEmpty())
+            uids.append(u);
+    }
+    return uids;
+}
+
+QString idList(const QJsonArray &uids, const QHash<QString, qint64> &uid) {
+    QStringList ids;
+    for (const auto &v : uids)
+        if (const qint64 id = uid.value(v.toString(), 0))
+            ids << QString::number(id);
+    return ids.join(',');
+}
+
 QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     map.remove("id");
     QJsonArray tagUids;
+    QJsonArray locationUids;
     switch (kind) {
     case KList: swapRef(map, "group_id", "group_uid", x.rev[KGroup]); break;
     case KTag: swapRef(map, "group_id", "group_uid", x.rev[KTagGroup]); break;
     case KAlarm: swapRef(map, "task_id", "task_uid", x.rev[KTask]); break;
+    case KAttachment: swapRef(map, "task_id", "task_uid", x.rev[KTask]); break;
     case KTask: {
         swapRef(map, "list_id", "list_uid", x.rev[KList]);
         swapRef(map, "parent_id", "parent_uid", x.rev[KTask]);
+        locationUids = uidList(map.take("location_ids").toString(), x.rev[KLocation]);
         for (const auto &part : map.take("tag_ids").toString().split(',', Qt::SkipEmptyParts)) {
             const QString u = x.rev[KTag].value(part.toLongLong());
             if (!u.isEmpty())
@@ -80,8 +104,10 @@ QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     default: break;
     }
     QJsonObject obj = QJsonObject::fromVariantMap(map);
-    if (kind == KTask)
+    if (kind == KTask) {
         obj.insert("tag_uids", tagUids);
+        obj.insert("location_uids", locationUids);
+    }
     return obj;
 }
 
@@ -97,9 +123,12 @@ QVariantMap fromJson(Kind kind, const QJsonObject &obj, const Maps &x, qint64 id
     case KList: swapBack("group_uid", "group_id", KGroup); break;
     case KTag: swapBack("group_uid", "group_id", KTagGroup); break;
     case KAlarm: swapBack("task_uid", "task_id", KTask); break;
+    case KAttachment: swapBack("task_uid", "task_id", KTask); break;
     case KTask: {
         swapBack("list_uid", "list_id", KList);
         swapBack("parent_uid", "parent_id", KTask);
+        map.remove("location_uids");
+        map.insert("location_ids", idList(obj.value("location_uids").toArray(), x.uid[KLocation]));
         map.remove("tag_uids");
         QStringList ids;
         for (const auto &v : obj.value("tag_uids").toArray()) {
@@ -145,6 +174,8 @@ QVector<LocalRec> collect(const Store &s, Kind k) {
     case KTag: collectInto(out, s.tags()); break;
     case KTask: collectInto(out, s.tasks()); break;
     case KAlarm: collectInto(out, s.alarms()); break;
+    case KLocation: collectInto(out, s.locations()); break;
+    case KAttachment: collectInto(out, s.attachments()); break;
     default: break;
     }
     return out;
@@ -287,7 +318,7 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
                 continue;
             const qint64 existing = x.uid[k].value(in.uid, 0);
             if (!existing) {
-                if (k == KAlarm && !x.uid[KTask].contains(in.obj.value("task_uid").toString()))
+                if ((k == KAlarm || k == KAttachment) && !x.uid[KTask].contains(in.obj.value("task_uid").toString()))
                     continue;  // its task is gone
                 const qint64 id = store.nextId(Tables[k]);
                 x.uid[k].insert(in.uid, id);
@@ -350,6 +381,8 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
             case KTag: store.putTag(Tag::fromMap(m)); break;
             case KTask: store.putTask(Task::fromMap(m)); break;
             case KAlarm: store.putAlarm(Alarm::fromMap(m)); break;
+            case KLocation: store.putLocation(Location::fromMap(m)); break;
+            case KAttachment: store.putAttachment(Attachment::fromMap(m)); break;
             default: break;
             }
             ++changed;

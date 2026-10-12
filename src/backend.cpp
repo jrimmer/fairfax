@@ -1195,6 +1195,43 @@ void Backend::setRepeatFromCompletion(qint64 id, bool on) {
     editTasks("Change Recurrence", {id}, [&](Task &t) { t.recurrence.from = on ? Repeat::FromCompletion : Repeat::FromDue; });
 }
 
+namespace {
+
+QVariantMap recurrenceToMap(const Recurrence &r) {
+    return {{"frequency", r.frequency}, {"interval", r.interval}, {"from", r.from}, {"weekdays", r.weekdays},
+            {"monthOrdinal", r.monthOrdinal}, {"monthWeekday", r.monthWeekday}, {"endType", r.endType},
+            {"endCount", r.endCount}, {"endDate", r.endDate.isValid() ? r.endDate.toString(Qt::ISODate) : QString()}};
+}
+
+Recurrence recurrenceFromMap(const QVariantMap &m) {
+    Recurrence r;
+    r.frequency = m.value("frequency").toInt();
+    r.interval = qBound(1, m.value("interval", 1).toInt(), 999);
+    r.from = m.value("from").toInt();
+    r.weekdays = m.value("weekdays").toInt();
+    r.monthOrdinal = m.value("monthOrdinal").toInt();
+    r.monthWeekday = m.value("monthWeekday").toInt();
+    r.endType = m.value("endType").toInt();
+    r.endCount = qBound(0, m.value("endCount").toInt(), 99);
+    r.endDate = QDate::fromString(m.value("endDate").toString(), Qt::ISODate);
+    return r;
+}
+
+}  // namespace
+
+void Backend::setRecurrence(qint64 id, const QVariantMap &rule) {
+    const Recurrence r = recurrenceFromMap(rule);
+    editTasks("Change Recurrence", {id}, [&](Task &t) {
+        Recurrence next = r;
+        next.occurrencesDone = t.recurrence.occurrencesDone;
+        if (next.isSet() && !t.dueDate.isValid() && !t.startDate.isValid())
+            t.dueDate = Recurrences::next(next, QDate::currentDate().addDays(-1));  // A repeat needs a date.
+        t.recurrence = next;
+    });
+}
+
+QString Backend::describeRecurrence(const QVariantMap &rule) const { return Recurrences::describe(recurrenceFromMap(rule)); }
+
 void Backend::toggleAlarm(qint64 id, int minutesBefore) {
     // the reference app's alarm presets: Message with Sound, relative to the due moment.
     // Choosing a preset that's already set removes it.
@@ -2093,6 +2130,9 @@ void Backend::rebuildEditor() {
             {"repeat", Recurrences::describe(t.recurrence)},
             {"repeatPreset", t.recurrence.isSet() ? 1 : 0},
             {"repeatFromCompletion", t.recurrence.from == Repeat::FromCompletion},
+            {"recurrence", recurrenceToMap(t.recurrence)},
+            {"startIso", t.startDate.isValid() ? t.startDate.toString(Qt::ISODate) : QString()},
+            {"dueIso", t.dueDate.isValid() ? t.dueDate.toString(Qt::ISODate) : QString()},
             {"actionType", t.actionType},
             {"actionValue", t.actionValue},
             {"hint", Schedule::dueHint(t, now, scheduleSettings())},

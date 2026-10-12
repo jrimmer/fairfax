@@ -5,7 +5,6 @@ TEMPLATE = app
 
 INCLUDEPATH += ../src
 
-# Every source in src/ except the app's own main(), plus every test file here.
-HEADERS += $$files(../src/*.h) $$files(*.h)
-SOURCES += $$files(../src/*.cpp) $$files(*.cpp)
-SOURCES -= ../src/main.cpp
+# Listed explicitly, like precrime.pro: every source except the app's main().
+HEADERS += ../src/alarms.h ../src/backend.h ../src/dateparse.h ../src/exchange.h ../src/filepicker.h ../src/gitsync.h ../src/model.h ../src/nlparse.h ../src/query.h ../src/recurrence.h ../src/rowmodel.h ../src/schedule.h ../src/store.h ../src/theme.h ../src/views.h  testregistry.h
+SOURCES += ../src/alarms.cpp ../src/backend.cpp ../src/dateparse.cpp ../src/demo.cpp ../src/exchange.cpp ../src/filepicker.cpp ../src/gitsync.cpp ../src/model.cpp ../src/nlparse.cpp ../src/query.cpp ../src/recurrence.cpp ../src/rowmodel.cpp ../src/schedule.cpp ../src/store.cpp ../src/theme.cpp ../src/views.cpp  main.cpp test_backend.cpp test_dateparse.cpp test_exchange.cpp test_gitsync.cpp test_nlparse.cpp test_query.cpp test_recurrence.cpp test_schedule.cpp test_store.cpp test_views.cpp 

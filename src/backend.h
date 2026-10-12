@@ -186,6 +186,8 @@ public:
     Q_INVOKABLE void setAction(qint64 id, int type, const QString &value);
     Q_INVOKABLE void setRepeatPreset(qint64 id, int preset);
     Q_INVOKABLE void setRepeatFromCompletion(qint64 id, bool on);
+    Q_INVOKABLE void setRecurrence(qint64 id, const QVariantMap &rule);
+    Q_INVOKABLE QString describeRecurrence(const QVariantMap &rule) const;
     Q_INVOKABLE void toggleAlarm(qint64 id, int minutesBefore);
     Q_INVOKABLE void clearAlarms(qint64 id);
     Q_INVOKABLE QVariantList dateSuggestions(const QString &text) const;

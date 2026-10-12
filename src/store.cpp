@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 3;
+constexpr int SchemaVersion = 4;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -27,7 +27,7 @@ const char *SyncColumns = R"(
     remote_id TEXT
 )";
 
-const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms"};
+const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments"};
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
 
@@ -171,6 +171,28 @@ bool Store::migrate(QString *error) {
             PRIMARY KEY (provider, entity, local_id)))"),
     };
 
+    // Version 4 adds locations and attachments.
+    const QStringList version4{
+        QStringLiteral("ALTER TABLE tasks ADD COLUMN location_ids TEXT NOT NULL DEFAULT ''"),
+        QStringLiteral(R"(CREATE TABLE IF NOT EXISTS locations (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL DEFAULT '',
+            address TEXT NOT NULL DEFAULT '',
+            latitude REAL NOT NULL DEFAULT 0,
+            longitude REAL NOT NULL DEFAULT 0,
+            paused INTEGER NOT NULL DEFAULT 0,
+            %1))").arg(SyncColumns),
+        QStringLiteral(R"(CREATE TABLE IF NOT EXISTS attachments (
+            id INTEGER PRIMARY KEY,
+            task_id INTEGER NOT NULL DEFAULT 0,
+            kind INTEGER NOT NULL DEFAULT 2,
+            name TEXT NOT NULL DEFAULT '',
+            file_name TEXT NOT NULL DEFAULT '',
+            bytes INTEGER NOT NULL DEFAULT 0,
+            created INTEGER,
+            %1))").arg(SyncColumns),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -178,6 +200,8 @@ bool Store::migrate(QString *error) {
         steps += version2;
     if (version < 3)
         steps += version3;
+    if (version < 4)
+        steps += version4;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();
@@ -199,6 +223,8 @@ void Store::reload() {
     m_tags.clear();
     m_tagGroups.clear();
     m_alarms.clear();
+    m_locations.clear();
+    m_attachments.clear();
     m_settings.clear();
     load();
     emit changed();
@@ -302,6 +328,37 @@ void Store::putAlarm(const Alarm &a) {
         copy.modified = QDateTime::currentDateTime();
     record("alarms", copy.id, cached("alarms", copy.id), copy.toMap());
 }
+
+void Store::putLocation(const Location &l) {
+    Location copy = l;
+    if (copy.uid.isEmpty())
+        copy.uid = newUid();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
+    record("locations", copy.id, cached("locations", copy.id), copy.toMap());
+}
+
+void Store::putAttachment(const Attachment &a) {
+    Attachment copy = a;
+    if (copy.uid.isEmpty())
+        copy.uid = newUid();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
+    if (!copy.created.isValid())
+        copy.created = copy.modified;
+    record("attachments", copy.id, cached("attachments", copy.id), copy.toMap());
+}
+
+QVector<Attachment> Store::attachmentsFor(qint64 taskId) const {
+    QVector<Attachment> result;
+    for (const auto &a : m_attachments)
+        if (a.taskId == taskId && !a.deleted)
+            result.append(a);
+    std::sort(result.begin(), result.end(), [](const Attachment &x, const Attachment &y) { return x.id < y.id; });
+    return result;
+}
+
+QString Store::attachmentsFolder() const { return QFileInfo(m_path).absolutePath() + "/attachments"; }
 
 void Store::putTagGroup(const TagGroup &g) {
     TagGroup copy = g;
@@ -435,6 +492,10 @@ void Store::applyToCache(const QString &table, const QVariantMap &row, qint64 id
         if (row.isEmpty()) m_tagGroups.remove(id); else m_tagGroups.insert(id, TagGroup::fromMap(row));
     } else if (table == "alarms") {
         if (row.isEmpty()) m_alarms.remove(id); else m_alarms.insert(id, Alarm::fromMap(row));
+    } else if (table == "locations") {
+        if (row.isEmpty()) m_locations.remove(id); else m_locations.insert(id, Location::fromMap(row));
+    } else if (table == "attachments") {
+        if (row.isEmpty()) m_attachments.remove(id); else m_attachments.insert(id, Attachment::fromMap(row));
     }
 }
 
@@ -445,6 +506,8 @@ QVariantMap Store::cached(const QString &table, qint64 id) const {
     if (table == "tags" && m_tags.contains(id)) return m_tags.value(id).toMap();
     if (table == "tag_groups" && m_tagGroups.contains(id)) return m_tagGroups.value(id).toMap();
     if (table == "alarms" && m_alarms.contains(id)) return m_alarms.value(id).toMap();
+    if (table == "locations" && m_locations.contains(id)) return m_locations.value(id).toMap();
+    if (table == "attachments" && m_attachments.contains(id)) return m_attachments.value(id).toMap();
     return {};
 }
 

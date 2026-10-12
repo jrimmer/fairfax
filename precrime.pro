@@ -4,7 +4,8 @@ CONFIG += c++20 release
 TARGET = precrime
 TEMPLATE = app
 
-HEADERS += $$files(src/*.h)
-SOURCES += $$files(src/*.cpp)
+# Listed explicitly so a half-written file in src/ never breaks the build.
+HEADERS += src/alarms.h src/backend.h src/dateparse.h src/exchange.h src/filepicker.h src/gitsync.h src/model.h src/nlparse.h src/query.h src/recurrence.h src/rowmodel.h src/schedule.h src/store.h src/theme.h src/views.h 
+SOURCES += src/alarms.cpp src/backend.cpp src/dateparse.cpp src/demo.cpp src/exchange.cpp src/filepicker.cpp src/gitsync.cpp src/main.cpp src/model.cpp src/nlparse.cpp src/query.cpp src/recurrence.cpp src/rowmodel.cpp src/schedule.cpp src/store.cpp src/theme.cpp src/views.cpp 
 
 RESOURCES += src/resources.qrc

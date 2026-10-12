@@ -30,6 +30,10 @@ public:
     const QHash<qint64, Tag> &tags() const { return m_tags; }
     const QHash<qint64, TagGroup> &tagGroups() const { return m_tagGroups; }
     const QHash<qint64, Alarm> &alarms() const { return m_alarms; }
+    const QHash<qint64, Location> &locations() const { return m_locations; }
+    const QHash<qint64, Attachment> &attachments() const { return m_attachments; }
+    QVector<Attachment> attachmentsFor(qint64 taskId) const;
+    QString attachmentsFolder() const;
     QVector<Alarm> alarmsFor(qint64 taskId) const;
 
     Task task(qint64 id) const { return m_tasks.value(id); }
@@ -56,6 +60,8 @@ public:
     void putTag(const Tag &tag);
     void putTagGroup(const TagGroup &group);
     void putAlarm(const Alarm &alarm);
+    void putLocation(const Location &location);
+    void putAttachment(const Attachment &attachment);
     bool commit();
 
     bool canUndo() const { return !m_undo.isEmpty(); }
@@ -129,6 +135,8 @@ private:
     QHash<qint64, Tag> m_tags;
     QHash<qint64, TagGroup> m_tagGroups;
     QHash<qint64, Alarm> m_alarms;
+    QHash<qint64, Location> m_locations;
+    QHash<qint64, Attachment> m_attachments;
     QHash<QString, qint64> m_maxIds;
     QHash<QString, QVariant> m_settings;
     bool m_inChange = false;
