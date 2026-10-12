@@ -32,7 +32,9 @@ Window {
         return v === true || v === "true" || v === 1 || v === "1"
     }
 
-    Shortcut { sequence: "Escape"; onActivated: root.close() }
+    // Omarchy windows have no title bar, so Settings closes itself: Escape,
+    // Ctrl+W, or the ✕ in the corner (Super+W works too, as for any window).
+    onVisibleChanged: if (visible) { requestActivate(); keyCatcher.forceActiveFocus() }
 
     Connections {
         target: filePicker
@@ -45,6 +47,25 @@ Window {
             else if (purpose === "restore") backend.restoreBackup(path)
         }
         function onFailed(message) { status.text = message }
+    }
+
+    Item {
+        id: keyCatcher
+        anchors.fill: parent
+        focus: true
+        Keys.onEscapePressed: root.close()
+        Shortcut { sequences: ["Escape", "Ctrl+W"]; context: Qt.WindowShortcut; onActivated: root.close() }
+    }
+
+    IconButton {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 10
+        z: 10
+        icon: "close"
+        size: 14
+        tip: "Close (Esc)"
+        onClicked: root.close()
     }
 
     RowLayout {

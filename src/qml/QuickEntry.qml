@@ -79,9 +79,14 @@ Window {
 
     TextEdit { id: clip; visible: false }
 
-    Shortcut { sequence: "Escape"; onActivated: root.hide() }
-    Shortcut { sequence: "Ctrl+Return"; onActivated: root.save(true) }
-    Shortcut { sequence: "Shift+Return"; onActivated: root.save(false) }
+    // Shortcuts live on an item inside the window so they reach it under
+    // Hyprland; the fields also handle Escape themselves.
+    Item {
+        anchors.fill: parent
+        Shortcut { sequences: ["Escape", "Ctrl+W"]; context: Qt.WindowShortcut; onActivated: root.hide() }
+        Shortcut { sequence: "Ctrl+Return"; context: Qt.WindowShortcut; onActivated: root.save(true) }
+        Shortcut { sequence: "Shift+Return"; context: Qt.WindowShortcut; onActivated: root.save(false) }
+    }
 
     // The layout fills whatever size the compositor gives the window; the
     // notes area takes up any extra height, so the buttons stay at the bottom.
@@ -160,6 +165,7 @@ Window {
                     else { root.save(false); root.hide() }
                 }
                 Keys.onEnterPressed: { root.save(false); root.hide() }
+                Keys.onEscapePressed: root.hide()
             }
         }
 
@@ -204,6 +210,7 @@ Window {
                 color: theme.foreground
                 font.pixelSize: backend.fontSize - 1
                 background: Item {}
+                Keys.onEscapePressed: root.hide()
             }
         }
 

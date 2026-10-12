@@ -97,6 +97,12 @@ void SelfTest::run(QQuickWindow *window, Backend *backend) {
         }
         const Step step = script.at((*index)++);
         if (qEnvironmentVariableIsSet("PRECRIME_SELFTEST_TRACE")) {
+            bool settingsVisible = false;
+            for (auto *w : window->findChildren<QQuickWindow *>())
+                if (w->title() == "Precrime Settings") settingsVisible = w->isVisible();
+            std::fprintf(stderr, "  settings visible: %d\n", settingsVisible);
+        }
+        if (qEnvironmentVariableIsSet("PRECRIME_SELFTEST_TRACE")) {
             QQuickItem *focus = window->activeFocusItem();
             QString chain;
             for (QQuickItem *i = focus; i; i = i->parentItem())
