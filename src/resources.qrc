@@ -20,10 +20,6 @@
         <file>qml/NotesArea.qml</file>
         <file>qml/PriorityPicker.qml</file>
         <file>qml/QuickEntry.qml</file>
-        <file>qml/QuickEntryChip.qml</file>
-        <file>qml/QuickEntryPill.qml</file>
-        <file>qml/QuickEntryPopupField.qml</file>
-        <file>qml/QuickEntryPopupRow.qml</file>
         <file>qml/QuickLook.qml</file>
         <file>qml/RepeatEditor.qml</file>
         <file>qml/RollingNumber.qml</file>

@@ -119,6 +119,7 @@ o.bind("$key", "Precrime quick entry", "precrime --quick")
 o.window({ class = "^precrime\$", title = "^Precrime Quick Entry\$" }, { float = true, center = true })
 o.window({ class = "^precrime\$", title = "^Precrime Settings\$" }, { float = true, center = true, size = { 760, 580 } })
 
+
 -- Keep Precrime running in the background after sign-in, so alarms arrive
 -- and Quick Entry opens instantly.
 o.launch_on_start("precrime --background")

@@ -136,10 +136,10 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
     if (reply.isValid())
         m_notifications.insert(reply.value(), a.id);
-    if (m_store->setting("alerts.nag", false).toBool() && !m_nagging.contains(a.id))
-        m_nagging.insert(a.id, QDateTime::currentDateTime().addSecs(5 * 60));
     else
         qWarning("precrime: couldn't show a notification: %s", qPrintable(reply.error().message()));
+    if (m_store->setting("alerts.nag", false).toBool() && !m_nagging.contains(a.id))
+        m_nagging.insert(a.id, QDateTime::currentDateTime().addSecs(5 * 60));
 
     // Notification daemons rarely play sounds themselves.
     if (a.sound) {

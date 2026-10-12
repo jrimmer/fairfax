@@ -1,5 +1,5 @@
 pkgname=precrime
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=1
 pkgdesc='A keyboard-first task manager for Omarchy, modelled on the reference app'
 arch=('x86_64' 'aarch64')

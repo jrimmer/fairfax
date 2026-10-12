@@ -170,6 +170,7 @@ Window {
                     Layout.fillWidth: true
                     Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Precrime running. Q or Ctrl+Q quits for real." }
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
+                    Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Precrime takes the free one. With tiled windows Hyprland places it as usual." }
                     Toggle { key: "general.trayIcon"; fallback: true; label: "Show Precrime in the bar's tray"; note: "Its menu lists today's tasks, with New Task, Find, Sync and Quit." }
                     Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
                     Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }

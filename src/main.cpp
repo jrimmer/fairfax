@@ -37,6 +37,7 @@
 #include "calendar.h"
 #include "cli.h"
 #include "exchange.h"
+#include "hyprland.h"
 #include "markdown.h"
 #include "selftest.h"
 #include "sounds.h"
@@ -224,7 +225,7 @@ int main(int argc, char *argv[]) {
     // menu, which Qt builds with widgets; the window itself is all QML.
     QApplication app(argc, argv);
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.3.0");
+    app.setApplicationVersion("0.3.1");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
@@ -521,6 +522,21 @@ int main(int argc, char *argv[]) {
         QObject::connect(extra, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
     };
     QObject::connect(&backend, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
+
+    // On Hyprland, fit the main window into a free third when the workspace
+    // is laid out with floating windows (see hyprland.h). Each time it
+    // appears, once it's mapped.
+    if (window && !offscreen && Hyprland::available()) {
+        QObject::connect(window, &QWindow::visibleChanged, window, [window, &store](bool shown) {
+            if (!shown || !store.setting("omarchy.fitThirds", true).toBool())
+                return;
+            QTimer::singleShot(250, window, [window] {
+                Hyprland::fitIntoFreeThird(QCoreApplication::applicationPid(), window->title());
+            });
+        });
+        if (window->isVisible())
+            QTimer::singleShot(400, window, [window] { Hyprland::fitIntoFreeThird(QCoreApplication::applicationPid(), window->title()); });
+    }
 
     if (cli.isSet(selfTestOption) && window)
         SelfTest::run(window, &backend);

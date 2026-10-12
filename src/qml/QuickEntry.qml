@@ -5,26 +5,27 @@ import QtQuick.Controls.Basic as Plain
 import QtQuick.Layouts
 
 // Quick Entry: a small floating window for capturing a task from anywhere,
-// summoned with `precrime --quick` from a Hyprland bind.
+// summoned with `precrime --quick` from a Hyprland bind. Its layout follows
+// the reference app's own Quick Entry: the title (priority and star at the right), a ribbon
+// in the list's colour with the list, the due summary and the attribute
+// buttons, tags beside the Start and Due fields, notes, and a footer.
 //
 // Natural language stays primary: dates, #tags, /list/, !!, *, repeats and
-// [durations] typed in the title are recognised as you type, shown as capsules
-// in the title and filled into the pills below it. Any pill you set by hand is
-// "pinned" and no longer overwritten by what the title says. Clicking a pill
-// opens one row of choices right under the pills (no popovers); inside it
-// Left/Right move, Return or 1-9 pick, Escape closes just the row.
+// [durations] typed in the title are recognised as you type, drawn as capsules
+// in the title and filled into the fields. Anything you set by hand is
+// "pinned" and no longer overwritten by what the title says.
 //
 // Return saves; Shift+Return saves and starts the next one (as does pressing
 // the bind again); Ctrl+Return saves and opens the task in the main window;
-// Escape (with no row open) cancels.
+// Escape closes a menu or the inline editor first, then cancels.
 Window {
     id: root
 
     title: "Precrime Quick Entry"
-    width: 640
-    height: body.implicitHeight + 28
+    width: 600
+    height: body.implicitHeight
     minimumWidth: 480
-    minimumHeight: body.implicitHeight + 28
+    minimumHeight: body.implicitHeight
     color: theme.raised
     flags: Qt.Window | Qt.WindowStaysOnTopHint
 
@@ -51,14 +52,18 @@ Window {
     property int priority: 0
     property bool starred: false
     property var files: []
+    property bool notesOpen: false
 
-    // ---- the option row
-    property string openKind: ""   // "", list, due, start, repeat, alert, duration, tags, place, priority, attach
-    // Read by the app's Escape filter: with an option row open, Escape closes
-    // the row (handled here) rather than the window.
-    readonly property bool escapeCloses: openKind === "" && rowMode === ""
-    property string rowMode: ""    // "", repeatCustom, durationCustom
-    readonly property var options: buildOptions()
+    // "", repeat or duration: the compact inline editor under the ribbon.
+    property string customMode: ""
+    property int durationUnit: 0   // 0 = minutes, 1 = hours (custom duration editor)
+
+    // Read by the app's Escape filter: with a menu or the inline editor open,
+    // Escape closes just that (handled there) rather than the window.
+    readonly property bool anyMenuOpen: listMenu.visible || typeMenu.visible || priorityMenu.visible || placeMenu.visible
+        || repeatMenu.visible || alarmMenu.visible || durationMenu.visible || attachMenu.visible
+    readonly property bool escapeCloses: customMode === "" && !anyMenuOpen && !tagPopup.visible
+        && !startField.dirty && !dueField.dirty && !startTimeField.dirty && !dueTimeField.dirty
     readonly property bool detect: backend.setting("nl.quickEntry").value !== "false"
 
     readonly property var kindColors: ({
@@ -71,14 +76,16 @@ Window {
         { label: "Daily", frequency: 1, interval: 1 },
         { label: "Weekdays", frequency: 5, interval: 1 },
         { label: "Weekly", frequency: 2, interval: 1 },
-        { label: "Every 2 weeks", frequency: 2, interval: 2 },
+        { label: "Every 2 Weeks", frequency: 2, interval: 2 },
         { label: "Monthly", frequency: 3, interval: 1 },
         { label: "Quarterly", frequency: 3, interval: 3 },
         { label: "Yearly", frequency: 4, interval: 1 }
     ]
     readonly property var alertPresets: [0, 5, 15, 30, 60, 1440]
     readonly property var durationPresets: [15, 30, 45, 60, 120]
-    readonly property var priorityNames: ["No priority", "! Low", "!! Medium", "!!! High"]
+    readonly property var currentList: listById(listId)
+    readonly property color listColor: currentList ? theme.listColor(currentList.color) : theme.accent
+    readonly property var repeatUnits: ["days", "weeks", "months", "years"]
 
     // ---------------------------------------------------------------- helpers
 
@@ -88,13 +95,6 @@ Window {
     function parseIso(s) {
         const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || "")
         return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null
-    }
-    function isoOf(d) {
-        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
-    }
-    function addDays(iso, n) {
-        const d = parseIso(iso) || new Date()
-        return isoOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
     }
     function timeText(m) {
         return new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
@@ -108,9 +108,16 @@ Window {
         if (diff === 0) s = "Today"
         else if (diff === 1) s = "Tomorrow"
         else if (diff === -1) s = "Yesterday"
-        else if (diff > 1 && diff < 7) s = Qt.locale().dayName(d.getDay(), Locale.LongFormat)
+        else if (diff > 1 && diff < 7) s = Qt.locale().dayName(d.getDay(), Locale.ShortFormat)
         else s = Qt.locale().monthName(d.getMonth(), Locale.ShortFormat) + " " + d.getDate() + (d.getFullYear() !== t.getFullYear() ? ", " + d.getFullYear() : "")
         return minutes >= 0 ? s + ", " + timeText(minutes) : s
+    }
+    function fieldDate(iso) {
+        const d = parseIso(iso)
+        if (!d) return ""
+        const t = parseIso(backend.today) || new Date()
+        return Qt.locale().dayName(d.getDay(), Locale.ShortFormat) + ", " + Qt.locale().monthName(d.getMonth(), Locale.ShortFormat) + " " + d.getDate()
+            + (d.getFullYear() !== t.getFullYear() ? " " + d.getFullYear() : "")
     }
     function isOverdue(iso) {
         return !!iso && iso < (backend.today || "")
@@ -126,24 +133,33 @@ Window {
         if (m === 0) return "At due time"
         if (m % 1440 === 0) return m === 1440 ? "1 day before" : (m / 1440) + " days before"
         if (m % 60 === 0) return m === 60 ? "1 hour before" : (m / 60) + " hours before"
-        return m + " min before"
-    }
-    function alertsText() {
-        if (!alerts.length) return "No alert"
-        return alertText(alerts[0]) + (alerts.length > 1 ? " +" + (alerts.length - 1) : "")
-    }
-    function priorityColor(p) {
-        return p >= 3 ? theme.priorityHigh : p === 2 ? theme.priorityMedium : p === 1 ? theme.priorityLow : theme.faint
+        return m + " minutes before"
     }
     function listById(id) {
         return backend.listChoices.find(l => l.id === id) || backend.listChoices[0] || null
     }
-    function fileName(url) {
-        return decodeURIComponent(String(url).split("/").pop())
+    function fileName(path) {
+        return decodeURIComponent(String(path).split("/").pop())
     }
     function anchorWeekday() {
         const d = parseIso(dueIso || startIso || backend.today) || new Date()
         return (d.getDay() + 6) % 7  // 0 = Monday, as in the bitmask.
+    }
+    function presetIndex() {
+        const r = recurrence
+        return repeatPresets.findIndex(p => r.frequency === p.frequency && r.interval === p.interval)
+    }
+    function repeatTip() {
+        if (!recurrence.frequency) return "Repeat"
+        const d = backend.describeRecurrence(recurrence)
+        return "Repeats " + d.charAt(0).toLowerCase() + d.slice(1) + (recurrence.from === 1 ? " (after completion)" : "")
+    }
+    function alarmTip() {
+        return alerts.length ? "Alert " + alerts.map(alertText).join(", ").toLowerCase() : "Alert"
+    }
+    function placeName() {
+        const l = backend.locationChoices().find(p => p.id === locationId)
+        return l ? l.name : ""
     }
 
     function pin(key) {
@@ -161,6 +177,22 @@ Window {
             startMinutes = !iso ? -1 : (minutes === undefined ? startMinutes : minutes)
         }
     }
+    function setTime(kind, minutes) {
+        pin(kind)
+        if (kind === "due") dueMinutes = dueIso || minutes < 0 ? minutes : (dueIso = backend.today, minutes)
+        else startMinutes = startIso || minutes < 0 ? minutes : (startIso = backend.today, minutes)
+    }
+    function typedDate(kind, text) {
+        if (!text.trim()) { setDate(kind, "", -1); return }
+        const s = backend.dateSuggestions(text)
+        if (s.length && s[0].date) setDate(kind, s[0].date, s[0].minutes >= 0 ? s[0].minutes : undefined)
+    }
+    function typedTime(kind, text) {
+        if (!text.trim()) { setTime(kind, -1); return }
+        const s = backend.dateSuggestions(text)
+        const hit = s.find(x => x.minutes >= 0)
+        if (hit) setTime(kind, hit.minutes)
+    }
     function setRule(patch) {
         pin("recurrence")
         const r = Object.assign(blankRule(), recurrence, patch)
@@ -177,20 +209,46 @@ Window {
         if (p.frequency === 2) r.weekdays = 1 << anchorWeekday()
         recurrence = r
     }
-    function setAlert(m) { pin("alerts"); alerts = m === null ? [] : [m] }
+    function toggleAlert(m) {
+        pin("alerts")
+        alerts = alerts.includes(m) ? alerts.filter(a => a !== m) : alerts.concat([m]).sort((a, b) => a - b)
+    }
     function setDuration(m) { pin("duration"); duration = Math.max(0, m) }
     function setPriority(p) { pin("priority"); priority = p }
     function setList(id) { pin("listId"); listId = id }
     function setPlace(id) { pin("locationId"); locationId = id }
-    function toggleTag(name) {
-        pin("tags")
-        tags = tags.includes(name) ? tags.filter(t => t !== name) : tags.concat([name])
-    }
     function addTag(text) {
         const name = text.trim().replace(/^#+/, "").replace(/\s+/g, "-")
         if (!name) return
         pin("tags")
         if (!tags.includes(name)) tags = tags.concat([name])
+    }
+    function removeTag(name) {
+        pin("tags")
+        tags = tags.filter(t => t !== name)
+    }
+    function openCustom(kind) {
+        customMode = kind
+        if (kind === "repeat") {
+            if (!recurrence.frequency) setRule({ frequency: 2, interval: 1 })
+            else if (recurrence.frequency === 5) setRule({ frequency: 2, interval: 1, weekdays: 31 })
+            numField.text = String(recurrence.interval)
+        } else {
+            durationUnit = duration >= 60 && duration % 60 === 0 ? 1 : 0
+            numField.text = duration ? String(durationUnit ? duration / 60 : duration) : ""
+        }
+        Qt.callLater(() => { numField.forceActiveFocus(); numField.selectAll() })
+    }
+    function closeCustom() {
+        customMode = ""
+        title_.forceActiveFocus()
+    }
+    function applyCustom() {
+        if (customMode === "duration") {
+            const n = parseInt(numField.text)
+            if (n > 0) setDuration(n * (durationUnit ? 60 : 1))
+        }
+        closeCustom()
     }
 
     // Seeds every field that has not been pinned: from what the title says, else from the defaults.
@@ -218,147 +276,6 @@ Window {
         if (!pn.starred) starred = !!f.starred
     }
 
-    // ------------------------------------------------------------ option rows
-
-    function opt(label, on, run, extra) {
-        return Object.assign({ label: label, on: !!on, run: run, keep: false }, extra || {})
-    }
-
-    function dateOptions(kind) {
-        const iso = kind === "due" ? dueIso : startIso
-        const minutes = kind === "due" ? dueMinutes : startMinutes
-        const t = backend.today
-        const o = [
-            opt("Today", iso === t, () => setDate(kind, t)),
-            opt("Tomorrow", iso === addDays(t, 1), () => setDate(kind, addDays(t, 1))),
-            opt("Next week", iso === addDays(t, 7), () => setDate(kind, addDays(t, 7))),
-            opt("Pick date…", false, () => dateField.forceActiveFocus(), { keep: true })
-        ]
-        if (minutes >= 0) o.push(opt("No time", false, () => setDate(kind, iso, -1)))
-        o.push(opt("No date", !iso, () => setDate(kind, "", -1)))
-        return o
-    }
-
-    function repeatOptions() {
-        const r = recurrence
-        if (rowMode === "repeatCustom") {
-            const o = []
-            const units = ["days", "weeks", "months", "years"]
-            for (let i = 0; i < 4; ++i)
-                o.push(opt(units[i], r.frequency === i + 1, () => setRule({ frequency: i + 1, weekdays: 0 }), { keep: true }))
-            if (r.frequency === 2)
-                for (let d = 0; d < 7; ++d)
-                    o.push(opt(weekdayNames[d], (r.weekdays >> d) & 1, () => {
-                        const w = r.weekdays ^ (1 << d)
-                        setRule({ weekdays: w || (1 << d) })
-                    }, { keep: true }))
-            o.push(opt("After completion", r.from === 1, () => setRule({ from: r.from === 1 ? 0 : 1 }), { keep: true }))
-            o.push(opt("Presets", false, () => { rowMode = "" }, { keep: true }))
-            return o
-        }
-        const o = [opt("Doesn't repeat", !r.frequency, () => { pin("recurrence"); recurrence = blankRule() })]
-        for (const p of repeatPresets)
-            o.push(opt(p.label, r.frequency === p.frequency && r.interval === p.interval, () => setPreset(p)))
-        const isPreset = repeatPresets.some(p => r.frequency === p.frequency && r.interval === p.interval)
-        o.push(opt("Custom…", r.frequency && !isPreset, () => {
-            if (!r.frequency) setRule({ frequency: 2, interval: 1 })
-            numField.text = String(recurrence.interval)
-            rowMode = "repeatCustom"
-            Qt.callLater(() => numField.forceActiveFocus())
-        }, { keep: true }))
-        return o
-    }
-
-    function buildOptions() {
-        const k = openKind
-        const o = []
-        if (k === "due" || k === "start") return dateOptions(k)
-        if (k === "repeat") return repeatOptions()
-        if (k === "alert") {
-            o.push(opt("No alert", !alerts.length, () => setAlert(null)))
-            for (const m of alertPresets)
-                o.push(opt(m === 0 ? "At due time" : m < 60 ? m + " min" : m === 60 ? "1 hour" : "1 day before", alerts.length === 1 && alerts[0] === m, () => setAlert(m)))
-        } else if (k === "duration") {
-            if (rowMode === "durationCustom") {
-                o.push(opt("Back", false, () => { rowMode = "" }, { keep: true }))
-                return o
-            }
-            o.push(opt("None", !duration, () => setDuration(0)))
-            for (const m of durationPresets)
-                o.push(opt(durationText(m), duration === m, () => setDuration(m)))
-            o.push(opt("Custom…", duration && !durationPresets.includes(duration), () => {
-                numField.text = duration ? String(duration) : ""
-                rowMode = "durationCustom"
-                Qt.callLater(() => numField.forceActiveFocus())
-            }, { keep: true }))
-        } else if (k === "priority") {
-            for (let p = 0; p < 4; ++p) {
-                const pr = p
-                o.push(opt(pr === 0 ? "None" : priorityNames[pr], priority === pr, () => setPriority(pr), { tint: priorityColor(pr) }))
-            }
-        } else if (k === "list") {
-            for (const l of backend.listChoices) {
-                const id = l.id
-                o.push(opt(l.name, listId === id, () => setList(id), { dot: theme.listColor(l.color), hasDot: true }))
-            }
-        } else if (k === "tags") {
-            for (const name of backend.tagNames) {
-                const n = name
-                o.push(opt("#" + n, tags.includes(n), () => toggleTag(n), { keep: true }))
-            }
-            for (const name of tags)
-                if (!backend.tagNames.includes(name)) {
-                    const n = name
-                    o.push(opt("#" + n, true, () => toggleTag(n), { keep: true }))
-                }
-        } else if (k === "place") {
-            o.push(opt("No place", !locationId, () => setPlace(0)))
-            for (const l of backend.locationChoices()) {
-                const id = l.id
-                o.push(opt(l.name, locationId === id, () => setPlace(id)))
-            }
-        } else if (k === "attach") {
-            o.push(opt("Add file…", false, () => filePicker.open("Attach a file", "quickentry")))
-            for (let i = 0; i < files.length; ++i) {
-                const idx = i
-                o.push(opt(fileName(files[i]) + "  ✕", true, () => { files = files.filter((_, j) => j !== idx) }, { keep: true }))
-            }
-        }
-        return o
-    }
-
-    function selectedIndex() {
-        const i = options.findIndex(o => o.on)
-        return i < 0 ? 0 : i
-    }
-
-    function openRow(kind) {
-        if (kind === "attach" && files.length === 0) {
-            filePicker.open("Attach a file", "quickentry")
-            return
-        }
-        if (openKind === kind) { closeRow(); return }
-        openKind = kind
-        rowMode = ""
-        textField.text = ""
-        optRow.index = selectedIndex()
-        Qt.callLater(() => optRow.forceActiveFocus())
-    }
-
-    function closeRow() {
-        openKind = ""
-        rowMode = ""
-        title_.forceActiveFocus()
-    }
-
-    function pick(i) {
-        const o = options[i]
-        if (!o) return
-        o.run()
-        if (!o.keep) closeRow()
-        else if (openKind !== "") Qt.callLater(() => { if (!numField.activeFocus && !textField.activeFocus) optRow.forceActiveFocus() })
-    }
-
     // ------------------------------------------------------------ lifecycle
 
     function summon() {
@@ -377,8 +294,7 @@ Window {
 
     function reset() {
         pinned = ({})
-        openKind = ""
-        rowMode = ""
+        customMode = ""
         defaults = backend.quickEntryDefaults()
         type = 0
         files = []
@@ -416,20 +332,22 @@ Window {
         title_.forceActiveFocus()
     }
 
-    property bool notesOpen: false
+    // Return on a field: save and hide; Shift keeps going; Ctrl opens the task.
+    function submit(modifiers) {
+        if (modifiers & Qt.ControlModifier) save(true)
+        else if (modifiers & Qt.ShiftModifier) save(false)
+        else { save(false); hide() }
+    }
 
     TextEdit { id: clip; visible: false }
 
     Connections {
         target: filePicker
         function onPicked(path, purpose) {
-            if (purpose === "quickentry" && path) root.files = root.files.concat(["file://" + path])
+            if (purpose === "quickentry-attach" && path && !root.files.includes(path)) root.files = root.files.concat([path])
         }
     }
 
-    // Escape is handled by an application-level filter (it closes this window
-    // unless a "Popup"-named item has focus, which is why the option row and
-    // its fields are named that way).
     Item {
         anchors.fill: parent
         Shortcut { sequence: "Ctrl+W"; context: Qt.WindowShortcut; onActivated: root.hide() }
@@ -437,45 +355,213 @@ Window {
         Shortcut { sequence: "Shift+Return"; context: Qt.WindowShortcut; onActivated: root.save(false) }
     }
 
-    // The layout fills whatever size the compositor gives the window; the
-    // notes area takes up any extra height, so the footer stays at the bottom.
+    // ------------------------------------------------------------ small parts
+
+    // A menu entry that stays truthful to its model after being clicked.
+    component CheckItem: MenuItem {
+        property bool on: false
+        checkable: true
+        checked: on
+        onTriggered: checked = Qt.binding(() => on)
+    }
+
+    // An icon button in the ribbon, tinted when it holds a value.
+    component RibbonButton: IconButton {
+        property bool active: false
+        property color tint: theme.today
+        size: 16
+        color: active ? tint : theme.muted
+    }
+
+    // A compact text toggle in the inline editors.
+    component Seg: Rectangle {
+        id: seg
+        property string text
+        property bool on: false
+        signal clicked()
+        implicitWidth: segText.implicitWidth + 16
+        implicitHeight: 24
+        radius: 6
+        color: on ? Qt.alpha(theme.accent, 0.28) : segHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.1) : theme.mix(theme.raised, theme.foreground, 0.05)
+        Text { id: segText; anchors.centerIn: parent; text: seg.text; color: seg.on ? theme.foreground : theme.muted; font.pixelSize: backend.fontSize - 1 }
+        HoverHandler { id: segHover }
+        TapHandler { onTapped: seg.clicked() }
+    }
+
+    component ClearButton: Item {
+        property bool shown: false
+        signal clicked()
+        implicitWidth: 16
+        implicitHeight: 16
+        Icon { anchors.centerIn: parent; visible: parent.shown; name: "clear"; size: 13; color: theme.faint }
+        MouseArea { anchors.fill: parent; enabled: parent.shown; onClicked: parent.clicked() }
+    }
+
+    // ------------------------------------------------------------ menus
+
+    Menu {
+        id: priorityMenu
+        Repeater {
+            model: [["None", 0], ["High", 3], ["Medium", 2], ["Low", 1]]
+            CheckItem {
+                required property var modelData
+                text: modelData[0]
+                on: root.priority === modelData[1]
+                onTriggered: root.setPriority(modelData[1])
+            }
+        }
+        MenuSeparator {}
+        CheckItem { text: "Star"; on: root.starred; onTriggered: { root.pin("starred"); root.starred = !root.starred } }
+    }
+
+    Menu {
+        id: listMenu
+        Repeater {
+            model: backend.listChoices
+            CheckItem {
+                required property var modelData
+                text: modelData.name
+                on: modelData.id === root.listId
+                onTriggered: root.setList(modelData.id)
+            }
+        }
+    }
+
+    Menu {
+        id: typeMenu
+        Repeater {
+            model: ["Task", "Project", "Checklist"]
+            CheckItem {
+                required property int index
+                required property string modelData
+                text: modelData
+                on: root.type === index
+                onTriggered: root.type = index
+            }
+        }
+    }
+
+    Menu {
+        id: attachMenu
+        MenuItem { text: "Add File…"; onTriggered: filePicker.open("Attach a file", "quickentry-attach") }
+        Repeater {
+            model: root.files
+            MenuItem {
+                required property int index
+                required property string modelData
+                text: "Remove " + root.fileName(modelData)
+                onTriggered: root.files = root.files.filter((_, j) => j !== index)
+            }
+        }
+    }
+
+    Menu {
+        id: placeMenu
+        property var places: []
+        onAboutToShow: places = backend.locationChoices()
+        CheckItem { text: "None"; on: !root.locationId; onTriggered: root.setPlace(0) }
+        MenuSeparator { visible: placeMenu.places.length > 0 }
+        Repeater {
+            model: placeMenu.places
+            CheckItem {
+                required property var modelData
+                text: modelData.name
+                on: root.locationId === modelData.id
+                onTriggered: root.setPlace(root.locationId === modelData.id ? 0 : modelData.id)
+            }
+        }
+    }
+
+    Menu {
+        id: repeatMenu
+        CheckItem { text: "Never"; on: !root.recurrence.frequency; onTriggered: { root.pin("recurrence"); root.recurrence = root.blankRule(); if (root.customMode === "repeat") root.closeCustom() } }
+        Repeater {
+            model: root.repeatPresets
+            CheckItem {
+                required property var modelData
+                required property int index
+                text: modelData.label
+                on: root.presetIndex() === index
+                onTriggered: { root.setPreset(modelData); if (root.customMode === "repeat") root.closeCustom() }
+            }
+        }
+        MenuSeparator {}
+        CheckItem {
+            text: "After Completion"
+            enabled: !!root.recurrence.frequency
+            on: root.recurrence.from === 1
+            onTriggered: root.setRule({ from: root.recurrence.from === 1 ? 0 : 1 })
+        }
+        MenuItem { text: "Custom…"; onTriggered: root.openCustom("repeat") }
+    }
+
+    Menu {
+        id: alarmMenu
+        Repeater {
+            model: root.alertPresets
+            CheckItem {
+                required property int modelData
+                text: root.alertText(modelData)
+                on: root.alerts.includes(modelData)
+                onTriggered: root.toggleAlert(modelData)
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "Remove All"; enabled: root.alerts.length > 0; onTriggered: { root.pin("alerts"); root.alerts = [] } }
+    }
+
+    Menu {
+        id: durationMenu
+        CheckItem { text: "None"; on: !root.duration; onTriggered: root.setDuration(0) }
+        Repeater {
+            model: root.durationPresets
+            CheckItem {
+                required property int modelData
+                text: root.durationText(modelData)
+                on: root.duration === modelData
+                onTriggered: root.setDuration(modelData)
+            }
+        }
+        CheckItem { text: "Custom…"; on: root.duration > 0 && !root.durationPresets.includes(root.duration); onTriggered: root.openCustom("duration") }
+    }
+
+    // ------------------------------------------------------------ the window
+
     ColumnLayout {
         id: body
-        anchors.fill: parent
-        anchors.margins: 14
-        spacing: 10
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: 0
 
-        // ---- title: a circle tinted by priority, then the line itself
+        // ---- title: circle, the line itself, priority and star
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            Layout.margins: 16
+            Layout.topMargin: 14
+            Layout.bottomMargin: 10
+            spacing: 12
             Rectangle {
                 Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 22; implicitHeight: 22; radius: 11
+                implicitWidth: 20; implicitHeight: 20; radius: root.type === 2 ? 5 : 10
                 color: "transparent"
-                border.width: 2
-                border.color: root.priority > 0 ? root.priorityColor(root.priority) : theme.faint
+                border.width: 1.5
+                border.color: root.priority > 0 ? root.kindColors.priority : theme.faint
                 Icon {
                     anchors.centerIn: parent
                     visible: root.type !== 0
                     name: root.type === 1 ? "project" : "checklist"
-                    size: 12
+                    size: 11
                     color: theme.faint
                 }
             }
             // Recognised phrases are drawn as capsules behind the text.
-            Rectangle {
+            Item {
                 Layout.fillWidth: true
-                implicitHeight: 42
-                radius: 8
-                color: theme.background
-                border.color: title_.activeFocus ? theme.accent : theme.divider
-
+                implicitHeight: 28
                 Repeater {
                     model: root.preview.spans || []
                     Rectangle {
                         required property var modelData
-                        // Re-measured whenever the text or its layout changes.
                         readonly property rect a: { title_.contentWidth; title_.width; title_.text; return title_.positionToRectangle(modelData.start) }
                         readonly property rect b: { title_.contentWidth; title_.width; title_.text; return title_.positionToRectangle(modelData.start + modelData.length) }
                         x: title_.x + title_.leftPadding + a.x - 3
@@ -490,277 +576,380 @@ Window {
                     id: title_
                     objectName: "quickTitle"
                     anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
+                    padding: 0
                     background: Item {}
                     color: theme.foreground
-                    placeholderText: root.type === 1 ? "New project" : root.type === 2 ? "New checklist" : "Call Sam tomorrow at 3pm #family !!"
+                    placeholderText: root.type === 1 ? "New Project" : root.type === 2 ? "New Checklist" : "New Task"
                     placeholderTextColor: theme.faint
-                    font.pixelSize: backend.fontSize + 2
+                    font.pixelSize: backend.fontSize + 4
+                    verticalAlignment: TextInput.AlignVCenter
                     selectByMouse: true
                     onTextChanged: root.applyParsed()
-                    Keys.onReturnPressed: (e) => {
-                        if (e.modifiers & Qt.ControlModifier) root.save(true)
-                        else if (e.modifiers & Qt.ShiftModifier) root.save(false)
-                        else { root.save(false); root.hide() }
+                    Keys.onReturnPressed: (e) => root.submit(e.modifiers)
+                    Keys.onEnterPressed: (e) => root.submit(e.modifiers)
+                    Keys.onEscapePressed: { if (root.customMode !== "") root.closeCustom(); else root.hide() }
+                }
+            }
+            // the reference app's bars-and-star glyph; opens the priority menu.
+            Item {
+                id: prio
+                Layout.alignment: Qt.AlignVCenter
+                implicitWidth: 34; implicitHeight: 24
+                Column {
+                    x: 2; anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+                    Repeater {
+                        model: 3
+                        Rectangle {
+                            required property int index
+                            width: 16; height: 2.5; radius: 1
+                            color: root.priority === 3 ? theme.priorityHigh : root.priority === 2 ? theme.priorityMedium
+                                 : root.priority === 1 ? theme.priorityLow : theme.faint
+                            opacity: root.priority === 0 ? 0.6 : root.priority === 1 && index > 0 ? 0.25 : root.priority === 2 && index > 1 ? 0.25 : 1
+                        }
                     }
-                    Keys.onEnterPressed: { root.save(false); root.hide() }
-                    Keys.onEscapePressed: { if (root.openKind !== "" || root.rowMode !== "") { root.openKind = ""; root.rowMode = "" } else root.hide() }
+                }
+                Icon {
+                    x: 15; y: 2
+                    name: "starred"
+                    size: 17
+                    filled: root.starred
+                    color: root.starred ? theme.star : theme.faint
+                }
+                MouseArea {
+                    id: prioMouse
+                    anchors.fill: parent; anchors.margins: -4
+                    hoverEnabled: true
+                    onClicked: priorityMenu.popup(prio, 0, prio.height + 4)
+                }
+                ToolTip.visible: prioMouse.containsMouse
+                ToolTip.delay: 600
+                ToolTip.text: (["No priority", "Low priority", "Medium priority", "High priority"][root.priority]) + (root.starred ? ", starred" : "")
+            }
+        }
+
+        // ---- the list ribbon
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 34
+            color: Qt.alpha(root.listColor, theme.dark ? 0.22 : 0.16)
+            RowLayout {
+                anchors.fill: parent
+                anchors.rightMargin: 12
+                spacing: 8
+                ListBadge {
+                    Layout.leftMargin: 10
+                    text: root.currentList ? root.currentList.name : "No list"
+                    color: root.listColor
+                    chevrons: true
+                    implicitHeight: 34
+                    onClicked: listMenu.popup(this, 0, height)
+                }
+                Item { Layout.fillWidth: true }
+                Text {
+                    readonly property bool late: root.isOverdue(root.dueIso)
+                    text: root.dueIso ? "Due " + root.dateText(root.dueIso, root.dueMinutes) : ""
+                    visible: text !== ""
+                    color: late ? theme.overdue : theme.today
+                    font.pixelSize: backend.fontSize
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    Layout.maximumWidth: 200
+                }
+                Row {
+                    spacing: 0
+                    RibbonButton {
+                        id: attachButton
+                        icon: "image"; active: root.files.length > 0
+                        tip: root.files.length ? root.files.map(root.fileName).join(", ") : "Attach a File"
+                        onClicked: attachMenu.popup(attachButton, 0, height)
+                    }
+                    RibbonButton {
+                        id: placeButton
+                        icon: "pin"; active: root.locationId > 0; tint: theme.start
+                        tip: root.locationId ? "Location: " + root.placeName() : "Location"
+                        onClicked: placeMenu.popup(placeButton, 0, height)
+                    }
+                    RibbonButton {
+                        id: repeatButton
+                        icon: "repeat"; active: !!root.recurrence.frequency; tint: theme.duration
+                        tip: root.repeatTip()
+                        onClicked: repeatMenu.popup(repeatButton, 0, height)
+                    }
+                    RibbonButton {
+                        id: alarmButton
+                        icon: "alarm"; active: root.alerts.length > 0; tint: theme.priorityMedium
+                        tip: root.alarmTip()
+                        onClicked: alarmMenu.popup(alarmButton, 0, height)
+                    }
+                    RibbonButton {
+                        id: durationButton
+                        icon: "duration"; active: root.duration > 0; tint: theme.duration
+                        tip: root.duration ? "Duration " + root.durationText(root.duration) : "Duration"
+                        onClicked: durationMenu.popup(durationButton, 0, height)
+                    }
                 }
             }
         }
 
-        // ---- the pills
-        Flow {
+        // ---- compact custom editor for repeat / duration
+        Rectangle {
             Layout.fillWidth: true
-            spacing: 6
-
-            QuickEntryPill {
-                readonly property var l: root.listById(root.listId)
-                hasDot: true
-                dot: l ? theme.listColor(l.color) : theme.faint
-                text: l ? l.name : "No list"
-                set: !!l
-                open: root.openKind === "list"
-                onClicked: root.openRow("list")
-            }
-            QuickEntryPill {
-                icon: "calendar"
-                text: root.dueIso ? root.dateText(root.dueIso, root.dueMinutes) : "No due date"
-                set: !!root.dueIso
-                tint: root.isOverdue(root.dueIso) ? theme.overdue : theme.today
-                valueColor: root.isOverdue(root.dueIso) ? theme.overdue : theme.foreground
-                open: root.openKind === "due"
-                onClicked: root.openRow("due")
-            }
-            QuickEntryPill {
-                icon: "play"
-                text: root.startIso ? "Starts " + root.dateText(root.startIso, root.startMinutes) : "No start date"
-                set: !!root.startIso
-                tint: theme.start
-                open: root.openKind === "start"
-                onClicked: root.openRow("start")
-            }
-            QuickEntryPill {
-                icon: "repeat"
-                text: root.recurrence.frequency ? backend.describeRecurrence(root.recurrence) : "Doesn't repeat"
-                set: !!root.recurrence.frequency
-                tint: theme.duration
-                open: root.openKind === "repeat"
-                onClicked: root.openRow("repeat")
-            }
-            QuickEntryPill {
-                icon: "alarm"
-                text: root.alertsText()
-                set: root.alerts.length > 0
-                tint: theme.priorityMedium
-                open: root.openKind === "alert"
-                onClicked: root.openRow("alert")
-            }
-            QuickEntryPill {
-                icon: "duration"
-                text: root.durationText(root.duration)
-                set: root.duration > 0
-                tint: theme.duration
-                open: root.openKind === "duration"
-                onClicked: root.openRow("duration")
-            }
-            QuickEntryPill {
-                icon: "tag"
-                text: root.tags.length ? root.tags.map(t => "#" + t).join(" ") : "Add tags"
-                set: root.tags.length > 0
-                tint: theme.muted
-                open: root.openKind === "tags"
-                onClicked: root.openRow("tags")
-            }
-            QuickEntryPill {
-                readonly property var loc: backend.locationChoices().find(l => l.id === root.locationId)
-                icon: "pin"
-                text: loc ? loc.name : "No place"
-                set: !!loc
-                tint: theme.start
-                open: root.openKind === "place"
-                onClicked: root.openRow("place")
-            }
-            QuickEntryPill {
-                text: root.priorityNames[root.priority]
-                set: root.priority > 0
-                valueColor: root.priorityColor(root.priority)
-                open: root.openKind === "priority"
-                onClicked: root.openRow("priority")
-            }
-            QuickEntryPill {
-                icon: "starred"
-                filledIcon: root.starred
-                text: root.starred ? "Starred" : "Star"
-                set: root.starred
-                tint: theme.star
-                onClicked: { root.pin("starred"); root.starred = !root.starred }
-            }
-            QuickEntryPill {
-                icon: "attach"
-                text: root.files.length === 0 ? "Attach file" : root.files.length === 1 ? root.fileName(root.files[0]) : root.files.length + " files"
-                set: root.files.length > 0
-                tint: theme.muted
-                open: root.openKind === "attach"
-                onClicked: root.openRow("attach")
+            visible: root.customMode !== ""
+            implicitHeight: 38
+            color: theme.mix(theme.raised, theme.foreground, 0.04)
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 6
+                Text {
+                    visible: root.customMode === "repeat"
+                    text: "Every"
+                    color: theme.muted
+                    font.pixelSize: backend.fontSize - 1
+                }
+                Plain.TextField {
+                    id: numField
+                    implicitWidth: 52
+                    implicitHeight: 26
+                    padding: 4
+                    horizontalAlignment: TextInput.AlignHCenter
+                    color: theme.foreground
+                    font.pixelSize: backend.fontSize - 1
+                    placeholderText: "1"
+                    placeholderTextColor: theme.faint
+                    validator: IntValidator { bottom: 1; top: 999 }
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    selectByMouse: true
+                    background: Rectangle { radius: 6; color: theme.background; border.color: numField.activeFocus ? theme.accent : theme.divider }
+                    onTextEdited: if (root.customMode === "repeat" && text) root.setRule({ interval: parseInt(text) })
+                    Keys.onReturnPressed: root.applyCustom()
+                    Keys.onEnterPressed: root.applyCustom()
+                    Keys.onEscapePressed: root.closeCustom()
+                }
+                Repeater {
+                    model: root.customMode === "repeat" ? root.repeatUnits : ["min", "hours"]
+                    Seg {
+                        required property string modelData
+                        required property int index
+                        text: modelData
+                        on: root.customMode === "repeat" ? root.recurrence.frequency === index + 1 || (root.recurrence.frequency === 5 && index === 1) : root.durationUnit === index
+                        onClicked: {
+                            if (root.customMode === "repeat") root.setRule({ frequency: index + 1, weekdays: 0 })
+                            else root.durationUnit = index
+                        }
+                    }
+                }
+                Item { implicitWidth: 6 }
+                Repeater {
+                    model: root.customMode === "repeat" && root.recurrence.frequency === 2 ? 7 : 0
+                    Seg {
+                        required property int index
+                        text: root.weekdayNames[index].charAt(0)
+                        implicitWidth: 24
+                        on: (root.recurrence.weekdays >> index) & 1
+                        onClicked: root.setRule({ weekdays: (root.recurrence.weekdays ^ (1 << index)) || (1 << index) })
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                Seg { text: "Done"; on: true; onClicked: root.applyCustom() }
             }
         }
 
-        // ---- the one open row of options
-        QuickEntryPopupRow {
-            id: optRow
+        // ---- tags (left) and start / due (right)
+        RowLayout {
             Layout.fillWidth: true
-            visible: root.openKind !== ""
-            implicitHeight: rowBox.implicitHeight
-            count: root.options.length
-            typeTarget: root.openKind === "due" || root.openKind === "start" || root.openKind === "tags" ? textField : null
-            onActivated: (i) => root.pick(i)
-            onCloseRequested: root.closeRow()
+            Layout.margins: 16
+            Layout.topMargin: 10
+            Layout.bottomMargin: 10
+            spacing: 12
 
-            Rectangle {
-                id: rowBox
-                width: parent.width
-                implicitHeight: flow.implicitHeight + 20
-                radius: 10
-                color: theme.mix(theme.raised, theme.foreground, 0.04)
-                border.color: optRow.activeFocus ? Qt.alpha(theme.accent, 0.5) : theme.divider
-
-                Flow {
-                    id: flow
-                    x: 10; y: 10
-                    width: parent.width - 20
-                    spacing: 6
-
-                    Text {
-                        height: 26
-                        verticalAlignment: Text.AlignVCenter
-                        rightPadding: 4
-                        text: ({ list: "List", due: "Due", start: "Start", repeat: root.rowMode === "repeatCustom" ? "Every" : "Repeat",
-                                 alert: "Alert", duration: "Duration", tags: "Tags", place: "Place", priority: "Priority", attach: "Files" })[root.openKind] || ""
-                        color: theme.faint
-                        font.pixelSize: backend.fontSize - 2
-                        font.weight: Font.DemiBold
-                        font.capitalization: Font.AllUppercase
-                    }
-                    QuickEntryPopupField {
-                        id: numField
-                        visible: root.rowMode !== ""
-                        implicitWidth: 64
-                        horizontalAlignment: TextInput.AlignHCenter
-                        placeholderText: root.rowMode === "durationCustom" ? "min" : "1"
-                        validator: IntValidator { bottom: 1; top: 999 }
-                        inputMethodHints: Qt.ImhDigitsOnly
-                        onTextEdited: if (root.rowMode === "repeatCustom" && text) root.setRule({ interval: parseInt(text) })
-                        onAccepted: {
-                            if (root.rowMode === "durationCustom") { if (text) root.setDuration(parseInt(text)); root.closeRow() }
-                            else optRow.forceActiveFocus()
-                        }
-                        onEscaped: root.closeRow()
-                    }
-                    Text {
-                        visible: root.rowMode === "durationCustom"
-                        height: 26
-                        verticalAlignment: Text.AlignVCenter
-                        text: "minutes"
-                        color: theme.muted
-                        font.pixelSize: backend.fontSize - 1
-                    }
-                    Repeater {
-                        model: root.options
-                        QuickEntryChip {
-                            required property var modelData
-                            required property int index
-                            text: modelData.label
-                            digit: index < 9 ? String(index + 1) : ""
-                            on: modelData.on
-                            tint: modelData.tint || theme.accent
-                            dot: modelData.dot || "transparent"
-                            hasDot: !!modelData.hasDot
-                            current: optRow.activeFocus && optRow.index === index
-                            onClicked: { optRow.index = index; root.pick(index) }
+            Flow {
+                id: tagFlow
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 5
+                Icon { name: "tag"; size: 16; color: theme.faint; height: 24 }
+                Repeater {
+                    model: root.tags
+                    Rectangle {
+                        required property string modelData
+                        height: 22
+                        width: chipText.implicitWidth + 30
+                        radius: 11
+                        color: theme.mix(theme.raised, theme.foreground, 0.28)
+                        Text { id: chipText; x: 9; anchors.verticalCenter: parent.verticalCenter; text: modelData; color: theme.background; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
+                        Icon {
+                            anchors.right: parent.right; anchors.rightMargin: 5; anchors.verticalCenter: parent.verticalCenter
+                            name: "close"; size: 9; stroke: 2.4; color: theme.background
+                            MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.removeTag(modelData) }
                         }
                     }
-                    QuickEntryPopupField {
-                        id: textField
-                        visible: root.rowMode === "" && (root.openKind === "due" || root.openKind === "start" || root.openKind === "tags")
-                        implicitWidth: 190
-                        placeholderText: root.openKind === "tags" ? "New tag" : "Type a date, e.g. fri 3pm"
-                        onAccepted: {
-                            if (root.openKind === "tags") { root.addTag(text); text = "" }
-                            else {
-                                const s = backend.dateSuggestions(text)
-                                if (s.length && s[0].date) {
-                                    root.setDate(root.openKind, s[0].date, s[0].minutes >= 0 ? s[0].minutes : undefined)
-                                    root.closeRow()
+                }
+                TextInput {
+                    id: tagInput
+                    property var matches: []
+                    width: Math.max(70, contentWidth + 10)
+                    height: 24
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: theme.foreground
+                    selectionColor: theme.selection
+                    font.pixelSize: backend.fontSize
+                    clip: true
+                    Text { visible: !tagInput.text && root.tags.length === 0; text: "Tags"; color: theme.faint; font: tagInput.font; anchors.verticalCenter: parent.verticalCenter }
+                    function accept(name) {
+                        root.addTag(name)
+                        text = ""
+                        matches = []
+                        tagPopup.close()
+                    }
+                    onTextEdited: {
+                        if (text.endsWith(",")) { accept(text.slice(0, -1)); return }
+                        const q = text.toLowerCase()
+                        matches = q ? backend.tagNames.filter(n => n.toLowerCase().startsWith(q) && !root.tags.includes(n)).slice(0, 6) : []
+                        if (matches.length) tagPopup.open(); else tagPopup.close()
+                    }
+                    Keys.onReturnPressed: (e) => {
+                        if (text.trim()) accept(matches.length && tagPopup.visible ? matches[0] : text)
+                        else root.submit(e.modifiers)
+                    }
+                    Keys.onTabPressed: (e) => { if (text.trim()) { accept(matches.length && tagPopup.visible ? matches[0] : text); e.accepted = true } else e.accepted = false }
+                    Keys.onPressed: (e) => {
+                        if (e.key === Qt.Key_Backspace && !text && root.tags.length) {
+                            root.removeTag(root.tags[root.tags.length - 1])
+                            e.accepted = true
+                        }
+                    }
+                    Keys.onEscapePressed: (e) => { if (tagPopup.visible) { tagPopup.close(); e.accepted = true } else root.hide() }
+                    onActiveFocusChanged: if (!activeFocus && text.trim()) accept(text)
+
+                    Popup {
+                        id: tagPopup
+                        y: tagInput.height + 2
+                        padding: 4
+                        background: Rectangle { color: theme.raised; radius: 8; border.color: theme.divider }
+                        contentItem: Column {
+                            Repeater {
+                                model: tagInput.matches
+                                Text {
+                                    required property string modelData
+                                    text: modelData
+                                    color: theme.foreground
+                                    padding: 5
+                                    font.pixelSize: backend.fontSize - 1
+                                    MouseArea { anchors.fill: parent; onClicked: tagInput.accept(modelData) }
                                 }
                             }
                         }
-                        onEscaped: root.closeRow()
-                    }
-                    Text {
-                        readonly property var s: textField.visible && root.openKind !== "tags" && textField.text ? backend.dateSuggestions(textField.text) : []
-                        visible: s.length > 0
-                        height: 26
-                        verticalAlignment: Text.AlignVCenter
-                        text: s.length ? "→ " + s[0].label : ""
-                        color: theme.today
-                        font.pixelSize: backend.fontSize - 1
                     }
                 }
+            }
+
+            GridLayout {
+                Layout.alignment: Qt.AlignTop
+                columns: 5
+                columnSpacing: 2
+                rowSpacing: 2
+                Icon { name: "play"; size: 11; filled: true; color: root.startIso ? theme.start : theme.faint }
+                DateField {
+                    id: startField
+                    iso: root.startIso
+                    value: root.fieldDate(root.startIso)
+                    placeholderText: "Start"
+                    onPicked: (iso, minutes) => root.setDate("start", iso, minutes >= 0 ? minutes : undefined)
+                    onTyped: (text) => root.typedDate("start", text)
+                }
+                ClearButton { shown: !!root.startIso; onClicked: root.setDate("start", "", -1) }
+                DateField {
+                    id: startTimeField
+                    timeOnly: true
+                    value: root.startMinutes >= 0 ? root.timeText(root.startMinutes) : ""
+                    placeholderText: "Time"
+                    onTyped: (text) => root.typedTime("start", text)
+                }
+                ClearButton { shown: root.startMinutes >= 0; onClicked: root.setTime("start", -1) }
+
+                Icon { name: "check"; size: 12; stroke: 2.2; color: root.dueIso ? theme.foreground : theme.faint }
+                DateField {
+                    id: dueField
+                    iso: root.dueIso
+                    value: root.fieldDate(root.dueIso)
+                    placeholderText: "Due"
+                    onPicked: (iso, minutes) => root.setDate("due", iso, minutes >= 0 ? minutes : undefined)
+                    onTyped: (text) => root.typedDate("due", text)
+                }
+                ClearButton { shown: !!root.dueIso; onClicked: root.setDate("due", "", -1) }
+                DateField {
+                    id: dueTimeField
+                    timeOnly: true
+                    value: root.dueMinutes >= 0 ? root.timeText(root.dueMinutes) : ""
+                    placeholderText: "Time"
+                    onTyped: (text) => root.typedTime("due", text)
+                }
+                ClearButton { shown: root.dueMinutes >= 0; onClicked: root.setTime("due", -1) }
             }
         }
 
         // ---- notes: one line until you click or Tab into it
         Rectangle {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumHeight: root.notesOpen ? 60 : 34
-            implicitHeight: root.notesOpen ? Math.ceil(notes.font.pixelSize * 1.4 * 4) + 16 : 34
-            radius: 8
+            implicitHeight: root.notesOpen ? Math.ceil(notes.font.pixelSize * 1.4 * 4) + 24 : 40
             color: theme.notes
+            Icon { x: 16; y: 12; name: "note"; size: 16; color: theme.faint }
             Plain.TextArea {
                 id: notes
                 anchors.fill: parent
-                anchors.margins: 4
+                anchors.leftMargin: 44
+                anchors.rightMargin: 16
+                topPadding: 10
+                bottomPadding: 10
+                leftPadding: 0
                 wrapMode: TextEdit.Wrap
-                placeholderText: "Add notes…"
+                placeholderText: "Notes"
                 placeholderTextColor: theme.faint
                 color: theme.foreground
-                font.pixelSize: backend.fontSize - 1
-                verticalAlignment: root.notesOpen ? TextEdit.AlignTop : TextEdit.AlignVCenter
+                font.pixelSize: backend.fontSize
+                verticalAlignment: TextEdit.AlignTop
                 background: Item {}
                 onActiveFocusChanged: {
                     if (activeFocus) root.notesOpen = true
                     else if (text === "") root.notesOpen = false
                 }
-                Keys.onEscapePressed: { if (root.openKind !== "" || root.rowMode !== "") { root.openKind = ""; root.rowMode = "" } else root.hide() }
+                Keys.onEscapePressed: root.hide()
             }
         }
 
         // ---- footer
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            Layout.margins: 16
+            Layout.topMargin: 12
+            spacing: 10
 
-            Row {
-                spacing: 4
-                Repeater {
-                    model: ["Task", "Project", "Checklist"]
-                    QuickEntryChip {
-                        required property string modelData
-                        required property int index
-                        focusable: true
-                        text: modelData
-                        on: root.type === index
-                        onClicked: root.type = index
-                    }
+            Rectangle {
+                id: typeButton
+                implicitWidth: typeRow.implicitWidth + 24; implicitHeight: 32; radius: 6
+                color: typeHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.14) : theme.mix(theme.raised, theme.foreground, 0.08)
+                border.width: 2
+                border.color: typeFocus.activeFocus ? theme.accent : "transparent"
+                Row {
+                    id: typeRow
+                    anchors.centerIn: parent
+                    spacing: 14
+                    Text { text: ["Task", "Project", "Checklist"][root.type]; color: theme.foreground; font.pixelSize: backend.fontSize; anchors.verticalCenter: parent.verticalCenter }
+                    Icon { name: "updown"; size: 11; stroke: 2; color: theme.muted; anchors.verticalCenter: parent.verticalCenter }
                 }
+                HoverHandler { id: typeHover }
+                TapHandler { onTapped: typeMenu.popup(typeButton, 0, typeButton.height + 2) }
+                FocusScope { id: typeFocus; anchors.fill: parent; activeFocusOnTab: true
+                    Keys.onPressed: (e) => { if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) { typeMenu.popup(typeButton, 0, typeButton.height + 2); e.accepted = true } } }
             }
             Item { Layout.fillWidth: true }
             Rectangle {
-                implicitWidth: cancelText.implicitWidth + 28; implicitHeight: 32; radius: 6
-                color: cancelHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.1) : "transparent"
+                implicitWidth: cancelText.implicitWidth + 40; implicitHeight: 32; radius: 6
+                color: cancelHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.14) : theme.mix(theme.raised, theme.foreground, 0.08)
+                border.width: 2
                 border.color: cancelFocus.activeFocus ? theme.accent : "transparent"
                 Text { id: cancelText; anchors.centerIn: parent; text: "Cancel"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 HoverHandler { id: cancelHover }
@@ -771,27 +960,20 @@ Window {
             Rectangle {
                 id: saveButton
                 readonly property bool ready: title_.text.trim() !== ""
-                implicitWidth: saveText.implicitWidth + 32; implicitHeight: 32; radius: 6
+                implicitWidth: saveText.implicitWidth + 48; implicitHeight: 32; radius: 6
                 color: theme.accent
                 opacity: ready ? 1 : 0.4
                 border.width: 2
                 border.color: saveFocus.activeFocus ? theme.foreground : "transparent"
                 Text { id: saveText; anchors.centerIn: parent; text: "Save"; color: theme.accentForeground; font.pixelSize: backend.fontSize; font.weight: Font.DemiBold }
+                HoverHandler { id: saveHover }
                 TapHandler { enabled: saveButton.ready; onTapped: { root.save(false); root.hide() } }
+                ToolTip.visible: saveHover.hovered
+                ToolTip.delay: 600
+                ToolTip.text: "Return saves · Shift+Return adds another · Ctrl+Return opens"
                 FocusScope { id: saveFocus; anchors.fill: parent; activeFocusOnTab: true
                     Keys.onPressed: (e) => { if (saveButton.ready && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) && !(e.modifiers & (Qt.ShiftModifier | Qt.ControlModifier))) { root.save(false); root.hide(); e.accepted = true } } }
             }
         }
-        Text {
-            Layout.fillWidth: true
-            Layout.topMargin: -4
-            text: "Return saves · Shift+Return saves and adds another · Ctrl+Return saves and opens"
-            color: theme.faint
-            font.pixelSize: backend.fontSize - 3
-            elide: Text.ElideRight
-        }
     }
-
-    // "Pick date…" focuses the typing field.
-    readonly property alias dateField: textField
 }
