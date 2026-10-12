@@ -65,9 +65,7 @@ private slots:
         QVERIFY(app.openSource(key));
         app.press(Qt::Key_N, Qt::ControlModifier);
         TRY_ITEM(title, findItem("editorTitle"));
-        QEXPECT_FAIL("", "BUG: Ctrl+N opens the new task's editor but leaves keyboard focus on the list row loader, so typing goes nowhere", Continue);
         QTRY_VERIFY2_WITH_TIMEOUT(title->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 3000);
-        click(title);  // What a user does when typing does nothing.
         app.type("Plan the offsite");
         app.press(Qt::Key_Return);
         QTRY_VERIFY2_WITH_TIMEOUT(app.taskTitled("Plan the offsite").id != 0, qPrintable(app.titles()), 3000);
@@ -78,9 +76,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 2000);
         app.press(Qt::Key_N, Qt::ControlModifier);
         TRY_ITEM(todayTitle, findItem("editorTitle"));
-        QEXPECT_FAIL("", "BUG: Ctrl+N opens the new task's editor but leaves keyboard focus on the list row loader (Today)", Continue);
         QTRY_VERIFY2_WITH_TIMEOUT(todayTitle->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 3000);
-        click(todayTitle);
         app.type("Send the invoice");
         app.press(Qt::Key_Return);
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Send the invoice").id != 0, 3000);
@@ -257,10 +253,7 @@ private slots:
         TRY_ITEM(field, findItem("searchField"));
         QTRY_VERIFY_WITH_TIMEOUT(field->property("activeFocus").toBool(), 2000);
         app.type("milk");
-        // Each keystroke refilters the list, and the list takes focus back on
-        // every view change, so only the first letter reaches the field (and
-        // the rest run as bare-key list commands).
-        QEXPECT_FAIL("", "BUG: search field loses focus to the list after the first typed character", Abort);
+        // Each keystroke refilters the list; the field keeps focus throughout.
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString("milk"), 2000);
         QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.report) && !app.row(app.ids.plants), 2000);
         app.press(Qt::Key_Escape);

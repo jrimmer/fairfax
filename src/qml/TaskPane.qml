@@ -270,7 +270,13 @@ Item {
                     const i = backend.tasks.indexOfKey("t:" + id)
                     if (i >= 0) list.positionViewAtIndex(i, ListView.Contain)
                 }
-                function onViewChanged() { if (!list.activeFocus && !backend.editingTaskId) list.forceActiveFocus() }
+                // A refilter brings focus back to the list, except from a text
+                // field such as search, where the next keystroke belongs.
+                function onViewChanged() {
+                    const f = root.Window.activeFocusItem
+                    if (f && "cursorPosition" in f) return
+                    if (!list.activeFocus && !backend.editingTaskId) list.forceActiveFocus()
+                }
             }
 
             // Clicking empty space clears the selection, as in the reference app.

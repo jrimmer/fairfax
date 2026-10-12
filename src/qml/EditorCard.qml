@@ -62,8 +62,12 @@ Item {
 
     Component.onCompleted: {
         loadTitle()
-        titleField.forceActiveFocus()
-        if (e.isNew) titleField.selectAll()
+        // The card is built before the list has placed its row, and focus
+        // asked for then is lost, so a new task's title wouldn't take typing.
+        Qt.callLater(() => {
+            titleField.forceActiveFocus()
+            if (root.e.isNew) titleField.selectAll()
+        })
         const pending = backend.takePendingField()
         if (pending) Qt.callLater(root.goTo, pending)
     }
