@@ -232,6 +232,7 @@ Window {
                     RowLayout {
                         Label { text: "Task rows"; Layout.preferredWidth: 160 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             model: ["Compressed", "Normal", "Extended"]
                             currentIndex: Number(root.value("appearance.density", 1))
                             onActivated: (i) => backend.setSetting("appearance.density", i)
@@ -240,6 +241,7 @@ Window {
                     RowLayout {
                         Label { text: "Mini calendar busy days"; Layout.preferredWidth: 160 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var styles: ["heat", "dots", "none"]
                             model: ["Heat Map", "Dots", "None"]
                             currentIndex: Math.max(0, styles.indexOf(String(root.value("appearance.calendarStyle", "heat"))))
@@ -273,6 +275,7 @@ Window {
                     RowLayout {
                         Label { text: "Show completed tasks for"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var minutes: [0, 1, 60, 1440, 10080, 43200, -1]
                             model: ["Never", "1 minute", "1 hour", "1 day", "1 week", "1 month", "Always"]
                             currentIndex: Math.max(0, minutes.indexOf(Number(root.value("tasks.completedWindow", 1440))))
@@ -283,6 +286,7 @@ Window {
                     RowLayout {
                         Label { text: "Default list"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             // 0 is the first list and -1 the list used last.
                             model: [{ name: "First list", id: 0 }, { name: "Last used", id: -1 }].concat(backend.listChoices)
                             textRole: "name"
@@ -296,6 +300,7 @@ Window {
                     RowLayout {
                         Label { text: "Default due date for new tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [-1, 0, 1, 2, 3, 7, 14, 30]
                             model: ["None", "Same Day", "Day After", "2 Days Later", "3 Days Later", "1 Week Later", "2 Weeks Later", "Next Month"]
                             currentIndex: Math.max(0, days.indexOf(Number(root.value("tasks.defaultDueOffset", -1))))
@@ -341,6 +346,7 @@ Window {
                     RowLayout {
                         Label { text: "Auto-delete completed tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [0, 1, 7, 30, 90, 180, 365]
                             model: ["Never", "After 1 day", "After 1 week", "After 1 month", "After 3 months", "After 6 months", "After 1 year"]
                             currentIndex: Math.max(0, days.indexOf(Number(root.value("tasks.autoDeleteDays", 0))))
@@ -377,6 +383,7 @@ Window {
                     RowLayout {
                         Label { text: "Counts on lists"; Layout.preferredWidth: 260 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             model: ["None", "Overdue", "Overdue + Undone"]
                             currentIndex: Math.max(0, Math.min(2, Number(root.value("lists.counts", 2))))
                             onActivated: (i) => backend.setSetting("lists.counts", i)
@@ -403,6 +410,7 @@ Window {
                     RowLayout {
                         Label { text: "Sound alerts repeat until dismissed"; Layout.preferredWidth: 260 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var minutes: [0, 2, 5, 10]
                             model: ["Never", "Every 2 mins", "Every 5 mins", "Every 10 mins"]
                             currentIndex: Math.max(0, minutes.indexOf(Number(root.value("alerts.nagMinutes", 0))))
@@ -427,6 +435,7 @@ Window {
                     RowLayout {
                         Label { text: "Tasks with a due time"; Layout.preferredWidth: 170 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var offsets: [-1, 0, 5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880]
                             model: ["None", "At due time", "5 minutes before", "10 minutes before", "15 minutes before", "30 minutes before",
                                     "1 hour before", "2 hours before", "6 hours before", "12 hours before", "1 day before", "2 days before"]
@@ -437,6 +446,7 @@ Window {
                     RowLayout {
                         Label { text: "Tasks with only a date"; Layout.preferredWidth: 170 }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [-1, 0, 1, 2]
                             model: ["None", "On the day", "1 day before", "2 days before"]
                             currentIndex: Math.max(0, days.indexOf(Number(root.value("alerts.defaultDateOnly", -1))))
@@ -444,6 +454,7 @@ Window {
                         }
                         Label { text: "at" }
                         ComboBox {
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             id: reminderTime
                             readonly property var minutes: [360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260]
                             model: minutes.map(m => ((m / 60) % 12 || 12) + ":00 " + (m < 720 ? "AM" : "PM"))
