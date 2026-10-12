@@ -23,21 +23,21 @@ Popup {
             ["t / y", "Due today / tomorrow"], ["Ctrl+T", "Start today"], ["d / k", "Defer / Schedule…"],
             ["e / x", "Due time / Duration…"], ["] [", "Due date ±1 day (Shift: week)"], [". ,", "Start date ±1 day (Shift: week)"],
             ["Alt+[ / Alt+,", "Remove due / start date"], ["0–3", "Priority none … high"], ["= / -", "Raise / lower priority"],
-            ["s / Ctrl+S", "Star / unstar"], ["l / Alt+L", "Tag… / untag"], ["m", "Move to list…"], ["c", "Collapse project"],
+            ["s / Ctrl+S", "Star / unstar"], ["l / Alt+L", "Tag… / Untag…"], ["m", "Move to list…"], ["c", "Collapse project"],
             ["p / u", "Perform action / open links"], ["j / f / /", "Jump to list / find task / find tag"],
             ["Delete", "Delete"], ["?", "This overlay"], ["q", "Quit"] ] },
         { title: "New & edit", keys: [
             ["Ctrl+N", "New task"], ["Ctrl+Alt+N", "New project"], ["Ctrl+Shift+Alt+N", "New checklist"],
             ["Alt+N", "New sub-task"], ["Ctrl+Shift+N", "New list"], ["Ctrl+.", "Complete / reopen"],
             ["Ctrl+D", "Duplicate"], ["Ctrl+Return / Esc", "Finish editing"], ["Ctrl+Alt+0–3", "Priority while editing"],
-            ["Ctrl+Alt+S", "Toggle star while editing"], ["Ctrl+/", "Defer…"], ["Ctrl+L / Ctrl+R", "Move… / Tag…"],
-            ["Ctrl+;", "Repeat…"], ["Ctrl+Shift+Alt+1–3", "Convert to task / project / checklist"],
+            ["Ctrl+Alt+S", "Toggle star while editing"], ["Ctrl+E B G ' / ;", "Editor: notes, action, location, alerts, dates, repeat"], ["Ctrl+J", "Focus Filter"], ["Ctrl+Alt+P / C", "Project / checklist from selection"], ["Ctrl+Alt+T", "New tag (+Shift: group)"], ["Ctrl+L / Ctrl+R", "Move… / Tag…"],
+            ["Ctrl+Shift+Alt+1–3", "Convert to task / project / checklist"],
             ["Ctrl+Shift+↑ ↓", "Move task up / down"], ["Ctrl+Alt+↑ ↓", "Collapse / expand all projects"], ["Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"] ] },
         { title: "View", keys: [
             ["Ctrl+1–5", "All, Today, Starred, Scheduled, Done"], ["Ctrl+0", "Inbox"], ["Ctrl+↑ ↓", "Previous / next list"],
             ["Ctrl+F", "Search"], ["Ctrl+Shift+O", "Quick Open"], ["Ctrl+K", "Show scheduled"], ["Ctrl+U", "Show paused"],
             ["Ctrl+Shift+K", "Show scheduled & paused"], ["Ctrl+O", "Hide completed"], ["Ctrl+Alt+J", "Project view"],
-            ["Ctrl+Alt+← →", "Lists / Tags panels"], ["Ctrl+= / Ctrl+-", "Text size"], ["Ctrl+C / Ctrl+V", "Copy / paste tasks"], ["Shift+F5", "Previous task"], ["Ctrl+Alt+F", "Search scope"], ["Ctrl+Alt+W", "New window"], ["Ctrl+S", "Sync now"], ["Ctrl+,", "Settings"],
+            ["Ctrl+Alt+← →", "Lists / Tags panels"], ["Ctrl+= / Ctrl+-", "Text size"], ["Ctrl+C / X / V", "Copy / cut / paste tasks"], ["Shift+F5", "Previous task"], ["Ctrl+Alt+F", "Search scope"], ["Ctrl+Alt+W", "New window"], ["Ctrl+S", "Sync now"], ["Ctrl+,", "Settings"],
             ["Ctrl+Shift+2", "Quick Entry"], ["Ctrl+Shift+E", "Export tasks"], ["Ctrl+Q", "Quit"] ] },
     ]
 

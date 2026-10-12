@@ -33,6 +33,11 @@ ApplicationWindow {
     readonly property bool utilityVisible: utilityShown && width >= 1040
 
     function openCommand(kind) { command.openFor(kind) }
+    function newTag(group) {
+        if (!win.utilityVisible) win.utilityShown = true
+        utility.tab = 0
+        utility.promptName(group ? "newGroup" : "newTag", 0, "", 0)
+    }
     // Popups restore focus to whatever they found when they close, which can
     // be the window itself; handing focus back to the list afterwards keeps
     // the bare-key commands working.
@@ -97,6 +102,8 @@ ApplicationWindow {
                 backend.addToCalendar(Number(purpose.slice(6)), path)
             else if (purpose === "export-selection")
                 backend.exportTo(path, path.endsWith(".ics") ? "ics" : "csv", true)
+            else if (purpose.startsWith("link:"))
+                backend.linkFile(Number(purpose.slice(5)), path)
         }
     }
 
@@ -203,8 +210,20 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+Shift+Alt+3"; onActivated: backend.convertSelection(2) }
     AppShortcut { sequence: "Ctrl+L"; onActivated: win.openCommand("move") }
     AppShortcut { sequence: "Ctrl+R"; onActivated: win.openCommand("tag") }
-    AppShortcut { sequence: "Ctrl+/"; onActivated: win.openCommand("defer") }
-    AppShortcut { sequence: "Ctrl+;"; onActivated: win.openCommand("repeat") }
+    // The editor quick-jumps: open the editor on the task, at one field.
+    AppShortcut { sequence: "Ctrl+E"; onActivated: backend.editField("notes") }
+    AppShortcut { sequence: "Ctrl+B"; onActivated: backend.editField("action") }
+    AppShortcut { sequence: "Ctrl+G"; onActivated: backend.editField("location") }
+    AppShortcut { sequence: "Ctrl+'"; onActivated: backend.editField("alerts") }
+    AppShortcut { sequence: "Ctrl+/"; onActivated: backend.editField("dates") }
+    AppShortcut { sequence: "Ctrl+;"; onActivated: backend.editField("repeat") }
+    AppShortcut { sequence: "Ctrl+J"; onActivated: backend.toggleFocus() }
+    AppShortcut { sequence: "Ctrl+Alt+R"; onActivated: backend.untagSelection() }
+    // Ctrl+T already starts tasks today, so tags take Alt with it.
+    AppShortcut { sequence: "Ctrl+Alt+T"; onActivated: win.newTag(false) }
+    AppShortcut { sequence: "Ctrl+Shift+Alt+T"; onActivated: win.newTag(true) }
+    AppShortcut { sequence: "Ctrl+Alt+P"; onActivated: backend.newFromSelection(1) }
+    AppShortcut { sequence: "Ctrl+Alt+C"; onActivated: backend.newFromSelection(2) }
     AppShortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
     AppShortcut { sequence: "Ctrl+Shift+2"; onActivated: quickEntry.summon() }
     AppShortcut { sequence: "Shift+F5"; onActivated: backend.showLastSelected() }
@@ -220,5 +239,4 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+Shift+Alt+F"; onActivated: pane.openSearchBuilder() }
     AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
     AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: exportDialog.show() }
-    AppShortcut { sequence: "Ctrl+'"; onActivated: if (!backend.editingTaskId) backend.beginEdit() }
 }

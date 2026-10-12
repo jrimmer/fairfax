@@ -66,12 +66,34 @@ ViewBuilder::ViewBuilder(const Store &store, const QDateTime &now, const Schedul
     for (const auto &tag : store.tags())
         if (tag.paused && !tag.deleted)
             m_pausedTags.insert(tag.id);
+    const auto tags = orderedTags(store);
+    for (int i = 0; i < tags.size(); ++i)
+        m_tagRank.insert(tags.at(i).id, i);
     for (const auto &place : store.locations())
         if (place.paused && !place.deleted)
             m_pausedLocations.insert(place.id);
     for (const auto &task : store.tasks())
         if (!task.deleted && task.parentId)
             m_childrenOf[task.parentId].append(task.id);
+}
+
+QVector<Tag> ViewBuilder::orderedTags(const Store &store) {
+    QVector<Tag> tags;
+    for (const auto &t : store.tags())
+        if (!t.deleted)
+            tags.append(t);
+    const bool manual = store.setting("tags.manual", false).toBool();
+    std::sort(tags.begin(), tags.end(), [&](const Tag &a, const Tag &b) {
+        const auto ga = store.tagGroups().value(a.groupId), gb = store.tagGroups().value(b.groupId);
+        const bool ua = !ga.id || ga.deleted, ub = !gb.id || gb.deleted;
+        if (ua != ub) return ua;  // Ungrouped tags first, under "Tags".
+        if (!ua && ga.order != gb.order) return ga.order < gb.order;
+        if (a.groupId != b.groupId) return a.groupId < b.groupId;
+        if (manual && a.order != b.order) return a.order < b.order;
+        const int byName = QString::localeAwareCompare(a.name, b.name);
+        return byName != 0 ? byName < 0 : a.id < b.id;
+    });
+    return tags;
 }
 
 bool ViewBuilder::isPaused(const Task &task) const {
@@ -301,6 +323,14 @@ void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
         if (!t.startDate.isValid()) return RankLast;
         return QDateTime(t.startDate, QTime(0, 0)).addSecs(qMax(0, t.startTime) * 60).toSecsSinceEpoch();
     };
+    // A task sorts by the first of its tags in tag order, and untagged tasks
+    // go last. Locations work the same way, in name order.
+    auto firstTagRank = [this](const Task &t) -> qint64 {
+        qint64 best = RankLast;
+        for (auto id : t.tagIds)
+            best = qMin<qint64>(best, m_tagRank.value(id, RankLast));
+        return best;
+    };
     // Returns <0, 0, >0 on the sort's own field; ties fall through to the
     // shared tiebreakers below.
     auto primary = [&](const Task &a, const Task &b) -> qint64 {
@@ -325,6 +355,7 @@ void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
             return la.isEmpty() ? 0 : QString::localeAwareCompare(la, lb);
         }
         case SortField::Completion: return a.completedAt == b.completedAt ? 0 : (a.completedAt > b.completedAt ? -1 : 1);
+        case SortField::Tag: return firstTagRank(a) - firstTagRank(b);
         case SortField::Manual:
         case SortField::Section: return a.order == b.order ? 0 : (a.order < b.order ? -1 : 1);
         default: return 0;
@@ -429,23 +460,38 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
         }
     };
 
+    // A task with several tags sits under each of them when sorting by tag.
+    auto placements = [&](const Task &t) -> QVector<Placement> {
+        if (sort.field != SortField::Tag || !sort.separated || source.kind == Source::Project)
+            return {place(t)};
+        QVector<Placement> found;
+        for (auto id : t.tagIds) {
+            const Tag tag = m_store.tag(id);
+            if (tag.id && !tag.deleted)
+                found.append({"t:" + QString::number(tag.id), tag.name, {}, -1, m_tagRank.value(tag.id)});
+        }
+        if (found.isEmpty()) found.append({"notag", "No Tags", {}, -1, RankLast});
+        return found;
+    };
+
     QVector<Section> sections;
     QHash<QString, int> indexOf;
     QHash<QString, qint64> rankOf;
     QHash<QString, QVector<Task>> itemsOf;
     for (const auto &t : items) {
-        const Placement p = place(t);
-        if (!indexOf.contains(p.key)) {
-            indexOf.insert(p.key, sections.size());
-            rankOf.insert(p.key, p.rank);
-            Section s;
-            s.key = p.key;
-            s.title = p.title;
-            s.tone = p.tone;
-            s.color = p.color;
-            sections.append(s);
+        for (const Placement &p : placements(t)) {
+            if (!indexOf.contains(p.key)) {
+                indexOf.insert(p.key, sections.size());
+                rankOf.insert(p.key, p.rank);
+                Section s;
+                s.key = p.key;
+                s.title = p.title;
+                s.tone = p.tone;
+                s.color = p.color;
+                sections.append(s);
+            }
+            itemsOf[p.key].append(t);
         }
-        itemsOf[p.key].append(t);
     }
 
     const bool dated = sort.field == SortField::DueDate || sort.field == SortField::StartDate;

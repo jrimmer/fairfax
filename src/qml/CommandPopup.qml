@@ -3,9 +3,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // One palette behind the reference app's quick commands: Defer (d), Schedule (k), Due Time
-// (e), Duration (x), Tag (l), Move (m), List Jump (j), Find Task (f), Tag
-// Search (/), Repeat and Quick Open (Ctrl+Shift+O). Each kind supplies preset
-// chips (Alt+1…), a filtered item list, and what accepting does.
+// (e), Duration (x), Tag (l), Untag (Alt+L), Move (m), List Jump (j), Find
+// Task (f), Tag Search (/), Repeat and Quick Open (Ctrl+Shift+O). Each kind
+// supplies preset chips (Alt+1…), a filtered item list, and what accepting
+// does.
 Popup {
     id: root
 
@@ -24,7 +25,7 @@ Popup {
     background: Rectangle { color: theme.raised; radius: 12; border.color: theme.divider }
 
     readonly property var titles: ({
-        defer: "Defer", schedule: "Schedule", time: "Due Time", duration: "Duration", tag: "Tag",
+        defer: "Defer", schedule: "Schedule", time: "Due Time", duration: "Duration", tag: "Tag", untag: "Untag",
         move: "Move to List", jump: "Jump to List", find: "Find Task", tagsearch: "Find Tag",
         open: "Quick Open", repeat: "Repeat"
     })
@@ -83,17 +84,18 @@ Popup {
             list = backend.listChoices.filter(l => like(l.name)).map(l => ({ label: l.name, sub: l.group, color: l.color, id: l.id }))
             break
         case "jump":
-            for (let i = 0; i < backend.sidebar.count; ++i) {
-                const r = backend.sidebar.get(i)
-                if (r.sourceKey && like(r.title)) list.push({ label: r.title, color: r.kind === "focus" ? -1 : r.color, key: r.sourceKey, sub: r.kind === "project" ? "Project" : "" })
-            }
+            // Lists in collapsed groups count; the panel only hides them.
+            list = backend.jumpTargets(input.text)
             break
         case "find":
-            for (let i = 0; i < backend.tasks.count; ++i) {
-                const r = backend.tasks.get(i)
-                if (r.kind === "task" && like(r.title)) list.push({ label: r.title, sub: r.listName, color: r.listColor, id: r.taskId })
-            }
+            // Tasks folded away inside collapsed projects count too.
+            list = backend.findInView(input.text, 12).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id }))
             break
+        case "untag": {
+            list = backend.selectionTags().filter(t => like(t.name)).map(t => ({ label: t.name, sub: t.count > 1 ? t.count + " tasks" : "", id: t.id }))
+            if (!q && list.length > 1) list.push({ label: "All Tags", sub: "Remove every tag", all: true })
+            break
+        }
         case "tagsearch": case "tag":
             list = backend.tagNames.filter(like).map(n => ({ label: n }))
             if (kind === "tag" && q && !backend.tagNames.some(n => n.toLowerCase() === q)) list.unshift({ label: input.text.trim(), sub: "New tag" })
@@ -105,6 +107,9 @@ Popup {
                     if (r.sourceKey && like(r.title)) list.push({ label: r.title, sub: "List", color: r.kind === "focus" ? -1 : r.color, key: r.sourceKey })
                 }
                 list = list.slice(0, 4).concat(backend.findTasks(input.text, 10).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id, task: true })))
+            } else {
+                // Nothing typed yet: where you have been lately.
+                list = backend.recentItems(8)
             }
             break
         }
@@ -136,7 +141,8 @@ Popup {
         case "duration": backend.setSelectionDuration(it.minutes); break
         case "move": backend.moveSelectionToList(it.id); break
         case "jump": backend.selectSource(it.key); break
-        case "find": backend.selectTask(it.id); backend.revealTask(it.id); break
+        case "find": backend.revealHere(it.id); break
+        case "untag": if (it.all) backend.untagSelection(); else backend.untagSelection([it.id]); break
         case "tagsearch": {
             for (let r = 0; r < backend.tags.count; ++r) {
                 const row = backend.tags.get(r)
@@ -172,7 +178,7 @@ Popup {
             placeholderTextColor: theme.faint
             placeholderText: ({ defer: "Type a date: tom 3pm, fri, in 2w, 18d", schedule: "Start on…", time: "Type a time: 9a, 14:30, 742",
                                 duration: "45m, 2h, 1d", tag: "Tag name (Shift+Return replaces existing tags)", move: "List name",
-                                jump: "List or project", find: "Task title", tagsearch: "Tag", open: "Find any task or list",
+                                jump: "List or project", find: "Task title", untag: "Tag to remove", tagsearch: "Tag", open: "Find any task or list",
                                 repeat: "" })[root.kind] || ""
             background: Rectangle { radius: 8; color: theme.background; border.color: input.activeFocus ? theme.accent : theme.divider }
             onTextEdited: root.refresh()

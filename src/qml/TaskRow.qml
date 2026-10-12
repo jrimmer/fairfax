@@ -355,6 +355,8 @@ Item {
         onPressed: (m) => {
             if (root.proxy) root.proxy.place(mapToItem(null, m.x, m.y))
             const mode = m.modifiers & Qt.ShiftModifier ? 1 : m.modifiers & Qt.ControlModifier ? 2 : 0
+            // Option (Alt) held as the drag starts copies instead of moving.
+            backend.setDragCopy(!!(m.modifiers & Qt.AltModifier))
             if (m.button === Qt.RightButton && root.r.selected) return
             backend.selectTask(root.r.taskId, mode)
         }

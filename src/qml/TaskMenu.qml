@@ -5,6 +5,29 @@ import QtQuick.Controls
 Menu {
     id: root
     property var row: ({})
+    // What the menu needs to know about the task, read as it opens.
+    property var info: ({})
+    property var untagChoices: []
+    property bool sortDescending: false
+    readonly property var window: ApplicationWindow.window
+    // A project's sort applies to the project itself, or the one a sub-task is in.
+    readonly property int projectId: root.row.type === 1 || root.row.type === 2 ? root.row.taskId : (root.info.parentId || 0)
+
+    onAboutToShow: {
+        info = backend.taskInfo(row.taskId || 0)
+        untagChoices = backend.selectionTags()
+    }
+
+    function isoIn(days) {
+        const d = new Date()
+        d.setDate(d.getDate() + days)
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
+    }
+    function pickDate(kind) { if (window) window.openCommand(kind) }
+
+    // The relative dates Defer and Schedule both offer.
+    readonly property var dateChoices: [["Today", 0], ["Tomorrow", 1], ["In 2 Days", 2], ["In 3 Days", 3], ["Next Week", 7],
+                                        ["In 2 Weeks", 14], ["In a Month", 30]]
 
     MenuItem { text: root.row.completed ? "Mark as Not Completed" : "Mark as Completed"; onTriggered: backend.toggleComplete() }
     MenuItem { text: "Edit"; onTriggered: backend.beginEdit(root.row.taskId) }
@@ -12,6 +35,62 @@ Menu {
     MenuItem { text: "Due Today"; onTriggered: backend.setDueInDays(0) }
     MenuItem { text: "Due Tomorrow"; onTriggered: backend.setDueInDays(1) }
     MenuItem { text: "Start Today"; onTriggered: backend.setStartInDays(0) }
+    Menu {
+        title: "Defer"
+        Repeater {
+            model: root.dateChoices
+            MenuItem {
+                required property var modelData
+                text: modelData[0]
+                onTriggered: backend.deferTo(root.isoIn(modelData[1]))
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "Pick Date…"; onTriggered: root.pickDate("defer") }
+        MenuItem { text: "No Due Date"; onTriggered: backend.clearDue() }
+    }
+    Menu {
+        title: "Schedule"
+        Repeater {
+            model: root.dateChoices
+            MenuItem {
+                required property var modelData
+                text: modelData[0]
+                onTriggered: backend.scheduleTo(root.isoIn(modelData[1]))
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "Pick Date…"; onTriggered: root.pickDate("schedule") }
+        MenuItem { text: "No Start Date"; onTriggered: backend.clearStart() }
+    }
+    Menu {
+        title: "Due Time"
+        Repeater {
+            model: [["9 AM", 540], ["12 PM", 720], ["3 PM", 900], ["6 PM", 1080]]
+            MenuItem {
+                required property var modelData
+                text: modelData[0]
+                onTriggered: backend.setSelectionDueTime(modelData[1])
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "Other…"; onTriggered: root.pickDate("time") }
+        MenuItem { text: "No Time"; onTriggered: backend.setSelectionDueTime(-1) }
+    }
+    Menu {
+        title: "Duration"
+        Repeater {
+            model: [["15 mins", 15], ["30 mins", 30], ["45 mins", 45], ["1 hour", 60], ["2 hours", 120], ["4 hours", 240], ["1 day", 1440]]
+            MenuItem {
+                required property var modelData
+                text: modelData[0]
+                onTriggered: backend.setSelectionDuration(modelData[1])
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "Other…"; onTriggered: root.pickDate("duration") }
+        MenuItem { text: "No Duration"; onTriggered: backend.setSelectionDuration(0) }
+    }
     Menu {
         title: "Priority"
         MenuItem { text: "None"; onTriggered: backend.setPriority(0) }
@@ -25,10 +104,56 @@ Menu {
     MenuItem { text: root.row.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.row.starred ? 0 : 1) }
     MenuSeparator {}
     Menu {
-        title: "Convert"
-        MenuItem { text: "To Task"; onTriggered: backend.convertSelection(0) }
-        MenuItem { text: "To Project"; onTriggered: backend.convertSelection(1) }
-        MenuItem { text: "To Checklist"; onTriggered: backend.convertSelection(2) }
+        id: tagMenu
+        title: "Tag"
+        // Only the first dozen tags fit a menu; the palette finds the rest.
+        Repeater {
+            model: backend.tagNames.slice(0, 12)
+            MenuItem {
+                required property string modelData
+                text: modelData
+                onTriggered: backend.tagSelection(modelData, false)
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "Choose Tags…"; onTriggered: root.pickDate("tag") }
+    }
+    Menu {
+        title: "Untag"
+        enabled: root.untagChoices.length > 0
+        Repeater {
+            model: root.untagChoices
+            MenuItem {
+                required property var modelData
+                text: modelData.name
+                onTriggered: backend.untagSelection([modelData.id])
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: "All Tags"; onTriggered: backend.untagSelection() }
+    }
+    MenuSeparator {}
+    Menu {
+        title: "Move To"
+        Repeater {
+            model: backend.listChoices
+            MenuItem {
+                required property var modelData
+                text: modelData.name
+                onTriggered: backend.moveSelectionToList(modelData.id)
+            }
+        }
+    }
+    Menu {
+        title: "Copy To"
+        Repeater {
+            model: backend.listChoices
+            MenuItem {
+                required property var modelData
+                text: modelData.name
+                onTriggered: backend.copySelectionToList(modelData.id)
+            }
+        }
     }
     Menu {
         id: sectionMenu
@@ -47,17 +172,37 @@ Menu {
         MenuSeparator {}
         MenuItem { text: "No Section"; onTriggered: backend.moveSelectionToSection(0) }
     }
+    MenuSeparator {}
     Menu {
-        title: root.row.type === 2 ? "Sort Checklist" : "Sort Project"
-        enabled: root.row.type === 1 || root.row.type === 2
+        title: "Convert"
+        MenuItem { text: "To Task"; onTriggered: backend.convertSelection(0) }
+        MenuItem { text: "To Project"; onTriggered: backend.convertSelection(1) }
+        MenuItem { text: "To Checklist"; onTriggered: backend.convertSelection(2) }
+    }
+    Menu {
+        title: "New"
+        MenuItem { text: "Project from Selection"; onTriggered: backend.newFromSelection(1) }
+        MenuItem { text: "Checklist from Selection"; onTriggered: backend.newFromSelection(2) }
+    }
+    Menu {
+        title: root.row.type === 2 || root.info.parentType === 2 ? "Sort Checklist" : "Sort Project"
+        enabled: root.projectId > 0
         Repeater {
-            model: [[8, "Manually"], [0, "Due Date"], [1, "Start Date"], [2, "Priority"], [4, "Title"], [5, "Creation"], [7, "Duration"], [11, "Status"]]
+            model: [[8, "Manually"], [11, "Status"], [2, "Priority"], [1, "Start Date"], [0, "Due Date"], [5, "Creation"],
+                    [13, "Note"], [4, "Title"], [9, "Tag"], [14, "Location"], [7, "Duration"]]
             MenuItem {
                 required property var modelData
                 text: modelData[1]
-                onTriggered: backend.setProjectSort(root.row.taskId, modelData[0], true)
+                onTriggered: backend.setProjectSort(root.projectId, modelData[0], !root.sortDescending)
             }
         }
+        MenuSeparator {}
+        MenuItem { text: "Descending"; checkable: true; checked: root.sortDescending; onToggled: root.sortDescending = checked }
+    }
+    MenuItem {
+        text: "Goto Project"
+        enabled: !!root.info.parentId
+        onTriggered: backend.gotoProject(root.row.taskId)
     }
     MenuItem {
         text: "Open in List"
@@ -69,7 +214,9 @@ Menu {
             backend.selectTask(root.row.taskId)
         }
     }
+    MenuSeparator {}
     MenuItem { text: "Perform Action"; enabled: (root.row.actionType || 0) > 0; onTriggered: backend.performAction(root.row.taskId) }
+    MenuItem { text: "Link File…"; onTriggered: filePicker.open("Link a file in “" + root.row.title + "”", "link:" + root.row.taskId) }
     MenuItem { text: "Duplicate"; onTriggered: backend.duplicateSelection() }
     MenuSeparator {}
     MenuItem { text: "Delete"; onTriggered: backend.deleteSelection() }

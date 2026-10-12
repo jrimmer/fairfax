@@ -286,6 +286,12 @@ void Backend::selectSource(const QString &key) {
     else
         m_inheritFrom = 0;
     m_source = next;
+    if (next.kind == Source::List || next.kind == Source::Project) {
+        m_recentSources.removeAll(key);
+        m_recentSources.prepend(key);
+        while (m_recentSources.size() > 8)
+            m_recentSources.removeLast();
+    }
     m_options.keepVisible.clear();
     m_options.dayFilterFrom = {};
     m_options.dayFilterTo = {};
@@ -530,6 +536,23 @@ void Backend::beginEdit(qint64 id) {
     m_editing = id;
     rebuild();
     emit selectionChanged();
+}
+
+void Backend::editField(const QString &kind) {
+    const bool wasEditing = m_editing != 0;
+    if (!wasEditing)
+        beginEdit();
+    if (!m_editing)
+        return;
+    // A freshly opened editor reads the request as it is created; one that is
+    // already open hears about it.
+    m_pendingField = kind;
+    if (wasEditing)
+        emit editFieldRequested();
+}
+
+QString Backend::takePendingField() {
+    return std::exchange(m_pendingField, QString());
 }
 
 void Backend::endEdit() {
@@ -910,6 +933,112 @@ void Backend::moveSelectionToList(qint64 listId) {
     m_store->commit();
 }
 
+void Backend::collectTree(const Task &task, QVector<Task> &into) const {
+    into.append(task);
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    for (const auto &c : views.children(task.id))
+        collectTree(c, into);
+}
+
+void Backend::copySelectionToList(qint64 listId) {
+    if (!m_store->lists().contains(listId) || m_store->list(listId).kind == ListKind::Smart)
+        return;
+    const auto ids = targetIds();
+    if (ids.isEmpty())
+        return;
+    m_store->begin(ids.size() > 1 ? QStringLiteral("Copy %1 Tasks").arg(ids.size()) : QStringLiteral("Copy Task"));
+    for (auto id : ids) {
+        const Task t = m_store->task(id);
+        const qint64 copy = duplicateTree(t, 0, listId);
+        // duplicateTree keeps the source's place; the copy goes last instead.
+        Task c = m_store->task(copy);
+        c.sectionId = 0;
+        c.order = nextOrder(listId, 0);
+        m_store->putTask(c);
+    }
+    m_store->commit();
+    setStatus(QStringLiteral("Copied to %1").arg(m_store->list(listId).name));
+}
+
+void Backend::newFromSelection(int type) {
+    auto ids = targetIds();
+    if (ids.isEmpty() || (type != TaskType::Project && type != TaskType::Checklist))
+        return;
+    endEdit();
+    // Tasks under a selected parent travel with it rather than separately.
+    QVector<qint64> picked;
+    for (auto id : ids) {
+        bool covered = false;
+        for (qint64 up = m_store->task(id).parentId; up && !covered; up = m_store->task(up).parentId)
+            covered = ids.contains(up);
+        if (!covered)
+            picked.append(id);
+    }
+    // Keep the order they have on screen.
+    std::stable_sort(picked.begin(), picked.end(), [this](qint64 a, qint64 b) {
+        const int ia = m_visibleOrder.indexOf(a), ib = m_visibleOrder.indexOf(b);
+        return ia < ib;
+    });
+    const Task first = m_store->task(picked.first());
+    Task parent;
+    parent.id = m_store->nextId("tasks");
+    parent.type = type;
+    parent.listId = first.listId;
+    parent.sectionId = first.sectionId;
+    parent.parentId = first.parentId && !picked.contains(first.parentId) ? first.parentId : 0;
+    parent.title = type == TaskType::Project ? QStringLiteral("New Project") : QStringLiteral("New Checklist");
+    parent.order = first.order - 0.5;
+    m_store->begin(type == TaskType::Project ? "New Project from Selection" : "New Checklist from Selection");
+    m_store->putTask(parent);
+    std::function<void(qint64)> relist = [&](qint64 id) {
+        ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+        for (const auto &c : views.children(id)) {
+            Task child = c;
+            child.listId = parent.listId;
+            m_store->putTask(child);
+            relist(c.id);
+        }
+    };
+    double order = 1;
+    for (auto id : picked) {
+        Task t = m_store->task(id);
+        t.parentId = parent.id;
+        t.listId = parent.listId;
+        t.sectionId = 0;
+        t.order = order++;
+        // Checklist items carry no dates or repeats of their own.
+        if (type == TaskType::Checklist)
+            t.type = TaskType::Task;
+        m_store->putTask(t);
+        relist(id);
+    }
+    m_store->commit();
+    m_newTask = parent.id;
+    m_options.keepVisible.insert(parent.id);
+    beginEdit(parent.id);
+    emit revealTask(parent.id);
+}
+
+void Backend::gotoProject(qint64 id) {
+    if (!id)
+        id = m_cursor;
+    const Task t = m_store->task(id);
+    if (!t.parentId || !m_store->tasks().contains(t.parentId))
+        return;
+    revealInList(t.parentId);
+}
+
+void Backend::linkFile(qint64 taskId, const QString &path) {
+    // The link goes into the notes as Markdown, which the notes area shows as
+    // a clickable link and U opens.
+    const Task t = m_store->task(taskId);
+    if (!t.id || path.isEmpty())
+        return;
+    const QString local = path.startsWith("file:") ? QUrl(path).toLocalFile() : path;
+    const QString link = QStringLiteral("[%1](%2)").arg(QFileInfo(local).fileName(), QUrl::fromLocalFile(local).toString());
+    setNotes(taskId, t.notes.isEmpty() ? link : t.notes.trimmed() + "\n" + link);
+}
+
 void Backend::moveSelection(int delta) {
     // ⌃⌘↑/↓: manual reordering among siblings, which also switches the list
     // to manual order the way dragging does in the reference app.
@@ -955,7 +1084,9 @@ QString Backend::dropHint(const QString &key) const {
     case Source::Starred: return "Drop to Star";
     case Source::Done: return "Drop to Complete";
     case Source::Scheduled: return "Drop to Start Tomorrow";
-    case Source::List: return m_store->list(target.id).kind == ListKind::Smart ? QString() : "Drop to Move";
+    case Source::List:
+        if (m_store->list(target.id).kind == ListKind::Smart) return {};
+        return m_dragCopy ? "Drop to Copy" : "Drop to Move";
     case Source::Project: return "Drop into Project";
     default: return {};
     }
@@ -972,8 +1103,10 @@ void Backend::dropOnSource(const QString &key) {
     case Source::Done: setCompleted(true); break;
     case Source::Scheduled: setStartInDays(1); break;
     case Source::List:
-        if (m_store->list(target.id).kind != ListKind::Smart)
-            moveSelectionToList(target.id);
+        if (m_store->list(target.id).kind != ListKind::Smart) {
+            if (m_dragCopy) copySelectionToList(target.id);
+            else moveSelectionToList(target.id);
+        }
         break;
     case Source::Project: {
         const Task project = m_store->task(target.id);
@@ -1089,6 +1222,28 @@ void Backend::tagSelection(const QString &names, bool replace) {
 
 void Backend::untagSelection() {
     editTasks("Untag", targetIds(), [](Task &t) { t.tagIds.clear(); });
+}
+
+QVariantList Backend::selectionTags() const {
+    QHash<qint64, int> counts;
+    for (auto id : targetIds())
+        for (auto tagId : m_store->task(id).tagIds)
+            counts[tagId]++;
+    QVariantList result;
+    for (const auto &tag : ViewBuilder::orderedTags(*m_store))
+        if (counts.contains(tag.id))
+            result.append(QVariantMap{{"id", tag.id}, {"name", tag.name}, {"count", counts.value(tag.id)}});
+    return result;
+}
+
+void Backend::untagSelection(const QVariantList &tagIds) {
+    QList<qint64> remove;
+    for (const auto &v : tagIds)
+        remove.append(v.toLongLong());
+    editTasks("Untag", targetIds(), [&](Task &t) {
+        for (auto id : remove)
+            t.tagIds.removeAll(id);
+    });
 }
 
 void Backend::performAction(qint64 id) {
@@ -1551,7 +1706,7 @@ QVariantMap Backend::taskInfo(qint64 id) const {
     }
     return {
         {"id", t.id}, {"title", t.title}, {"notes", t.notes}, {"type", t.type}, {"listName", list.name},
-        {"listId", t.listId}, {"parentId", t.parentId},
+        {"listId", t.listId}, {"parentId", t.parentId}, {"parentType", t.parentId ? m_store->task(t.parentId).type : 0},
         {"listColor", list.color}, {"parent", t.parentId ? m_store->task(t.parentId).title : QString()},
         {"priority", t.priority}, {"starred", t.starred}, {"completed", t.completed},
         {"start", t.startDate.isValid() ? Schedule::friendlyDateTime(t.startDate, t.startTime, now.date(), false) : QString()},
@@ -1620,6 +1775,139 @@ void Backend::revealInList(qint64 taskId) {
     emit revealTask(taskId);
 }
 
+QVariantList Backend::jumpTargets(const QString &text) const {
+    const QString q = text.trimmed();
+    auto matches = [&](const QString &title) { return q.isEmpty() || title.contains(q, Qt::CaseInsensitive); };
+    QVariantList result;
+    static const char *focusTitles[] = {"All", "Today", "Starred", "Scheduled", "Done"};
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    const auto lists = views.orderedLists();
+    for (const auto &l : lists)
+        if (l.kind == ListKind::Inbox && matches("Inbox"))
+            result.append(QVariantMap{{"label", "Inbox"}, {"color", -1}, {"key", Source{Source::List, l.id}.key()}, {"sub", ""}});
+    for (int k = Source::All; k <= Source::Done; ++k)
+        if (matches(focusTitles[k]))
+            result.append(QVariantMap{{"label", focusTitles[k]}, {"color", -1}, {"key", Source{k, 0}.key()}, {"sub", ""}});
+    // Lists in a collapsed group count: the group only hides them from the panel.
+    for (const auto &l : lists) {
+        if (l.kind == ListKind::Inbox || !matches(l.name))
+            continue;
+        const auto g = m_store->groups().value(l.groupId);
+        result.append(QVariantMap{{"label", l.name}, {"color", l.color}, {"key", Source{Source::List, l.id}.key()},
+                                  {"sub", g.id && !g.deleted ? g.name : QString()}});
+    }
+    for (const auto &l : lists) {
+        QVector<Task> projects;
+        for (const auto &t : m_store->tasks())
+            if (t.listId == l.id && !t.parentId && !t.deleted && !t.completed && t.type != TaskType::Task && matches(t.title))
+                projects.append(t);
+        std::sort(projects.begin(), projects.end(), [](const Task &a, const Task &b) { return a.order < b.order; });
+        for (const auto &p : projects)
+            result.append(QVariantMap{{"label", p.title}, {"color", l.color}, {"key", Source{Source::Project, p.id}.key()},
+                                      {"sub", "Project"}});
+    }
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind == ListKind::Smart && matches(l.name))
+            result.append(QVariantMap{{"label", l.name}, {"color", -1}, {"key", Source{Source::List, l.id}.key()}, {"sub", "Smart List"}});
+    return result;
+}
+
+QVariantList Backend::findInView(const QString &text, int limit) const {
+    // Every task the view holds, including those folded away inside collapsed
+    // projects.
+    const QString q = text.trimmed();
+    QVariantList result;
+    QSet<qint64> seen;
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    auto add = [&](const Task &t) {
+        if (seen.contains(t.id) || result.size() >= limit)
+            return;
+        seen.insert(t.id);
+        if (!q.isEmpty() && !t.title.contains(q, Qt::CaseInsensitive))
+            return;
+        const TaskList l = m_store->list(t.listId);
+        result.append(QVariantMap{{"id", t.id}, {"title", t.title}, {"listName", t.parentId ? m_store->task(t.parentId).title : l.name},
+                                  {"listColor", l.color}});
+    };
+    std::function<void(const Task &)> addTree = [&](const Task &t) {
+        for (const auto &c : views.children(t.id)) {
+            add(c);
+            addTree(c);
+        }
+    };
+    for (const auto &row : m_tasks.rows()) {
+        if (row.value("kind") != "task")
+            continue;
+        const Task t = m_store->task(row.value("taskId").toLongLong());
+        add(t);
+        if (row.value("collapsed").toBool() && row.value("hasChildren").toBool())
+            addTree(t);
+    }
+    return result;
+}
+
+void Backend::revealHere(qint64 taskId) {
+    // Selects a task in the current view, unfolding the projects it is in.
+    if (!m_store->tasks().contains(taskId))
+        return;
+    QVector<Task> fold;
+    for (qint64 up = m_store->task(taskId).parentId; up; up = m_store->task(up).parentId) {
+        const Task parent = m_store->task(up);
+        if (parent.collapsed)
+            fold.append(parent);
+    }
+    if (!fold.isEmpty()) {
+        m_store->begin("Expand");
+        for (Task p : fold) {
+            p.collapsed = false;
+            m_store->putTask(p);
+        }
+        m_store->commit();
+    }
+    selectTask(taskId);
+    emit revealTask(taskId);
+}
+
+QVariantList Backend::recentItems(int limit) const {
+    QVariantList result;
+    for (const auto &key : m_recentSources) {
+        if (result.size() >= 4)
+            break;
+        const Source s = Source::fromKey(key);
+        if (s.kind == Source::List) {
+            const TaskList l = m_store->list(s.id);
+            if (l.id && !l.deleted && !l.archived)
+                result.append(QVariantMap{{"label", l.name}, {"sub", "List"}, {"color", l.color}, {"key", key}});
+        } else if (s.kind == Source::Project) {
+            const Task t = m_store->task(s.id);
+            if (t.id && !t.deleted)
+                result.append(QVariantMap{{"label", t.title}, {"sub", "Project"}, {"color", m_store->list(t.listId).color}, {"key", key}});
+        }
+    }
+    // Then the tasks selected most recently, and failing that the ones
+    // changed most recently.
+    QVector<qint64> ids;
+    for (int i = m_history.size() - 1; i >= 0; --i)
+        ids.append(m_history.at(i));
+    QVector<Task> changed;
+    for (const auto &t : m_store->tasks())
+        if (!t.deleted && !t.title.isEmpty() && !ids.contains(t.id))
+            changed.append(t);
+    std::sort(changed.begin(), changed.end(), [](const Task &a, const Task &b) { return a.modified > b.modified; });
+    for (const auto &t : changed.mid(0, limit))
+        ids.append(t.id);
+    for (auto id : ids) {
+        if (result.size() >= limit)
+            break;
+        const Task t = m_store->task(id);
+        if (!t.id || t.deleted || t.title.isEmpty() || !m_store->lists().contains(t.listId) || m_store->list(t.listId).deleted)
+            continue;
+        const TaskList l = m_store->list(t.listId);
+        result.append(QVariantMap{{"label", t.title}, {"sub", l.name}, {"color", l.color}, {"id", t.id}, {"task", true}});
+    }
+    return result;
+}
+
 void Backend::setTagPaused(qint64 tagId, bool paused) {
     Tag t = m_store->tag(tagId);
     if (!t.id)
@@ -1628,6 +1916,42 @@ void Backend::setTagPaused(qint64 tagId, bool paused) {
     m_store->begin(paused ? "Pause Tag" : "Resume Tag");
     m_store->putTag(t);
     m_store->commit();
+}
+
+void Backend::setTagsManual(bool on) {
+    m_store->setSetting("tags.manual", on);
+    rebuild();
+    emit dataChanged();
+    emit viewChanged();
+}
+
+void Backend::moveTag(qint64 tagId, qint64 beforeTagId, qint64 groupId) {
+    // Dragging a tag in the panel puts it before another (or last in a
+    // group), and switches the panel to manual order as it does in the reference app.
+    Tag moved = m_store->tag(tagId);
+    if (!moved.id || tagId == beforeTagId)
+        return;
+    if (beforeTagId)
+        groupId = m_store->tag(beforeTagId).groupId;
+    // Renumber from the order on screen now, so nothing else shuffles.
+    QVector<Tag> sameGroup;
+    for (const auto &t : ViewBuilder::orderedTags(*m_store))
+        if (t.groupId == groupId && t.id != tagId)
+            sameGroup.append(t);
+    int at = sameGroup.size();
+    for (int i = 0; i < sameGroup.size(); ++i)
+        if (sameGroup.at(i).id == beforeTagId)
+            at = i;
+    moved.groupId = groupId;
+    sameGroup.insert(at, moved);
+    m_store->begin("Move Tag");
+    for (int i = 0; i < sameGroup.size(); ++i) {
+        Tag t = sameGroup.at(i);
+        t.order = i + 1;
+        m_store->putTag(t);
+    }
+    m_store->commit();
+    setTagsManual(true);
 }
 
 qint64 Backend::newTag(const QString &name, qint64 groupId) {
@@ -2114,6 +2438,7 @@ void Backend::copySelection() {
     // Plain text a person can paste anywhere: titles, with notes and
     // sub-tasks indented under them.
     QStringList lines;
+    QVector<Task> trees;
     std::function<void(const Task &, int)> add = [&](const Task &t, int depth) {
         lines << QString(depth * 2, ' ') + (t.completed ? "✓ " : "") + t.title;
         for (const auto &line : t.notes.split('\n', Qt::SkipEmptyParts))
@@ -2122,47 +2447,165 @@ void Backend::copySelection() {
         for (const auto &c : views.children(t.id))
             add(c, depth + 1);
     };
-    for (auto id : targetIds())
+    // Tasks under another selected task are copied with it, once.
+    const auto ids = targetIds();
+    for (auto id : ids) {
+        bool covered = false;
+        for (qint64 up = m_store->task(id).parentId; up && !covered; up = m_store->task(up).parentId)
+            covered = ids.contains(up);
+        if (covered)
+            continue;
         add(m_store->task(id), 0);
+        collectTree(m_store->task(id), trees);
+    }
     if (lines.isEmpty())
         return;
-    QGuiApplication::clipboard()->setText(lines.join('\n'));
-    setStatus(targetIds().size() == 1 ? "Copied" : QStringLiteral("Copied %1 tasks").arg(targetIds().size()));
+    m_clipText = lines.join('\n');
+    m_clipTasks = trees;
+    QGuiApplication::clipboard()->setText(m_clipText);
+    setStatus(ids.size() == 1 ? "Copied" : QStringLiteral("Copied %1 tasks").arg(ids.size()));
+}
+
+void Backend::cutSelection() {
+    // Delete is undoable, and pasting brings the tasks back whole.
+    const int count = targetIds().size();
+    if (count == 0)
+        return;
+    copySelection();
+    deleteSelection();
+    setStatus(count == 1 ? "Cut" : QStringLiteral("Cut %1 tasks").arg(count));
 }
 
 void Backend::pasteTasks() {
-    // Each non-empty line of pasted text becomes a task in the current list,
-    // read with natural-language input like a typed title.
-    const QString text = QGuiApplication::clipboard()->text();
-    QStringList lines;
-    for (const auto &line : text.split('\n'))
-        if (!line.trimmed().isEmpty())
-            lines << line.trimmed().remove(QRegularExpression("^([-*•✓]|\\d+[.)])\\s+"));
-    if (lines.isEmpty())
+    pasteText(QGuiApplication::clipboard()->text());
+}
+
+namespace {
+
+struct OutlineLine {
+    int level = 0;
+    QString title;
+};
+
+// Reads pasted text as an outline. A tab or two or more spaces indent a
+// line; levels are relative to the lines above, so ragged indentation still
+// nests sensibly. Bullets and numbers are dropped.
+QVector<OutlineLine> parseOutline(const QString &text) {
+    static const QRegularExpression marker("^([-*•✓]|\\d+[.)])\\s+");
+    QVector<OutlineLine> lines;
+    QVector<int> stack;  // Indent widths of the open levels.
+    for (QString raw : text.split('\n')) {
+        if (raw.endsWith('\r'))
+            raw.chop(1);
+        if (raw.trimmed().isEmpty())
+            continue;
+        int width = 0, i = 0;
+        bool tab = false;
+        for (; i < raw.size() && (raw[i] == ' ' || raw[i] == '\t'); ++i) {
+            width += raw[i] == '\t' ? 4 : 1;
+            tab = tab || raw[i] == '\t';
+        }
+        // A single leading space is stray, not an indent.
+        if (width < 2 && !tab)
+            width = 0;
+        while (!stack.isEmpty() && stack.last() > width)
+            stack.removeLast();
+        if (stack.isEmpty() || stack.last() < width)
+            stack.append(width);
+        int level = stack.size() - 1;
+        // The first line can't be nested under nothing, nor can a line skip a level.
+        level = lines.isEmpty() ? 0 : qMin(level, lines.last().level + 1);
+        lines.append({level, raw.mid(i).trimmed().remove(marker)});
+    }
+    return lines;
+}
+
+}  // namespace
+
+void Backend::pasteText(const QString &text) {
+    const bool restore = !m_clipTasks.isEmpty() && text == m_clipText;
+    const auto outline = restore ? QVector<OutlineLine>() : parseOutline(text);
+    if (!restore && outline.isEmpty())
         return;
-    qint64 listId = m_source.kind == Source::List ? m_source.id
-                  : m_source.kind == Source::Project ? m_store->task(m_source.id).listId : defaultListId();
+    // Pasting onto a selected project or checklist nests under it; otherwise
+    // tasks land in the viewed list (or the project being viewed).
+    Task into;
+    if (m_source.kind == Source::Project) {
+        into = m_store->task(m_source.id);
+    } else if (m_selected.size() == 1) {
+        const Task current = m_store->task(m_selected.first());
+        if (current.type == TaskType::Project || current.type == TaskType::Checklist)
+            into = current;
+    }
+    qint64 listId = into.id ? into.listId : m_source.kind == Source::List ? m_source.id : defaultListId();
     if (!listId || m_store->list(listId).kind == ListKind::Smart)
         listId = defaultListId();
-    const qint64 parentId = m_source.kind == Source::Project ? m_source.id : 0;
+    if (!listId)
+        return;
+    const qint64 parentId = into.id;
     QVector<qint64> created;
-    m_store->begin(lines.size() > 1 ? QStringLiteral("Paste %1 Tasks").arg(lines.size()) : QStringLiteral("Paste Task"));
-    for (const auto &line : lines.mid(0, 500)) {
-        Task t;
-        t.id = m_store->nextId("tasks");
-        t.listId = listId;
-        t.parentId = parentId;
-        t.title = line.left(1000);
-        t.order = nextOrder(listId, parentId);
-        if (m_source.kind == Source::Today) t.dueDate = QDate::currentDate();
-        if (m_source.kind == Source::Starred) t.starred = true;
-        if (m_store->setting("nl.editor", true).toBool())
-            applyParsed(t, NaturalLanguage::parse(line, QDateTime::currentDateTime(), listNames(), locationNames()));
-        m_store->putTask(t);
-        AlarmTimes::applyDefaultReminder(*m_store, t);
-        created.append(t.id);
+    const int count = restore ? m_clipTasks.size() : outline.size();
+    m_store->begin(count > 1 ? QStringLiteral("Paste %1 Tasks").arg(count) : QStringLiteral("Paste Task"));
+    if (restore) {
+        QHash<qint64, qint64> newIds;
+        QSet<qint64> present;
+        for (const auto &t : m_clipTasks)
+            present.insert(t.id);
+        for (Task t : m_clipTasks) {
+            const bool top = !present.contains(t.parentId);
+            const qint64 oldId = t.id;
+            t.id = m_store->nextId("tasks");
+            t.uid.clear();
+            t.created = {};
+            t.listId = listId;
+            t.deleted = false;
+            if (top) {
+                t.parentId = parentId;
+                t.sectionId = 0;
+                t.order = nextOrder(listId, parentId);
+                created.append(t.id);
+            } else {
+                t.parentId = newIds.value(t.parentId);
+            }
+            newIds.insert(oldId, t.id);
+            m_store->putTask(t);
+        }
+    } else {
+        // Parents are tracked by level as the lines go down.
+        QVector<qint64> open;
+        for (int i = 0; i < qMin<int>(outline.size(), 500); ++i) {
+            const auto &line = outline.at(i);
+            const bool hasChildren = i + 1 < outline.size() && outline.at(i + 1).level > line.level;
+            Task t;
+            t.id = m_store->nextId("tasks");
+            t.listId = listId;
+            t.parentId = line.level == 0 ? parentId : open.value(line.level - 1);
+            t.title = line.title.left(1000);
+            t.order = nextOrder(listId, t.parentId);
+            // A top-level line with lines under it is a project of its own.
+            if (hasChildren && line.level == 0 && !parentId)
+                t.type = TaskType::Project;
+            if (line.level == 0 && m_source.kind == Source::Today) t.dueDate = QDate::currentDate();
+            if (line.level == 0 && m_source.kind == Source::Starred) t.starred = true;
+            if (m_store->setting("nl.editor", true).toBool())
+                applyParsed(t, NaturalLanguage::parse(line.title, QDateTime::currentDateTime(), listNames(), locationNames()));
+            m_store->putTask(t);
+            AlarmTimes::applyDefaultReminder(*m_store, t);
+            open.resize(line.level);
+            open.append(t.id);
+            if (line.level == 0)
+                created.append(t.id);
+        }
     }
     m_store->commit();
+    if (into.id && into.collapsed) {
+        into.collapsed = false;
+        m_store->begin("Expand");
+        m_store->putTask(into);
+        m_store->commit();
+    }
+    if (created.isEmpty())
+        return;
     for (auto id : created)
         m_options.keepVisible.insert(id);
     m_selected = created;
@@ -3253,22 +3696,11 @@ void Backend::rebuildTags(const ViewBuilder &views) {
         for (auto id : t.tagIds)
             counts[id]++;
     }
-    QVector<Tag> tags;
-    for (const auto &t : m_store->tags())
-        if (!t.deleted)
-            tags.append(t);
+    const QVector<Tag> tags = ViewBuilder::orderedTags(*m_store);
     auto groupName = [this](qint64 id) {
         const auto g = m_store->tagGroups().value(id);
         return g.deleted ? QString() : g.name;
     };
-    std::sort(tags.begin(), tags.end(), [&](const Tag &a, const Tag &b) {
-        const auto ga = m_store->tagGroups().value(a.groupId), gb = m_store->tagGroups().value(b.groupId);
-        const bool ua = !ga.id || ga.deleted, ub = !gb.id || gb.deleted;
-        if (ua != ub) return ua;  // Ungrouped tags first, under "Tags".
-        if (!ua && ga.order != gb.order) return ga.order < gb.order;
-        if (a.groupId != b.groupId) return a.groupId < b.groupId;
-        return QString::localeAwareCompare(a.name, b.name) < 0;
-    });
     QVector<QVariantMap> rows;
     qint64 lastGroup = -1;
     for (const auto &t : tags) {

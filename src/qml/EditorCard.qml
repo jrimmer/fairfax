@@ -34,10 +34,30 @@ Item {
         root.done()
     }
 
+    // Goes to one field when the editor was opened by a quick-jump (Ctrl+E
+    // for the notes, Ctrl+G for the location, and so on).
+    function goTo(kind) {
+        switch (kind) {
+        case "notes": notesArea.forceEditorFocus(); break
+        case "action": actionMenu.popup(actionButton, 0, actionButton.height); break
+        case "location": locationMenu.popup(locationButton, 0, locationButton.height); break
+        case "alerts": if (!root.e.isChecklistItem) alarmMenu.popup(alarmButton, 0, alarmButton.height); break
+        case "dates": if (!root.e.isChecklistItem) dueField.forceActiveFocus(); break
+        case "repeat": if (!root.e.isChecklistItem) repeatEditor.openAt(repeatButton); break
+        }
+    }
+
     Component.onCompleted: {
         titleField.text = e.title || ""
         titleField.forceActiveFocus()
         if (e.isNew) titleField.selectAll()
+        const pending = backend.takePendingField()
+        if (pending) Qt.callLater(root.goTo, pending)
+    }
+
+    Connections {
+        target: backend
+        function onEditFieldRequested() { root.goTo(backend.takePendingField()) }
     }
 
     Rectangle { width: 4; height: parent.height; color: root.listColor }
@@ -247,7 +267,7 @@ Item {
                             font.pixelSize: backend.fontSize - 2
                         }
                         Item { Layout.fillWidth: true }
-                        RibbonButton { icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; onClicked: actionMenu.popup() }
+                        RibbonButton { id: actionButton; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; onClicked: actionMenu.popup(actionButton, 0, actionButton.height) }
                         RibbonButton {
                             icon: "mic"
                             tip: backend.recordingTaskId === root.e.id ? "Stop Recording" : "Record an Audio Note"
@@ -256,9 +276,9 @@ Item {
                             onClicked: backend.toggleRecording(root.e.id)
                         }
                         RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
-                        RibbonButton { icon: "pin"; tip: "Location"; active: (root.e.locations || []).length > 0; onClicked: locationMenu.popup() }
+                        RibbonButton { id: locationButton; icon: "pin"; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; onClicked: locationMenu.popup(locationButton, 0, locationButton.height) }
                         RibbonButton { id: repeatButton; icon: "repeat"; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; onClicked: repeatEditor.openAt(repeatButton) }
-                        RibbonButton { icon: "alarm"; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; onClicked: alarmMenu.popup() }
+                        RibbonButton { id: alarmButton; icon: "alarm"; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; onClicked: alarmMenu.popup(alarmButton, 0, alarmButton.height) }
                         RibbonButton { icon: "duration"; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; onClicked: durationMenu.popup() }
 
                         Menu {
@@ -368,6 +388,7 @@ Item {
                         rowSpacing: 2
                         Icon { name: "play"; size: 11; filled: true; color: root.e.hasStart ? theme.start : theme.faint }
                         DateField {
+                            id: startField
                             iso: root.e.startIso || ""
                             value: root.e.startDate || ""
                             placeholderText: "Start"
@@ -385,6 +406,7 @@ Item {
 
                         Icon { name: "check"; size: 12; stroke: 2.2; color: root.e.hasDue ? theme.foreground : theme.faint }
                         DateField {
+                            id: dueField
                             iso: root.e.dueIso || ""
                             value: root.e.dueDate || ""
                             placeholderText: "Due"

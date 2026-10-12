@@ -151,6 +151,10 @@ public:
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE void beginEdit(qint64 id = 0);
+    // Opens the editor on the selected task and goes to one of its fields:
+    // notes, action, location, alerts, dates or repeat (⌘E, ⌘B, ⌘G, ⌘', ⌘/, ⌘;).
+    Q_INVOKABLE void editField(const QString &kind);
+    Q_INVOKABLE QString takePendingField();
     Q_INVOKABLE void endEdit();
     Q_INVOKABLE bool isSelected(qint64 id) const { return m_selected.contains(id); }
 
@@ -175,6 +179,15 @@ public:
     Q_INVOKABLE void deleteSelection();
     Q_INVOKABLE void duplicateSelection();
     Q_INVOKABLE void moveSelectionToList(qint64 listId);
+    Q_INVOKABLE void copySelectionToList(qint64 listId);
+    // True while the drag in progress copies (Alt held at the press).
+    Q_INVOKABLE void setDragCopy(bool on) { m_dragCopy = on; }
+    // New Project / Checklist from Selection: the selected tasks become the
+    // children of a new parent in the first one's list.
+    Q_INVOKABLE void newFromSelection(int type);
+    // Goto Project: reveals the project or checklist a sub-task belongs to.
+    Q_INVOKABLE void gotoProject(qint64 id = 0);
+    Q_INVOKABLE void linkFile(qint64 taskId, const QString &path);
     Q_INVOKABLE void moveSelection(int delta);
     // Drag and drop of the selection onto a sidebar entry, a calendar day, or
     // before another task (manual reordering).
@@ -186,6 +199,9 @@ public:
     Q_INVOKABLE void convertSelection(int type);
     Q_INVOKABLE void tagSelection(const QString &names, bool replace);
     Q_INVOKABLE void untagSelection();
+    // Untag...: the tags the selection carries, and removing some of them.
+    Q_INVOKABLE QVariantList selectionTags() const;
+    Q_INVOKABLE void untagSelection(const QVariantList &tagIds);
     Q_INVOKABLE void performAction(qint64 id = 0);
     Q_INVOKABLE void openLinks(qint64 id = 0);
 
@@ -223,6 +239,13 @@ public:
     Q_INVOKABLE QVariantMap taskInfo(qint64 id) const;
     Q_INVOKABLE QVariantList findTasks(const QString &text, int limit = 12) const;
     Q_INVOKABLE void revealInList(qint64 taskId);
+    // The jump, find and quick-open bars. Jump lists every list, including
+    // those in collapsed groups; find looks inside collapsed projects too;
+    // Quick Open starts from what was visited lately.
+    Q_INVOKABLE QVariantList jumpTargets(const QString &text) const;
+    Q_INVOKABLE QVariantList findInView(const QString &text, int limit = 12) const;
+    Q_INVOKABLE void revealHere(qint64 taskId);
+    Q_INVOKABLE QVariantList recentItems(int limit = 8) const;
 
     // Focus Filter: per-list conditions, OR-combined, toggled as a whole.
     Q_INVOKABLE void toggleFocus();
@@ -294,6 +317,11 @@ public:
     Q_INVOKABLE void requestNewWindow() { emit newWindowRequested(); }
     void requestPanel(const QString &panel) { emit windowRequested(); emit panelRequested(panel); }
     Q_INVOKABLE void setTagPaused(qint64 tagId, bool paused);
+    // Tags can be listed alphabetically or in a manual order set by dragging.
+    Q_PROPERTY(bool tagsManual READ tagsManual NOTIFY dataChanged)
+    bool tagsManual() const { return m_store->setting("tags.manual", false).toBool(); }
+    Q_INVOKABLE void setTagsManual(bool on);
+    Q_INVOKABLE void moveTag(qint64 tagId, qint64 beforeTagId, qint64 groupId);
     Q_INVOKABLE qint64 newTag(const QString &name, qint64 groupId = 0);
 
     // Sidebar arrangement and the archive.
@@ -341,8 +369,13 @@ public:
     Q_INVOKABLE void showLastSelected();
 
     // Clipboard: copy selected tasks as text, paste lines as new tasks.
+    // Cut is copy then delete; pasting what was just cut or copied restores
+    // the tasks with everything they carried, not only their titles.
     Q_INVOKABLE void copySelection();
+    Q_INVOKABLE void cutSelection();
     Q_INVOKABLE void pasteTasks();
+    // Indented lines (tabs, two or more spaces) nest as sub-tasks.
+    Q_INVOKABLE void pasteText(const QString &text);
 
     // Files dropped on a task (or on empty space, making a new task).
     Q_INVOKABLE void dropFiles(qint64 taskId, const QVariantList &urls);
@@ -388,6 +421,7 @@ signals:
     void panelRequested(const QString &panel);  // "open" (Quick Open) or "settings".
     void recordingChanged();
     void quickEntryTextRequested(const QString &text);
+    void editFieldRequested();  // The editor is open; takePendingField() says where to go.
     void windowRequested();
 
 private:
@@ -399,6 +433,7 @@ private:
     void completeTask(Task task, bool done, const QDateTime &now);
     void deleteTree(qint64 id);
     qint64 duplicateTree(const Task &task, qint64 parentId, qint64 listId);
+    void collectTree(const Task &task, QVector<Task> &into) const;
     qint64 defaultListId() const;
     void rememberList(qint64 listId);
     qint64 tagIdForName(const QString &name, bool create);
@@ -428,6 +463,7 @@ private:
     qint64 m_recordingTask = 0;
     QString m_recordingFile;
     QVector<qint64> m_history;
+    QStringList m_recentSources;  // Newest first.
     int m_historyStep = 0;
     void rebuildPlaces(const ViewBuilder &views);
     void completeAfterAutoDelete();
@@ -443,6 +479,11 @@ private:
     qint64 m_noDetectTask = 0;
     bool m_hasHidden = false;
     QVariantMap m_editor;
+    QString m_pendingField;
+    bool m_dragCopy = false;
+    // What the last Copy or Cut put on the clipboard, to restore on paste.
+    QString m_clipText;
+    QVector<Task> m_clipTasks;
     QString m_status;
     QTimer m_clock;
     QTimer m_backupTimer;

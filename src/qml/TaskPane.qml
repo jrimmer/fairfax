@@ -371,6 +371,7 @@ Item {
         if (k === Qt.Key_Alt) { root.altHeld = true; return }
         if (ctrl && k === Qt.Key_A) { backend.selectAll(); return done() }
         if (ctrl && k === Qt.Key_C) { backend.copySelection(); return done() }
+        if (ctrl && k === Qt.Key_X) { backend.cutSelection(); return done() }
         if (ctrl && k === Qt.Key_V) { backend.pasteTasks(); return done() }
         if (ctrl && k === Qt.Key_T) { backend.setStartInDays(0); return done() }
         if (ctrl && k === Qt.Key_S) { backend.setStarred(0); return done() }
@@ -399,7 +400,7 @@ Item {
         case Qt.Key_K: root.command("schedule"); return done()
         case Qt.Key_E: root.command("time"); return done()
         case Qt.Key_X: root.command("duration"); return done()
-        case Qt.Key_L: if (alt) backend.untagSelection(); else root.command("tag"); return done()
+        case Qt.Key_L: root.command(alt ? "untag" : "tag"); return done()
         case Qt.Key_M: root.command("move"); return done()
         case Qt.Key_J: root.command("jump"); return done()
         case Qt.Key_F: root.command("find"); return done()

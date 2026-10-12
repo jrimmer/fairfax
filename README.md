@@ -148,7 +148,7 @@ list has focus. Press `?` in the app for the full list.
 | `Alt+[` / `Alt+,` | Remove the due / start date |
 | `0`–`3`, `=` / `-` | Priority none…high, raise / lower |
 | `s` / `Ctrl+S` | Star / unstar |
-| `l` / `Alt+L` | Tag… / remove tags |
+| `l` / `Alt+L` | Tag… / Untag… (choose which tags to remove) |
 | `m` | Move to list… |
 | `c` | Collapse a project or checklist |
 | `p` / `u` | Perform the task's action / open its links |
@@ -168,7 +168,11 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+Alt+←` / `Ctrl+Alt+→` | Show or hide the Lists / Tags panels |
 | `Ctrl+=` / `Ctrl+-` | Text size |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo |
-| `Ctrl+C` / `Ctrl+V` | Copy tasks as text / paste lines as new tasks |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / cut tasks; paste restores them, or turns pasted lines into tasks (indented lines or `-` bullets become sub-tasks; pasting onto a project nests under it) |
+| `Ctrl+E` `Ctrl+B` `Ctrl+G` `Ctrl+'` `Ctrl+/` `Ctrl+;` | Open the editor at the notes / action / location / alerts / dates / repeat |
+| `Ctrl+J` | Toggle the Focus Filter |
+| `Ctrl+Alt+P` / `Ctrl+Alt+C` | New project / checklist from the selection |
+| `Ctrl+Alt+T` / `Ctrl+Shift+Alt+T` / `Ctrl+Alt+R` | New tag / new tag group / remove all tags |
 | `Shift+F5` | Back to the previously selected task |
 | `Ctrl+Alt+F` | Search this list / all lists |
 | `Ctrl+Alt+W` | New window |

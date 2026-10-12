@@ -4,6 +4,7 @@
 #include "backend.h"
 #include "store.h"
 #include "testregistry.h"
+#include "views.h"
 
 // Drives the backend the way the keyboard does, on a temporary database.
 class BackendTest : public QObject {
@@ -18,15 +19,30 @@ class BackendTest : public QObject {
             backend = std::make_unique<Backend>(&store);
             backend->ensureDefaults();
         }
+        // The lowest live list id, so the answer doesn't shift with hash order.
         qint64 firstList() const {
+            qint64 first = 0;
             for (const auto &l : store.lists())
-                if (!l.deleted) return l.id;
-            return 0;
+                if (!l.deleted && (!first || l.id < first)) first = l.id;
+            return first;
         }
         Task only() const {
             for (const auto &t : store.tasks())
                 if (!t.deleted) return t;
             return {};
+        }
+        Task titled(const QString &title) const {
+            for (const auto &t : store.tasks())
+                if (!t.deleted && t.title == title) return t;
+            return {};
+        }
+        qint64 addTask(const QString &title, int type = 0) {
+            backend->selectSource("list:" + QString::number(firstList()));
+            backend->newTask(type);
+            const qint64 id = backend->editingTaskId();
+            backend->setTitle(id, title);
+            backend->endEdit();
+            return id;
         }
     };
 
@@ -215,6 +231,237 @@ private slots:
         for (const auto &row : f.backend->tasks()->rows())
             listed = listed || row.value("taskId").toLongLong() == id;
         QVERIFY(listed);
+    }
+
+    void pastedOutlineNestsUnderParents() {
+        Fixture f;
+        f.backend->selectSource("list:" + QString::number(f.firstList()));
+        f.backend->pasteText("Trip\n  - Pack\n  - Book\n      Hotel\nErrands\n");
+        const Task trip = f.store.task(f.titled("Trip").id);
+        QCOMPARE(trip.type, int(TaskType::Project));
+        QCOMPARE(f.titled("Pack").parentId, trip.id);
+        QCOMPARE(f.titled("Book").parentId, trip.id);
+        QCOMPARE(f.titled("Hotel").parentId, f.titled("Book").id);
+        QCOMPARE(f.titled("Errands").parentId, qint64(0));
+        QCOMPARE(f.titled("Errands").type, int(TaskType::Task));
+    }
+
+    void pastedTabIndentsAndBullets() {
+        Fixture f;
+        f.backend->selectSource("list:" + QString::number(f.firstList()));
+        f.backend->pasteText("* Parent\n\t* Child one\n\t* Child two");
+        QCOMPARE(f.titled("Child one").parentId, f.titled("Parent").id);
+        QCOMPARE(f.titled("Child two").parentId, f.titled("Parent").id);
+    }
+
+    void pastingFlatLinesStaysFlat() {
+        Fixture f;
+        f.backend->selectSource("list:" + QString::number(f.firstList()));
+        f.backend->pasteText("one\ntwo\nthree");
+        for (const char *title : {"one", "two", "three"}) {
+            QCOMPARE(f.titled(title).parentId, qint64(0));
+            QCOMPARE(f.titled(title).type, int(TaskType::Task));
+        }
+    }
+
+    void pastingOntoSelectedProjectNestsUnderIt() {
+        Fixture f;
+        const qint64 project = f.addTask("Plan", TaskType::Project);
+        f.backend->selectTask(project);
+        f.backend->pasteText("Step one\nStep two\n  Detail");
+        QCOMPARE(f.titled("Step one").parentId, project);
+        QCOMPARE(f.titled("Step two").parentId, project);
+        QCOMPARE(f.titled("Detail").parentId, f.titled("Step two").id);
+        // Step two stays a plain task with a sub-task; only top-level lines become projects.
+        QCOMPARE(f.titled("Step two").type, int(TaskType::Task));
+    }
+
+    void pastingWhileViewingAProjectNestsUnderIt() {
+        Fixture f;
+        const qint64 project = f.addTask("Plan", TaskType::Project);
+        f.backend->selectSource("project:" + QString::number(project));
+        f.backend->pasteText("Only step");
+        QCOMPARE(f.titled("Only step").parentId, project);
+    }
+
+    void cutDeletesAndPasteRestoresEverything() {
+        Fixture f;
+        const qint64 id = f.addTask("Cut me");
+        f.backend->setDue(id, "2026-12-24");
+        f.backend->addTag(id, "keep");
+        const qint64 child = f.backend->addSubtask(id, "Child");
+        QVERIFY(child);
+        f.backend->selectTask(id);
+        f.backend->cutSelection();
+        QVERIFY(f.titled("Cut me").id == 0);
+        f.backend->pasteTasks();
+        const Task back = f.titled("Cut me");
+        QVERIFY(back.id && back.id != id);
+        QCOMPARE(back.dueDate, QDate(2026, 12, 24));
+        QCOMPARE(back.tagIds.size(), 1);
+        QCOMPARE(f.titled("Child").parentId, back.id);
+    }
+
+    void cutIsUndoable() {
+        Fixture f;
+        const qint64 id = f.addTask("Oops");
+        f.backend->selectTask(id);
+        f.backend->cutSelection();
+        QVERIFY(f.titled("Oops").id == 0);
+        f.backend->undo();
+        QCOMPARE(f.titled("Oops").id, id);
+    }
+
+    void newProjectFromSelectionAdoptsTheTasks() {
+        Fixture f;
+        const qint64 a = f.addTask("A");
+        const qint64 b = f.addTask("B");
+        f.addTask("Untouched");
+        f.backend->selectTask(a);
+        f.backend->selectTask(b, 2);
+        f.backend->newFromSelection(TaskType::Project);
+        const qint64 parent = f.backend->editingTaskId();
+        QVERIFY(parent);
+        QCOMPARE(f.store.task(parent).type, int(TaskType::Project));
+        QCOMPARE(f.store.task(a).parentId, parent);
+        QCOMPARE(f.store.task(b).parentId, parent);
+        QCOMPARE(f.titled("Untouched").parentId, qint64(0));
+    }
+
+    void newChecklistFromSelectionKeepsNestedTasksTogether() {
+        Fixture f;
+        const qint64 parent = f.addTask("Parent");
+        const qint64 sub = f.backend->addSubtask(parent, "Sub");
+        f.backend->selectTask(parent);
+        f.backend->selectTask(sub, 2);
+        f.backend->newFromSelection(TaskType::Checklist);
+        const qint64 list = f.backend->editingTaskId();
+        QCOMPARE(f.store.task(list).type, int(TaskType::Checklist));
+        // The sub-task rides along under its own parent instead of leaving it.
+        QCOMPARE(f.store.task(parent).parentId, list);
+        QCOMPARE(f.store.task(sub).parentId, parent);
+    }
+
+    void gotoProjectRevealsTheParent() {
+        Fixture f;
+        const qint64 project = f.addTask("Plan", TaskType::Project);
+        const qint64 step = f.backend->addSubtask(project, "Step");
+        f.backend->selectTask(step);
+        f.backend->gotoProject();
+        QCOMPARE(f.backend->currentTaskId(), project);
+    }
+
+    void untagRemovesOnlyTheChosenTags() {
+        Fixture f;
+        const qint64 id = f.addTask("Tagged");
+        f.backend->addTag(id, "red");
+        f.backend->addTag(id, "blue");
+        f.backend->selectTask(id);
+        const auto choices = f.backend->selectionTags();
+        QCOMPARE(choices.size(), 2);
+        qint64 red = 0;
+        for (const auto &c : choices)
+            if (c.toMap().value("name") == "red") red = c.toMap().value("id").toLongLong();
+        f.backend->untagSelection(QVariantList{red});
+        const Task t = f.store.task(id);
+        QCOMPARE(t.tagIds.size(), 1);
+        QCOMPARE(f.store.tag(t.tagIds.first()).name, QString("blue"));
+        f.backend->untagSelection();
+        QVERIFY(f.store.task(id).tagIds.isEmpty());
+    }
+
+    void movingTagsSetsAManualOrder() {
+        Fixture f;
+        const qint64 a = f.backend->newTag("alpha");
+        const qint64 b = f.backend->newTag("bravo");
+        const qint64 c = f.backend->newTag("charlie");
+        f.backend->moveTag(c, a, 0);
+        QVERIFY(f.backend->tagsManual());
+        QStringList names;
+        for (const auto &t : ViewBuilder::orderedTags(f.store))
+            names << t.name;
+        QCOMPARE(names, (QStringList{"charlie", "alpha", "bravo"}));
+        // Back to alphabetical when the manual order is switched off.
+        f.backend->setTagsManual(false);
+        names.clear();
+        for (const auto &t : ViewBuilder::orderedTags(f.store))
+            names << t.name;
+        QCOMPARE(names, (QStringList{"alpha", "bravo", "charlie"}));
+        Q_UNUSED(b);
+    }
+
+    void copyToListLeavesTheOriginal() {
+        Fixture f;
+        const qint64 id = f.addTask("Twice");
+        const qint64 home = f.store.task(id).listId;
+        const qint64 other = f.backend->newList("Other");
+        f.backend->selectTask(id);
+        f.backend->copySelectionToList(other);
+        int count = 0;
+        for (const auto &t : f.store.tasks())
+            if (!t.deleted && t.title == "Twice") ++count;
+        QCOMPARE(count, 2);
+        QCOMPARE(f.store.task(id).listId, home);
+    }
+
+    void editFieldOpensTheEditorAndRemembersTheField() {
+        Fixture f;
+        const qint64 id = f.addTask("Edit me");
+        f.backend->selectTask(id);
+        f.backend->editField("notes");
+        QCOMPARE(f.backend->editingTaskId(), id);
+        QCOMPARE(f.backend->takePendingField(), QString("notes"));
+        QCOMPARE(f.backend->takePendingField(), QString());
+    }
+
+    void editFieldOnAnOpenEditorSignals() {
+        Fixture f;
+        const qint64 id = f.addTask("Edit me");
+        f.backend->beginEdit(id);
+        QSignalSpy spy(f.backend.get(), &Backend::editFieldRequested);
+        f.backend->editField("repeat");
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(f.backend->takePendingField(), QString("repeat"));
+    }
+
+    void findInViewReachesIntoCollapsedProjects() {
+        Fixture f;
+        const qint64 project = f.addTask("Plan", TaskType::Project);
+        f.backend->addSubtask(project, "Hidden step");
+        f.backend->selectTask(project);
+        f.backend->toggleCollapsed();
+        const auto hits = f.backend->findInView("hidden");
+        QCOMPARE(hits.size(), 1);
+        const qint64 step = hits.first().toMap().value("id").toLongLong();
+        f.backend->revealHere(step);
+        QVERIFY(!f.store.task(project).collapsed);
+        QCOMPARE(f.backend->currentTaskId(), step);
+    }
+
+    void jumpTargetsIncludeListsInCollapsedGroups() {
+        Fixture f;
+        const qint64 group = f.backend->newGroup("Folder");
+        const qint64 list = f.backend->newList("Tucked Away");
+        f.backend->moveList(list, 0, group);
+        f.backend->toggleGroupCollapsed(group);
+        bool found = false;
+        for (const auto &t : f.backend->jumpTargets("tucked"))
+            found = found || t.toMap().value("label") == "Tucked Away";
+        QVERIFY(found);
+    }
+
+    void quickOpenRecentsListVisitedTasksAndLists() {
+        Fixture f;
+        const qint64 id = f.addTask("Recently seen");
+        f.backend->selectTask(id);
+        const auto recents = f.backend->recentItems();
+        bool hasTask = false, hasList = false;
+        for (const auto &r : recents) {
+            hasTask = hasTask || r.toMap().value("label") == "Recently seen";
+            hasList = hasList || r.toMap().value("sub") == "List";
+        }
+        QVERIFY(hasTask);
+        QVERIFY(hasList);
     }
 
     void panesAreFilledAtStartup() {

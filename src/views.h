@@ -103,6 +103,10 @@ public:
     QVector<Task> children(qint64 parentId) const;  // Sorted by manual order.
     // A project or checklist's own sort (the reference app's Sort Project), or manual.
     SortSpec projectSort(qint64 parentId) const;
+    // Tags as the Tags panel lists them: ungrouped first, then by group, then
+    // alphabetically or, with the "tags.manual" setting, in their own order.
+    // Sorting by tag uses the same order.
+    static QVector<Tag> orderedTags(const Store &store);
 
 private:
     QueryContext queryContext(const ViewOptions &options) const;
@@ -123,5 +127,6 @@ private:
     ScheduleSettings m_settings;
     QSet<qint64> m_pausedTags;
     QSet<qint64> m_pausedLocations;
+    QHash<qint64, qint64> m_tagRank;
     QHash<qint64, QVector<qint64>> m_childrenOf;
 };

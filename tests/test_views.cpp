@@ -678,6 +678,74 @@ private slots:
         s.separated = true;
         QCOMPARE(keys(build(list(l), {}, s)), (QStringList{"loc:attic", "loc:zoo", "noloc"}));
     }
+
+    // ---- sorting by tag ----
+
+    void sortByTagPlacesATaskUnderEveryTag() {
+        const auto l = addList("L");
+        const auto work = addTag("work", false);
+        const auto home = addTag("home", false);
+        addTask(l, "both", [&](Task &t) { t.tagIds = {work, home}; });
+        addTask(l, "only home", [&](Task &t) { t.tagIds = {home}; });
+        addTask(l, "bare");
+        const auto sections = build(list(l), {}, SortSpec{SortField::Tag, true, true});
+        // Alphabetical: home, work, then the untagged.
+        QCOMPARE(sections.size(), 3);
+        QCOMPARE(sections.at(0).title, QString("home"));
+        QCOMPARE(sections.at(0).rows.size(), 2);
+        QCOMPARE(sections.at(1).title, QString("work"));
+        QCOMPARE(sections.at(1).rows.size(), 1);
+        QCOMPARE(sections.at(2).title, QString("No Tags"));
+    }
+
+    void sortByTagFollowsManualTagOrder() {
+        const auto l = addList("L");
+        const auto a = addTag("alpha", false);
+        const auto z = addTag("zulu", false);
+        addTask(l, "x", [&](Task &t) { t.tagIds = {a}; });
+        addTask(l, "y", [&](Task &t) { t.tagIds = {z}; });
+        // Putting zulu first by hand puts its section first.
+        Tag tz = m_store->tag(z), ta = m_store->tag(a);
+        tz.order = 1;
+        ta.order = 2;
+        m_store->begin("order");
+        m_store->putTag(tz);
+        m_store->putTag(ta);
+        m_store->commit();
+        m_store->setSetting("tags.manual", true);
+        const auto sections = build(list(l), {}, SortSpec{SortField::Tag, true, true});
+        QCOMPARE(sections.at(0).title, QString("zulu"));
+        QCOMPARE(sections.at(1).title, QString("alpha"));
+    }
+
+    void projectSortByTagUsesAllTagsInOrder() {
+        const auto l = addList("L");
+        const auto a = addTag("alpha", false);
+        const auto b = addTag("bravo", false);
+        const auto project = addTask(l, "P", [](Task &t) { t.type = TaskType::Project; });
+        addTask(l, "has b", [&](Task &t) { t.parentId = project; t.tagIds = {b}; });
+        addTask(l, "has both", [&](Task &t) { t.parentId = project; t.tagIds = {b, a}; });
+        addTask(l, "none", [&](Task &t) { t.parentId = project; });
+        m_store->setSetting(QStringLiteral("sort.project:%1.field").arg(project), SortField::Tag);
+        const auto sections = build(list(l));
+        QStringList seen;
+        for (const auto &r : sections.at(0).rows)
+            seen << m_store->task(r.taskId).title;
+        QCOMPARE(seen, (QStringList{"P", "has both", "has b", "none"}));
+    }
+
+    void projectSortByNoteSendsEmptyNotesLast() {
+        const auto l = addList("L");
+        const auto project = addTask(l, "P", [](Task &t) { t.type = TaskType::Project; });
+        addTask(l, "plain", [&](Task &t) { t.parentId = project; });
+        addTask(l, "noted", [&](Task &t) { t.parentId = project; t.notes = "hello"; });
+        m_store->setSetting(QStringLiteral("sort.project:%1.field").arg(project), SortField::Note);
+        const auto sections = build(list(l));
+        QStringList seen;
+        for (const auto &r : sections.at(0).rows)
+            seen << m_store->task(r.taskId).title;
+        QCOMPARE(seen, (QStringList{"P", "noted", "plain"}));
+    }
 };
 
 REGISTER_TEST(ViewsTest)

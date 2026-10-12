@@ -182,6 +182,28 @@ Rectangle {
                     Text { id: countText; anchors.centerIn: parent; text: row.model.count || ""; color: theme.muted; font.pixelSize: backend.fontSize - 4; font.bold: true }
                 }
 
+                // A tag dropped on another tag takes its place (manual order);
+                // on a group header it joins that group.
+                DropArea {
+                    id: reorder
+                    anchors.fill: parent
+                    keys: ["precrime-tag"]
+                    enabled: row.shown
+                    onDropped: (d) => {
+                        const id = Number(d.getDataAsString("text/x-precrime-tag"))
+                        if (row.isHeader) backend.moveTag(id, 0, row.model.groupId || 0)
+                        else backend.moveTag(id, row.model.tagId, 0)
+                    }
+                    Rectangle {
+                        visible: reorder.containsDrag
+                        x: 8
+                        width: parent.width - 16
+                        height: 2
+                        y: row.isHeader ? parent.height - 2 : 0
+                        color: theme.accent
+                    }
+                }
+
                 // Tasks dropped here tag themselves.
                 DropArea {
                     id: drop
@@ -415,6 +437,7 @@ Rectangle {
                 onClicked: backend.showPaused = !backend.showPaused
             }
             IconButton {
+                id: usedBtn
                 anchors.right: pausedBtn.left
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
@@ -423,6 +446,17 @@ Rectangle {
                 checked: root.usedOnly
                 tip: root.usedOnly ? "Show All Tags" : "Show Used Tags Only"
                 onClicked: root.usedOnly = !root.usedOnly
+            }
+            // Tag Sorting: alphabetical, or the order tags are dragged into.
+            IconButton {
+                anchors.right: usedBtn.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.tab === 0
+                icon: "sort"
+                checked: backend.tagsManual
+                tip: backend.tagsManual ? "Tags Sorted Manually (click for alphabetical)" : "Tags Sorted Alphabetically (click for manual; drag tags to reorder)"
+                onClicked: backend.setTagsManual(!backend.tagsManual)
             }
         }
     }
