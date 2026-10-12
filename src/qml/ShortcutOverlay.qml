@@ -37,7 +37,8 @@ Popup {
             ["Ctrl+1–5", "All, Today, Starred, Scheduled, Done"], ["Ctrl+0", "Inbox"], ["Ctrl+↑ ↓", "Previous / next list"],
             ["Ctrl+F", "Search"], ["Ctrl+Shift+O", "Quick Open"], ["Ctrl+K", "Show scheduled"], ["Ctrl+U", "Show paused"],
             ["Ctrl+Shift+K", "Show scheduled & paused"], ["Ctrl+O", "Hide completed"], ["Ctrl+Alt+J", "Project view"],
-            ["Ctrl+Alt+← →", "Lists / Tags panels"], ["Ctrl+= / Ctrl+-", "Text size"], ["Ctrl+Q", "Quit"] ] },
+            ["Ctrl+Alt+← →", "Lists / Tags panels"], ["Ctrl+= / Ctrl+-", "Text size"], ["Ctrl+S", "Sync now"], ["Ctrl+,", "Settings"],
+            ["Ctrl+Shift+2", "Quick Entry"], ["Ctrl+Shift+E", "Export CSV"], ["Ctrl+Q", "Quit"] ] },
     ]
 
     contentItem: Flickable {
