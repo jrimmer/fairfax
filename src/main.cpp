@@ -24,6 +24,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
+#include <QQmlExpression>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QStandardPaths>
@@ -251,9 +252,12 @@ int main(int argc, char *argv[]) {
     QCommandLineOption settingsOption("settings", "Open Settings.");
     QCommandLineOption selfTestOption("selftest", "Drive the window with scripted keys and report QML errors (use with --demo).");
     QCommandLineOption quickTextOption("quick-text", "Type this into Quick Entry (for screenshots).", "text");
+    QCommandLineOption evalOption("shot-eval", "Evaluate this QML expression in the main window before --screenshot.", "js");
+    QCommandLineOption shotWindowOption("shot-window", "Capture the window whose title contains this instead of the main one.", "title");
     QCommandLineOption daemonOption("background", "Start without a window, to deliver alarms (for exec-once).");
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
-                    daemonOption, quickTextOption, selfTestOption, openOption, settingsOption, schemeOption});
+                    daemonOption, quickTextOption, selfTestOption, openOption, settingsOption, schemeOption,
+                    evalOption, shotWindowOption});
     cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
@@ -574,6 +578,27 @@ int main(int argc, char *argv[]) {
                     if (auto *field = target->findChild<QObject *>("quickTitle"))
                         field->setProperty("text", cli.value(quickTextOption));
                 QTimer::singleShot(300, &app, [&, target] {
+                    target->grabWindow().save(cli.value(shotOption));
+                    app.quit();
+                });
+                return;
+            }
+            // Screenshots of menus and dialogs: run an expression in the
+            // window's own scope, then capture it or a window it opened.
+            if (cli.isSet(evalOption) || cli.isSet(shotWindowOption)) {
+                if (cli.isSet(evalOption)) {
+                    QQmlExpression expr(qmlContext(window), window, cli.value(evalOption));
+                    expr.evaluate();
+                    if (expr.hasError())
+                        qWarning().noquote() << "shot-eval:" << expr.error().toString();
+                }
+                QTimer::singleShot(500, &app, [&] {
+                    QQuickWindow *target = window;
+                    if (cli.isSet(shotWindowOption))
+                        for (auto *w : QGuiApplication::topLevelWindows())
+                            if (auto *qw = qobject_cast<QQuickWindow *>(w); qw && qw->isVisible() && qw != window
+                                && qw->title().contains(cli.value(shotWindowOption)))
+                                target = qw;
                     target->grabWindow().save(cli.value(shotOption));
                     app.quit();
                 });

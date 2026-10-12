@@ -341,7 +341,7 @@ Window {
 
                     Label { text: "Default Reminders"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
-                        Label { text: "Remind me of tasks with a due time"; Layout.preferredWidth: 260 }
+                        Label { text: "Tasks with a due time"; Layout.preferredWidth: 170 }
                         ComboBox {
                             readonly property var offsets: [-1, 0, 5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880]
                             model: ["None", "At due time", "5 minutes before", "10 minutes before", "15 minutes before", "30 minutes before",
@@ -351,7 +351,7 @@ Window {
                         }
                     }
                     RowLayout {
-                        Label { text: "Remind me of tasks with a due date"; Layout.preferredWidth: 260 }
+                        Label { text: "Tasks with only a date"; Layout.preferredWidth: 170 }
                         ComboBox {
                             readonly property var days: [-1, 0, 1, 2]
                             model: ["None", "On the day", "1 day before", "2 days before"]
@@ -495,6 +495,7 @@ Window {
                         ComboBox {
                             readonly property var hours: [0, 24, 48]
                             model: ["Never", "Every 24 hours", "Every 48 hours"]
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             currentIndex: Math.max(0, hours.indexOf(Number(root.value("backup.intervalHours", 24))))
                             onActivated: (i) => backend.setSetting("backup.intervalHours", hours[i])
                         }
