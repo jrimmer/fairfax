@@ -309,15 +309,27 @@ Item {
                 onDropped: (drop) => { if (drop.hasUrls) { backend.dropFiles(0, drop.urls); drop.accept() } }
             }
 
-            // Section heat bars: one per section, longer for fuller sections;
-            // click or drag along the rail to jump.
+            // Section bars, as in the reference app: one centred dash per section, longer for
+            // fuller sections, with the one in view drawn darker. Click or drag
+            // along the rail to jump. Only shown when the list scrolls, so it
+            // isn't mistaken for a row's priority mark.
             Column {
                 id: rail
                 anchors.right: parent.right
-                anchors.rightMargin: 6
+                anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
+                width: 14
                 spacing: 5
-                visible: sections.length > 1
+                visible: sections.length > 1 && list.contentHeight > list.height
+                // The last section starting at or above the top of the view; above
+                // the first row (the list's header) that's the first section.
+                readonly property int current: {
+                    const top = list.indexAt(list.width / 2, list.contentY + 1)
+                    let c = 0
+                    for (let i = 0; i < sections.length; ++i)
+                        if (top >= 0 && sections[i].index <= top) c = i
+                    return c
+                }
                 readonly property var sections: {
                     const out = []
                     for (let i = 0; i < backend.tasks.count; ++i) {
@@ -331,11 +343,12 @@ Item {
                     model: rail.sections
                     Rectangle {
                         required property var modelData
-                        anchors.right: parent.right
+                        required property int index
+                        anchors.horizontalCenter: parent.horizontalCenter
                         width: 4 + 10 * modelData.count / rail.most
                         height: 3
                         radius: 1.5
-                        color: modelData.tone === "overdue" && backend.overdueInRed ? theme.overdue : theme.faint
+                        color: index === rail.current ? theme.foreground : theme.faint
                     }
                 }
             }
