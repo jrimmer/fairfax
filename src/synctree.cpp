@@ -551,6 +551,8 @@ void setListExcluded(Store &store, qint64 listId, bool excluded) {
     store.setSetting(ExcludedSetting, sorted.join(','));
 }
 
+bool autoSyncEnabled(const Store &store) { return store.setting("sync.auto", true).toBool(); }
+
 void wipeLocal(Store &store) {
     const Maps x = buildMaps(store);
     const Exclusion excl = exclusionOf(store);

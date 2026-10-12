@@ -12,6 +12,7 @@
 
 #include "nlparse.h"
 #include "store.h"
+#include "synctree.h"
 
 using TodoistMapping::Provider;
 
@@ -231,11 +232,14 @@ void buildSimple(Builder &b, const Store &s, const QString &entity, const QSet<Q
             ids << t.id;
     std::sort(ids.begin(), ids.end());
 
+    const QSet<qint64> excluded = SyncTree::excludedListIds(s);
     for (qint64 id : std::as_const(ids)) {
         QVariantMap map;
         QString name;
         bool deleted = false;
         if (lists) {
+            if (excluded.contains(id))
+                continue;  // "Don't Sync This List": no project for it, no changes pushed.
             const TaskList l = s.list(id);
             if (l.kind == ListKind::Smart)
                 continue;
@@ -342,13 +346,17 @@ QJsonArray TodoistMapping::buildCommands(const Store &s, const QSet<QString> &sk
         if (skip.contains(keyOf(ETasks, id)))
             continue;
         const auto t = s.tasks().constFind(id);
+        if (t != s.tasks().constEnd() && SyncTree::excludedListIds(s).contains(t->listId))
+            continue;
         b.add("item_delete", {{"id", taskLinks.value(id).remoteId}}, ETasks, id, "del",
               t == s.tasks().constEnd() ? QVariantMap() : withoutModified(t->toMap()), taskLinks.value(id).remoteId);
     }
 
+    // Tasks of lists excluded from sync are neither created nor updated.
+    const QSet<qint64> excludedLists = SyncTree::excludedListIds(s);
     QVector<Task> tasks;
     for (const auto &t : s.tasks())
-        if (!t.deleted)
+        if (!t.deleted && !excludedLists.contains(t.listId))
             tasks << t;
     std::sort(tasks.begin(), tasks.end(), [&](const Task &x, const Task &y) {
         const int dx = depthOf(s, x), dy = depthOf(s, y);
@@ -534,9 +542,10 @@ struct Pull {
     QHash<qint64, Store::SyncLink> taskLinks, listLinks, tagLinks;
     QHash<QString, qint64> taskByRemote, listByRemote, tagByRemote;
     QSet<QString> justPushed;
+    QSet<qint64> excluded;  // Lists the user keeps out of sync.
     int in = 0;
 
-    explicit Pull(Store &s) : store(s) { reload(); }
+    explicit Pull(Store &s) : store(s), excluded(SyncTree::excludedListIds(s)) { reload(); }
 
     void reload() {
         taskLinks = store.syncLinks(Provider, ETasks);
@@ -584,15 +593,17 @@ struct Pull {
             const bool deleted = p.value("is_deleted").toBool();
             const QString name = p.value("name").toString();
             qint64 id = listByRemote.value(rid, 0);
+            if (id && excluded.contains(id))
+                continue;  // A list kept out of sync is left alone.
             bool adopt = false;
             if (!id && !deleted) {
                 if (p.value("is_inbox_project").toBool()) {
                     for (const auto &l : store.lists())
-                        if (l.kind == ListKind::Inbox && !l.deleted && !listLinks.contains(l.id) && (!id || l.id < id))
+                        if (l.kind == ListKind::Inbox && !l.deleted && !listLinks.contains(l.id) && !excluded.contains(l.id) && (!id || l.id < id))
                             id = l.id;
                 } else {
                     for (const auto &l : store.lists())
-                        if (l.kind == ListKind::Normal && !l.deleted && !listLinks.contains(l.id) && l.name == name && (!id || l.id < id))
+                        if (l.kind == ListKind::Normal && !l.deleted && !listLinks.contains(l.id) && !excluded.contains(l.id) && l.name == name && (!id || l.id < id))
                             id = l.id;
                 }
                 adopt = id != 0;
@@ -855,6 +866,12 @@ struct Pull {
         }
         const QDateTime updated = parseStamp(item.value("updated_at").toString());
 
+        // Tasks in a list kept out of sync are left alone, wherever they are.
+        if (id && excluded.contains(store.task(id).listId))
+            return;
+        if (!id && excluded.contains(listByRemote.value(jsonId(item.value("project_id")), 0)))
+            return;
+
         if (!id) {
             if (deleted)
                 return;
@@ -1030,18 +1047,18 @@ Secret runSecret(const QStringList &args, const QByteArray &input = {}) {
 TodoistSync::TodoistSync(Store *store, QObject *parent) : QObject(parent), m_store(store) {
     m_timer.setInterval(5 * 60 * 1000);
     connect(&m_timer, &QTimer::timeout, this, [this] {
-        if (connected())
+        if (connected() && SyncTree::autoSyncEnabled(*m_store))
             syncNow();
     });
     m_timer.start();
     m_debounce.setSingleShot(true);
     m_debounce.setInterval(20 * 1000);
     connect(&m_debounce, &QTimer::timeout, this, [this] {
-        if (connected())
+        if (connected() && SyncTree::autoSyncEnabled(*m_store))
             syncNow();
     });
     connect(store, &Store::changed, this, [this] {
-        if (m_applying || !m_tokenLooked || m_cachedToken.isEmpty())
+        if (m_applying || !m_tokenLooked || m_cachedToken.isEmpty() || !SyncTree::autoSyncEnabled(*m_store))
             return;
         m_debounce.start();
     });
@@ -1056,6 +1073,10 @@ QString TodoistSync::token() const {
 }
 
 bool TodoistSync::connected() const { return !token().isEmpty(); }
+
+QDateTime TodoistSync::lastSync() const {
+    return QDateTime::fromString(m_store->setting("todoist.lastSync").toString(), Qt::ISODate);
+}
 
 void TodoistSync::setTransport(Transport transport, const QString &token) {
     m_transport = std::move(transport);
@@ -1095,6 +1116,7 @@ void TodoistSync::disconnectAccount() {
     m_tokenLooked = true;
     m_store->setSetting(SyncTokenSetting, QString());
     m_store->clearSyncLinks(Provider);
+    m_store->setSetting("todoist.lastSync", QString());
     m_status = "Not connected";
     emit stateChanged();
 }
@@ -1138,6 +1160,7 @@ void TodoistSync::step() {
             QString s = QString("Synced: %1 in, %2 out").arg(m_in).arg(m_out);
             if (!m_firstError.isEmpty())
                 s += " (" + m_firstError + ")";
+            m_store->setSetting("todoist.lastSync", QDateTime::currentDateTime().toString(Qt::ISODate));
             finish(s);
             emit synced(s);
             return;

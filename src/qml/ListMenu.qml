@@ -56,6 +56,13 @@ Menu {
     MenuItem { text: "Archive"; onTriggered: backend.setListFlag(root.listId, "archived", true) }
     MenuItem { text: "Delete all Tasks…"; onTriggered: confirmTasks.open() }
     MenuItem { text: "Delete List…"; onTriggered: confirm.open() }
+    MenuSeparator {}
+    MenuItem {
+        text: "Don't Sync This List"
+        checkable: true
+        checked: !!root.info.syncExcluded
+        onTriggered: backend.setListSyncExcluded(root.listId, !root.info.syncExcluded)
+    }
 
     Dialog {
         id: confirmTasks

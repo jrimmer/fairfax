@@ -65,6 +65,10 @@ QSet<qint64> excludedListIds(const Store &store);
 bool isListExcluded(const Store &store, qint64 listId);
 void setListExcluded(Store &store, qint64 listId, bool excluded);
 
+// "Sync automatically" (Settings > Sync): when off, providers sync only when
+// asked. On by default, which is how sync always behaved.
+bool autoSyncEnabled(const Store &store);
+
 // Whether `path` (relative, with '/') is one the tree uses: Store.json, a
 // record file named <uid>.json in a record folder, or an attachment file.
 // Anything else in a shared folder (a Syncthing ".sync-conflict" copy, a

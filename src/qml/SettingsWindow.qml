@@ -21,6 +21,7 @@ Window {
     Material.foreground: theme.foreground
 
     property int pane: 0
+    property string copySource
     readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation"]
 
     function value(key, fallback) {
@@ -45,6 +46,8 @@ Window {
             else if (purpose === "import-taskdb") backend.importFrom(path, "taskapp")
             else if (purpose === "import-ticktick") backend.importFrom(path, "ticktick")
             else if (purpose === "restore") backend.restoreBackup(path)
+            else if (purpose === "sync-folder" && folderSync) folderSync.setFolder(path)
+            else if (purpose === "backup-copy") backend.saveBackupCopy(copySource, path)
         }
         function onFailed(message) { status.text = message }
     }
@@ -372,7 +375,11 @@ Window {
                 ColumnLayout {
                     visible: root.pane === 5
                     Layout.fillWidth: true
-                    Label { text: "Git"; font.bold: true }
+                    Toggle {
+                        key: "sync.auto"; fallback: true; label: "Sync automatically"
+                        note: "Syncs a few seconds after an edit and every few minutes. Turn it off to sync only with Ctrl+S or Sync Now."
+                    }
+                    Label { text: "Git"; font.bold: true; Layout.topMargin: 12 }
                     Hint {
                         Layout.topMargin: 0
                         text: "Keep your tasks in a private git repository and every machine that points at it stays in step. "
@@ -425,6 +432,58 @@ Window {
                         Button { text: "Disconnect"; flat: true; onClicked: todoist.disconnectAccount() }
                     }
                     Text { visible: !!todoist; text: todoist ? todoist.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+
+                    // Folder
+                    Label { text: "Folder"; font.bold: true; Layout.topMargin: 16 }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Keep the same per-task files in a folder that Syncthing, Dropbox or Nextcloud's desktop client already shares. Several machines pointed at the same folder stay in step."
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: !!folderSync
+                        Text { Layout.fillWidth: true; elide: Text.ElideMiddle; color: theme.foreground; font.pixelSize: backend.fontSize - 1; text: folderSync && folderSync.configured ? folderSync.folder : "No folder chosen" }
+                        Button { text: folderSync && folderSync.configured ? "Change…" : "Choose Folder…"; onClicked: filePicker.openFolder("Choose the sync folder", "sync-folder") }
+                    }
+                    RowLayout {
+                        visible: !!folderSync && folderSync.configured
+                        Button { text: folderSync && folderSync.busy ? "Syncing…" : "Sync Now"; enabled: !!folderSync && !folderSync.busy && !folderSync.needsChoice; onClicked: folderSync.syncNow() }
+                        Button { text: "Disconnect"; flat: true; onClicked: folderSync.disconnectProvider() }
+                    }
+                    FirstSyncChoice { provider: folderSync }
+                    Text { visible: !!folderSync && folderSync.configured; text: folderSync ? folderSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+
+                    // WebDAV
+                    Label { text: "WebDAV"; font.bold: true; Layout.topMargin: 16 }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "The same files over WebDAV, for Nextcloud, ownCloud and other servers. Use the address of an existing folder, such as https://cloud.example.com/remote.php/dav/files/you/Precrime/. The password is kept in your keyring."
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: !!webDavSync
+                        TextField { id: davUrl; Layout.fillWidth: true; placeholderText: "https://…/dav/files/you/Precrime/"; text: webDavSync ? webDavSync.url : "" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            TextField { id: davUser; Layout.fillWidth: true; placeholderText: "User name"; text: webDavSync ? webDavSync.user : "" }
+                            TextField { id: davPassword; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Password" }
+                            Button {
+                                text: webDavSync && webDavSync.configured ? "Change" : "Connect"
+                                enabled: davUrl.text.trim() !== "" && davPassword.text !== ""
+                                onClicked: { webDavSync.setServer(davUrl.text.trim(), davUser.text.trim(), davPassword.text); davPassword.text = "" }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        visible: !!webDavSync && webDavSync.configured
+                        Button { text: webDavSync && webDavSync.busy ? "Syncing…" : "Sync Now"; enabled: !!webDavSync && !webDavSync.busy && !webDavSync.needsChoice; onClicked: webDavSync.syncNow() }
+                        Button { text: "Disconnect"; flat: true; onClicked: webDavSync.disconnectProvider() }
+                    }
+                    FirstSyncChoice { provider: webDavSync }
+                    Text { visible: !!webDavSync && webDavSync.configured; text: webDavSync ? webDavSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+
+                    Label { text: "Exclusions"; font.bold: true; Layout.topMargin: 16 }
+                    Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV and Todoist sync all skip it." }
                 }
 
                 // Backups
@@ -458,6 +517,9 @@ Window {
                             Label { text: modelData.date; Layout.fillWidth: true }
                             Label { text: modelData.size; color: theme.muted }
                             Button { text: "Restore"; flat: true; onClicked: { confirmRestore.path = modelData.path; confirmRestore.open() } }
+                            Button { text: "Lists…"; flat: true; onClicked: restoreLists.show(modelData.path, modelData.date) }
+                            Button { text: "Save a Copy…"; flat: true; onClicked: { root.copySource = modelData.path; filePicker.save("Save a copy of this backup", modelData.name, "backup-copy") } }
+                            Button { text: "Delete"; flat: true; onClicked: { confirmDelete.path = modelData.path; confirmDelete.open() } }
                         }
                     }
                 }
@@ -553,6 +615,65 @@ Window {
         onAccepted: backend.restoreBackup(path)
     }
 
+    Dialog {
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
+        id: confirmDelete
+        property string path
+        anchors.centerIn: parent
+        modal: true
+        title: "Delete this backup?"
+        Label { text: "The backup file is removed from disk." }
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        onAccepted: { backend.deleteBackup(path); backupList.model = backend.backups() }
+    }
+
+    // Restore Selected Lists: pick lists out of a backup and add them, with
+    // their tasks, as new records in a "Restored" group. Nothing is replaced.
+    Dialog {
+        id: restoreLists
+        property string path
+        property string date
+        property var lists: []
+        property var chosen: ({})
+        function show(p, d) {
+            path = p; date = d
+            lists = backend.backupLists(p)
+            chosen = ({})
+            open()
+        }
+        width: Math.min(460, (parent ? parent.width : 480) - 40)
+        height: Math.min(460, (parent ? parent.height : 480) - 40)
+        anchors.centerIn: parent
+        modal: true
+        title: "Restore lists from " + date
+        standardButtons: Dialog.Cancel
+        ColumnLayout {
+            anchors.fill: parent
+            Label { text: "Pick the lists to add. They arrive as new lists in a “Restored” group; nothing you have now is changed, and Ctrl+Z undoes it."; wrapMode: Text.Wrap; Layout.fillWidth: true; color: theme.muted }
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: restoreLists.lists
+                delegate: CheckBox {
+                    required property var modelData
+                    width: ListView.view.width
+                    text: modelData.name + "  (" + modelData.tasks + (modelData.tasks === 1 ? " task)" : " tasks)")
+                    checked: !!restoreLists.chosen[modelData.uid]
+                    onToggled: { const c = restoreLists.chosen; c[modelData.uid] = checked; restoreLists.chosen = c }
+                }
+            }
+            Button {
+                text: "Restore Selected Lists"
+                enabled: Object.keys(restoreLists.chosen).some(k => restoreLists.chosen[k])
+                onClicked: {
+                    backend.restoreBackupLists(restoreLists.path, Object.keys(restoreLists.chosen).filter(k => restoreLists.chosen[k]))
+                    restoreLists.close()
+                }
+            }
+        }
+    }
+
     ExportDialog { id: exportDialog; owner: "settings" }
 
     component Toggle: ColumnLayout {
@@ -573,6 +694,32 @@ Window {
             color: theme.muted
             font.pixelSize: backend.fontSize - 2
             leftPadding: 44
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+        }
+    }
+
+    // The question a folder or WebDAV sync asks when both sides already hold tasks.
+    component FirstSyncChoice: ColumnLayout {
+        property var provider
+        visible: !!provider && provider.needsChoice
+        Layout.fillWidth: true
+        Text {
+            text: "This machine and the remote both have tasks. How should the first sync go?"
+            color: theme.foreground
+            font.pixelSize: backend.fontSize - 1
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+        }
+        RowLayout {
+            Button { text: "Merge"; onClicked: provider.chooseFirstSync("merge") }
+            Button { text: "Replace Local"; onClicked: provider.chooseFirstSync("local") }
+            Button { text: "Replace Server"; onClicked: provider.chooseFirstSync("server") }
+        }
+        Text {
+            text: "Merge keeps the newest version of every task. Replace Local discards this machine's tasks for the remote's (a backup is made first). Replace Server overwrites the remote with this machine's tasks."
+            color: theme.muted
+            font.pixelSize: backend.fontSize - 2
             wrapMode: Text.Wrap
             Layout.fillWidth: true
         }

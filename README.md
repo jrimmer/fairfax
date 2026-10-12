@@ -194,6 +194,25 @@ list has focus. Press `?` in the app for the full list.
 
 Every import is one step that Ctrl+Z undoes, and a backup is taken first.
 
+## Sync and backups
+
+Settings → Sync offers four ways to keep machines in step, all of which can run at once:
+a git repository, a plain folder (for Syncthing, Dropbox or Nextcloud's desktop client),
+a WebDAV folder (Nextcloud, ownCloud and the like; the password lives in your keyring),
+and Todoist. The folder and WebDAV providers use the same per-task files as git sync; the
+newest edit of each task wins. The first time a machine meets a folder or server that
+already holds tasks, it asks whether to Merge, Replace Local (a backup is made first) or
+Replace Server. "Sync automatically" (on by default) can be turned off to sync only with
+`Ctrl+S`. The sidebar footer shows when sync last succeeded for whichever providers are set
+up, and `Ctrl+S` or its button syncs them all.
+
+Right-click a list and choose **Don't Sync This List** to keep it, and its tasks, on this
+machine only; every sync provider skips it.
+
+In Settings → Backups, each backup can be restored whole, **Lists…** to restore only chosen
+lists (with their tasks, tags, alerts and attachments) as new lists in a "Restored" group
+without touching what you have, saved elsewhere with **Save a Copy…**, or deleted.
+
 ## Automation
 
 Everything the reference app's Automation Suite offers is available outside the window too:

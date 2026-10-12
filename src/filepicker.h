@@ -15,6 +15,7 @@ public:
     explicit FilePicker(QObject *parent = nullptr);
 
     Q_INVOKABLE void open(const QString &title, const QString &purpose);
+    Q_INVOKABLE void openFolder(const QString &title, const QString &purpose);
     Q_INVOKABLE void save(const QString &title, const QString &suggestedName, const QString &purpose);
 
 signals:

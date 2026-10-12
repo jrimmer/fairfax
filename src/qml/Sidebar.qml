@@ -212,19 +212,41 @@ Rectangle {
             Layout.fillWidth: true
             implicitHeight: 38
             Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: theme.divider }
-            // Sync, when a git remote is set: spins while syncing, and the
-            // tooltip says how it went.
+            // Sync, when any provider is set up (git, Todoist, a folder or
+            // WebDAV): spins while syncing, shows when it last succeeded, and
+            // turns red after a failure. The tooltip says how each one went.
+            Text {
+                id: syncAge
+                visible: syncButton.visible
+                anchors.right: syncButton.left
+                anchors.rightMargin: 2
+                anchors.verticalCenter: parent.verticalCenter
+                color: syncHub && syncHub.failed ? theme.overdue : theme.muted
+                font.pixelSize: backend.fontSize - 3
+                property int tick: 0
+                text: {
+                    tick
+                    if (!syncHub) return ""
+                    if (syncHub.busy) return "Syncing…"
+                    if (syncHub.failed) return "Sync failed"
+                    const t = syncHub.lastSync
+                    if (!t || isNaN(t.getTime())) return "Not synced"
+                    const m = Math.floor((Date.now() - t.getTime()) / 60000)
+                    return m < 1 ? "Synced just now" : m < 60 ? "Synced " + m + " min ago" : m < 1440 ? "Synced " + Math.floor(m / 60) + " h ago" : "Synced " + Math.floor(m / 1440) + " d ago"
+                }
+                Timer { interval: 30000; running: syncButton.visible; repeat: true; onTriggered: syncAge.tick++ }
+            }
             IconButton {
                 id: syncButton
-                visible: !!gitSync && gitSync.configured
+                visible: !!syncHub && syncHub.active
                 anchors.right: parent.right
                 anchors.rightMargin: 44
                 anchors.verticalCenter: parent.verticalCenter
                 icon: "sync"
-                tip: gitSync ? gitSync.status + " (Ctrl+S)" : ""
-                color: gitSync && gitSync.status.startsWith("Synced") === false && !gitSync.busy ? theme.overdue : theme.muted
-                onClicked: gitSync.syncNow()
-                RotationAnimator on rotation { running: !!gitSync && gitSync.busy; from: 0; to: 360; duration: 900; loops: Animation.Infinite }
+                tip: syncHub ? syncHub.summary + "\nSync now (Ctrl+S)" : ""
+                color: syncHub && syncHub.failed ? theme.overdue : theme.muted
+                onClicked: syncHub.syncAll()
+                RotationAnimator on rotation { running: !!syncHub && syncHub.busy; from: 0; to: 360; duration: 900; loops: Animation.Infinite }
             }
             IconButton {
                 anchors.right: parent.right

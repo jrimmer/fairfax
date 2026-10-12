@@ -232,8 +232,7 @@ ApplicationWindow {
     AppShortcut {
         sequence: "Ctrl+S"
         onActivated: {
-            if (gitSync && gitSync.configured) gitSync.syncNow()
-            if (todoist && todoist.connected) todoist.syncNow()
+            if (syncHub) syncHub.syncAll()
         }
     }
     AppShortcut { sequence: "Ctrl+Shift+Alt+F"; onActivated: pane.openSearchBuilder() }

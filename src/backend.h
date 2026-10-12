@@ -236,6 +236,9 @@ public:
     Q_INVOKABLE void setListFlag(qint64 id, const QString &flag, bool on);
     Q_INVOKABLE void deleteList(qint64 id);
     Q_INVOKABLE QVariantMap listInfo(qint64 id) const;
+    // "Don't Sync This List": git, folder, WebDAV and Todoist sync skip it
+    // and its tasks. Kept in a setting, on this machine only.
+    Q_INVOKABLE void setListSyncExcluded(qint64 id, bool excluded);
     Q_INVOKABLE QVariantMap taskInfo(qint64 id) const;
     Q_INVOKABLE QVariantList findTasks(const QString &text, int limit = 12) const;
     Q_INVOKABLE void revealInList(qint64 taskId);
@@ -298,6 +301,13 @@ public:
     Q_INVOKABLE bool backupNow(const QString &reason = {});
     Q_INVOKABLE QVariantList backups() const;
     Q_INVOKABLE bool restoreBackup(const QString &path);
+    // Restore Selected Lists: the lists a backup holds ({uid, name, tasks}),
+    // and adding chosen ones to the current database as new records in a
+    // "Restored" group (undoable; the backup itself is only read).
+    Q_INVOKABLE QVariantList backupLists(const QString &path) const;
+    Q_INVOKABLE int restoreBackupLists(const QString &path, const QStringList &listUids);
+    Q_INVOKABLE bool saveBackupCopy(const QString &path, const QString &destination);
+    Q_INVOKABLE bool deleteBackup(const QString &path);
     Q_INVOKABLE QString backupFolder() const;
 
     // Import and export (paths come from the portal file picker).

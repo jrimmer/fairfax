@@ -53,14 +53,20 @@ GitSync::GitSync(Store *store, const QString &directory, QObject *parent)
     m_status = configured() ? "Not synced yet" : "Not set up";
 
     m_periodic.setInterval(5 * 60 * 1000);
-    connect(&m_periodic, &QTimer::timeout, this, &GitSync::syncNow);
+    connect(&m_periodic, &QTimer::timeout, this, [this] {
+        if (SyncTree::autoSyncEnabled(*m_store))
+            syncNow();
+    });
     m_debounce.setSingleShot(true);
     m_debounce.setInterval(20 * 1000);
-    connect(&m_debounce, &QTimer::timeout, this, &GitSync::syncNow);
+    connect(&m_debounce, &QTimer::timeout, this, [this] {
+        if (SyncTree::autoSyncEnabled(*m_store))
+            syncNow();
+    });
     // The sync's own writes don't count; an edit made while a sync runs
     // queues another sync right after it.
     connect(store, &Store::changed, this, [this] {
-        if (!configured() || m_applying)
+        if (!configured() || m_applying || !SyncTree::autoSyncEnabled(*m_store))
             return;
         if (m_busy)
             m_again = true;

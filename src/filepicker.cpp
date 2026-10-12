@@ -33,6 +33,16 @@ void FilePicker::open(const QString &title, const QString &purpose) {
 #endif
 }
 
+void FilePicker::openFolder(const QString &title, const QString &purpose) {
+#if defined(Q_OS_LINUX)
+    request("OpenFile", title, {{"directory", true}}, purpose);
+#else
+    const QString path = QFileDialog::getExistingDirectory(nullptr, title, QStandardPaths::writableLocation(QStandardPaths::HomeLocation));
+    if (!path.isEmpty())
+        emit picked(path, purpose);
+#endif
+}
+
 void FilePicker::save(const QString &title, const QString &suggestedName, const QString &purpose) {
 #if defined(Q_OS_LINUX)
     request("SaveFile", title, {{"current_name", suggestedName}}, purpose);

@@ -1,4 +1,7 @@
 #include "backend.h"
+#include "restorelists.h"
+#include "synctree.h"
+#include <QTemporaryDir>
 
 #include <QClipboard>
 #include <QDesktopServices>
@@ -1683,7 +1686,14 @@ QVariantMap Backend::listInfo(qint64 id) const {
     const TaskList l = m_store->list(id);
     return {{"id", l.id}, {"name", l.name}, {"color", l.color}, {"showInAll", l.showInAll},
             {"showInToday", l.showInToday}, {"showInDone", l.showInDone}, {"archived", l.archived},
-            {"muteAlerts", l.muteAlerts}, {"completedMode", l.completedMode}, {"kind", l.kind}};
+            {"muteAlerts", l.muteAlerts}, {"completedMode", l.completedMode}, {"kind", l.kind},
+            {"syncExcluded", SyncTree::isListExcluded(*m_store, id)}};
+}
+
+void Backend::setListSyncExcluded(qint64 id, bool excluded) {
+    SyncTree::setListExcluded(*m_store, id, excluded);
+    emit settingsChanged();
+    emit viewChanged();
 }
 
 QVariantMap Backend::taskInfo(qint64 id) const {
@@ -3041,6 +3051,60 @@ bool Backend::restoreBackup(const QString &path) {
     emit selectionChanged();
     setStatus("Restored " + QFileInfo(path).fileName());
     return true;
+}
+
+namespace {
+// Opens a copy of a backup so reading it never writes beside the original
+// (SQLite's journal files) or migrates it in place.
+bool openBackupCopy(const QString &path, QTemporaryDir &dir, Store &store) {
+    if (!dir.isValid() || !QFileInfo::exists(path))
+        return false;
+    const QString copy = dir.filePath("backup.db");
+    return QFile::copy(path, copy) && store.open(copy);
+}
+}  // namespace
+
+QVariantList Backend::backupLists(const QString &path) const {
+    QVariantList result;
+    QTemporaryDir dir;
+    Store backup;
+    if (!openBackupCopy(path, dir, backup))
+        return result;
+    for (const auto &info : RestoreLists::listsIn(backup))
+        result.append(QVariantMap{{"uid", info.uid}, {"name", info.name}, {"tasks", info.tasks}});
+    return result;
+}
+
+int Backend::restoreBackupLists(const QString &path, const QStringList &listUids) {
+    QTemporaryDir dir;
+    Store backup;
+    if (!openBackupCopy(path, dir, backup)) {
+        setStatus("Could not read " + QFileInfo(path).fileName());
+        return 0;
+    }
+    endEdit();
+    const auto result = RestoreLists::merge(*m_store, backup, QSet<QString>(listUids.begin(), listUids.end()),
+                                            m_store->attachmentsFolder());
+    if (result.lists)
+        setStatus(QStringLiteral("Restored %1 lists with %2 tasks into “Restored” (Ctrl+Z undoes it)")
+                      .arg(result.lists).arg(result.tasks));
+    return result.lists;
+}
+
+bool Backend::saveBackupCopy(const QString &path, const QString &destination) {
+    if (destination.isEmpty() || !QFileInfo(path).absoluteFilePath().startsWith(QFileInfo(backupFolder()).absoluteFilePath()))
+        return false;
+    QFile::remove(destination);
+    const bool ok = QFile::copy(path, destination);
+    setStatus(ok ? "Saved a copy as " + QFileInfo(destination).fileName() : "Could not save the copy");
+    return ok;
+}
+
+bool Backend::deleteBackup(const QString &path) {
+    // Only files in the backup folder, so a stray path can't delete anything else.
+    if (!QFileInfo(path).absoluteFilePath().startsWith(QFileInfo(backupFolder()).absoluteFilePath() + "/"))
+        return false;
+    return QFile::remove(path);
 }
 
 void Backend::exportTo(const QString &path, const QString &format, bool selectionOnly) {

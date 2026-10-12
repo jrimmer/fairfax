@@ -44,7 +44,9 @@
 #include "views.h"
 #include "backend.h"
 #include "filepicker.h"
+#include "foldersync.h"
 #include "gitsync.h"
+#include "synchub.h"
 #include "store.h"
 #include "theme.h"
 #include "todoist.h"
@@ -399,9 +401,9 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<GitSync> gitSync;
     if (opened && !offscreen) {
         gitSync = std::make_unique<GitSync>(&store);
-        QObject::connect(&app, &QCoreApplication::aboutToQuit, gitSync.get(), [&gitSync] {
+        QObject::connect(&app, &QCoreApplication::aboutToQuit, gitSync.get(), [&gitSync, &store] {
             // One last push so edits made just before quitting reach the remote.
-            if (gitSync->configured())
+            if (gitSync->configured() && SyncTree::autoSyncEnabled(store))
                 gitSync->syncBlocking(8000);
         });
     }
@@ -416,13 +418,28 @@ int main(int argc, char *argv[]) {
             QTimer::singleShot(3000, todoist.get(), &TodoistSync::syncNow);
     }
     engine.rootContext()->setContextProperty("todoist", todoist.get());
+    std::unique_ptr<FolderSync> folderSync;
+    std::unique_ptr<WebDavSync> webDavSync;
+    if (opened && !offscreen) {
+        folderSync = std::make_unique<FolderSync>(&store);
+        webDavSync = std::make_unique<WebDavSync>(&store);
+        if (SyncTree::autoSyncEnabled(store)) {
+            QTimer::singleShot(4000, folderSync.get(), &TreeProvider::syncNow);
+            QTimer::singleShot(5000, webDavSync.get(), &TreeProvider::syncNow);
+        }
+    }
+    engine.rootContext()->setContextProperty("folderSync", folderSync.get());
+    engine.rootContext()->setContextProperty("webDavSync", webDavSync.get());
+    SyncHub syncHub;
+    syncHub.add(gitSync.get(), "Git");
+    syncHub.add(todoist.get(), "Todoist");
+    syncHub.add(folderSync.get(), "Folder");
+    syncHub.add(webDavSync.get(), "WebDAV");
+    engine.rootContext()->setContextProperty("syncHub", &syncHub);
     if (opened && !offscreen) {
         tray = std::make_unique<Tray>(&store, &backend);
-        tray->canSync = [&] { return (gitSync && gitSync->configured()) || (todoist && todoist->connected()); };
-        tray->syncNow = [&] {
-            if (gitSync && gitSync->configured()) gitSync->syncNow();
-            if (todoist && todoist->connected()) todoist->syncNow();
-        };
+        tray->canSync = [&] { return syncHub.active(); };
+        tray->syncNow = [&] { syncHub.syncAll(); };
         QObject::connect(&backend, &Backend::settingsChanged, tray.get(),
                          [&] { tray->setVisible(store.setting("general.trayIcon", true).toBool()); });
     }

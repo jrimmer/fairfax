@@ -17,6 +17,7 @@
 // from its snapshot when it changed since the last sync; a record without a
 // link is new; a deleted record with a link is a deletion.
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -74,6 +75,8 @@ QString recurrenceString(const Recurrence &rule);
 class TodoistSync : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool connected READ connected NOTIFY stateChanged)
+    Q_PROPERTY(bool configured READ connected NOTIFY stateChanged)
+    Q_PROPERTY(QDateTime lastSync READ lastSync NOTIFY stateChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
     Q_PROPERTY(QString status READ status NOTIFY stateChanged)
 
@@ -81,6 +84,7 @@ public:
     explicit TodoistSync(Store *store, QObject *parent = nullptr);
 
     bool connected() const;
+    QDateTime lastSync() const;
     bool busy() const { return m_busy; }
     QString status() const { return m_status; }
 
