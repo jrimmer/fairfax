@@ -240,6 +240,25 @@ bool writeTree(const Store &store, const QString &directory, const QDateTime &no
             if (!expected.contains(name))
                 QFile::remove(folder + "/" + name);
     }
+    // Attachment files are copied into attachment-files/ so other machines
+    // get the pictures and audio notes too; files of removed attachments go.
+    {
+        const QString filesDir = root.filePath("attachment-files");
+        QDir().mkpath(filesDir);
+        QSet<QString> wanted;
+        for (const auto &a : store.attachments()) {
+            if (a.deleted || a.fileName.isEmpty())
+                continue;
+            wanted.insert(a.fileName);
+            const QString source = store.attachmentsFolder() + "/" + a.fileName;
+            const QString target = filesDir + "/" + a.fileName;
+            if (!QFile::exists(target) && QFile::exists(source))
+                QFile::copy(source, target);
+        }
+        for (const auto &name : QDir(filesDir).entryList(QDir::Files))
+            if (!wanted.contains(name))
+                QFile::remove(filesDir + "/" + name);
+    }
     return true;
 }
 
@@ -389,6 +408,19 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
         }
     }
     store.commit();
+    // Attachment files ride along in attachment-files/; copy in any that
+    // arrived from another machine.
+    {
+        const QDir from(QDir(directory).filePath("attachment-files"));
+        QDir().mkpath(store.attachmentsFolder());
+        for (const auto &a : store.attachments()) {
+            if (a.deleted || a.fileName.isEmpty())
+                continue;
+            const QString target = store.attachmentsFolder() + "/" + a.fileName;
+            if (!QFile::exists(target) && from.exists(a.fileName))
+                QFile::copy(from.filePath(a.fileName), target);
+        }
+    }
     return changed;
 }
 

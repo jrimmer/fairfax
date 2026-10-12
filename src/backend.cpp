@@ -4,6 +4,7 @@
 #include <QDesktopServices>
 #include <QGuiApplication>
 #include <QMimeDatabase>
+#include <QProcess>
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
@@ -1447,6 +1448,12 @@ QVariantMap Backend::taskInfo(qint64 id) const {
         {"repeat", Recurrences::describe(t.recurrence)}, {"duration", Schedule::durationBadge(t.duration)},
         {"tags", tags}, {"actionType", t.actionType}, {"actionValue", t.actionValue},
         {"childTotal", total}, {"childDone", done},
+        {"pictureUrl", [&] {
+             for (const auto &a : m_store->attachmentsFor(t.id))
+                 if (a.kind == Attachment::Image)
+                     return QUrl::fromLocalFile(m_store->attachmentsFolder() + "/" + a.fileName).toString();
+             return QString();
+         }()},
     };
 }
 
@@ -2015,6 +2022,55 @@ void Backend::openAttachment(qint64 attachmentId) {
     const Attachment a = m_store->attachments().value(attachmentId);
     if (a.id)
         QDesktopServices::openUrl(QUrl::fromLocalFile(m_store->attachmentsFolder() + "/" + a.fileName));
+}
+
+void Backend::toggleRecording(qint64 taskId) {
+    if (m_recorder) {
+        // Stopping: pw-record finishes the file on SIGINT-like termination.
+        m_recorder->terminate();
+        if (!m_recorder->waitForFinished(3000))
+            m_recorder->kill();
+        m_recorder->deleteLater();
+        m_recorder = nullptr;
+        const qint64 task = m_recordingTask;
+        m_recordingTask = 0;
+        emit recordingChanged();
+        const QFileInfo info(m_recordingFile);
+        if (!info.exists() || info.size() < 1024) {
+            setStatus("Nothing was recorded.");
+            QFile::remove(m_recordingFile);
+            return;
+        }
+        Attachment a;
+        a.id = m_store->nextId("attachments");
+        a.uid = info.completeBaseName();
+        a.taskId = task;
+        a.kind = Attachment::Audio;
+        a.name = "Audio note " + QDateTime::currentDateTime().toString("d MMM, h:mm AP") + ".flac";
+        a.fileName = info.fileName();
+        a.bytes = info.size();
+        m_store->begin("Record Audio Note");
+        m_store->putAttachment(a);
+        m_store->commit();
+        return;
+    }
+    const QString recorder = QStandardPaths::findExecutable("pw-record");
+    if (recorder.isEmpty()) {
+        setStatus("Recording needs pw-record (PipeWire), which isn't installed.");
+        return;
+    }
+    QDir().mkpath(m_store->attachmentsFolder());
+    m_recordingFile = m_store->attachmentsFolder() + "/" + Store::newUid() + ".flac";
+    m_recorder = new QProcess(this);
+    m_recorder->start(recorder, {m_recordingFile});
+    if (!m_recorder->waitForStarted(2000)) {
+        setStatus("Couldn't start recording: " + m_recorder->errorString());
+        m_recorder->deleteLater();
+        m_recorder = nullptr;
+        return;
+    }
+    m_recordingTask = taskId;
+    emit recordingChanged();
 }
 
 void Backend::timeBlock(const QString &isoDate, int startMinute, int durationMinutes) {

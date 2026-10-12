@@ -299,6 +299,10 @@ public:
     Q_INVOKABLE void dropFiles(qint64 taskId, const QVariantList &urls);
     Q_INVOKABLE void removeAttachment(qint64 attachmentId);
     Q_INVOKABLE void openAttachment(qint64 attachmentId);
+    // Audio notes recorded with PipeWire's pw-record, Omarchy's audio stack.
+    Q_INVOKABLE void toggleRecording(qint64 taskId);
+    Q_PROPERTY(qint64 recordingTaskId READ recordingTaskId NOTIFY recordingChanged)
+    qint64 recordingTaskId() const { return m_recordingTask; }
 
     // Calendar Day Bar time blocking: the selection is due at that slot.
     Q_INVOKABLE void timeBlock(const QString &isoDate, int startMinute, int durationMinutes);
@@ -330,6 +334,7 @@ signals:
     void taskCompleted(bool done);   // For the completion sound.
     void celebrate();                // The last open task in view was just completed.
     void newWindowRequested();
+    void recordingChanged();
     void quickEntryTextRequested(const QString &text);
     void windowRequested();
 
@@ -365,6 +370,9 @@ private:
     RowModel m_tags;
     RowModel m_places;
     bool m_searchAll = false;
+    class QProcess *m_recorder = nullptr;
+    qint64 m_recordingTask = 0;
+    QString m_recordingFile;
     QVector<qint64> m_history;
     int m_historyStep = 0;
     void rebuildPlaces(const ViewBuilder &views);

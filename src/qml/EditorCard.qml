@@ -102,6 +102,25 @@ Item {
                     Plain.TextField {
                         id: titleField
                         Layout.fillWidth: true
+                        // While a new task's title is typed, recognised dates,
+                        // tags and the rest are drawn as capsules, as in Quick Entry.
+                        property var spans: root.e.isNew && backend.setting("nl.editor").value !== "false" && text.trim()
+                                            ? backend.previewEntry(text).spans : []
+                        Repeater {
+                            model: titleField.spans
+                            Rectangle {
+                                required property var modelData
+                                readonly property rect a: { titleField.contentWidth; titleField.text; return titleField.positionToRectangle(modelData.start) }
+                                readonly property rect b: { titleField.contentWidth; titleField.text; return titleField.positionToRectangle(modelData.start + modelData.length) }
+                                x: titleField.leftPadding + a.x - 3
+                                width: b.x - a.x + 6
+                                y: (titleField.height - height) / 2
+                                height: titleField.height + 2
+                                radius: 5
+                                z: -1
+                                color: Qt.alpha(theme.accent, 0.20)
+                            }
+                        }
                         padding: 0
                         font.pixelSize: backend.fontSize + 1
                         color: theme.foreground
@@ -174,6 +193,13 @@ Item {
                         }
                         Item { Layout.fillWidth: true }
                         RibbonButton { icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; onClicked: actionMenu.popup() }
+                        RibbonButton {
+                            icon: "mic"
+                            tip: backend.recordingTaskId === root.e.id ? "Stop Recording" : "Record an Audio Note"
+                            active: backend.recordingTaskId === root.e.id
+                            color: backend.recordingTaskId === root.e.id ? theme.overdue : theme.muted
+                            onClicked: backend.toggleRecording(root.e.id)
+                        }
                         RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
                         RibbonButton { icon: "pin"; tip: "Location"; active: (root.e.locations || []).length > 0; onClicked: locationMenu.popup() }
                         RibbonButton { id: repeatButton; icon: "repeat"; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; onClicked: repeatEditor.openAt(repeatButton) }

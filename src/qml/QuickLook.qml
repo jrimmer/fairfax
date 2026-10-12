@@ -65,6 +65,17 @@ Popup {
                 }
                 Icon { visible: !!root.t.starred; name: "starred"; filled: true; size: 16; color: theme.star }
             }
+            // The task's picture as a cover banner.
+            Image {
+                visible: !!root.t.pictureUrl
+                Layout.fillWidth: true
+                Layout.preferredHeight: visible ? 150 : 0
+                source: root.t.pictureUrl || ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                sourceSize.width: 900
+                clip: true
+            }
             // Completion bar for projects and checklists.
             Rectangle {
                 visible: (root.t.childTotal || 0) > 0

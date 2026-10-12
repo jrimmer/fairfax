@@ -79,6 +79,17 @@ exec-once = precrime --background
   due today, this week, high priority, starred and so on, each list remembering its own.
 - **Repeats.** Completing a repeating task keeps a done copy and moves it to the next
   occurrence, from its due date or from the day you finished it.
+- **The editor.** Typeable dates with a calendar (click the field or press ↓; ⌥1–⌥4 for Today,
+  Tomorrow, the day after, a week), a full repeat editor (every N days/weeks/months/years,
+  chosen weekdays, "2nd Tuesday", "last Friday", ending after N times or on a date, from
+  completion), sub-tasks you add with Return, alerts (presets, or a date and time; nagging
+  optional), locations, a picture and audio notes (record with the mic button, or drop
+  files), and notes with live Markdown, clickable links and `@{Task}` links to other tasks.
+- **Calendar day bar.** Add an iCalendar address in Settings → Calendar and today's events
+  appear above Today; drag a task onto the bar to block out time for it.
+- **Arrange freely.** Drag lists and groups to reorder them, drag tasks onto lists, Today,
+  Starred, Done, projects, tags, locations or calendar days, and between rows. Archived
+  lists wait under *Archived* in the sidebar.
 - **Undo.** Every change is undoable with Ctrl+Z.
 
 ## Keyboard
@@ -118,10 +129,35 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+Alt+←` / `Ctrl+Alt+→` | Show or hide the Lists / Tags panels |
 | `Ctrl+=` / `Ctrl+-` | Text size |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo |
+| `Ctrl+C` / `Ctrl+V` | Copy tasks as text / paste lines as new tasks |
+| `Shift+F5` | Back to the previously selected task |
+| `Ctrl+Alt+F` | Search this list / all lists |
+| `Ctrl+Alt+W` | New window |
 | `Ctrl+S` | Sync now |
 | `Ctrl+,` | Settings |
 | `?` | All shortcuts |
 | `q` / `Ctrl+Q` | Quit |
+
+## Automation
+
+Everything the reference app's Automation Suite offers is available outside the window too:
+
+```sh
+precrime ctl help                                   # list commands
+precrime ctl query_tasks focus=today
+precrime ctl create_task '{"title": "Call Sam tomorrow 3pm #family", "natural_language": true}'
+claude mcp add precrime -- precrime mcp             # let Claude work with your tasks
+xdg-open 'precrime://x-callback-url/add?task=Buy%20milk&due=tomorrow'
+```
+
+Changes made this way appear in the open window within a couple of seconds.
+
+For a Waybar module with today's counts (like the reference app's Dock badge), add to
+`~/.config/waybar/config.jsonc`:
+
+```jsonc
+"custom/precrime": { "exec": "precrime --waybar", "return-type": "json", "interval": 60, "on-click": "precrime" }
+```
 
 ## Development
 
