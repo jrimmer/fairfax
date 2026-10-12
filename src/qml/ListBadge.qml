@@ -9,6 +9,7 @@ Item {
     property string text
     property color color: theme.accent
     property bool chevrons: false
+    property bool pressedDown: false  // Lighter while its menu is open.
     signal clicked()
 
     implicitWidth: label.implicitWidth + 30 + (chevrons ? 16 : 0)
@@ -18,7 +19,7 @@ Item {
         anchors.fill: parent
         preferredRendererType: Shape.CurveRenderer
         ShapePath {
-            fillColor: root.color
+            fillColor: root.pressedDown ? Qt.lighter(root.color, 1.25) : root.color
             strokeColor: "transparent"
             startX: 4; startY: 0
             PathLine { x: root.width - 10; y: 0 }

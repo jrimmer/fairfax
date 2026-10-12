@@ -366,11 +366,24 @@ Window {
     }
 
     // An icon button in the ribbon, tinted when it holds a value.
+    // Opens its menu just below itself and stays highlighted while the menu
+    // is open, so it's clear what's being changed.
     component RibbonButton: IconButton {
+        id: rb
         property bool active: false
         property color tint: theme.today
+        property var menu: null
         size: 16
-        color: active ? tint : theme.muted
+        color: active || (menu && menu.visible) ? tint : theme.muted
+        onClicked: if (menu) menu.popup(rb, 0, rb.height + 4)
+        Rectangle {
+            anchors.fill: parent
+            radius: 6
+            visible: !!rb.menu && rb.menu.visible
+            color: Qt.alpha(rb.tint, 0.18)
+            border.color: rb.tint
+            border.width: 1
+        }
     }
 
     // A compact text toggle in the inline editors.
@@ -400,6 +413,10 @@ Window {
     // ------------------------------------------------------------ menus
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: priorityMenu
         Repeater {
             model: [["None", 0], ["High", 3], ["Medium", 2], ["Low", 1]]
@@ -415,6 +432,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: listMenu
         Repeater {
             model: backend.listChoices
@@ -428,6 +449,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: typeMenu
         Repeater {
             model: ["Task", "Project", "Checklist"]
@@ -442,6 +467,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: attachMenu
         MenuItem { text: "Add File…"; onTriggered: filePicker.open("Attach a file", "quickentry-attach") }
         Repeater {
@@ -456,6 +485,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: placeMenu
         property var places: []
         onAboutToShow: places = backend.locationChoices()
@@ -473,6 +506,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: repeatMenu
         CheckItem { text: "Never"; on: !root.recurrence.frequency; onTriggered: { root.pin("recurrence"); root.recurrence = root.blankRule(); if (root.customMode === "repeat") root.closeCustom() } }
         Repeater {
@@ -496,6 +533,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: alarmMenu
         Repeater {
             model: root.alertPresets
@@ -511,6 +552,10 @@ Window {
     }
 
     Menu {
+
+        // A real popup window, so it can reach past the dialog's edges.
+
+        popupType: Popup.Window
         id: durationMenu
         CheckItem { text: "None"; on: !root.duration; onTriggered: root.setDuration(0) }
         Repeater {
@@ -590,41 +635,33 @@ Window {
                     Keys.onEscapePressed: { if (root.customMode !== "") root.closeCustom(); else root.hide() }
                 }
             }
-            // the reference app's bars-and-star glyph; opens the priority menu.
-            Item {
+            // One star: filled when starred, coloured by priority when one is
+            // set; it opens the priority and star menu.
+            IconButton {
                 id: prio
                 Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 34; implicitHeight: 24
-                Column {
-                    x: 2; anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
-                    Repeater {
-                        model: 3
-                        Rectangle {
-                            required property int index
-                            width: 16; height: 2.5; radius: 1
-                            color: root.priority === 3 ? theme.priorityHigh : root.priority === 2 ? theme.priorityMedium
-                                 : root.priority === 1 ? theme.priorityLow : theme.faint
-                            opacity: root.priority === 0 ? 0.6 : root.priority === 1 && index > 0 ? 0.25 : root.priority === 2 && index > 1 ? 0.25 : 1
-                        }
-                    }
+                icon: "starred"
+                size: 18
+                color: root.priority === 3 ? theme.priorityHigh : root.priority === 2 ? theme.priorityMedium
+                     : root.priority === 1 ? theme.priorityLow : root.starred ? theme.star : theme.faint
+                tip: (["No priority", "Low priority", "Medium priority", "High priority"][root.priority]) + (root.starred ? " · starred" : "")
+                onClicked: priorityMenu.popup(prio, 0, prio.height + 4)
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 6
+                    visible: priorityMenu.visible
+                    color: Qt.alpha(theme.accent, 0.18)
+                    border.color: theme.accent
                 }
+                // IconButton draws outlines; fill the star when starred.
                 Icon {
-                    x: 15; y: 2
+                    anchors.centerIn: parent
+                    visible: root.starred
                     name: "starred"
-                    size: 17
-                    filled: root.starred
-                    color: root.starred ? theme.star : theme.faint
+                    size: 18
+                    filled: true
+                    color: parent.color
                 }
-                MouseArea {
-                    id: prioMouse
-                    anchors.fill: parent; anchors.margins: -4
-                    hoverEnabled: true
-                    onClicked: priorityMenu.popup(prio, 0, prio.height + 4)
-                }
-                ToolTip.visible: prioMouse.containsMouse
-                ToolTip.delay: 600
-                ToolTip.text: (["No priority", "Low priority", "Medium priority", "High priority"][root.priority]) + (root.starred ? ", starred" : "")
             }
         }
 
@@ -643,7 +680,8 @@ Window {
                     color: root.listColor
                     chevrons: true
                     implicitHeight: 34
-                    onClicked: listMenu.popup(this, 0, height)
+                    pressedDown: listMenu.opened
+                    onClicked: listMenu.popup(this, 0, height + 2)
                 }
                 Item { Layout.fillWidth: true }
                 Text {
@@ -662,31 +700,31 @@ Window {
                         id: attachButton
                         icon: "image"; active: root.files.length > 0
                         tip: root.files.length ? root.files.map(root.fileName).join(", ") : "Attach a File"
-                        onClicked: attachMenu.popup(attachButton, 0, height)
+                        menu: attachMenu
                     }
                     RibbonButton {
                         id: placeButton
                         icon: "pin"; active: root.locationId > 0; tint: theme.start
                         tip: root.locationId ? "Location: " + root.placeName() : "Location"
-                        onClicked: placeMenu.popup(placeButton, 0, height)
+                        menu: placeMenu
                     }
                     RibbonButton {
                         id: repeatButton
                         icon: "repeat"; active: !!root.recurrence.frequency; tint: theme.duration
                         tip: root.repeatTip()
-                        onClicked: repeatMenu.popup(repeatButton, 0, height)
+                        menu: repeatMenu
                     }
                     RibbonButton {
                         id: alarmButton
                         icon: "alarm"; active: root.alerts.length > 0; tint: theme.priorityMedium
                         tip: root.alarmTip()
-                        onClicked: alarmMenu.popup(alarmButton, 0, height)
+                        menu: alarmMenu
                     }
                     RibbonButton {
                         id: durationButton
                         icon: "duration"; active: root.duration > 0; tint: theme.duration
                         tip: root.duration ? "Duration " + root.durationText(root.duration) : "Duration"
-                        onClicked: durationMenu.popup(durationButton, 0, height)
+                        menu: durationMenu
                     }
                 }
             }
@@ -757,88 +795,111 @@ Window {
             }
         }
 
-        // ---- tags (left) and start / due (right)
+        // ---- tags on the left; start and due on the right, as in the reference app: the
+        // date and time sit right next to their icon at the far right.
         RowLayout {
             Layout.fillWidth: true
-            Layout.margins: 16
+            Layout.leftMargin: 16
+            Layout.rightMargin: 14
             Layout.topMargin: 10
-            Layout.bottomMargin: 10
-            spacing: 12
+            Layout.bottomMargin: 8
+            spacing: 16
 
-            Flow {
-                id: tagFlow
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
-                spacing: 5
-                Icon { name: "tag"; size: 16; color: theme.faint; height: 24 }
-                Repeater {
-                    model: root.tags
-                    Rectangle {
-                        required property string modelData
-                        height: 22
-                        width: chipText.implicitWidth + 30
-                        radius: 11
-                        color: theme.mix(theme.raised, theme.foreground, 0.28)
-                        Text { id: chipText; x: 9; anchors.verticalCenter: parent.verticalCenter; text: modelData; color: theme.background; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
-                        Icon {
-                            anchors.right: parent.right; anchors.rightMargin: 5; anchors.verticalCenter: parent.verticalCenter
-                            name: "close"; size: 9; stroke: 2.4; color: theme.background
-                            MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.removeTag(modelData) }
-                        }
-                    }
+                spacing: 10
+                Icon {
+                    Layout.preferredWidth: 16
+                    Layout.preferredHeight: 16
+                    Layout.alignment: Qt.AlignTop
+                    Layout.topMargin: 6
+                    name: "tag"; size: 16; color: theme.faint
                 }
-                TextInput {
-                    id: tagInput
-                    property var matches: []
-                    width: Math.max(70, contentWidth + 10)
-                    height: 24
-                    verticalAlignment: TextInput.AlignVCenter
-                    color: theme.foreground
-                    selectionColor: theme.selection
-                    font.pixelSize: backend.fontSize
-                    clip: true
-                    Text { visible: !tagInput.text && root.tags.length === 0; text: "Tags"; color: theme.faint; font: tagInput.font; anchors.verticalCenter: parent.verticalCenter }
-                    function accept(name) {
-                        root.addTag(name)
-                        text = ""
-                        matches = []
-                        tagPopup.close()
-                    }
-                    onTextEdited: {
-                        if (text.endsWith(",")) { accept(text.slice(0, -1)); return }
-                        const q = text.toLowerCase()
-                        matches = q ? backend.tagNames.filter(n => n.toLowerCase().startsWith(q) && !root.tags.includes(n)).slice(0, 6) : []
-                        if (matches.length) tagPopup.open(); else tagPopup.close()
-                    }
-                    Keys.onReturnPressed: (e) => {
-                        if (text.trim()) accept(matches.length && tagPopup.visible ? matches[0] : text)
-                        else root.submit(e.modifiers)
-                    }
-                    Keys.onTabPressed: (e) => { if (text.trim()) { accept(matches.length && tagPopup.visible ? matches[0] : text); e.accepted = true } else e.accepted = false }
-                    Keys.onPressed: (e) => {
-                        if (e.key === Qt.Key_Backspace && !text && root.tags.length) {
-                            root.removeTag(root.tags[root.tags.length - 1])
-                            e.accepted = true
+                // The tag box: chips for what's set, then where you type.
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: tagFlow.implicitHeight + 8
+                    radius: 6
+                    color: theme.background
+                    border.color: tagInput.activeFocus ? theme.accent : theme.divider
+                    MouseArea { anchors.fill: parent; onClicked: tagInput.forceActiveFocus() }
+                    Flow {
+                        id: tagFlow
+                        x: 6; y: 4
+                        width: parent.width - 12
+                        spacing: 5
+                        Repeater {
+                            model: root.tags
+                            Rectangle {
+                                required property string modelData
+                                height: 22
+                                width: chipText.implicitWidth + 30
+                                radius: 11
+                                color: theme.mix(theme.raised, theme.foreground, 0.28)
+                                Text { id: chipText; x: 9; anchors.verticalCenter: parent.verticalCenter; text: modelData; color: theme.background; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
+                                Icon {
+                                    anchors.right: parent.right; anchors.rightMargin: 5; anchors.verticalCenter: parent.verticalCenter
+                                    name: "close"; size: 9; stroke: 2.4; color: theme.background
+                                    MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.removeTag(modelData) }
+                                }
+                            }
                         }
-                    }
-                    Keys.onEscapePressed: (e) => { if (tagPopup.visible) { tagPopup.close(); e.accepted = true } else root.hide() }
-                    onActiveFocusChanged: if (!activeFocus && text.trim()) accept(text)
+                TextInput {
+                            id: tagInput
+                            property var matches: []
+                            width: Math.max(70, contentWidth + 10)
+                            height: 24
+                            verticalAlignment: TextInput.AlignVCenter
+                            color: theme.foreground
+                            selectionColor: theme.selection
+                            font.pixelSize: backend.fontSize - 1
+                            clip: true
+                            Text { visible: !tagInput.text; text: root.tags.length ? "Add another…" : "Add tags…"; color: theme.faint; font: tagInput.font; anchors.verticalCenter: parent.verticalCenter }
+                            function accept(name) {
+                                root.addTag(name)
+                                text = ""
+                                matches = []
+                                tagPopup.close()
+                            }
+                            onTextEdited: {
+                                if (text.endsWith(",")) { accept(text.slice(0, -1)); return }
+                                const q = text.toLowerCase()
+                                matches = q ? backend.tagNames.filter(n => n.toLowerCase().startsWith(q) && !root.tags.includes(n)).slice(0, 6) : []
+                                if (matches.length) tagPopup.open(); else tagPopup.close()
+                            }
+                            Keys.onReturnPressed: (e) => {
+                                if (text.trim()) accept(matches.length && tagPopup.visible ? matches[0] : text)
+                                else root.submit(e.modifiers)
+                            }
+                            Keys.onTabPressed: (e) => { if (text.trim()) { accept(matches.length && tagPopup.visible ? matches[0] : text); e.accepted = true } else e.accepted = false }
+                            Keys.onPressed: (e) => {
+                                if (e.key === Qt.Key_Backspace && !text && root.tags.length) {
+                                    root.removeTag(root.tags[root.tags.length - 1])
+                                    e.accepted = true
+                                }
+                            }
+                            Keys.onEscapePressed: (e) => { if (tagPopup.visible) { tagPopup.close(); e.accepted = true } else root.hide() }
+                            onActiveFocusChanged: if (!activeFocus && text.trim()) accept(text)
 
-                    Popup {
-                        id: tagPopup
-                        y: tagInput.height + 2
-                        padding: 4
-                        background: Rectangle { color: theme.raised; radius: 8; border.color: theme.divider }
-                        contentItem: Column {
-                            Repeater {
-                                model: tagInput.matches
-                                Text {
-                                    required property string modelData
-                                    text: modelData
-                                    color: theme.foreground
-                                    padding: 5
-                                    font.pixelSize: backend.fontSize - 1
-                                    MouseArea { anchors.fill: parent; onClicked: tagInput.accept(modelData) }
+                            Popup {
+                                id: tagPopup
+                                popupType: Popup.Window
+                                y: tagInput.height + 2
+                                padding: 4
+                                background: Rectangle { color: theme.raised; radius: 8; border.color: theme.divider }
+                                contentItem: Column {
+                                    Repeater {
+                                        model: tagInput.matches
+                                        Text {
+                                            required property string modelData
+                                            text: modelData
+                                            color: theme.foreground
+                                            padding: 5
+                                            font.pixelSize: backend.fontSize - 1
+                                            MouseArea { anchors.fill: parent; onClicked: tagInput.accept(modelData) }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -848,46 +909,55 @@ Window {
 
             GridLayout {
                 Layout.alignment: Qt.AlignTop
-                columns: 5
-                columnSpacing: 2
+                columns: 3
+                columnSpacing: 4
                 rowSpacing: 2
-                Icon { name: "play"; size: 11; filled: true; color: root.startIso ? theme.start : theme.faint }
                 DateField {
                     id: startField
+                    implicitWidth: 112
                     iso: root.startIso
                     value: root.fieldDate(root.startIso)
                     placeholderText: "Start"
+                    clearable: !!root.startIso
+                    onCleared: root.setDate("start", "", -1)
                     onPicked: (iso, minutes) => root.setDate("start", iso, minutes >= 0 ? minutes : undefined)
                     onTyped: (text) => root.typedDate("start", text)
                 }
-                ClearButton { shown: !!root.startIso; onClicked: root.setDate("start", "", -1) }
                 DateField {
                     id: startTimeField
                     timeOnly: true
+                    implicitWidth: 82
                     value: root.startMinutes >= 0 ? root.timeText(root.startMinutes) : ""
                     placeholderText: "Time"
+                    clearable: root.startMinutes >= 0
+                    onCleared: root.setTime("start", -1)
                     onTyped: (text) => root.typedTime("start", text)
                 }
-                ClearButton { shown: root.startMinutes >= 0; onClicked: root.setTime("start", -1) }
+                Icon { Layout.preferredWidth: 14; Layout.preferredHeight: 14; name: "play"; size: 12; filled: true; color: root.startIso ? theme.start : theme.faint }
 
-                Icon { name: "check"; size: 12; stroke: 2.2; color: root.dueIso ? theme.foreground : theme.faint }
                 DateField {
                     id: dueField
+                    implicitWidth: 112
                     iso: root.dueIso
                     value: root.fieldDate(root.dueIso)
                     placeholderText: "Due"
+                    color: root.dueIso ? theme.today : theme.foreground
+                    clearable: !!root.dueIso
+                    onCleared: root.setDate("due", "", -1)
                     onPicked: (iso, minutes) => root.setDate("due", iso, minutes >= 0 ? minutes : undefined)
                     onTyped: (text) => root.typedDate("due", text)
                 }
-                ClearButton { shown: !!root.dueIso; onClicked: root.setDate("due", "", -1) }
                 DateField {
                     id: dueTimeField
                     timeOnly: true
+                    implicitWidth: 82
                     value: root.dueMinutes >= 0 ? root.timeText(root.dueMinutes) : ""
                     placeholderText: "Time"
+                    clearable: root.dueMinutes >= 0
+                    onCleared: root.setTime("due", -1)
                     onTyped: (text) => root.typedTime("due", text)
                 }
-                ClearButton { shown: root.dueMinutes >= 0; onClicked: root.setTime("due", -1) }
+                Icon { Layout.preferredWidth: 14; Layout.preferredHeight: 14; name: "check"; size: 13; stroke: 2.2; color: root.dueIso ? theme.today : theme.faint }
             }
         }
 
@@ -930,9 +1000,9 @@ Window {
             Rectangle {
                 id: typeButton
                 implicitWidth: typeRow.implicitWidth + 24; implicitHeight: 32; radius: 6
-                color: typeHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.14) : theme.mix(theme.raised, theme.foreground, 0.08)
+                color: typeMenu.opened ? Qt.alpha(theme.accent, 0.22) : typeHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.14) : theme.mix(theme.raised, theme.foreground, 0.08)
                 border.width: 2
-                border.color: typeFocus.activeFocus ? theme.accent : "transparent"
+                border.color: typeFocus.activeFocus || typeMenu.opened ? theme.accent : "transparent"
                 Row {
                     id: typeRow
                     anchors.centerIn: parent

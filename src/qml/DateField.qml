@@ -10,6 +10,11 @@ Plain.TextField {
 
     property string value
     property string iso  // The current date, for the picker.
+    // Quick Entry shows date fields as boxes so it's clear they're inputs;
+    // the editor card keeps them borderless until focused.
+    property bool boxed: false
+    property bool clearable: false
+    signal cleared()
     property bool timeOnly: false
     property var suggestions: []
     property int highlighted: 0
@@ -20,16 +25,24 @@ Plain.TextField {
     implicitWidth: timeOnly ? 84 : 116
     padding: 3
     leftPadding: 6
-    rightPadding: 6
     font.pixelSize: backend.fontSize - 1
     color: theme.foreground
     placeholderTextColor: theme.faint
     selectByMouse: true
     horizontalAlignment: Text.AlignRight
+    rightPadding: clearable ? 22 : 6
     background: Rectangle {
         radius: 5
-        color: root.activeFocus ? theme.background : "transparent"
-        border.color: root.activeFocus ? theme.accent : "transparent"
+        color: root.activeFocus || root.boxed ? theme.background : "transparent"
+        border.color: root.activeFocus ? theme.accent : root.boxed ? theme.divider : "transparent"
+        Icon {
+            visible: root.clearable && !root.activeFocus
+            anchors.right: parent.right
+            anchors.rightMargin: 5
+            anchors.verticalCenter: parent.verticalCenter
+            name: "clear"; size: 12; color: theme.faint
+            MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.cleared() }
+        }
     }
 
     Component.onCompleted: text = value
@@ -81,6 +94,7 @@ Plain.TextField {
 
     Popup {
         id: popup
+        popupType: Popup.Window
         y: root.height + 2
         x: root.width - width
         width: 210
