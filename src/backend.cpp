@@ -75,6 +75,10 @@ Backend::Backend(Store *store, QObject *parent)
     connect(&m_backupTimer, &QTimer::timeout, this, &Backend::maybeBackup);
     m_backupTimer.start();
     QTimer::singleShot(5000, this, &Backend::maybeBackup);
+
+    // Build the panes from what's already in the database straight away;
+    // otherwise they'd stay empty until the first change or clock tick.
+    rebuild();
 }
 
 // ---------------------------------------------------------------- settings

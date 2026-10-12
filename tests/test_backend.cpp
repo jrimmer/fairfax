@@ -185,6 +185,33 @@ private slots:
         f.backend->undo();
         QCOMPARE(f.store.task(id).sectionId, sec);
     }
+
+    void panesAreFilledAtStartup() {
+        // A backend opened on an existing database shows it immediately,
+        // without waiting for a change.
+        QTemporaryDir dir;
+        {
+            Store store;
+            QVERIFY(store.open(dir.filePath("t.db")));
+            Backend first(&store);
+            first.ensureDefaults();
+            first.selectSource("list:" + QString::number(store.lists().keys().first()));
+            first.newTask();
+            first.setTitle(first.editingTaskId(), "Already here");
+            first.endEdit();
+            first.selectSource("all");
+        }
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        Backend backend(&store);
+        bool hasList = false, hasTask = false;
+        for (const auto &row : backend.sidebar()->rows())
+            hasList = hasList || row.value("kind") == "list";
+        for (const auto &row : backend.tasks()->rows())
+            hasTask = hasTask || row.value("title") == "Already here";
+        QVERIFY(hasList);
+        QVERIFY(hasTask);
+    }
 };
 
 REGISTER_TEST(BackendTest)
