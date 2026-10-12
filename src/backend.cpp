@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "dateparse.h"
+#include "query.h"
 #include "recurrence.h"
 
 namespace {
@@ -14,7 +15,7 @@ namespace {
 const QLocale English(QLocale::English, QLocale::UnitedKingdom);
 
 const QStringList TaskRoles{
-    "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
+    "hasAlarm", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
     "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
@@ -173,6 +174,8 @@ QVariantList Backend::sortChoices() const {
     if (m_source.kind == Source::Done)
         all = {{SortField::Priority, "Priority"}, {SortField::List, "To-do List"}, {SortField::Modified, "Modified"},
                {SortField::Completion, "Completion"}, {SortField::Title, "Title"}};
+    if (sourceIsSmart())
+        all.removeIf([](const auto &choice) { return choice.first == SortField::Manual; });
     QVariantList result;
     for (const auto &[field, name] : all)
         result.append(QVariantMap{{"field", field}, {"name", name}});
@@ -929,6 +932,10 @@ void Backend::setTitle(qint64 id, const QString &title) {
     t.title = head;
     if (title.size() > 1000)
         t.notes = title.mid(1000) + (t.notes.isEmpty() ? "" : "\n" + t.notes);
+    // A new task's title is read for dates, tags, repeats and the rest, which
+    // then come out of the title, as the reference app's natural-language input does.
+    if (id == m_newTask && m_store->setting("nl.editor", true).toBool())
+        applyParsed(t, NaturalLanguage::parse(head, QDateTime::currentDateTime(), listNames()));
     m_store->putTask(t);
     m_store->commit();
 }
@@ -1093,6 +1100,49 @@ void Backend::setRepeatPreset(qint64 id, int preset) {
 
 void Backend::setRepeatFromCompletion(qint64 id, bool on) {
     editTasks("Change Recurrence", {id}, [&](Task &t) { t.recurrence.from = on ? Repeat::FromCompletion : Repeat::FromDue; });
+}
+
+void Backend::toggleAlarm(qint64 id, int minutesBefore) {
+    // the reference app's alarm presets: Message with Sound, relative to the due moment.
+    // Choosing a preset that's already set removes it.
+    Task t = m_store->task(id);
+    if (!t.id)
+        return;
+    m_store->begin("Change Alerts");
+    bool removed = false;
+    for (auto a : m_store->alarmsFor(id)) {
+        if (a.kind == Alarm::Relative && a.offset == minutesBefore) {
+            a.deleted = true;
+            m_store->putAlarm(a);
+            removed = true;
+        }
+    }
+    if (!removed) {
+        if (m_store->alarmsFor(id).size() >= 10) {
+            m_store->commit();
+            setStatus("A task can have at most 10 alerts.");
+            return;
+        }
+        Alarm a;
+        a.id = m_store->nextId("alarms");
+        a.taskId = id;
+        a.offset = minutesBefore;
+        m_store->putAlarm(a);
+        if (!t.dueDate.isValid()) {
+            t.dueDate = QDate::currentDate();  // An alert needs a deadline to count from.
+            m_store->putTask(t);
+        }
+    }
+    m_store->commit();
+}
+
+void Backend::clearAlarms(qint64 id) {
+    m_store->begin("Remove Alerts");
+    for (auto a : m_store->alarmsFor(id)) {
+        a.deleted = true;
+        m_store->putAlarm(a);
+    }
+    m_store->commit();
 }
 
 QVariantList Backend::dateSuggestions(const QString &text) const {
@@ -1319,6 +1369,216 @@ void Backend::redo() {
     setStatus("Redo " + m_store->undoLabel());
 }
 
+
+// ----------------------------------------------------- focus & smart lists
+
+bool Backend::focusOn() const { return m_store->setting(focusSettingKey() + ".on", false).toBool(); }
+
+QStringList Backend::focusConditions() const {
+    return m_store->setting(focusSettingKey() + ".conditions").toString().split(',', Qt::SkipEmptyParts);
+}
+
+void Backend::toggleFocus() {
+    // With nothing ticked yet, turning the filter on starts from Today, as a
+    // single click on the reference app's sun button does.
+    if (!focusOn() && focusConditions().isEmpty())
+        m_store->setSetting(focusSettingKey() + ".conditions", "overdue,today");
+    m_store->setSetting(focusSettingKey() + ".on", !focusOn());
+    rebuild();
+    emit viewChanged();
+}
+
+void Backend::setFocusCondition(const QString &condition, bool on) {
+    QStringList conditions = focusConditions();
+    conditions.removeAll(condition);
+    if (on)
+        conditions.append(condition);
+    m_store->setSetting(focusSettingKey() + ".conditions", conditions.join(','));
+    m_store->setSetting(focusSettingKey() + ".on", !conditions.isEmpty());
+    rebuild();
+    emit viewChanged();
+}
+
+bool Backend::sourceIsSmart() const {
+    return m_source.kind == Source::List && m_store->list(m_source.id).kind == ListKind::Smart;
+}
+
+QString Backend::smartQuery() const { return sourceIsSmart() ? m_store->list(m_source.id).smartQuery : QString(); }
+
+void Backend::setSoundex(bool on) {
+    m_options.soundex = on;
+    rebuild();
+    emit viewChanged();
+}
+
+qint64 Backend::saveSmartList(const QString &name, const QString &query) {
+    if (query.trimmed().isEmpty())
+        return 0;
+    TaskList l;
+    l.id = m_store->nextId("lists");
+    l.kind = ListKind::Smart;
+    l.name = name.trimmed().isEmpty() ? query.trimmed() : name.trimmed();
+    l.smartQuery = query.trimmed();
+    l.order = l.id;
+    l.sortField = SortField::DueDate;
+    m_store->begin("New Smart List");
+    m_store->putList(l);
+    m_store->commit();
+    m_options.search.clear();
+    selectSource(Source{Source::List, l.id}.key());
+    return l.id;
+}
+
+void Backend::setSmartQuery(qint64 listId, const QString &query) {
+    TaskList l = m_store->list(listId);
+    if (!l.id || l.kind != ListKind::Smart || l.smartQuery == query)
+        return;
+    l.smartQuery = query;
+    m_store->begin("Edit Smart List");
+    m_store->putList(l);
+    m_store->commit();
+    emit viewChanged();
+}
+
+// ---------------------------------------------------------- quick entry
+
+QStringList Backend::listNames() const {
+    QStringList names;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind != ListKind::Smart)
+            names << l.name;
+    return names;
+}
+
+QVariantMap Backend::setting(const QString &key) const { return {{"value", m_store->setting(key)}}; }
+
+void Backend::setSetting(const QString &key, const QVariant &value) {
+    m_store->setSetting(key, value);
+    rebuild();
+    emit settingsChanged();
+    emit viewChanged();
+}
+
+qint64 Backend::quickEntryListId() const {
+    // Quick Entry lands in the Inbox when there is one, else the default list.
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && l.kind == ListKind::Inbox)
+            return l.id;
+    const qint64 chosen = m_store->setting("tasks.quickEntryList", 0).toLongLong();
+    if (chosen && m_store->lists().contains(chosen) && !m_store->list(chosen).deleted)
+        return chosen;
+    return defaultListId();
+}
+
+QVariantMap Backend::previewEntry(const QString &text) const {
+    const ParsedEntry p = NaturalLanguage::parse(text, QDateTime::currentDateTime(), listNames());
+    const QDate today = QDate::currentDate();
+    QVariantList chips;
+    auto chip = [&](const QString &kind, const QString &label) { chips.append(QVariantMap{{"kind", kind}, {"label", label}}); };
+    if (p.startDate.isValid())
+        chip("start", "Start " + Schedule::friendlyDateTime(p.startDate, p.startTime, today));
+    if (p.dueDate.isValid())
+        chip("due", "Due " + Schedule::friendlyDateTime(p.dueDate, p.dueTime, today));
+    else if (p.dueTime >= 0)
+        chip("due", "Due " + Schedule::formatTime(p.dueTime));
+    if (p.recurrence.isSet())
+        chip("repeat", Recurrences::describe(p.recurrence));
+    if (p.duration > 0)
+        chip("duration", Schedule::durationBadge(p.duration));
+    if (p.priority > 0)
+        chip("priority", QStringList{"", "Low", "Medium", "High"}.at(p.priority) + " priority");
+    if (p.starred)
+        chip("star", "Starred");
+    for (const auto &tag : p.tags)
+        chip("tag", "#" + tag);
+    if (!p.list.isEmpty())
+        chip("list", p.list);
+    for (int offset : p.alertOffsets)
+        chip("alert", "Alert " + Schedule::durationBadge(offset) + " before");
+    QVariantList spans;
+    for (const auto &span : p.spans)
+        spans.append(QVariantMap{{"start", span.start}, {"length", span.length}, {"kind", span.kind}});
+    return {{"title", p.title}, {"chips", chips}, {"spans", spans}};
+}
+
+void Backend::applyParsed(Task &t, const ParsedEntry &p) {
+    if (!p.title.isEmpty())
+        t.title = p.title.left(1000);
+    if (p.startDate.isValid()) {
+        t.startDate = p.startDate;
+        t.startTime = p.startTime;
+    }
+    if (p.dueDate.isValid()) {
+        t.dueDate = p.dueDate;
+        t.dueTime = p.dueTime;
+    } else if (p.dueTime >= 0) {
+        t.dueDate = QDate::currentDate();
+        t.dueTime = p.dueTime;
+    }
+    if (p.duration > 0)
+        t.duration = p.duration;
+    if (p.priority > 0)
+        t.priority = p.priority;
+    if (p.starred)
+        t.starred = true;
+    if (p.recurrence.isSet()) {
+        t.recurrence = p.recurrence;
+        // "every Monday" with no date starts at the first occurrence from today.
+        if (!t.dueDate.isValid() && !t.startDate.isValid())
+            t.dueDate = Recurrences::next(p.recurrence, QDate::currentDate().addDays(-1));
+    }
+    for (const auto &tag : p.tags) {
+        const qint64 tagId = tagIdForName(tag, true);
+        if (tagId && !t.tagIds.contains(tagId))
+            t.tagIds.append(tagId);
+    }
+    for (int offset : p.alertOffsets) {
+        Alarm a;
+        a.id = m_store->nextId("alarms");
+        a.taskId = t.id;
+        a.offset = offset;
+        m_store->putAlarm(a);
+        if (!t.dueDate.isValid())
+            t.dueDate = QDate::currentDate();
+    }
+    if (!p.list.isEmpty()) {
+        for (const auto &l : m_store->lists()) {
+            if (!l.deleted && l.kind != ListKind::Smart && l.name.compare(p.list, Qt::CaseInsensitive) == 0) {
+                if (t.listId != l.id) {
+                    t.listId = l.id;
+                    t.parentId = 0;
+                    t.order = nextOrder(l.id, 0);
+                }
+                break;
+            }
+        }
+    }
+}
+
+qint64 Backend::quickAdd(const QString &text, const QString &notes, int type, qint64 listId) {
+    if (text.trimmed().isEmpty())
+        return 0;
+    Task t;
+    t.id = m_store->nextId("tasks");
+    t.type = type;
+    t.listId = listId && m_store->lists().contains(listId) ? listId : quickEntryListId();
+    if (!t.listId) {
+        setStatus("Create a list first: there is nowhere to put the task.");
+        return 0;
+    }
+    t.title = text.trimmed().left(1000);
+    t.notes = notes;
+    t.order = nextOrder(t.listId, 0);
+    m_store->begin("Quick Entry");
+    if (m_store->setting("nl.quickEntry", true).toBool())
+        applyParsed(t, NaturalLanguage::parse(text, QDateTime::currentDateTime(), listNames()));
+    m_store->putTask(t);
+    m_store->commit();
+    m_options.keepVisible.insert(t.id);
+    setStatus("Added “" + t.title + "” to " + m_store->list(t.listId).name);
+    return t.id;
+}
+
 // -------------------------------------------------------------- rebuilding
 
 void Backend::saveUiState() {
@@ -1413,6 +1673,27 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
             }
         }
     }
+
+    // Smart Lists follow under their own heading; each counts what it matches.
+    QVector<TaskList> smart;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind == ListKind::Smart)
+            smart.append(l);
+    std::sort(smart.begin(), smart.end(), [](const TaskList &a, const TaskList &b) { return a.order < b.order; });
+    if (!smart.isEmpty())
+        rows.append({{"key", "h:smart"}, {"kind", "header"}, {"title", "Smart Lists"}, {"groupId", -1}, {"collapsed", false}});
+    for (const auto &l : smart) {
+        const Source source{Source::List, l.id};
+        ViewOptions probe;
+        probe.completedWindowMinutes = 0;
+        int count = 0;
+        for (const auto &section : views.build(source, SortSpec{SortField::Title, true, false}, probe))
+            for (const auto &row : section.rows)
+                count += row.depth == 0;
+        rows.append({{"key", source.key()}, {"kind", "smart"}, {"sourceKey", source.key()}, {"title", l.name},
+                     {"icon", "search"}, {"undone", count}, {"selected", m_source.key() == source.key()},
+                     {"listId", l.id}});
+    }
     m_sidebar.setRows(rows);
 }
 
@@ -1475,10 +1756,12 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         // Scheduled, where being scheduled is the point.
         {"dimmed", views.isPaused(t) || (Schedule::isScheduled(t, now) && m_source.kind != Source::Scheduled)},
         {"progress", childCount ? (childCount - childOpen) * 100 / childCount : 0},
+        {"hasAlarm", !m_store->alarmsFor(t.id).isEmpty()},
     };
 }
 
 void Backend::rebuildTasks(const ViewBuilder &views) {
+    m_options.focusConditions = focusOn() ? focusConditions() : QStringList();
     const auto sections = views.build(m_source, sortSpec(), m_options);
     QVector<QVariantMap> rows;
     QVector<qint64> order;
@@ -1607,6 +1890,12 @@ void Backend::rebuildEditor() {
                             Schedule::formatTime(t.created.time().hour() * 60 + t.created.time().minute())},
             {"isChecklistItem", parent.id && parent.type == TaskType::Checklist},
             {"isNew", t.id == m_newTask},
+            {"alarmOffsets", [&] {
+                 QVariantList offsets;
+                 for (const auto &a : m_store->alarmsFor(t.id))
+                     if (a.kind == Alarm::Relative) offsets.append(a.offset);
+                 return offsets;
+             }()},
         };
     }
     if (editor != m_editor) {

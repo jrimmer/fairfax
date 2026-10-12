@@ -10,7 +10,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 1;
+constexpr int SchemaVersion = 2;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -24,7 +24,7 @@ const char *SyncColumns = R"(
     remote_id TEXT
 )";
 
-const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups"};
+const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms"};
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
 
@@ -141,11 +141,31 @@ bool Store::migrate(QString *error) {
         QStringLiteral("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS tasks_list ON tasks(list_id)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS tasks_parent ON tasks(parent_id)"),
-        QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion),
+    };
+    // Version 2 adds alarms.
+    const QStringList version2{
+        QStringLiteral(R"(CREATE TABLE IF NOT EXISTS alarms (
+            id INTEGER PRIMARY KEY,
+            task_id INTEGER NOT NULL DEFAULT 0,
+            kind INTEGER NOT NULL DEFAULT 0,
+            offset_minutes INTEGER NOT NULL DEFAULT 0,
+            at INTEGER,
+            sound INTEGER NOT NULL DEFAULT 1,
+            snoozed_until INTEGER,
+            fired_for INTEGER,
+            %1))").arg(SyncColumns),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS alarms_task ON alarms(task_id)"),
     };
 
+    QStringList steps;
+    if (version < 1)
+        steps += statements;
+    if (version < 2)
+        steps += version2;
+    steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
+
     m_db.transaction();
-    for (const auto &sql : statements) {
+    for (const auto &sql : steps) {
         if (!q.exec(sql)) {
             if (error)
                 *error = errorText(q);
@@ -154,6 +174,27 @@ bool Store::migrate(QString *error) {
         }
     }
     return m_db.commit();
+}
+
+void Store::reload() {
+    m_tasks.clear();
+    m_lists.clear();
+    m_groups.clear();
+    m_tags.clear();
+    m_tagGroups.clear();
+    m_alarms.clear();
+    m_settings.clear();
+    load();
+    emit changed();
+}
+
+QVector<Alarm> Store::alarmsFor(qint64 taskId) const {
+    QVector<Alarm> result;
+    for (const auto &a : m_alarms)
+        if (a.taskId == taskId && !a.deleted)
+            result.append(a);
+    std::sort(result.begin(), result.end(), [](const Alarm &x, const Alarm &y) { return x.id < y.id; });
+    return result;
 }
 
 void Store::load() {
@@ -180,9 +221,9 @@ void Store::load() {
 
 qint64 Store::nextId(const QString &table) { return ++m_maxIds[table]; }
 
-void Store::begin(const QString &label) {
+void Store::begin(const QString &label, bool undoable) {
     m_inChange = true;
-    m_pending = Change{label, {}};
+    m_pending = Change{label, {}, undoable};
 }
 
 void Store::record(const QString &table, qint64 id, const QVariantMap &before, const QVariantMap &after) {
@@ -233,6 +274,14 @@ void Store::putTag(const Tag &t) {
     record("tags", copy.id, cached("tags", copy.id), copy.toMap());
 }
 
+void Store::putAlarm(const Alarm &a) {
+    Alarm copy = a;
+    if (copy.uid.isEmpty())
+        copy.uid = newUid();
+    copy.modified = QDateTime::currentDateTime();
+    record("alarms", copy.id, cached("alarms", copy.id), copy.toMap());
+}
+
 void Store::putTagGroup(const TagGroup &g) {
     TagGroup copy = g;
     if (copy.uid.isEmpty())
@@ -246,10 +295,12 @@ bool Store::commit() {
     if (m_pending.edits.isEmpty())
         return true;
     const bool ok = write(m_pending.edits, true);
-    m_undo.push_back(m_pending);
-    if (m_undo.size() > UndoDepth)
-        m_undo.removeFirst();
-    m_redo.clear();
+    if (m_pending.undoable) {
+        m_undo.push_back(m_pending);
+        if (m_undo.size() > UndoDepth)
+            m_undo.removeFirst();
+        m_redo.clear();
+    }
     m_pending = {};
     emit changed();
     return ok;
@@ -360,6 +411,8 @@ void Store::applyToCache(const QString &table, const QVariantMap &row, qint64 id
         if (row.isEmpty()) m_tags.remove(id); else m_tags.insert(id, Tag::fromMap(row));
     } else if (table == "tag_groups") {
         if (row.isEmpty()) m_tagGroups.remove(id); else m_tagGroups.insert(id, TagGroup::fromMap(row));
+    } else if (table == "alarms") {
+        if (row.isEmpty()) m_alarms.remove(id); else m_alarms.insert(id, Alarm::fromMap(row));
     }
 }
 
@@ -369,6 +422,7 @@ QVariantMap Store::cached(const QString &table, qint64 id) const {
     if (table == "list_groups" && m_groups.contains(id)) return m_groups.value(id).toMap();
     if (table == "tags" && m_tags.contains(id)) return m_tags.value(id).toMap();
     if (table == "tag_groups" && m_tagGroups.contains(id)) return m_tagGroups.value(id).toMap();
+    if (table == "alarms" && m_alarms.contains(id)) return m_alarms.value(id).toMap();
     return {};
 }
 

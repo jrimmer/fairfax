@@ -1,0 +1,149 @@
+#include "alarms.h"
+
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusReply>
+#include <QFileInfo>
+#include <QProcess>
+
+#include "schedule.h"
+#include "store.h"
+
+namespace {
+
+constexpr auto Service = "org.freedesktop.Notifications";
+constexpr auto Path = "/org/freedesktop/Notifications";
+constexpr auto Interface = "org.freedesktop.Notifications";
+
+}  // namespace
+
+QDateTime AlarmTimes::fireTime(const Alarm &a, const Task &t, int defaultDueMinutes) {
+    if (a.deleted || t.deleted || t.completed)
+        return {};
+    if (a.snoozedUntil.isValid())
+        return a.snoozedUntil;
+    if (a.kind == Alarm::Absolute)
+        return a.at;
+    if (!t.dueDate.isValid())
+        return {};
+    const int minutes = t.dueTime >= 0 ? t.dueTime : defaultDueMinutes;
+    return QDateTime(t.dueDate, QTime(0, 0)).addSecs(qint64(minutes - a.offset) * 60);
+}
+
+AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_store(store) {
+    m_timer.setSingleShot(true);
+    connect(&m_timer, &QTimer::timeout, this, &AlarmService::check);
+    connect(m_store, &Store::changed, this, &AlarmService::schedule);
+    m_connected = QDBusConnection::sessionBus().connect(Service, Path, Interface, "ActionInvoked", this,
+                                                        SLOT(onAction(uint, QString)));
+    // Alarms that came due while Precrime wasn't running go off now.
+    QTimer::singleShot(1500, this, &AlarmService::check);
+}
+
+QVector<Alarm> AlarmService::due(const QDateTime &now) const {
+    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    QVector<Alarm> result;
+    for (const auto &a : m_store->alarms()) {
+        const QDateTime moment = AlarmTimes::fireTime(a, m_store->task(a.taskId), defaultDue);
+        if (moment.isValid() && moment <= now && a.firedFor != moment)
+            result.append(a);
+    }
+    return result;
+}
+
+void AlarmService::check() {
+    const QDateTime now = QDateTime::currentDateTime();
+    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    for (const auto &a : due(now)) {
+        const Task t = m_store->task(a.taskId);
+        const TaskList list = m_store->list(t.listId);
+        const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
+        // Muted lists keep their alarms quiet, and very old misses aren't
+        // worth a notification: they are just marked as handled.
+        if (list.showInToday || !m_store->setting("alerts.respectExclusions", false).toBool()) {
+            if (moment.secsTo(now) < 24 * 3600)
+                notify(a, t, moment);
+        }
+        markFired(a, moment);
+    }
+    schedule();
+}
+
+void AlarmService::schedule() {
+    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    const QDateTime now = QDateTime::currentDateTime();
+    QDateTime next;
+    for (const auto &a : m_store->alarms()) {
+        const QDateTime moment = AlarmTimes::fireTime(a, m_store->task(a.taskId), defaultDue);
+        if (!moment.isValid() || a.firedFor == moment)
+            continue;
+        if (!next.isValid() || moment < next)
+            next = moment;
+    }
+    // Wake at the next alarm, but at least once a minute so a suspend or a
+    // clock change can't make one late by more than that.
+    const qint64 wait = next.isValid() ? qBound(qint64(0), now.msecsTo(next), qint64(60000)) : 60000;
+    m_timer.start(int(wait));
+}
+
+void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment) {
+    const ScheduleSettings settings;
+    QString body = Schedule::dueHint(t, QDateTime::currentDateTime(), settings);
+    const QString list = m_store->list(t.listId).name;
+    if (!list.isEmpty())
+        body = body.isEmpty() ? list : list + " · " + body;
+
+    QDBusMessage call = QDBusMessage::createMethodCall(Service, Path, Interface, "Notify");
+    QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-precrime.alarm"},
+                      {"desktop-entry", "precrime"}};
+    if (a.sound)
+        hints.insert("sound-name", "alarm-clock-elapsed");
+    call << QStringLiteral("Precrime") << uint(0) << QStringLiteral("precrime") << t.title << body
+         << QStringList{"default", "Open", "complete", "Complete", "snooze", "Snooze 15 Minutes"} << hints << int(0);
+    const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
+    if (reply.isValid())
+        m_notifications.insert(reply.value(), a.id);
+    else
+        qWarning("precrime: couldn't show a notification: %s", qPrintable(reply.error().message()));
+
+    // Notification daemons rarely play sounds themselves.
+    if (a.sound) {
+        const QString file = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga";
+        if (QFileInfo::exists(file))
+            QProcess::startDetached("pw-play", {file});
+    }
+    Q_UNUSED(moment);
+}
+
+void AlarmService::markFired(const Alarm &a, const QDateTime &moment) {
+    Alarm copy = a;
+    copy.firedFor = moment;
+    copy.snoozedUntil = {};
+    // Firing is bookkeeping, not an edit, so it stays out of the undo history.
+    m_store->begin("Alarm", false);
+    m_store->putAlarm(copy);
+    m_store->commit();
+}
+
+void AlarmService::snooze(qint64 alarmId, int minutes) {
+    Alarm a = m_store->alarms().value(alarmId);
+    if (!a.id)
+        return;
+    a.snoozedUntil = QDateTime::currentDateTime().addSecs(qint64(minutes) * 60);
+    m_store->begin("Snooze", false);
+    m_store->putAlarm(a);
+    m_store->commit();
+}
+
+void AlarmService::onAction(uint id, const QString &key) {
+    if (!m_notifications.contains(id))
+        return;
+    const qint64 alarmId = m_notifications.take(id);
+    const qint64 taskId = m_store->alarms().value(alarmId).taskId;
+    if (key == "complete")
+        emit completeTask(taskId);
+    else if (key == "snooze")
+        snooze(alarmId, 15);
+    else
+        emit openTask(taskId);
+}

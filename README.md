@@ -22,6 +22,25 @@ bin/build && build/precrime --demo
 
 Your tasks live in `~/.local/share/precrime/precrime.db`. `--db PATH` opens another file.
 
+## Quick Entry
+
+Capture a task from anywhere by binding Quick Entry to a key in
+`~/.config/hypr/bindings.conf`, and floating its window:
+
+```ini
+bindd = SUPER SHIFT, T, Precrime quick entry, exec, precrime --quick
+windowrule = float, title:^(Precrime Quick Entry)$
+windowrule = center, title:^(Precrime Quick Entry)$
+```
+
+Type the task the way you'd say it, and Precrime picks out the details:
+`Call Sam tomorrow at 3pm #family !! every Monday [30m] /work/`. Dates, start dates
+(`starting Friday`), ranges (`from Monday until Friday`), repeats, `alert 30m`,
+`[durations]`, `!`/`!!`/`!!!` priority, `*` star, `#tags` and `/list/` all work, and
+`"quotes"` keep words literal. The same parsing applies to a new task's title in the main
+window. Return saves, Shift+Return saves and starts another (so does pressing the bind
+again), Ctrl+Return saves and opens the task.
+
 ## How it works
 
 - **Focus lists.** *All*, *Today*, *Starred*, *Scheduled* and *Done* gather tasks from every list.
@@ -33,6 +52,10 @@ Your tasks live in `~/.local/share/precrime/precrime.db`. `--db PATH` opens anot
   in the focus lists; a checklist's items ride along with the checklist.
 - **Tags.** Group them, filter by them from the right panel, and *pause* one (right-click) to
   hide every task that carries it until you resume it.
+- **Smart Lists.** Type a search in the reference app's syntax (`type: hiprio tags: !work`,
+  `"exact phrase"`, `OR`, `-word`) and save it as a Smart List.
+- **Focus Filter.** The sun in the sort bar narrows any list to tasks that are overdue,
+  due today, this week, high priority, starred and so on, each list remembering its own.
 - **Repeats.** Completing a repeating task keeps a done copy and moves it to the next
   occurrence, from its due date or from the day you finished it.
 - **Undo.** Every change is undoable with Ctrl+Z.

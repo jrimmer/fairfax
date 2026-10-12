@@ -1,6 +1,8 @@
 #include "views.h"
 
 #include <QLocale>
+
+#include "query.h"
 #include <algorithm>
 #include <limits>
 
@@ -81,7 +83,35 @@ bool ViewBuilder::isPaused(const Task &task) const {
 
 bool ViewBuilder::listVisible(qint64 listId) const {
     const auto it = m_store.lists().constFind(listId);
-    return it != m_store.lists().cend() && !it->deleted && !it->archived;
+    return it != m_store.lists().cend() && !it->deleted && !it->archived && it->kind != ListKind::Smart;
+}
+
+bool ViewBuilder::isSmartList(qint64 listId) const {
+    const auto it = m_store.lists().constFind(listId);
+    return it != m_store.lists().cend() && !it->deleted && it->kind == ListKind::Smart;
+}
+
+bool ViewBuilder::matchesFocusCondition(const Task &t, const QString &c, const QDateTime &now,
+                                        const ScheduleSettings &s) {
+    const QDate today = now.date();
+    const auto dueWithin = [&](int days) { return t.dueDate.isValid() && t.dueDate >= today && t.dueDate < today.addDays(days); };
+    if (c == "overdue") return Schedule::isOverdue(t, now, s);
+    if (c == "nodue") return !t.dueDate.isValid();
+    if (c == "inprogress") return Schedule::isInProgress(t, now) || (t.startDate.isValid() && t.startDate <= today && !t.completed);
+    if (c == "today") return Schedule::isDueToday(t, now);
+    if (c == "tomorrow") return t.dueDate == today.addDays(1);
+    if (c == "thisweek") {
+        const QDate monday = today.addDays(1 - today.dayOfWeek());
+        return t.dueDate.isValid() && t.dueDate >= monday && t.dueDate <= monday.addDays(6);
+    }
+    if (c == "next3") return dueWithin(3);
+    if (c == "next7") return dueWithin(7);
+    if (c == "next30") return dueWithin(30);
+    if (c == "next6m") return t.dueDate.isValid() && t.dueDate >= today && t.dueDate < today.addMonths(6);
+    if (c == "next12m") return t.dueDate.isValid() && t.dueDate >= today && t.dueDate < today.addMonths(12);
+    if (c == "hiprio") return t.priority == Priority::High;
+    if (c == "starred") return t.starred;
+    return false;
 }
 
 QVector<Task> ViewBuilder::children(qint64 parentId) const {
@@ -143,7 +173,7 @@ bool ViewBuilder::matchesFocus(const Task &t, int kind) const {
     return false;
 }
 
-bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewOptions &o) const {
+bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewOptions &o, const Query *query) const {
     if (t.deleted || !listVisible(t.listId))
         return false;
     if (!o.showPaused && isPaused(t))
@@ -163,11 +193,23 @@ bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewO
         if (!t.dueDate.isValid() || t.dueDate < o.dayFilterFrom || t.dueDate > to)
             return false;
     }
-    if (!o.search.isEmpty()) {
-        bool hit = t.title.contains(o.search, Qt::CaseInsensitive) || t.notes.contains(o.search, Qt::CaseInsensitive);
-        for (auto id : t.tagIds)
-            hit = hit || m_store.tag(id).name.contains(o.search, Qt::CaseInsensitive);
-        if (!hit)
+    if (query && !query->isEmpty()) {
+        QueryContext context;
+        context.store = &m_store;
+        context.now = m_now;
+        context.settings = m_settings;
+        context.soundex = o.soundex;
+        context.rangeFrom = o.dayFilterFrom;
+        context.rangeTo = o.dayFilterTo.isValid() ? o.dayFilterTo : o.dayFilterFrom;
+        context.isPaused = [this](const Task &task) { return isPaused(task); };
+        if (!query->matches(t, context))
+            return false;
+    }
+    if (!o.focusConditions.isEmpty()) {
+        bool any = false;
+        for (const auto &c : o.focusConditions)
+            any = any || matchesFocusCondition(t, c, m_now, m_settings);
+        if (!any)
             return false;
     }
     return true;
@@ -332,11 +374,21 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
 }
 
 QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, const ViewOptions &o) const {
+    // A Smart List is a saved search over every list, combined with whatever
+    // is typed in the search field.
+    const bool smart = source.kind == Source::List && isSmartList(source.id);
+    const Query search = Query::parse(o.search);
+    const Query saved = smart ? Query::parse(m_store.list(source.id).smartQuery) : Query();
     QVector<Task> items;
     for (const auto &t : m_store.tasks()) {
         if (t.deleted)
             continue;
-        if (source.isFocus()) {
+        if (smart) {
+            if (t.parentId && m_store.task(t.parentId).type != TaskType::Project)
+                continue;
+            if (!passesFilters(t, source, o, &saved))
+                continue;
+        } else if (source.isFocus()) {
             // Checklist items and a task's own sub-tasks never surface on
             // their own; project children do.
             if (t.parentId) {
@@ -354,7 +406,7 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
             if (t.id != source.id)
                 continue;
         }
-        if (!passesFilters(t, source, o) || !completedVisible(t, source, o))
+        if (!passesFilters(t, source, o, &search) || !completedVisible(t, source, o))
             continue;
         items.append(t);
     }
@@ -369,9 +421,9 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         for (const auto &row : s.rows) {
             const Task t = m_store.task(row.taskId);
             TaskRow top = row;
-            top.breadcrumb = source.isFocus() && t.parentId != 0;
+            top.breadcrumb = (source.isFocus() || smart) && t.parentId != 0;
             QVector<TaskRow> nested;
-            const bool nestHere = t.type != TaskType::Project || !source.isFocus();
+            const bool nestHere = t.type != TaskType::Project || (!source.isFocus() && !smart);
             if (nestHere) {
                 for (const auto &c : children(t.id)) {
                     if (!passesFilters(c, Source{Source::List, c.listId}, o))

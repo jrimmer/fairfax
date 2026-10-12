@@ -11,6 +11,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include "nlparse.h"
 #include "rowmodel.h"
 #include "schedule.h"
 #include "store.h"
@@ -35,6 +36,11 @@ class Backend : public QObject {
     Q_PROPERTY(bool hideCompleted READ hideCompleted WRITE setHideCompleted NOTIFY viewChanged)
     Q_PROPERTY(bool hasHidden READ hasHidden NOTIFY viewChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY viewChanged)
+    Q_PROPERTY(bool soundex READ soundex WRITE setSoundex NOTIFY viewChanged)
+    Q_PROPERTY(bool focusOn READ focusOn NOTIFY viewChanged)
+    Q_PROPERTY(QStringList focusConditions READ focusConditions NOTIFY viewChanged)
+    Q_PROPERTY(bool sourceIsSmart READ sourceIsSmart NOTIFY viewChanged)
+    Q_PROPERTY(QString smartQuery READ smartQuery NOTIFY viewChanged)
     Q_PROPERTY(QVariantList tagFilter READ tagFilter NOTIFY viewChanged)
     Q_PROPERTY(QString dayFilter READ dayFilter NOTIFY viewChanged)
     Q_PROPERTY(QString selectionSummary READ selectionSummary NOTIFY selectionChanged)
@@ -75,6 +81,12 @@ public:
     bool hideCompleted() const { return m_options.hideCompleted; }
     bool hasHidden() const { return m_hasHidden; }
     QString search() const { return m_options.search; }
+    bool soundex() const { return m_options.soundex; }
+    void setSoundex(bool on);
+    bool focusOn() const;
+    QStringList focusConditions() const;
+    bool sourceIsSmart() const;
+    QString smartQuery() const;
     QVariantList tagFilter() const;
     QString dayFilter() const;
     QString selectionSummary() const;
@@ -168,6 +180,8 @@ public:
     Q_INVOKABLE void setAction(qint64 id, int type, const QString &value);
     Q_INVOKABLE void setRepeatPreset(qint64 id, int preset);
     Q_INVOKABLE void setRepeatFromCompletion(qint64 id, bool on);
+    Q_INVOKABLE void toggleAlarm(qint64 id, int minutesBefore);
+    Q_INVOKABLE void clearAlarms(qint64 id);
     Q_INVOKABLE QVariantList dateSuggestions(const QString &text) const;
 
     // Lists, groups and tags.
@@ -182,6 +196,23 @@ public:
     Q_INVOKABLE QVariantMap taskInfo(qint64 id) const;
     Q_INVOKABLE QVariantList findTasks(const QString &text, int limit = 12) const;
     Q_INVOKABLE void revealInList(qint64 taskId);
+
+    // Focus Filter: per-list conditions, OR-combined, toggled as a whole.
+    Q_INVOKABLE void toggleFocus();
+    Q_INVOKABLE void setFocusCondition(const QString &condition, bool on);
+
+    // Smart Lists are saved searches.
+    Q_INVOKABLE qint64 saveSmartList(const QString &name, const QString &query);
+    Q_INVOKABLE void setSmartQuery(qint64 listId, const QString &query);
+
+    // Quick Entry and natural-language input.
+    Q_INVOKABLE QVariantMap previewEntry(const QString &text) const;
+    Q_INVOKABLE qint64 quickAdd(const QString &text, const QString &notes, int type, qint64 listId);
+    Q_INVOKABLE qint64 quickEntryListId() const;
+    Q_INVOKABLE QVariantMap setting(const QString &key) const;
+    Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
+    Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
+    Q_INVOKABLE void requestWindow() { emit windowRequested(); }
     Q_INVOKABLE void setTagPaused(qint64 tagId, bool paused);
     Q_INVOKABLE qint64 newTag(const QString &name, qint64 groupId = 0);
 
@@ -201,6 +232,8 @@ signals:
     void clockChanged();
     void statusChanged();
     void revealTask(qint64 id);  // Asks the list to scroll a task into view.
+    void quickEntryRequested();
+    void windowRequested();
 
 private:
     SortSpec sortSpec() const;
@@ -215,6 +248,9 @@ private:
     qint64 tagIdForName(const QString &name, bool create);
     double nextOrder(qint64 listId, qint64 parentId) const;
     void setStatus(const QString &message);
+    void applyParsed(Task &task, const ParsedEntry &parsed);
+    QStringList listNames() const;
+    QString focusSettingKey() const { return "focus." + m_source.key(); }
 
     void rebuild();
     void rebuildSidebar(const ViewBuilder &views);

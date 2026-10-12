@@ -227,7 +227,7 @@ Rectangle {
 
             // Focus list glyphs; Today shows the day of the month like the reference app.
             Item {
-                visible: item.row.kind === "focus"
+                visible: item.row.kind === "focus" || item.row.kind === "smart"
                 x: 22
                 width: 20
                 height: 20
@@ -281,7 +281,7 @@ Rectangle {
                 id: label
                 visible: root.renamingListId !== item.row.listId || !item.isList
                 anchors.verticalCenter: parent.verticalCenter
-                x: item.row.kind === "focus" ? 52 : item.row.kind === "project" ? 68 : 50
+                x: item.row.kind === "focus" || item.row.kind === "smart" ? 52 : item.row.kind === "project" ? 68 : 50
                 width: counts.x - x - 6
                 text: item.row.title || ""
                 elide: Text.ElideRight
@@ -323,8 +323,9 @@ Rectangle {
                 onClicked: (m) => {
                     if (item.row.sourceKey) backend.selectSource(item.row.sourceKey)
                     if (m.button === Qt.RightButton && item.isList) listMenu.popup()
+                    if (m.button === Qt.RightButton && item.row.kind === "smart") smartMenu.popup()
                 }
-                onDoubleClicked: if (item.isList) root.renamingListId = item.row.listId
+                onDoubleClicked: if (item.isList || item.row.kind === "smart") root.renamingListId = item.row.listId
             }
 
             InlineEditor {
@@ -332,13 +333,18 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.rightMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                active: item.isList && root.renamingListId === item.row.listId
+                active: (item.isList || item.row.kind === "smart") && root.renamingListId === item.row.listId
                 initial: item.row.title || ""
                 onCommitted: (text) => { backend.renameList(item.row.listId, text); root.renamingListId = 0 }
                 onCancelled: root.renamingListId = 0
             }
 
             ListMenu { id: listMenu; listId: item.row.listId || 0; onRename: root.renamingListId = item.row.listId }
+            Menu {
+                id: smartMenu
+                MenuItem { text: "Rename…"; onTriggered: root.renamingListId = item.row.listId }
+                MenuItem { text: "Delete Smart List"; onTriggered: backend.deleteList(item.row.listId) }
+            }
         }
     }
 }

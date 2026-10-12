@@ -172,6 +172,13 @@ Item {
             name: "tag"; size: 14; color: theme.faint
         }
         Icon {
+            visible: !!root.row.hasAlarm
+            anchors.verticalCenter: parent.verticalCenter
+            name: "alarm"
+            size: 14
+            color: theme.faint
+        }
+        Icon {
             visible: (root.row.actionType || 0) > 0
             anchors.verticalCenter: parent.verticalCenter
             name: Icons.actionIcons[root.row.actionType || 0]

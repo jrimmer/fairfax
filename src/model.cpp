@@ -202,3 +202,26 @@ Tag Tag::fromMap(const QVariantMap &m) {
     t.deleted = m.value("deleted").toBool();
     return t;
 }
+
+QVariantMap Alarm::toMap() const {
+    return {{"id", id}, {"uid", uid}, {"task_id", taskId}, {"kind", kind}, {"offset_minutes", offset},
+            {"at", stampValue(at)}, {"sound", sound}, {"snoozed_until", stampValue(snoozedUntil)},
+            {"fired_for", stampValue(firedFor)}, {"modified", stampValue(modified)}, {"deleted", deleted}};
+}
+
+Alarm Alarm::fromMap(const QVariantMap &m) {
+    Alarm a;
+    a.id = m.value("id").toLongLong();
+    a.uid = m.value("uid").toString();
+    a.taskId = m.value("task_id").toLongLong();
+    a.kind = m.value("kind").toInt();
+    a.offset = m.value("offset_minutes").toInt();
+    a.at = stampFrom(m.value("at"));
+    a.sound = m.value("sound", true).toBool();
+    a.snoozedUntil = stampFrom(m.value("snoozed_until"));
+    a.firedFor = stampFrom(m.value("fired_for"));
+    a.modified = stampFrom(m.value("modified"));
+    a.deleted = m.value("deleted").toBool();
+    return a;
+}
+

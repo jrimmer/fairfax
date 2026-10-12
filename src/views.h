@@ -8,11 +8,14 @@
 #include <QDateTime>
 #include <QHash>
 #include <QSet>
+#include <QStringList>
 #include <QVector>
 
 #include "model.h"
 #include "schedule.h"
 #include "store.h"
+
+class Query;
 
 struct Source {
     enum Kind { All = 0, Today = 1, Starred = 2, Scheduled = 3, Done = 4, List = 5, Project = 6 };
@@ -31,7 +34,9 @@ struct ViewOptions {
     bool hideCompleted = false;
     int completedWindowMinutes = 24 * 60;  // -1 keeps completed tasks forever, 0 hides them at once.
     QSet<qint64> tagFilter;
-    QString search;
+    QString search;  // the reference app search syntax; see query.h.
+    bool soundex = false;
+    QStringList focusConditions;  // Focus Filter conditions, OR-combined; empty when the filter is off.
     QDate dayFilterFrom;
     QDate dayFilterTo;
     QSet<qint64> keepVisible;  // Just-completed tasks that stay until the view changes.
@@ -80,6 +85,9 @@ public:
     ListCounts countsForFocus(int kind) const;
 
     bool isPaused(const Task &task) const;
+    bool isSmartList(qint64 listId) const;
+    static bool matchesFocusCondition(const Task &task, const QString &condition, const QDateTime &now,
+                                      const ScheduleSettings &settings);
     bool listVisible(qint64 listId) const;
     QString sourceTitle(const Source &source) const;
     QVector<TaskList> orderedLists() const;  // Sidebar order: ungrouped first, then by group.
@@ -87,7 +95,8 @@ public:
 
 private:
     bool matchesFocus(const Task &task, int kind) const;
-    bool passesFilters(const Task &task, const Source &source, const ViewOptions &options) const;
+    bool passesFilters(const Task &task, const Source &source, const ViewOptions &options,
+                       const Query *query = nullptr) const;
     bool completedVisible(const Task &task, const Source &source, const ViewOptions &options) const;
     QVector<Section> sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort) const;
     void sortItems(QVector<Task> &items, const SortSpec &sort) const;

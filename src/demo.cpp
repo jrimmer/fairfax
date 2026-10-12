@@ -158,6 +158,29 @@ void Backend::seedDemo() {
     const qint64 read = s.task(office, "Read the platform RFC", NoDate, -1, 60, {"work"});
     s.edit(read, [](Task &t) { t.starred = true; });
 
+    TaskList important;
+    important.id = m_store->nextId("lists");
+    important.kind = ListKind::Smart;
+    important.name = "Important";
+    important.smartQuery = "type: hiprio OR starred";
+    important.order = 1;
+    m_store->putList(important);
+    TaskList calls;
+    calls.id = m_store->nextId("lists");
+    calls.kind = ListKind::Smart;
+    calls.name = "Calls to make";
+    calls.smartQuery = "type: call";
+    calls.order = 2;
+    m_store->putList(calls);
+
+    for (const qint64 task : {birthday, review}) {
+        Alarm a;
+        a.id = m_store->nextId("alarms");
+        a.taskId = task;
+        a.offset = 15;
+        m_store->putAlarm(a);
+    }
+
     m_store->commit();
     rebuild();
 }

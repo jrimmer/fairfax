@@ -1,4 +1,4 @@
-QT += core gui sql qml quick quickcontrols2
+QT += core gui sql qml quick quickcontrols2 network dbus
 
 CONFIG += c++20 release
 TARGET = precrime

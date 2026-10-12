@@ -29,22 +29,31 @@ public:
     const QHash<qint64, ListGroup> &groups() const { return m_groups; }
     const QHash<qint64, Tag> &tags() const { return m_tags; }
     const QHash<qint64, TagGroup> &tagGroups() const { return m_tagGroups; }
+    const QHash<qint64, Alarm> &alarms() const { return m_alarms; }
+    QVector<Alarm> alarmsFor(qint64 taskId) const;
 
     Task task(qint64 id) const { return m_tasks.value(id); }
     TaskList list(qint64 id) const { return m_lists.value(id); }
     Tag tag(qint64 id) const { return m_tags.value(id); }
+
+    // Reloads everything from disk, for when another process (the alarm
+    // service, a second window) has written to the database.
+    void reload();
 
     // Ids are handed out here rather than by SQLite so a change can refer to
     // records it has not written yet, and undoing a creation is exact.
     qint64 nextId(const QString &table);
     static QString newUid();
 
-    void begin(const QString &label);
+    // An `undoable` false change is bookkeeping (an alarm firing) that is
+    // written but never offered to undo.
+    void begin(const QString &label, bool undoable = true);
     void putTask(const Task &task);
     void putList(const TaskList &list);
     void putGroup(const ListGroup &group);
     void putTag(const Tag &tag);
     void putTagGroup(const TagGroup &group);
+    void putAlarm(const Alarm &alarm);
     bool commit();
 
     bool canUndo() const { return !m_undo.isEmpty(); }
@@ -78,6 +87,7 @@ private:
     struct Change {
         QString label;
         QVector<Edit> edits;
+        bool undoable = true;
     };
 
     void record(const QString &table, qint64 id, const QVariantMap &before, const QVariantMap &after);
@@ -97,6 +107,7 @@ private:
     QHash<qint64, ListGroup> m_groups;
     QHash<qint64, Tag> m_tags;
     QHash<qint64, TagGroup> m_tagGroups;
+    QHash<qint64, Alarm> m_alarms;
     QHash<QString, qint64> m_maxIds;
     QHash<QString, QVariant> m_settings;
     bool m_inChange = false;

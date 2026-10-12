@@ -114,6 +114,7 @@ Item {
                 onClicked: backend.showScheduled = !backend.showScheduled
             }
             Rectangle { visible: backend.hasHidden; implicitWidth: 1; implicitHeight: 16; color: theme.divider }
+            FocusButton {}
             IconButton {
                 icon: backend.sortAscending ? "arrowDown" : "arrowUp"
                 size: 15
@@ -121,6 +122,54 @@ Item {
                 onClicked: backend.toggleSortDirection()
             }
             SortButton {}
+        }
+
+        // A Smart List shows its saved search, editable in place; a typed
+        // search offers to become one.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: root.contentMargin
+            Layout.rightMargin: root.contentMargin
+            Layout.bottomMargin: 6
+            visible: backend.sourceIsSmart || backend.search !== ""
+            spacing: 8
+            Icon { name: "search"; size: 14; color: theme.muted }
+            TextInput {
+                id: smartQuery
+                Layout.fillWidth: true
+                visible: backend.sourceIsSmart
+                text: backend.smartQuery
+                color: theme.foreground
+                selectionColor: theme.selection
+                font.family: "monospace"
+                font.pixelSize: backend.fontSize - 2
+                clip: true
+                onEditingFinished: backend.setSmartQuery(Number(backend.sourceKey.split(":")[1]), text)
+                Keys.onEscapePressed: { text = backend.smartQuery; root.focusList() }
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: !backend.sourceIsSmart
+                text: backend.search
+                color: theme.muted
+                font.family: "monospace"
+                font.pixelSize: backend.fontSize - 2
+                elide: Text.ElideRight
+            }
+            CheckBox {
+                text: "Sounds like"
+                checked: backend.soundex
+                font.pixelSize: backend.fontSize - 2
+                onToggled: backend.soundex = checked
+                padding: 0
+            }
+            Button {
+                visible: backend.search !== "" && !backend.sourceIsSmart
+                text: "Save as Smart List"
+                flat: true
+                font.pixelSize: backend.fontSize - 2
+                onClicked: backend.saveSmartList("", backend.search)
+            }
         }
 
         ListView {

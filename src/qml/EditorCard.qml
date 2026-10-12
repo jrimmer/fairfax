@@ -165,7 +165,26 @@ Item {
                         Item { Layout.fillWidth: true }
                         RibbonButton { icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; onClicked: actionMenu.popup() }
                         RibbonButton { icon: "repeat"; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; onClicked: repeatMenu.popup() }
+                        RibbonButton { icon: "alarm"; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; onClicked: alarmMenu.popup() }
                         RibbonButton { icon: "duration"; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; onClicked: durationMenu.popup() }
+
+                        Menu {
+                            id: alarmMenu
+                            Repeater {
+                                model: [[0, "At due time"], [5, "5 minutes before"], [15, "15 minutes before"], [30, "30 minutes before"],
+                                        [60, "1 hour before"], [120, "2 hours before"], [360, "6 hours before"], [720, "12 hours before"],
+                                        [1440, "1 day before"], [2880, "2 days before"]]
+                                MenuItem {
+                                    required property var modelData
+                                    text: modelData[1]
+                                    checkable: true
+                                    checked: (root.e.alarmOffsets || []).indexOf(modelData[0]) >= 0
+                                    onTriggered: backend.toggleAlarm(root.e.id, modelData[0])
+                                }
+                            }
+                            MenuSeparator {}
+                            MenuItem { text: "Remove All Alerts"; enabled: (root.e.alarmOffsets || []).length > 0; onTriggered: backend.clearAlarms(root.e.id) }
+                        }
 
                         Menu {
                             id: actionMenu

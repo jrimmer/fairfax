@@ -13,7 +13,7 @@ ApplicationWindow {
     height: 760
     minimumWidth: 640
     minimumHeight: 460
-    visible: true
+    visible: !startHidden
     title: backend.sourceTitle ? backend.sourceTitle + " — Precrime" : "Precrime"
     color: theme.background
 
@@ -72,6 +72,13 @@ ApplicationWindow {
     }
 
     CommandPopup { id: command; onClosed: win.focusList() }
+    QuickEntry { id: quickEntry }
+
+    Connections {
+        target: backend
+        function onQuickEntryRequested() { quickEntry.summon() }
+        function onWindowRequested() { win.show(); win.raise(); win.requestActivate() }
+    }
     QuickLook { id: quickLook; onClosed: win.focusList() }
     ShortcutOverlay { id: help; onClosed: win.focusList() }
 
@@ -166,4 +173,6 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+/"; onActivated: win.openCommand("defer") }
     AppShortcut { sequence: "Ctrl+;"; onActivated: win.openCommand("repeat") }
     AppShortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+    AppShortcut { sequence: "Ctrl+Shift+2"; onActivated: quickEntry.summon() }
+    AppShortcut { sequence: "Ctrl+'"; onActivated: if (!backend.editingTaskId) backend.beginEdit() }
 }

@@ -161,3 +161,25 @@ struct Tag {
     QVariantMap toMap() const;
     static Tag fromMap(const QVariantMap &map);
 };
+
+// An alert on a task, after the reference app's alarms: relative to the due moment (an
+// offset in minutes before it) or at a fixed date and time.
+struct Alarm {
+    enum Kind { Relative = 0, Absolute = 1 };
+
+    qint64 id = 0;
+    QString uid;
+    qint64 taskId = 0;
+    int kind = Relative;
+    int offset = 0;           // Minutes before the due moment, for relative alarms.
+    QDateTime at;             // For absolute alarms.
+    bool sound = true;        // "Message with Sound" rather than "Message".
+    QDateTime snoozedUntil;   // A snoozed alarm fires again at this moment.
+    QDateTime firedFor;       // The fire moment it last went off for, so a moved due date re-arms it.
+    QDateTime modified;
+    bool deleted = false;
+
+    QVariantMap toMap() const;
+    static Alarm fromMap(const QVariantMap &map);
+};
+
