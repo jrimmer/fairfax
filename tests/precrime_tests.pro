@@ -1,4 +1,4 @@
-QT += core gui sql qml quick quickcontrols2 testlib network dbus
+QT += core gui widgets sql qml quick quickcontrols2 testlib network dbus
 CONFIG += c++20 testcase
 TARGET = precrime_tests
 TEMPLATE = app

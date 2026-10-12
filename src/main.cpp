@@ -7,6 +7,7 @@
 #include <QTextStream>
 #include <QDir>
 #include <QFontDatabase>
+#include <QApplication>
 #include <QGuiApplication>
 #include <QFileInfo>
 #include <QIcon>
@@ -44,6 +45,7 @@
 #include "store.h"
 #include "theme.h"
 #include "todoist.h"
+#include "tray.h"
 
 namespace {
 
@@ -211,7 +213,9 @@ int main(int argc, char *argv[]) {
             return runHeadless(argc, argv);
     }
 
-    QGuiApplication app(argc, argv);
+    // QApplication rather than QGuiApplication only for the tray icon's
+    // menu, which Qt builds with widgets; the window itself is all QML.
+    QApplication app(argc, argv);
     app.setApplicationName("precrime");
     app.setApplicationVersion("0.2.4");
 
@@ -387,6 +391,7 @@ int main(int argc, char *argv[]) {
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("filePicker", &filePicker);
     engine.rootContext()->setContextProperty("gitSync", gitSync.get());
+    std::unique_ptr<Tray> tray;
     std::unique_ptr<TodoistSync> todoist;
     if (opened && !offscreen) {
         todoist = std::make_unique<TodoistSync>(&store);
@@ -394,6 +399,16 @@ int main(int argc, char *argv[]) {
             QTimer::singleShot(3000, todoist.get(), &TodoistSync::syncNow);
     }
     engine.rootContext()->setContextProperty("todoist", todoist.get());
+    if (opened && !offscreen) {
+        tray = std::make_unique<Tray>(&store, &backend);
+        tray->canSync = [&] { return (gitSync && gitSync->configured()) || (todoist && todoist->connected()); };
+        tray->syncNow = [&] {
+            if (gitSync && gitSync->configured()) gitSync->syncNow();
+            if (todoist && todoist->connected()) todoist->syncNow();
+        };
+        QObject::connect(&backend, &Backend::settingsChanged, tray.get(),
+                         [&] { tray->setVisible(store.setting("general.trayIcon", true).toBool()); });
+    }
     engine.rootContext()->setContextProperty("calendar", &calendar);
     engine.rootContext()->setContextProperty("sounds", &sounds);
     engine.rootContext()->setContextProperty("theme", &theme);
