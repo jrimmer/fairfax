@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file>qml/CommandPopup.qml</file>
         <file>qml/DateField.qml</file>
+        <file>qml/DragProxy.qml</file>
         <file>qml/EditorCard.qml</file>
         <file>qml/FocusButton.qml</file>
         <file>qml/IconButton.qml</file>
@@ -17,6 +18,7 @@
         <file>qml/QuickLook.qml</file>
         <file>qml/SearchBox.qml</file>
         <file>qml/SectionHeader.qml</file>
+        <file>qml/SettingsWindow.qml</file>
         <file>qml/ShortcutOverlay.qml</file>
         <file>qml/Sidebar.qml</file>
         <file>qml/SortButton.qml</file>

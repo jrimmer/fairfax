@@ -259,13 +259,41 @@ Item {
         }
     }
 
+    readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
+
+    // Dropping tasks onto this row moves them in front of it.
+    DropArea {
+        anchors.fill: parent
+        keys: ["precrime-tasks"]
+        onDropped: backend.dropBefore(root.row.taskId)
+        Rectangle {
+            visible: parent.containsDrag
+            x: root.margin + root.indent
+            width: parent.width - x - root.margin
+            height: 2
+            color: theme.accent
+        }
+    }
+
     MouseArea {
         id: mouse
         anchors.fill: parent
         z: -1
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        drag.target: root.proxy
+        drag.threshold: 10
+        drag.onActiveChanged: {
+            if (!root.proxy) return
+            if (drag.active) {
+                const n = backend.selectionCount
+                root.proxy.start(n > 1 ? n + " tasks" : root.row.title)
+            } else {
+                root.proxy.finish()
+            }
+        }
         onPressed: (m) => {
+            if (root.proxy) root.proxy.place(mapToItem(null, m.x, m.y))
             const mode = m.modifiers & Qt.ShiftModifier ? 1 : m.modifiers & Qt.ControlModifier ? 2 : 0
             if (m.button === Qt.RightButton && root.row.selected) return
             backend.selectTask(root.row.taskId, mode)

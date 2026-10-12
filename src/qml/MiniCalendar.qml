@@ -89,6 +89,17 @@ ColumnLayout {
                     color: cell.isToday ? theme.today : cell.inMonth ? theme.foreground : theme.faint
                 }
                 MouseArea { anchors.fill: parent; onClicked: backend.setDayFilter(root.iso(cell.day)) }
+                // Dropping tasks on a day defers them to it.
+                DropArea {
+                    id: dayDrop
+                    anchors.fill: parent
+                    keys: ["precrime-tasks"]
+                    readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
+                    onEntered: if (proxy) proxy.hint = "Defer to " + Qt.formatDate(cell.day, "ddd d MMM")
+                    onExited: if (proxy) proxy.hint = ""
+                    onDropped: backend.dropOnDate(root.iso(cell.day))
+                }
+                Rectangle { anchors.centerIn: parent; width: 22; height: 22; radius: 11; color: "transparent"; border.width: 2; border.color: theme.accent; visible: dayDrop.containsDrag }
             }
         }
     }

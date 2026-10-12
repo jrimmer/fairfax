@@ -8,6 +8,7 @@ Rectangle {
     id: root
 
     signal hideRequested()
+    signal settingsRequested()
 
     color: theme.sidebar
     property int renamingListId: 0
@@ -82,11 +83,19 @@ Rectangle {
             visible: root.height > 660
         }
 
-        // Footer: new list or group.
+        // Footer: new list or group, and settings.
         Item {
             Layout.fillWidth: true
             implicitHeight: 38
             Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: theme.divider }
+            IconButton {
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "settings"
+                tip: "Settings (Ctrl+,)"
+                onClicked: root.settingsRequested()
+            }
             IconButton {
                 anchors.left: parent.left
                 anchors.leftMargin: 10
@@ -312,6 +321,27 @@ Rectangle {
                     text: item.row.undone > 999 ? "999+" : item.row.undone || ""
                     color: theme.muted
                     font.pixelSize: backend.fontSize - 2
+                }
+            }
+
+            DropArea {
+                id: drop
+                anchors.fill: parent
+                keys: ["precrime-tasks"]
+                enabled: !!item.row.sourceKey && backend.dropHint(item.row.sourceKey) !== ""
+                readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
+                onEntered: if (proxy) proxy.hint = backend.dropHint(item.row.sourceKey)
+                onExited: if (proxy) proxy.hint = ""
+                onDropped: backend.dropOnSource(item.row.sourceKey)
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    radius: 6
+                    color: "transparent"
+                    border.width: 2
+                    border.color: theme.accent
+                    visible: drop.containsDrag
                 }
             }
 

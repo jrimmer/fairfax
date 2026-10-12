@@ -74,6 +74,11 @@ public:
     // consistent file even while the app is writing.
     bool backupTo(const QString &file, QString *error = nullptr);
 
+    // Replaces the whole database with `file` (a backup), after checking it
+    // opens as a Precrime database. Undo history is cleared: there is no
+    // undoing past a restore, which is why a safety backup is made first.
+    bool replaceWith(const QString &file, QString *error = nullptr);
+
 signals:
     void changed();
 

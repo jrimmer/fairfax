@@ -24,6 +24,7 @@ ApplicationWindow {
     Material.primary: theme.accent
     font.pixelSize: backend.fontSize
 
+    property alias dragProxy: dragProxy
     property bool sidebarShown: true
     property bool utilityShown: true
     // The lists panel tucks away in a narrow window and comes back with room,
@@ -44,6 +45,7 @@ ApplicationWindow {
             Layout.preferredWidth: 240
             visible: win.sidebarVisible
             onHideRequested: win.sidebarShown = false
+            onSettingsRequested: { settings.show(); settings.raise() }
         }
 
         Rectangle { Layout.fillHeight: true; implicitWidth: 1; color: theme.divider; visible: sidebar.visible }
@@ -71,8 +73,10 @@ ApplicationWindow {
         }
     }
 
+    DragProxy { id: dragProxy; parent: Overlay.overlay }
     CommandPopup { id: command; onClosed: win.focusList() }
     QuickEntry { id: quickEntry }
+    SettingsWindow { id: settings }
 
     Connections {
         target: backend
@@ -174,5 +178,7 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+;"; onActivated: win.openCommand("repeat") }
     AppShortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
     AppShortcut { sequence: "Ctrl+Shift+2"; onActivated: quickEntry.summon() }
+    AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
+    AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
     AppShortcut { sequence: "Ctrl+'"; onActivated: if (!backend.editingTaskId) backend.beginEdit() }
 }

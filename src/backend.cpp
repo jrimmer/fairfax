@@ -1,12 +1,16 @@
 #include "backend.h"
 
 #include <QDesktopServices>
+#include <QDir>
+#include <QFileInfo>
+#include <QStandardPaths>
 #include <QLocale>
 #include <QRegularExpression>
 #include <QUrl>
 #include <algorithm>
 
 #include "dateparse.h"
+#include "exchange.h"
 #include "query.h"
 #include "recurrence.h"
 
@@ -59,6 +63,11 @@ Backend::Backend(Store *store, QObject *parent)
         rebuild();
     });
     m_clock.start();
+
+    m_backupTimer.setInterval(60 * 60 * 1000);
+    connect(&m_backupTimer, &QTimer::timeout, this, &Backend::maybeBackup);
+    m_backupTimer.start();
+    QTimer::singleShot(5000, this, &Backend::maybeBackup);
 }
 
 // ---------------------------------------------------------------- settings
@@ -829,6 +838,90 @@ void Backend::moveSelection(int delta) {
         setSort(SortField::Manual);
 }
 
+QString Backend::dropHint(const QString &key) const {
+    const Source target = Source::fromKey(key);
+    switch (target.kind) {
+    case Source::Today: return "Drop to Do Today";
+    case Source::Starred: return "Drop to Star";
+    case Source::Done: return "Drop to Complete";
+    case Source::Scheduled: return "Drop to Start Tomorrow";
+    case Source::List: return m_store->list(target.id).kind == ListKind::Smart ? QString() : "Drop to Move";
+    case Source::Project: return "Drop into Project";
+    default: return {};
+    }
+}
+
+void Backend::dropOnSource(const QString &key) {
+    const Source target = Source::fromKey(key);
+    const auto ids = targetIds();
+    if (ids.isEmpty())
+        return;
+    switch (target.kind) {
+    case Source::Today: setDueInDays(0); break;
+    case Source::Starred: setStarred(1); break;
+    case Source::Done: setCompleted(true); break;
+    case Source::Scheduled: setStartInDays(1); break;
+    case Source::List:
+        if (m_store->list(target.id).kind != ListKind::Smart)
+            moveSelectionToList(target.id);
+        break;
+    case Source::Project: {
+        const Task project = m_store->task(target.id);
+        m_store->begin("Move into Project");
+        for (auto id : ids) {
+            if (id == project.id)
+                continue;
+            Task t = m_store->task(id);
+            t.listId = project.listId;
+            t.parentId = project.id;
+            t.order = nextOrder(project.listId, project.id);
+            m_store->putTask(t);
+        }
+        m_store->commit();
+        break;
+    }
+    default: break;
+    }
+}
+
+void Backend::dropOnDate(const QString &iso) {
+    deferTo(iso);
+}
+
+void Backend::dropBefore(qint64 taskId) {
+    // Dragging within a list puts it in manual order, as in the reference app.
+    const Task anchor = m_store->task(taskId);
+    auto ids = targetIds();
+    ids.removeAll(taskId);
+    if (!anchor.id || ids.isEmpty())
+        return;
+    QVector<Task> siblings;
+    for (const auto &s : m_store->tasks())
+        if (!s.deleted && s.listId == anchor.listId && s.parentId == anchor.parentId && !ids.contains(s.id))
+            siblings.append(s);
+    std::sort(siblings.begin(), siblings.end(), [](const Task &a, const Task &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    QVector<Task> ordered;
+    for (const auto &s : siblings) {
+        if (s.id == anchor.id)
+            for (auto id : ids)
+                ordered.append(m_store->task(id));
+        ordered.append(s);
+    }
+    m_store->begin("Move Task");
+    for (int i = 0; i < ordered.size(); ++i) {
+        Task t = ordered.at(i);
+        t.order = i + 1;
+        t.listId = anchor.listId;
+        t.parentId = anchor.parentId;
+        m_store->putTask(t);
+    }
+    m_store->commit();
+    if (m_source.kind == Source::List && sortSpec().field != SortField::Manual)
+        setSort(SortField::Manual);
+}
+
 void Backend::toggleCollapsed(qint64 id) {
     for (auto i : targetIds(id)) {
         Task t = m_store->task(i);
@@ -1440,6 +1533,122 @@ void Backend::setSmartQuery(qint64 listId, const QString &query) {
     emit viewChanged();
 }
 
+
+// ------------------------------------------------------- backups & files
+
+QString Backend::backupFolder() const {
+    return QFileInfo(m_store->path()).absolutePath() + "/backups";
+}
+
+void Backend::maybeBackup() {
+    // "Back up every 24 / 48 hours", 0 meaning off.
+    const int hours = m_store->setting("backup.intervalHours", 24).toInt();
+    if (hours <= 0 || m_store->path().isEmpty())
+        return;
+    const QDateTime last = QDateTime::fromSecsSinceEpoch(m_store->setting("backup.last", 0).toLongLong());
+    if (last.secsTo(QDateTime::currentDateTime()) >= qint64(hours) * 3600)
+        backupNow();
+}
+
+bool Backend::backupNow(const QString &reason) {
+    const QString name = QStringLiteral("Precrime_(%1)%2.db")
+                             .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd-HH_mm_ss"),
+                                  reason.isEmpty() ? QString() : "_" + reason);
+    QString error;
+    if (!m_store->backupTo(backupFolder() + "/" + name, &error)) {
+        setStatus("Backup failed: " + error);
+        return false;
+    }
+    m_store->setSetting("backup.last", QDateTime::currentSecsSinceEpoch());
+    // Keep at most N automatic backups; safety backups taken before a
+    // restore or import are pruned the same way.
+    const int keep = qMax(1, m_store->setting("backup.keep", 10).toInt());
+    QDir dir(backupFolder());
+    const auto files = dir.entryInfoList({"Precrime_*.db"}, QDir::Files, QDir::Time);
+    for (int i = keep; i < files.size(); ++i)
+        QFile::remove(files.at(i).absoluteFilePath());
+    if (reason.isEmpty())
+        setStatus("Backed up to " + name);
+    return true;
+}
+
+QVariantList Backend::backups() const {
+    QVariantList result;
+    QDir dir(backupFolder());
+    for (const auto &f : dir.entryInfoList({"Precrime_*.db"}, QDir::Files, QDir::Time))
+        result.append(QVariantMap{{"path", f.absoluteFilePath()}, {"name", f.fileName()},
+                                  {"date", English.toString(f.lastModified(), "ddd d MMM yyyy, h:mm AP")},
+                                  {"size", QString::number(f.size() / 1024) + " KB"}});
+    return result;
+}
+
+bool Backend::restoreBackup(const QString &path) {
+    endEdit();
+    if (!backupNow("before-restore"))
+        return false;
+    QString error;
+    if (!m_store->replaceWith(path, &error)) {
+        setStatus(error);
+        return false;
+    }
+    m_selected.clear();
+    m_cursor = 0;
+    m_source = Source{};
+    rebuild();
+    emit viewChanged();
+    emit selectionChanged();
+    setStatus("Restored " + QFileInfo(path).fileName());
+    return true;
+}
+
+void Backend::exportTo(const QString &path, const QString &format, bool selectionOnly) {
+    QList<qint64> ids;
+    if (selectionOnly)
+        for (auto id : m_selected)
+            ids.append(id);
+    QString error;
+    const bool ok = format == "ics" ? Exchange::exportIcs(*m_store, path, ids, &error)
+                                    : Exchange::exportCsv(*m_store, path, ids, &error);
+    setStatus(ok ? "Exported to " + QFileInfo(path).fileName() : "Export failed: " + error);
+}
+
+void Backend::importFrom(const QString &path, const QString &format) {
+    backupNow("before-import");
+    const ImportResult r = format == "taskapp" ? Exchange::importTwoDo(*m_store, path)
+                                           : Exchange::importIcs(*m_store, path, defaultListId());
+    if (!r.error.isEmpty()) {
+        setStatus("Import failed: " + r.error);
+        return;
+    }
+    setStatus(QStringLiteral("Imported %1 tasks in %2 lists (Ctrl+Z undoes it)").arg(r.tasks).arg(r.lists));
+}
+
+bool Backend::inboxEnabled() const {
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && l.kind == ListKind::Inbox)
+            return true;
+    return false;
+}
+
+void Backend::setInboxEnabled(bool on) {
+    if (on == inboxEnabled())
+        return;
+    if (on) {
+        TaskList inbox;
+        inbox.id = m_store->nextId("lists");
+        inbox.kind = ListKind::Inbox;
+        inbox.name = "Inbox";
+        inbox.color = 5;
+        m_store->begin("Turn On Inbox");
+        m_store->putList(inbox);
+        m_store->commit();
+        return;
+    }
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && l.kind == ListKind::Inbox)
+            deleteList(l.id);
+}
+
 // ---------------------------------------------------------- quick entry
 
 QStringList Backend::listNames() const {
@@ -1454,6 +1663,7 @@ QVariantMap Backend::setting(const QString &key) const { return {{"value", m_sto
 
 void Backend::setSetting(const QString &key, const QVariant &value) {
     m_store->setSetting(key, value);
+    m_options.completedWindowMinutes = m_store->setting("tasks.completedWindow", 24 * 60).toInt();
     rebuild();
     emit settingsChanged();
     emit viewChanged();

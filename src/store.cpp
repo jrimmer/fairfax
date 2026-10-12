@@ -1,6 +1,7 @@
 #include "store.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -452,3 +453,53 @@ bool Store::backupTo(const QString &file, QString *error) {
     }
     return true;
 }
+
+bool Store::replaceWith(const QString &file, QString *error) {
+    {
+        // Check the candidate before touching anything.
+        const QString probeName = m_connection + "-probe";
+        {
+            QSqlDatabase probe = QSqlDatabase::addDatabase("QSQLITE", probeName);
+            probe.setDatabaseName(file);
+            probe.setConnectOptions("QSQLITE_OPEN_READONLY");
+            bool ok = probe.open();
+            if (ok) {
+                QSqlQuery q(probe);
+                ok = q.exec("SELECT count(*) FROM tasks") && q.exec("SELECT count(*) FROM lists");
+            }
+            probe.close();
+            if (!ok) {
+                if (error)
+                    *error = QStringLiteral("%1 isn't a Precrime database.").arg(file);
+                QSqlDatabase::removeDatabase(probeName);
+                return false;
+            }
+        }
+        QSqlDatabase::removeDatabase(probeName);
+    }
+
+    m_db.close();
+    // Copy beside the target, then rename over it, so a failed copy never
+    // leaves a half-written database.
+    const QString staging = m_path + ".restoring";
+    QFile::remove(staging);
+    bool ok = QFile::copy(file, staging);
+    if (ok) {
+        QFile::remove(m_path + "-wal");
+        QFile::remove(m_path + "-shm");
+        QFile::remove(m_path);
+        ok = QFile::rename(staging, m_path);
+    }
+    if (!m_db.open() || !ok) {
+        if (error)
+            *error = QStringLiteral("Couldn't restore from %1.").arg(file);
+        return false;
+    }
+    QString migrateError;
+    migrate(&migrateError);
+    m_undo.clear();
+    m_redo.clear();
+    reload();
+    return true;
+}
+

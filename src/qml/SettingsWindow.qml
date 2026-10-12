@@ -1,0 +1,288 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+import QtQuick.Layouts
+
+// Settings, in the reference app's panes: General, Appearance, Tasks, Today & Lists,
+// Alerts, Backups, and Import & Export. Everything applies at once.
+Window {
+    id: root
+
+    title: "Precrime Settings"
+    width: 720
+    height: 560
+    minimumWidth: 560
+    minimumHeight: 420
+    color: theme.background
+
+    Material.theme: theme.dark ? Material.Dark : Material.Light
+    Material.accent: theme.accent
+    Material.background: theme.raised
+    Material.foreground: theme.foreground
+
+    property int pane: 0
+    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Backups", "Import & Export"]
+
+    function value(key, fallback) {
+        const v = backend.setting(key).value
+        return v === undefined || v === null || v === "" ? fallback : v
+    }
+    function bool(key, fallback) {
+        const v = value(key, fallback)
+        return v === true || v === "true" || v === 1 || v === "1"
+    }
+
+    Shortcut { sequence: "Escape"; onActivated: root.close() }
+
+    Connections {
+        target: filePicker
+        function onPicked(path, purpose) {
+            if (purpose === "export-csv") backend.exportTo(path, "csv")
+            else if (purpose === "export-ics") backend.exportTo(path, "ics")
+            else if (purpose === "import-ics") backend.importFrom(path, "ics")
+            else if (purpose === "import-taskdb") backend.importFrom(path, "taskapp")
+            else if (purpose === "restore") backend.restoreBackup(path)
+        }
+        function onFailed(message) { status.text = message }
+    }
+
+    RowLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        Rectangle {
+            Layout.fillHeight: true
+            Layout.preferredWidth: 180
+            color: theme.sidebar
+            Column {
+                anchors.fill: parent
+                anchors.topMargin: 14
+                spacing: 2
+                Repeater {
+                    model: root.panes
+                    Rectangle {
+                        required property int index
+                        required property string modelData
+                        x: 8
+                        width: parent.width - 16
+                        height: 32
+                        radius: 6
+                        color: root.pane === index ? theme.selection : "transparent"
+                        Text { x: 12; anchors.verticalCenter: parent.verticalCenter; text: modelData; color: theme.foreground; font.pixelSize: backend.fontSize }
+                        MouseArea { anchors.fill: parent; onClicked: root.pane = index }
+                    }
+                }
+            }
+        }
+
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            contentWidth: availableWidth
+
+            ColumnLayout {
+                width: parent.width - 48
+                x: 24
+                y: 20
+                spacing: 6
+
+                Text {
+                    text: root.panes[root.pane]
+                    color: theme.foreground
+                    font.pixelSize: backend.fontSize + 6
+                    font.weight: Font.Bold
+                    Layout.bottomMargin: 10
+                }
+
+                // General
+                ColumnLayout {
+                    visible: root.pane === 0
+                    Layout.fillWidth: true
+                    Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Precrime running. Q or Ctrl+Q quits for real." }
+                    Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
+                    Hint { text: "Quick Entry from anywhere: add to ~/.config/hypr/bindings.conf\nbindd = SUPER SHIFT, T, Precrime quick entry, exec, precrime --quick\nwindowrule = float, title:^(Precrime Quick Entry)$\nTo get alarms after signing in: exec-once = precrime --background" }
+                }
+
+                // Appearance
+                ColumnLayout {
+                    visible: root.pane === 1
+                    Layout.fillWidth: true
+                    RowLayout {
+                        Label { text: "Text size"; Layout.preferredWidth: 160 }
+                        Slider { from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }
+                        Label { text: backend.textSizeName; Layout.preferredWidth: 70 }
+                    }
+                    Toggle { key: "appearance.friendlyDates"; fallback: true; label: "Use friendly dates (Today, Tomorrow, In 28 days)" }
+                    Hint { text: "Colours follow your Omarchy theme, light or dark, and change with it." }
+                }
+
+                // Tasks
+                ColumnLayout {
+                    visible: root.pane === 2
+                    Layout.fillWidth: true
+                    CheckBox {
+                        text: "Getting Things Done® Inbox"
+                        checked: backend.inboxEnabled()
+                        onToggled: {
+                            if (!checked && !confirmInbox.visible) { checked = true; confirmInbox.open(); return }
+                            backend.setInboxEnabled(checked)
+                        }
+                    }
+                    Toggle { key: "nl.quickEntry"; fallback: true; label: "Detect dates and details as you type in Quick Entry" }
+                    Toggle { key: "nl.editor"; fallback: true; label: "Detect dates and details as you type in the task editor" }
+                    RowLayout {
+                        Label { text: "Show completed tasks for"; Layout.preferredWidth: 220 }
+                        ComboBox {
+                            readonly property var minutes: [0, 1, 60, 1440, 10080, 43200, -1]
+                            model: ["Never", "1 minute", "1 hour", "1 day", "1 week", "1 month", "Always"]
+                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("tasks.completedWindow", 1440))))
+                            onActivated: (i) => backend.setSetting("tasks.completedWindow", minutes[i])
+                        }
+                    }
+                    RowLayout {
+                        Label { text: "Default list"; Layout.preferredWidth: 220 }
+                        ComboBox {
+                            model: [{ name: "First list", id: 0 }].concat(backend.listChoices)
+                            textRole: "name"
+                            currentIndex: Math.max(0, model.findIndex(l => l.id === Number(root.value("tasks.defaultList", 0))))
+                            onActivated: (i) => backend.setSetting("tasks.defaultList", model[i].id)
+                        }
+                    }
+                    Toggle { key: "tasks.overdueUsesTime"; fallback: false; label: "Due time taken into account when marking a task overdue" }
+                }
+
+                // Today & Lists
+                ColumnLayout {
+                    visible: root.pane === 3
+                    Layout.fillWidth: true
+                    Toggle { key: "today.overdue"; fallback: true; label: "Include overdue items in Today" }
+                    Toggle { key: "today.starred"; fallback: false; label: "Include starred items in Today" }
+                    Toggle { key: "today.stillWorking"; fallback: true; label: "Include 'Still Working On' tasks in Today"; note: "Tasks whose start date has passed stay in Today until done." }
+                }
+
+                // Alerts
+                ColumnLayout {
+                    visible: root.pane === 4
+                    Layout.fillWidth: true
+                    RowLayout {
+                        Label { text: "Alerts on date-only tasks fire at"; Layout.preferredWidth: 260 }
+                        ComboBox {
+                            readonly property var minutes: [360, 420, 480, 540, 600, 720]
+                            model: ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "12:00 PM"]
+                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("tasks.defaultDueTime", 540))))
+                            onActivated: (i) => backend.setSetting("tasks.defaultDueTime", minutes[i])
+                        }
+                    }
+                    Toggle { key: "alerts.respectExclusions"; fallback: false; label: "Silence alerts from lists excluded from Today" }
+                    Hint { text: "Alerts appear as notifications with Complete and Snooze. Precrime has to be running to deliver them." }
+                }
+
+                // Backups
+                ColumnLayout {
+                    visible: root.pane === 5
+                    Layout.fillWidth: true
+                    RowLayout {
+                        Label { text: "Back up automatically"; Layout.preferredWidth: 200 }
+                        ComboBox {
+                            readonly property var hours: [0, 24, 48]
+                            model: ["Never", "Every 24 hours", "Every 48 hours"]
+                            currentIndex: Math.max(0, hours.indexOf(Number(root.value("backup.intervalHours", 24))))
+                            onActivated: (i) => backend.setSetting("backup.intervalHours", hours[i])
+                        }
+                    }
+                    RowLayout {
+                        Label { text: "Keep at most"; Layout.preferredWidth: 200 }
+                        SpinBox { from: 1; to: 100; value: Number(root.value("backup.keep", 10)); onValueModified: backend.setSetting("backup.keep", value) }
+                    }
+                    RowLayout {
+                        Button { text: "Back Up Now"; onClicked: { backend.backupNow(); backupList.model = backend.backups() } }
+                        Button { text: "Restore from File…"; flat: true; onClicked: filePicker.open("Restore a Precrime backup", "restore") }
+                    }
+                    Hint { text: "Backups are kept in " + backend.backupFolder() }
+                    Repeater {
+                        id: backupList
+                        model: root.pane === 5 ? backend.backups() : []
+                        RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            Label { text: modelData.date; Layout.fillWidth: true }
+                            Label { text: modelData.size; color: theme.muted }
+                            Button { text: "Restore"; flat: true; onClicked: { confirmRestore.path = modelData.path; confirmRestore.open() } }
+                        }
+                    }
+                }
+
+                // Import & Export
+                ColumnLayout {
+                    visible: root.pane === 6
+                    Layout.fillWidth: true
+                    Label { text: "Export"; font.bold: true }
+                    RowLayout {
+                        Button { text: "CSV…"; onClicked: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
+                        Button { text: "iCalendar (.ics)…"; onClicked: filePicker.save("Export tasks as iCalendar", "Precrime.ics", "export-ics") }
+                    }
+                    Label { text: "Import"; font.bold: true; Layout.topMargin: 12 }
+                    RowLayout {
+                        Button { text: "From the reference app…"; onClicked: filePicker.open("Choose a the reference app database (tasks.db or a .taskdb backup)", "import-taskdb") }
+                        Button { text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
+                    }
+                    Hint { text: "From the reference app: on the Mac, use a backup from the reference app > Settings > Backups (a .taskdb file). Lists, groups, tags, dates, repeats and alerts come across; one Ctrl+Z undoes the whole import, and a backup is made first." }
+                }
+
+                Text { id: status; color: theme.overdue; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            }
+        }
+    }
+
+    Dialog {
+        id: confirmInbox
+        anchors.centerIn: parent
+        modal: true
+        title: "Turn off the Inbox?"
+        Label { text: "The Inbox list and its tasks are deleted. Ctrl+Z brings them back." }
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        onAccepted: backend.setInboxEnabled(false)
+    }
+
+    Dialog {
+        id: confirmRestore
+        property string path
+        anchors.centerIn: parent
+        modal: true
+        title: "Restore this backup?"
+        Label { text: "Everything is replaced by the backup. Your current tasks are backed up first." }
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        onAccepted: backend.restoreBackup(path)
+    }
+
+    component Toggle: ColumnLayout {
+        property string key
+        property bool fallback: false
+        property string label
+        property string note
+        Layout.fillWidth: true
+        spacing: 0
+        CheckBox {
+            text: parent.label
+            checked: root.bool(parent.key, parent.fallback)
+            onToggled: backend.setSetting(parent.key, checked)
+        }
+        Text {
+            visible: parent.note !== ""
+            text: parent.note
+            color: theme.muted
+            font.pixelSize: backend.fontSize - 2
+            leftPadding: 44
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+        }
+    }
+
+    component Hint: Text {
+        color: theme.muted
+        font.pixelSize: backend.fontSize - 2
+        wrapMode: Text.Wrap
+        Layout.fillWidth: true
+        Layout.topMargin: 8
+    }
+}

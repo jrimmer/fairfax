@@ -157,6 +157,12 @@ public:
     Q_INVOKABLE void duplicateSelection();
     Q_INVOKABLE void moveSelectionToList(qint64 listId);
     Q_INVOKABLE void moveSelection(int delta);
+    // Drag and drop of the selection onto a sidebar entry, a calendar day, or
+    // before another task (manual reordering).
+    Q_INVOKABLE void dropOnSource(const QString &sourceKey);
+    Q_INVOKABLE void dropOnDate(const QString &isoDate);
+    Q_INVOKABLE void dropBefore(qint64 taskId);
+    Q_INVOKABLE QString dropHint(const QString &sourceKey) const;
     Q_INVOKABLE void toggleCollapsed(qint64 id = 0);
     Q_INVOKABLE void convertSelection(int type);
     Q_INVOKABLE void tagSelection(const QString &names, bool replace);
@@ -212,6 +218,21 @@ public:
     Q_INVOKABLE QVariantMap setting(const QString &key) const;
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
     Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
+
+    // Backups: automatic every 24 or 48 hours, keeping the newest N, plus
+    // Backup Now and restore. A restore first backs up what it replaces.
+    Q_INVOKABLE bool backupNow(const QString &reason = {});
+    Q_INVOKABLE QVariantList backups() const;
+    Q_INVOKABLE bool restoreBackup(const QString &path);
+    Q_INVOKABLE QString backupFolder() const;
+
+    // Import and export (paths come from the portal file picker).
+    Q_INVOKABLE void exportTo(const QString &path, const QString &format, bool selectionOnly = false);
+    Q_INVOKABLE void importFrom(const QString &path, const QString &format);
+
+    // The GTD Inbox: a real list that Quick Entry fills by default.
+    Q_INVOKABLE void setInboxEnabled(bool on);
+    Q_INVOKABLE bool inboxEnabled() const;
     Q_INVOKABLE void requestWindow() { emit windowRequested(); }
     Q_INVOKABLE void setTagPaused(qint64 tagId, bool paused);
     Q_INVOKABLE qint64 newTag(const QString &name, qint64 groupId = 0);
@@ -277,5 +298,7 @@ private:
     QVariantMap m_editor;
     QString m_status;
     QTimer m_clock;
+    QTimer m_backupTimer;
+    void maybeBackup();
     QDate m_lastDay;
 };

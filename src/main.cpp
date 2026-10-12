@@ -18,6 +18,7 @@
 
 #include "alarms.h"
 #include "backend.h"
+#include "filepicker.h"
 #include "store.h"
 #include "theme.h"
 
@@ -90,7 +91,9 @@ int main(int argc, char *argv[]) {
             backend.selectSource(cli.value(sourceOption));
     }
 
+    FilePicker filePicker;
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("filePicker", &filePicker);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("storeError", opened ? QString() : dbPath + ": " + error);
