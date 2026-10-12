@@ -178,6 +178,7 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+;"; onActivated: win.openCommand("repeat") }
     AppShortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
     AppShortcut { sequence: "Ctrl+Shift+2"; onActivated: quickEntry.summon() }
+    AppShortcut { sequence: "Ctrl+S"; onActivated: if (gitSync && gitSync.configured) gitSync.syncNow() }
     AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
     AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
     AppShortcut { sequence: "Ctrl+'"; onActivated: if (!backend.editingTaskId) backend.beginEdit() }

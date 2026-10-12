@@ -2,6 +2,8 @@
 
 #include <QDir>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QFileInfo>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -11,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 2;
+constexpr int SchemaVersion = 3;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -158,11 +160,24 @@ bool Store::migrate(QString *error) {
         QStringLiteral("CREATE INDEX IF NOT EXISTS alarms_task ON alarms(task_id)"),
     };
 
+    // Version 3 adds sync bookkeeping.
+    const QStringList version3{
+        QStringLiteral(R"(CREATE TABLE IF NOT EXISTS sync_links (
+            provider TEXT NOT NULL,
+            entity TEXT NOT NULL,
+            local_id INTEGER NOT NULL,
+            remote_id TEXT NOT NULL,
+            snapshot TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (provider, entity, local_id)))"),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
     if (version < 2)
         steps += version2;
+    if (version < 3)
+        steps += version3;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();
@@ -222,9 +237,9 @@ void Store::load() {
 
 qint64 Store::nextId(const QString &table) { return ++m_maxIds[table]; }
 
-void Store::begin(const QString &label, bool undoable) {
+void Store::begin(const QString &label, bool undoable, bool keepStamps) {
     m_inChange = true;
-    m_pending = Change{label, {}, undoable};
+    m_pending = Change{label, {}, undoable, keepStamps};
 }
 
 void Store::record(const QString &table, qint64 id, const QVariantMap &before, const QVariantMap &after) {
@@ -245,7 +260,8 @@ void Store::putTask(const Task &t) {
     Task copy = t;
     if (copy.uid.isEmpty())
         copy.uid = newUid();
-    copy.modified = QDateTime::currentDateTime();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
     if (!copy.created.isValid())
         copy.created = copy.modified;
     record("tasks", copy.id, cached("tasks", copy.id), copy.toMap());
@@ -255,7 +271,8 @@ void Store::putList(const TaskList &l) {
     TaskList copy = l;
     if (copy.uid.isEmpty())
         copy.uid = newUid();
-    copy.modified = QDateTime::currentDateTime();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
     record("lists", copy.id, cached("lists", copy.id), copy.toMap());
 }
 
@@ -263,7 +280,8 @@ void Store::putGroup(const ListGroup &g) {
     ListGroup copy = g;
     if (copy.uid.isEmpty())
         copy.uid = newUid();
-    copy.modified = QDateTime::currentDateTime();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
     record("list_groups", copy.id, cached("list_groups", copy.id), copy.toMap());
 }
 
@@ -271,7 +289,8 @@ void Store::putTag(const Tag &t) {
     Tag copy = t;
     if (copy.uid.isEmpty())
         copy.uid = newUid();
-    copy.modified = QDateTime::currentDateTime();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
     record("tags", copy.id, cached("tags", copy.id), copy.toMap());
 }
 
@@ -279,7 +298,8 @@ void Store::putAlarm(const Alarm &a) {
     Alarm copy = a;
     if (copy.uid.isEmpty())
         copy.uid = newUid();
-    copy.modified = QDateTime::currentDateTime();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
     record("alarms", copy.id, cached("alarms", copy.id), copy.toMap());
 }
 
@@ -287,7 +307,8 @@ void Store::putTagGroup(const TagGroup &g) {
     TagGroup copy = g;
     if (copy.uid.isEmpty())
         copy.uid = newUid();
-    copy.modified = QDateTime::currentDateTime();
+    if (!m_pending.keepStamps || !copy.modified.isValid())
+        copy.modified = QDateTime::currentDateTime();
     record("tag_groups", copy.id, cached("tag_groups", copy.id), copy.toMap());
 }
 
@@ -425,6 +446,52 @@ QVariantMap Store::cached(const QString &table, qint64 id) const {
     if (table == "tag_groups" && m_tagGroups.contains(id)) return m_tagGroups.value(id).toMap();
     if (table == "alarms" && m_alarms.contains(id)) return m_alarms.value(id).toMap();
     return {};
+}
+
+QHash<qint64, Store::SyncLink> Store::syncLinks(const QString &provider, const QString &entity) const {
+    QHash<qint64, SyncLink> links;
+    QSqlQuery q(m_db);
+    q.prepare("SELECT local_id, remote_id, snapshot FROM sync_links WHERE provider = ? AND entity = ?");
+    q.addBindValue(provider);
+    q.addBindValue(entity);
+    q.exec();
+    while (q.next()) {
+        SyncLink link;
+        link.localId = q.value(0).toLongLong();
+        link.remoteId = q.value(1).toString();
+        link.snapshot = QJsonDocument::fromJson(q.value(2).toByteArray()).object().toVariantMap();
+        links.insert(link.localId, link);
+    }
+    return links;
+}
+
+void Store::setSyncLink(const QString &provider, const QString &entity, const SyncLink &link) {
+    QSqlQuery q(m_db);
+    q.prepare("INSERT INTO sync_links (provider, entity, local_id, remote_id, snapshot) VALUES (?, ?, ?, ?, ?) "
+              "ON CONFLICT(provider, entity, local_id) DO UPDATE SET remote_id = excluded.remote_id, "
+              "snapshot = excluded.snapshot");
+    q.addBindValue(provider);
+    q.addBindValue(entity);
+    q.addBindValue(link.localId);
+    q.addBindValue(link.remoteId);
+    q.addBindValue(QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(link.snapshot)).toJson(QJsonDocument::Compact)));
+    q.exec();
+}
+
+void Store::removeSyncLink(const QString &provider, const QString &entity, qint64 localId) {
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM sync_links WHERE provider = ? AND entity = ? AND local_id = ?");
+    q.addBindValue(provider);
+    q.addBindValue(entity);
+    q.addBindValue(localId);
+    q.exec();
+}
+
+void Store::clearSyncLinks(const QString &provider) {
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM sync_links WHERE provider = ?");
+    q.addBindValue(provider);
+    q.exec();
 }
 
 QVariant Store::setting(const QString &key, const QVariant &fallback) const {

@@ -6,7 +6,7 @@ pull tasks from everywhere, start dates that hide work until it's time, projects
 checklists, and single-key commands for everything you do to a task.
 
 It follows the Omarchy theme live, light or dark, and keeps everything in a local SQLite
-database. Sync (Todoist first) comes later.
+database, synced between machines through a git repository you choose.
 
 ## Install
 
@@ -40,6 +40,27 @@ Type the task the way you'd say it, and Precrime picks out the details:
 `"quotes"` keep words literal. The same parsing applies to a new task's title in the main
 window. Return saves, Shift+Return saves and starts another (so does pressing the bind
 again), Ctrl+Return saves and opens the task.
+
+## Sync
+
+Precrime syncs through a git repository of your own. Make a **private** repository, then
+open Settings (Ctrl+,) → Sync and paste its URL (`git@github.com:you/tasks.git`, or any URL
+or path git accepts). Every machine pointed at it stays in step.
+
+The database never goes into git. Each task, list and tag is a small JSON file, so changes
+on different machines merge record by record, with the most recent edit winning, and git
+never reports a conflict. Precrime syncs at startup, about 20 seconds after you change
+something, every five minutes, and once more on quit; Ctrl+S or the sidebar's sync button
+syncs right away. git runs with your own SSH keys and config and never prompts, so the
+remote must work non-interactively (`ssh -T git@github.com` should succeed without a
+password prompt).
+
+To get alarms after you sign in, start Precrime in the background from
+`~/.config/hypr/autostart.conf`:
+
+```ini
+exec-once = precrime --background
+```
 
 ## How it works
 
@@ -96,6 +117,8 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+Alt+←` / `Ctrl+Alt+→` | Show or hide the Lists / Tags panels |
 | `Ctrl+=` / `Ctrl+-` | Text size |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo |
+| `Ctrl+S` | Sync now |
+| `Ctrl+,` | Settings |
 | `?` | All shortcuts |
 | `q` / `Ctrl+Q` | Quit |
 

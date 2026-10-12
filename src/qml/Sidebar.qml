@@ -88,6 +88,20 @@ Rectangle {
             Layout.fillWidth: true
             implicitHeight: 38
             Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: theme.divider }
+            // Sync, when a git remote is set: spins while syncing, and the
+            // tooltip says how it went.
+            IconButton {
+                id: syncButton
+                visible: !!gitSync && gitSync.configured
+                anchors.right: parent.right
+                anchors.rightMargin: 44
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "sync"
+                tip: gitSync ? gitSync.status + " (Ctrl+S)" : ""
+                color: gitSync && gitSync.status.startsWith("Synced") === false && !gitSync.busy ? theme.overdue : theme.muted
+                onClicked: gitSync.syncNow()
+                RotationAnimator on rotation { running: !!gitSync && gitSync.busy; from: 0; to: 360; duration: 900; loops: Animation.Infinite }
+            }
             IconButton {
                 anchors.right: parent.right
                 anchors.rightMargin: 10

@@ -46,8 +46,10 @@ public:
     static QString newUid();
 
     // An `undoable` false change is bookkeeping (an alarm firing) that is
-    // written but never offered to undo.
-    void begin(const QString &label, bool undoable = true);
+    // written but never offered to undo. `keepStamps` writes records with the
+    // `modified` (and `created`) they carry instead of now, for records
+    // arriving from sync, so last-writer-wins compares the real edit times.
+    void begin(const QString &label, bool undoable = true, bool keepStamps = false);
     void putTask(const Task &task);
     void putList(const TaskList &list);
     void putGroup(const ListGroup &group);
@@ -66,6 +68,19 @@ public:
     // Removes a record outright and scrubs it from the undo history, for a new
     // task the user abandoned before giving it a title.
     void discard(const QString &table, qint64 id);
+
+    // Sync bookkeeping, per provider and entity ("tasks", "lists", "tags"):
+    // the remote id of each linked record and a snapshot of the record as it
+    // was when last synced, so a sync can tell exactly what changed locally.
+    struct SyncLink {
+        qint64 localId = 0;
+        QString remoteId;
+        QVariantMap snapshot;
+    };
+    QHash<qint64, SyncLink> syncLinks(const QString &provider, const QString &entity) const;
+    void setSyncLink(const QString &provider, const QString &entity, const SyncLink &link);
+    void removeSyncLink(const QString &provider, const QString &entity, qint64 localId);
+    void clearSyncLinks(const QString &provider);
 
     QVariant setting(const QString &key, const QVariant &fallback = {}) const;
     void setSetting(const QString &key, const QVariant &value);
@@ -93,6 +108,7 @@ private:
         QString label;
         QVector<Edit> edits;
         bool undoable = true;
+        bool keepStamps = false;
     };
 
     void record(const QString &table, qint64 id, const QVariantMap &before, const QVariantMap &after);

@@ -21,7 +21,7 @@ Window {
     Material.foreground: theme.foreground
 
     property int pane: 0
-    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Backups", "Import & Export"]
+    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export"]
 
     function value(key, fallback) {
         const v = backend.setting(key).value
@@ -177,9 +177,53 @@ Window {
                     Hint { text: "Alerts appear as notifications with Complete and Snooze. Precrime has to be running to deliver them." }
                 }
 
-                // Backups
+                // Sync
                 ColumnLayout {
                     visible: root.pane === 5
+                    Layout.fillWidth: true
+                    Label { text: "Git"; font.bold: true }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Keep your tasks in a private git repository and every machine that points at it stays in step. "
+                            + "Each task, list and tag is a small JSON file; git runs with your own SSH keys and never prompts."
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        TextField {
+                            id: remoteField
+                            Layout.fillWidth: true
+                            placeholderText: "git@github.com:you/tasks.git"
+                            text: gitSync ? gitSync.remote : ""
+                            enabled: !!gitSync
+                        }
+                        Button {
+                            text: gitSync && gitSync.configured ? "Change" : "Connect"
+                            enabled: !!gitSync && remoteField.text.trim() !== ""
+                            onClicked: gitSync.setRemote(remoteField.text.trim())
+                        }
+                    }
+                    RowLayout {
+                        visible: !!gitSync && gitSync.configured
+                        Button { text: gitSync && gitSync.busy ? "Syncing…" : "Sync Now"; enabled: !!gitSync && !gitSync.busy; onClicked: gitSync.syncNow() }
+                        Button { text: "Disconnect"; flat: true; onClicked: gitSync.disconnectRemote() }
+                    }
+                    Text {
+                        visible: !!gitSync
+                        text: gitSync ? gitSync.status + (gitSync.lastSync && !isNaN(gitSync.lastSync.getTime()) ? "  ·  last synced " + Qt.formatDateTime(gitSync.lastSync, "ddd d MMM, h:mm AP") : "") : ""
+                        color: theme.muted
+                        font.pixelSize: backend.fontSize - 1
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    Hint { visible: !!gitSync; text: gitSync ? "Working copy: " + gitSync.directory : "" }
+                    Hint { visible: !gitSync; text: "Sync is off in demo mode." }
+                    Label { text: "Todoist"; font.bold: true; Layout.topMargin: 16 }
+                    Hint { Layout.topMargin: 0; text: "Coming next: two-way sync with Todoist, for your phone." }
+                }
+
+                // Backups
+                ColumnLayout {
+                    visible: root.pane === 6
                     Layout.fillWidth: true
                     RowLayout {
                         Label { text: "Back up automatically"; Layout.preferredWidth: 200 }
@@ -201,7 +245,7 @@ Window {
                     Hint { text: "Backups are kept in " + backend.backupFolder() }
                     Repeater {
                         id: backupList
-                        model: root.pane === 5 ? backend.backups() : []
+                        model: root.pane === 6 ? backend.backups() : []
                         RowLayout {
                             required property var modelData
                             Layout.fillWidth: true
@@ -214,7 +258,7 @@ Window {
 
                 // Import & Export
                 ColumnLayout {
-                    visible: root.pane === 6
+                    visible: root.pane === 7
                     Layout.fillWidth: true
                     Label { text: "Export"; font.bold: true }
                     RowLayout {

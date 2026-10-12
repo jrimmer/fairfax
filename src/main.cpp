@@ -19,6 +19,7 @@
 #include "alarms.h"
 #include "backend.h"
 #include "filepicker.h"
+#include "gitsync.h"
 #include "store.h"
 #include "theme.h"
 
@@ -92,8 +93,20 @@ int main(int argc, char *argv[]) {
     }
 
     FilePicker filePicker;
+    // Git sync works on a working copy beside the database; demo and
+    // screenshot runs leave it alone.
+    std::unique_ptr<GitSync> gitSync;
+    if (opened && !offscreen) {
+        gitSync = std::make_unique<GitSync>(&store);
+        QObject::connect(&app, &QCoreApplication::aboutToQuit, gitSync.get(), [&gitSync] {
+            // One last push so edits made just before quitting reach the remote.
+            if (gitSync->configured())
+                gitSync->syncBlocking(8000);
+        });
+    }
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("filePicker", &filePicker);
+    engine.rootContext()->setContextProperty("gitSync", gitSync.get());
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("storeError", opened ? QString() : dbPath + ": " + error);
