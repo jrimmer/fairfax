@@ -25,6 +25,8 @@ Item {
         list: theme.accent, location: theme.start
     })
     readonly property color listColor: theme.listColor(e.listColor || 0)
+    // The priority's colour, or null with none, for the circle and the star.
+    readonly property var priorityColor: [null, theme.priorityLow, theme.priorityMedium, theme.priorityHigh][e.priority || 0]
     height: column.implicitHeight + 12
 
     function finish() {
@@ -39,9 +41,9 @@ Item {
     function goTo(kind) {
         switch (kind) {
         case "notes": notesArea.forceEditorFocus(); break
-        case "action": actionMenu.popup(actionButton, 0, actionButton.height); break
-        case "location": locationMenu.popup(locationButton, 0, locationButton.height); break
-        case "alerts": if (!root.e.isChecklistItem) alarmMenu.popup(alarmButton, 0, alarmButton.height); break
+        case "action": actionMenu.popup(actionButton, 0, actionButton.height + 4); break
+        case "location": locationMenu.popup(locationButton, 0, locationButton.height + 4); break
+        case "alerts": if (!root.e.isChecklistItem) alarmMenu.popup(alarmButton, 0, alarmButton.height + 4); break
         case "dates": if (!root.e.isChecklistItem) dueField.forceActiveFocus(); break
         case "repeat": if (!root.e.isChecklistItem) repeatEditor.openAt(repeatButton); break
         }
@@ -136,7 +138,7 @@ Item {
                         radius: root.e.type === 2 ? 4 : 9
                         color: "transparent"
                         border.width: 1.3
-                        border.color: theme.faint
+                        border.color: root.priorityColor || theme.faint
                         MouseArea { anchors.fill: parent; onClicked: backend.toggleComplete(root.e.id) }
                     }
                     Plain.TextField {
@@ -177,14 +179,52 @@ Item {
                         Keys.onReturnPressed: root.finish()
                         Keys.onEscapePressed: root.finish()
                     }
-                    Icon {
-                        name: "starred"
-                        size: 16
-                        filled: !!root.e.starred
-                        color: root.e.starred ? theme.star : theme.faint
-                        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: backend.setStarred(root.e.starred ? 0 : 1, root.e.id) }
+                    // One star: filled when starred, coloured by priority when one is
+                    // set; it opens the priority and star menu.
+                    IconButton {
+                        id: prio
+                        icon: "starred"
+                        size: 17
+                        color: root.priorityColor || (root.e.starred ? theme.star : theme.faint)
+                        tip: (["No priority", "Low priority", "Medium priority", "High priority"][root.e.priority || 0]) + (root.e.starred ? " · starred" : "")
+                        onClicked: priorityMenu.popup(prio, 0, prio.height + 4)
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 6
+                            visible: priorityMenu.visible
+                            color: Qt.alpha(theme.accent, 0.18)
+                            border.color: theme.accent
+                        }
+                        // IconButton draws outlines; fill the star when starred.
+                        Icon {
+                            anchors.centerIn: parent
+                            visible: !!root.e.starred
+                            name: "starred"
+                            size: 17
+                            filled: true
+                            color: parent.color
+                        }
+                        Menu {
+                            id: priorityMenu
+                            Repeater {
+                                model: [["None", 0], ["High", 3], ["Medium", 2], ["Low", 1]]
+                                MenuItem {
+                                    required property var modelData
+                                    text: modelData[0]
+                                    checkable: true
+                                    checked: (root.e.priority || 0) === modelData[1]
+                                    onTriggered: backend.setPriority(modelData[1], root.e.id)
+                                }
+                            }
+                            MenuSeparator {}
+                            MenuItem {
+                                text: "Star"
+                                checkable: true
+                                checked: !!root.e.starred
+                                onTriggered: backend.setStarred(root.e.starred ? 0 : 1, root.e.id)
+                            }
+                        }
                     }
-                    PriorityPicker { value: root.e.priority || 0; onPicked: (p) => backend.setPriority(p, root.e.id) }
                 }
 
                 // What was recognised in a new task's title, with the switch to
@@ -247,7 +287,8 @@ Item {
                             color: root.listColor
                             chevrons: true
                             implicitHeight: 32
-                            onClicked: listMenu.popup()
+                            pressedDown: listMenu.opened
+                            onClicked: listMenu.popup(this, 0, height + 2)
                             Menu {
                                 id: listMenu
                                 Repeater {
@@ -262,6 +303,7 @@ Item {
                                 }
                             }
                         }
+                        Item { Layout.fillWidth: true }
                         Icon {
                             visible: (root.e.actionType || 0) > 0
                             name: Icons.actionIcons[root.e.actionType || 0]
@@ -270,19 +312,28 @@ Item {
                             MouseArea { anchors.fill: parent; onClicked: backend.performAction(root.e.id) }
                         }
                         Text {
+                            visible: (root.e.actionType || 0) > 0 && !!root.e.hint
+                            text: "·"
+                            color: theme.today
+                            font.pixelSize: backend.fontSize
+                        }
+                        Text {
+                            Layout.maximumWidth: 220
                             text: root.e.hint || ""
+                            visible: text !== ""
                             color: (root.e.hint || "").startsWith("Overdue") ? theme.overdue : theme.today
-                            font.pixelSize: backend.fontSize - 1
+                            font.pixelSize: backend.fontSize
                             font.weight: Font.DemiBold
+                            elide: Text.ElideRight
                         }
                         Text {
                             visible: !!root.e.repeat
                             text: "· " + (root.e.repeat || "")
                             color: theme.muted
                             font.pixelSize: backend.fontSize - 2
+                            Layout.rightMargin: 4
                         }
-                        Item { Layout.fillWidth: true }
-                        RibbonButton { id: actionButton; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; onClicked: actionMenu.popup(actionButton, 0, actionButton.height) }
+                        RibbonButton { id: actionButton; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; menu: actionMenu }
                         RibbonButton {
                             icon: "mic"
                             tip: backend.recordingTaskId === root.e.id ? "Stop Recording" : "Record an Audio Note"
@@ -291,10 +342,10 @@ Item {
                             onClicked: backend.toggleRecording(root.e.id)
                         }
                         RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
-                        RibbonButton { id: locationButton; icon: "pin"; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; onClicked: locationMenu.popup(locationButton, 0, locationButton.height) }
-                        RibbonButton { id: repeatButton; icon: "repeat"; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; onClicked: repeatEditor.openAt(repeatButton) }
-                        RibbonButton { id: alarmButton; icon: "alarm"; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; onClicked: alarmMenu.popup(alarmButton, 0, alarmButton.height) }
-                        RibbonButton { icon: "duration"; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; onClicked: durationMenu.popup() }
+                        RibbonButton { id: locationButton; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; menu: locationMenu }
+                        RibbonButton { id: repeatButton; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
+                        RibbonButton { id: alarmButton; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
+                        RibbonButton { id: durationButton; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; menu: durationMenu }
 
                         Menu {
                             id: alarmMenu
@@ -395,47 +446,58 @@ Item {
                         taskId: root.e.id || 0
                         tags: root.e.tags || []
                     }
+                    // Start and due, each a date and a time, with the row's icon at the
+                    // right as in Quick Entry and the reference app.
                     GridLayout {
                         Layout.alignment: Qt.AlignTop
                         visible: !root.e.isChecklistItem
-                        columns: 5
-                        columnSpacing: 2
+                        columns: 3
+                        columnSpacing: 4
                         rowSpacing: 2
-                        Icon { name: "play"; size: 11; filled: true; color: root.e.hasStart ? theme.start : theme.faint }
                         DateField {
                             id: startField
+                            implicitWidth: 112
                             iso: root.e.startIso || ""
                             value: root.e.startDate || ""
                             placeholderText: "Start"
+                            clearable: !!root.e.hasStart
+                            onCleared: backend.setStart(root.e.id, "", -1)
                             onPicked: (iso, minutes) => backend.setStart(root.e.id, iso, minutes >= 0 ? minutes : -2)
                             onTyped: (text) => backend.setStartFromText(root.e.id, text)
                         }
-                        ClearButton { shown: !!root.e.hasStart; onClicked: backend.setStart(root.e.id, "", -1) }
                         DateField {
                             timeOnly: true
+                            implicitWidth: 82
                             value: root.e.startTime || ""
                             placeholderText: "Time"
+                            clearable: !!root.e.startTime
+                            onCleared: backend.setTimeFromText(root.e.id, false, "")
                             onTyped: (text) => backend.setTimeFromText(root.e.id, false, text)
                         }
-                        ClearButton { shown: !!root.e.startTime; onClicked: backend.setTimeFromText(root.e.id, false, "") }
+                        Icon { Layout.preferredWidth: 14; Layout.preferredHeight: 14; name: "play"; size: 12; filled: true; color: root.e.hasStart ? theme.start : theme.faint }
 
-                        Icon { name: "check"; size: 12; stroke: 2.2; color: root.e.hasDue ? theme.foreground : theme.faint }
                         DateField {
                             id: dueField
+                            implicitWidth: 112
                             iso: root.e.dueIso || ""
                             value: root.e.dueDate || ""
                             placeholderText: "Due"
+                            color: root.e.hasDue ? ((root.e.hint || "").startsWith("Overdue") ? theme.overdue : theme.today) : theme.foreground
+                            clearable: !!root.e.hasDue
+                            onCleared: backend.setDue(root.e.id, "", -1)
                             onPicked: (iso, minutes) => backend.setDue(root.e.id, iso, minutes >= 0 ? minutes : -2)
                             onTyped: (text) => backend.setDueFromText(root.e.id, text)
                         }
-                        ClearButton { shown: !!root.e.hasDue; onClicked: backend.setDue(root.e.id, "", -1) }
                         DateField {
                             timeOnly: true
+                            implicitWidth: 82
                             value: root.e.dueTime || ""
                             placeholderText: "Time"
+                            clearable: !!root.e.dueTime
+                            onCleared: backend.setTimeFromText(root.e.id, true, "")
                             onTyped: (text) => backend.setTimeFromText(root.e.id, true, text)
                         }
-                        ClearButton { shown: !!root.e.dueTime; onClicked: backend.setTimeFromText(root.e.id, true, "") }
+                        Icon { Layout.preferredWidth: 14; Layout.preferredHeight: 14; name: "check"; size: 13; stroke: 2.2; color: root.e.hasDue ? theme.today : theme.faint }
                     }
                 }
 
@@ -711,19 +773,26 @@ Item {
         }
     }
 
+    // An icon button in the ribbon, tinted when it holds a value. It opens
+    // its menu just below itself and stays lit while the menu is open, so
+    // it's clear what's being changed.
     component RibbonButton: IconButton {
+        id: rb
         property bool active: false
-        size: 15
-        color: active ? theme.today : theme.muted
+        property color tint: theme.today
+        property var menu: null
+        property bool lit: !!menu && menu.visible
+        size: 16
+        color: active || lit ? tint : theme.muted
         opacity: enabled ? 1 : 0.35
-    }
-
-    component ClearButton: Item {
-        property bool shown: false
-        signal clicked()
-        implicitWidth: 16
-        implicitHeight: 16
-        Icon { anchors.centerIn: parent; visible: parent.shown; name: "clear"; size: 13; color: theme.faint }
-        MouseArea { anchors.fill: parent; enabled: parent.shown; onClicked: parent.clicked() }
+        onClicked: if (menu) menu.popup(rb, 0, rb.height + 4)
+        Rectangle {
+            anchors.fill: parent
+            radius: 6
+            visible: rb.lit
+            color: Qt.alpha(rb.tint, 0.18)
+            border.color: rb.tint
+            border.width: 1
+        }
     }
 }
