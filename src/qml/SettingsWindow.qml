@@ -128,6 +128,15 @@ Window {
                             onActivated: (i) => backend.setSetting("appearance.density", i)
                         }
                     }
+                    RowLayout {
+                        Label { text: "Mini calendar busy days"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            readonly property var styles: ["heat", "dots", "none"]
+                            model: ["Heat Map", "Dots", "None"]
+                            currentIndex: Math.max(0, styles.indexOf(String(root.value("appearance.calendarStyle", "heat"))))
+                            onActivated: (i) => backend.setSetting("appearance.calendarStyle", styles[i])
+                        }
+                    }
                     Toggle { key: "appearance.friendlyDates"; fallback: true; label: "Use friendly dates (Today, Tomorrow, In 28 days)" }
                     Toggle { key: "appearance.notesPreview"; fallback: false; label: "Show notes under tasks" }
                     Toggle { key: "appearance.listNames"; fallback: false; label: "Always show list names"; note: "Otherwise hold Alt in the task list to reveal list and tag names." }

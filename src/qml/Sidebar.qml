@@ -410,11 +410,12 @@ Rectangle {
             // The list's colour band.
             Rectangle {
                 visible: item.isList || item.row.kind === "project"
-                x: 30
-                width: 7
+                // the reference app's bands are wide pills that stack into one column.
+                x: 24
+                width: 20
                 y: item.runStart ? 3 : 0
                 height: parent.height - (item.runStart ? 3 : 0) - (item.runEnd ? 3 : 0)
-                radius: 3.5
+                radius: 8
                 color: item.band
                 // Square off the joins so stacked pills read as one column.
                 Rectangle { visible: !item.runStart; width: parent.width; height: parent.radius; color: parent.color }
@@ -423,15 +424,15 @@ Rectangle {
                     visible: !!item.row.excluded && item.isList
                     anchors.centerIn: parent
                     name: "eyeOff"
-                    size: 7
-                    stroke: 2.4
+                    size: 11
+                    stroke: 2
                     color: theme.background
                 }
             }
 
             Icon {
                 visible: item.row.expandable === true
-                x: 13
+                x: 9
                 anchors.verticalCenter: parent.verticalCenter
                 name: item.row.expanded ? "chevronDown" : "chevronRight"
                 size: 11
@@ -454,18 +455,20 @@ Rectangle {
                     size: 19
                     color: item.row.icon === "starred" ? theme.star : theme.muted
                 }
+                // A calendar page showing today's date, as the reference app draws it.
                 Rectangle {
                     anchors.centerIn: parent
                     visible: item.row.icon === "today"
                     width: 18
                     height: 18
                     radius: 4
-                    color: theme.overdue
+                    color: theme.muted
+                    Rectangle { width: parent.width; height: 4; radius: 2; color: theme.mix(theme.muted, theme.foreground, 0.35) }
                     Text {
                         anchors.centerIn: parent
-                        anchors.verticalCenterOffset: 1
+                        anchors.verticalCenterOffset: 1.5
                         text: new Date().getDate()
-                        color: theme.background
+                        color: theme.sidebar
                         font.pixelSize: 10
                         font.bold: true
                     }
@@ -474,17 +477,18 @@ Rectangle {
 
             Icon {
                 visible: item.row.kind === "project"
-                x: 48
+                x: 54
                 anchors.verticalCenter: parent.verticalCenter
                 name: item.row.icon || "project"
                 size: 14
                 color: theme.muted
             }
 
-            // Due-today (white) or overdue (red) glow at the name's edge.
+            // Due-today (white) or overdue (red) glow: on a list's band, or at
+            // the far edge of Today.
             Rectangle {
-                visible: !!item.row.dot && item.row.kind !== "focus"
-                x: 41
+                visible: !!item.row.dot
+                x: item.row.kind === "focus" ? 3 : 21
                 anchors.verticalCenter: parent.verticalCenter
                 width: 5
                 height: 5
@@ -496,7 +500,7 @@ Rectangle {
                 id: label
                 visible: root.renamingListId !== item.row.listId || !item.isList
                 anchors.verticalCenter: parent.verticalCenter
-                x: item.row.kind === "focus" || item.row.kind === "smart" ? 52 : item.row.kind === "project" ? 68 : 50
+                x: item.row.kind === "focus" || item.row.kind === "smart" ? 52 : item.row.kind === "project" ? 74 : 54
                 width: counts.x - x - 6
                 text: item.row.title || ""
                 elide: Text.ElideRight

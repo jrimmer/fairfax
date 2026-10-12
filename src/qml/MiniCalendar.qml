@@ -13,6 +13,8 @@ ColumnLayout {
     readonly property int month: shown.getMonth()
     readonly property int firstDay: Qt.locale().firstDayOfWeek  // 0 = Sunday.
     property var counts: backend.monthDays(year, month + 1)
+    // the reference app's Busy Days styles: a heat-map tint, dots under the date, or none.
+    readonly property string style: String(backend.setting("appearance.calendarStyle").value || "heat")
     readonly property int peak: Math.max(1, ...counts)
 
     Connections {
@@ -77,9 +79,27 @@ ColumnLayout {
                     height: 20
                     radius: 10
                     // Ten steps of tint, deepening with the number of tasks that day.
-                    color: cell.busy ? Qt.alpha(theme.accent, 0.03 + 0.024 * Math.ceil(10 * cell.busy / root.peak)) : "transparent"
+                    color: cell.busy && root.style === "heat" ? Qt.alpha(theme.accent, 0.03 + 0.024 * Math.ceil(10 * cell.busy / root.peak)) : "transparent"
                     border.width: cell.filtered ? 1.5 : 0
                     border.color: theme.accent
+                }
+                // Dots: one per task, up to three; red on past days, whose open
+                // tasks are overdue.
+                Row {
+                    visible: root.style === "dots" && cell.busy > 0
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: -1
+                    spacing: 2
+                    Repeater {
+                        model: Math.min(3, cell.busy)
+                        Rectangle {
+                            width: 3
+                            height: 3
+                            radius: 1.5
+                            color: root.iso(cell.day) < backend.today ? theme.overdue : theme.muted
+                        }
+                    }
                 }
                 Text {
                     anchors.centerIn: parent

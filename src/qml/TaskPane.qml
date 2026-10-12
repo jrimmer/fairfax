@@ -67,7 +67,31 @@ Item {
             }
             Item { Layout.fillWidth: true }
             SearchBox { id: search; onFinished: root.focusList() }
-            IconButton { icon: "sort"; size: 15; tip: "Search Options (Ctrl+Shift+Alt+F)"; onClicked: root.openSearchBuilder() }
+            // the reference app's search menu: ready-made searches, and the full options.
+            IconButton {
+                id: presetsButton
+                icon: "chevronDown"
+                size: 10
+                tip: "Search Presets"
+                onClicked: presets.popup(0, presetsButton.height)
+                Menu {
+                    id: presets
+                    Repeater {
+                        model: [["Overdue", "type: overdue"], ["Due Today", "type: duetoday"], ["Due This Week", "type: duethisweek"],
+                                ["In Progress", "type: inprogress"], ["High Priority", "type: hiprio"], ["Starred", "type: starred"],
+                                ["Without Due Date", "type: nodue"], ["Repeating", "type: repeat"], ["With Alerts", "type: alarms"],
+                                ["Empty Projects and Checklists", "type: emptyproj OR emptychck"], ["Recently Completed", "completed: 7d"]]
+                        MenuItem {
+                            required property var modelData
+                            text: modelData[0]
+                            onTriggered: { backend.search = modelData[1]; root.focusList() }
+                        }
+                    }
+                    MenuSeparator {}
+                    MenuItem { text: "Search Options…\tCtrl+Shift+Alt+F"; onTriggered: root.openSearchBuilder() }
+                    MenuItem { text: backend.searchAllLists ? "Search This List Only" : "Search All Lists"; onTriggered: backend.toggleSearchScope() }
+                }
+            }
             IconButton { icon: "panel"; tip: root.utilityVisible ? "Hide Tags (Ctrl+Alt+→)" : "Show Tags (Ctrl+Alt+→)"; onClicked: root.toggleUtility() }
         }
 
