@@ -5,7 +5,7 @@ import QtQuick.Layouts
 // A small HSV colour picker for custom list colours: a saturation/value
 // square, a hue strip and a hex field. Call pick() with the starting colour;
 // `picked` fires with the chosen one.
-Dialog {
+ThemedDialog {
     id: root
 
     signal picked(color value)

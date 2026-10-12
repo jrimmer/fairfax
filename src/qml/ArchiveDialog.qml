@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // Archived lists, each with a Restore button.
-Dialog {
+ThemedDialog {
     id: root
 
     property var lists: []

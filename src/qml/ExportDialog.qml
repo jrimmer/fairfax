@@ -5,7 +5,7 @@ import QtQuick.Layouts
 // the reference app's export panel: tick the lists to write out, say which tasks (All, Not
 // Done, Done) and pick the format; the save panel follows. Main and Settings
 // each have one, so `owner` keeps them from both answering the file picker.
-Dialog {
+ThemedDialog {
     id: root
 
     property string owner: "main"
@@ -27,17 +27,6 @@ Dialog {
     title: "Export Tasks"
     width: Math.min(420, (parent ? parent.width : 460) - 40)
     standardButtons: Dialog.Cancel | Dialog.Ok
-    padding: 20
-    topPadding: 4
-    background: Rectangle { color: theme.raised; radius: 12; border.color: theme.divider }
-    header: Label {
-        text: root.title
-        padding: 20
-        bottomPadding: 8
-        color: theme.foreground
-        font.pixelSize: backend.fontSize + 4
-        font.weight: Font.DemiBold
-    }
     Component.onCompleted: standardButton(Dialog.Ok).text = "Export…"
     onAboutToShow: standardButton(Dialog.Ok).enabled = Qt.binding(() => root.count > 0)
 

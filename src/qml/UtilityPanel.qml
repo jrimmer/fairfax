@@ -499,7 +499,7 @@ Rectangle {
         }
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: nameDialog
@@ -524,7 +524,7 @@ Rectangle {
         }
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirm
@@ -546,7 +546,7 @@ Rectangle {
         onAccepted: confirm.kind === "tag" ? backend.deleteTag(targetId) : backend.deleteTagGroup(targetId)
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: locDialog

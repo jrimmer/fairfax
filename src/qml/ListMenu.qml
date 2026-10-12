@@ -57,7 +57,7 @@ Menu {
         onTriggered: backend.setListSyncExcluded(root.listId, !root.info.syncExcluded)
     }
 
-    Dialog {
+    ThemedDialog {
         id: confirmTasks
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         parent: Overlay.overlay
@@ -69,7 +69,7 @@ Menu {
         onAccepted: backend.deleteAllTasks(root.listId)
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirm

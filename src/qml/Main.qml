@@ -98,7 +98,7 @@ ApplicationWindow {
         target: backend
         function onDoneWarningRequested() { if (win.active) doneWarning.open() }
     }
-    Dialog {
+    ThemedDialog {
         id: doneWarning
         parent: Overlay.overlay
         anchors.centerIn: parent

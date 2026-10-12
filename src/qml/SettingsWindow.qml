@@ -799,7 +799,7 @@ Window {
         }
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmInbox
@@ -811,7 +811,7 @@ Window {
         onAccepted: backend.setInboxEnabled(false)
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmRestore
@@ -824,7 +824,7 @@ Window {
         onAccepted: backend.restoreBackup(path)
     }
 
-    Dialog {
+    ThemedDialog {
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmDelete
         property string path
@@ -838,7 +838,7 @@ Window {
 
     // Restore Selected Lists: pick lists out of a backup and add them, with
     // their tasks, as new records in a "Restored" group. Nothing is replaced.
-    Dialog {
+    ThemedDialog {
         id: restoreLists
         property string path
         property string date

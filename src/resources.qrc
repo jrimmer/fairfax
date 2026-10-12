@@ -12,6 +12,7 @@
         <file>qml/EditListDialog.qml</file>
         <file>qml/EditorCard.qml</file>
         <file>qml/ExportDialog.qml</file>
+        <file>qml/ThemedDialog.qml</file>
         <file>qml/FocusButton.qml</file>
         <file>qml/IconButton.qml</file>
         <file>qml/Icon.qml</file>

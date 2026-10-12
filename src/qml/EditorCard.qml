@@ -608,7 +608,7 @@ Item {
         }
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: actionDialog
@@ -638,7 +638,7 @@ Item {
         MenuItem { text: "Message"; checkable: true; checked: !alarmStyleMenu.sound; onTriggered: backend.setAlarmSound(alarmStyleMenu.alarmId, false) }
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: daysBeforeAlarm
@@ -657,7 +657,7 @@ Item {
         onAccepted: backend.addDaysBeforeAlarm(root.e.id, daysBox.value, minutes)
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: absoluteAlarm
@@ -676,7 +676,7 @@ Item {
         onAccepted: backend.addAbsoluteAlarm(root.e.id, iso, minutes)
     }
 
-    Dialog {
+    ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: newLocation
