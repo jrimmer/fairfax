@@ -143,6 +143,18 @@ list has focus. Press `?` in the app for the full list.
 | `?` | All shortcuts |
 | `q` / `Ctrl+Q` | Quit |
 
+## Moving in
+
+- **From TickTick:** in TickTick's web app, Settings → Account → Generate Backup. Then in
+  Precrime, Settings → Import & Export → From TickTick…, or from a terminal:
+  `precrime import ~/Downloads/TickTick-backup-*.csv`. Lists, folders, tags, dates (in each
+  task's time zone), repeats, reminders, priorities, checklists, sub-tasks and completed
+  history come across, and importing the same backup again adds only what's new.
+- **From the reference app:** `precrime import tasks.db` (or a `.taskdb` backup).
+- **From anything with iCalendar export:** `precrime import tasks.ics`.
+
+Every import is one step that Ctrl+Z undoes, and a backup is taken first.
+
 ## Automation
 
 Everything the reference app's Automation Suite offers is available outside the window too:

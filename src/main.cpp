@@ -85,12 +85,12 @@ int runHeadless(int argc, char *argv[]) {
         // precrime import FILE: a the reference app database or .taskdb backup, or .ics.
         const QString file = args.value(2);
         if (file.isEmpty()) {
-            err << "usage: precrime import <tasks.db | backup.taskdb | tasks.ics> [--db PATH]" << Qt::endl;
+            err << "usage: precrime import <tasks.db | backup.taskdb | tasks.ics | TickTick-backup.csv> [--db PATH]" << Qt::endl;
             return 2;
         }
-        const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive)
-                                   ? Exchange::importIcs(store, file, 0)
-                                   : Exchange::importTwoDo(store, file);
+        const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive) ? Exchange::importIcs(store, file, 0)
+                               : Exchange::isTickTickBackup(file)          ? Exchange::importTickTick(store, file)
+                                                                           : Exchange::importTwoDo(store, file);
         if (!r.error.isEmpty()) {
             err << "precrime: import failed: " << r.error << Qt::endl;
             return 1;

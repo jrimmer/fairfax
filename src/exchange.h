@@ -35,6 +35,17 @@ bool exportIcs(const Store &store, const QString &path, const QList<qint64> &tas
 // without a list go to `fallbackListId`.
 ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId);
 
+// Imports a TickTick backup (Settings > Account > Generate Backup, a CSV)
+// as one undoable change: folders become list groups, lists become lists
+// (Inbox into the Inbox when there is one), checklists keep their items, and
+// dates are read in each task's own time zone so all-day tasks keep their day.
+// Each task keeps its TickTick id in its uid, so importing the same backup
+// again skips what is already here.
+ImportResult importTickTick(Store &store, const QString &path);
+
+// True when `path` looks like a TickTick backup CSV.
+bool isTickTickBackup(const QString &path);
+
 // Imports a the reference app database (tasks.db, or a .taskdb backup, which is the same
 // SQLite file) as one undoable change, skipping the reference app's built-in focus lists.
 ImportResult importTwoDo(Store &store, const QString &path);

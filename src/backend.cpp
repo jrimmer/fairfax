@@ -2313,8 +2313,9 @@ void Backend::exportTo(const QString &path, const QString &format, bool selectio
 
 void Backend::importFrom(const QString &path, const QString &format) {
     backupNow("before-import");
-    const ImportResult r = format == "taskapp" ? Exchange::importTwoDo(*m_store, path)
-                                           : Exchange::importIcs(*m_store, path, defaultListId());
+    const ImportResult r = format == "taskapp"        ? Exchange::importTwoDo(*m_store, path)
+                         : format == "ticktick" ? Exchange::importTickTick(*m_store, path)
+                                                : Exchange::importIcs(*m_store, path, defaultListId());
     if (!r.error.isEmpty()) {
         setStatus("Import failed: " + r.error);
         return;

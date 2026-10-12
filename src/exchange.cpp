@@ -1,4 +1,5 @@
 #include "exchange.h"
+#include <QRegularExpression>
 
 #include <QFile>
 #include <QMap>
@@ -1161,3 +1162,364 @@ ImportResult importTwoDo(Store &store, const QString &path) {
 }
 
 }  // namespace Exchange
+
+// ------------------------------------------------------------- TickTick
+
+namespace {
+
+// RFC 4180 rows, with quoted fields that may span lines.
+QList<QStringList> parseCsv(const QString &text) {
+    QList<QStringList> rows;
+    QStringList row;
+    QString field;
+    bool quoted = false;
+    for (int i = 0; i < text.size(); ++i) {
+        const QChar c = text.at(i);
+        if (quoted) {
+            if (c == '"' && i + 1 < text.size() && text.at(i + 1) == '"') {
+                field += '"';
+                ++i;
+            } else if (c == '"') {
+                quoted = false;
+            } else {
+                field += c;
+            }
+        } else if (c == '"') {
+            quoted = true;
+        } else if (c == ',') {
+            row << field;
+            field.clear();
+        } else if (c == '\n' || c == '\r') {
+            if (c == '\r' && i + 1 < text.size() && text.at(i + 1) == '\n')
+                ++i;
+            row << field;
+            field.clear();
+            rows << row;
+            row.clear();
+        } else {
+            field += c;
+        }
+    }
+    if (!field.isEmpty() || !row.isEmpty()) {
+        row << field;
+        rows << row;
+    }
+    return rows;
+}
+
+// TickTick writes instants in UTC ("2025-07-01T07:00:00+0000"); an all-day
+// task is local midnight in its own time zone, so the day must be read there.
+QDateTime tickTickInstant(const QString &text) {
+    if (text.isEmpty())
+        return {};
+    QDateTime t = QDateTime::fromString(text.left(19), "yyyy-MM-ddTHH:mm:ss");
+    if (!t.isValid())
+        return {};
+    t.setTimeZone(QTimeZone::utc());
+    return t;
+}
+
+// "PT0S", "-P0DT15H0M0S", "-PT30M": the reminder's offset from the task's
+// time, in minutes before it (positive) or after (negative).
+int tickTickReminderMinutesBefore(const QString &trigger, bool *ok) {
+    static const QRegularExpression re(R"(^(-)?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$)");
+    const auto m = re.match(trigger.trimmed());
+    *ok = m.hasMatch();
+    if (!*ok)
+        return 0;
+    const int minutes = m.captured(2).toInt() * 7 * 1440 + m.captured(3).toInt() * 1440 + m.captured(4).toInt() * 60 +
+                        m.captured(5).toInt() + m.captured(6).toInt() / 60;
+    return m.captured(1) == "-" ? minutes : -minutes;
+}
+
+}  // namespace
+
+namespace Exchange {
+
+bool isTickTickBackup(const QString &path) {
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    const QString head = QString::fromUtf8(f.read(4096));
+    return head.contains("\"Folder Name\",\"List Name\",\"Title\"");
+}
+
+ImportResult importTickTick(Store &store, const QString &path) {
+    ImportResult result;
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        result.error = QStringLiteral("Can't read %1.").arg(path);
+        return result;
+    }
+    QString text = QString::fromUtf8(f.readAll());
+    if (text.startsWith(QChar(0xFEFF)))
+        text.remove(0, 1);
+    const int headerAt = text.indexOf("\"Folder Name\",\"List Name\"");
+    if (headerAt < 0) {
+        result.error = "This doesn't look like a TickTick backup (no task header row).";
+        return result;
+    }
+    const QList<QStringList> rows = parseCsv(text.mid(headerAt));
+    if (rows.size() < 2) {
+        result.error = "The TickTick backup has no tasks.";
+        return result;
+    }
+    const QStringList header = rows.first();
+    auto col = [&](const QStringList &row, const char *name) {
+        const int i = header.indexOf(QString::fromLatin1(name));
+        return i >= 0 && i < row.size() ? row.at(i) : QString();
+    };
+
+    // Rows without a time zone are read in the zone most of the file uses.
+    QHash<QString, int> zoneCounts;
+    for (int i = 1; i < rows.size(); ++i)
+        if (!col(rows.at(i), "Timezone").isEmpty())
+            zoneCounts[col(rows.at(i), "Timezone")]++;
+    QString commonZone;
+    for (auto it = zoneCounts.cbegin(); it != zoneCounts.cend(); ++it)
+        if (commonZone.isEmpty() || it.value() > zoneCounts.value(commonZone))
+            commonZone = it.key();
+
+    QSet<QString> existingUids;
+    for (const auto &t : store.tasks())
+        existingUids.insert(t.uid);
+
+    store.begin("Import from TickTick");
+
+    auto groupFor = [&](const QString &name) -> qint64 {
+        if (name.trimmed().isEmpty())
+            return 0;
+        for (const auto &g : store.groups())
+            if (!g.deleted && g.name.compare(name.trimmed(), Qt::CaseInsensitive) == 0)
+                return g.id;
+        ListGroup g;
+        g.id = store.nextId("list_groups");
+        g.name = name.trimmed();
+        g.order = g.id;
+        store.putGroup(g);
+        return g.id;
+    };
+    QHash<QString, qint64> listIds;
+    auto listFor = [&](const QString &folder, const QString &rawName) -> qint64 {
+        const QString name = rawName.trimmed().isEmpty() ? QStringLiteral("Inbox") : rawName.trimmed();
+        const QString key = folder + "\n" + name.toLower();
+        if (listIds.contains(key))
+            return listIds.value(key);
+        qint64 id = 0;
+        for (const auto &l : store.lists()) {
+            if (l.deleted || l.kind == ListKind::Smart)
+                continue;
+            const bool inboxMatch = name.compare("Inbox", Qt::CaseInsensitive) == 0 && l.kind == ListKind::Inbox;
+            if (inboxMatch || l.name.compare(name, Qt::CaseInsensitive) == 0) {
+                id = l.id;
+                break;
+            }
+        }
+        if (!id) {
+            TaskList l;
+            l.id = store.nextId("lists");
+            l.name = name;
+            l.groupId = groupFor(folder);
+            l.color = int(store.lists().size()) % 13;
+            l.order = l.id;
+            store.putList(l);
+            id = l.id;
+            ++result.lists;
+        }
+        listIds.insert(key, id);
+        return id;
+    };
+    QHash<QString, qint64> tagIds;
+    auto tagFor = [&](const QString &raw) -> qint64 {
+        const QString name = QString(raw).remove(QRegularExpression("^#")).trimmed();
+        if (name.isEmpty())
+            return 0;
+        if (tagIds.contains(name.toLower()))
+            return tagIds.value(name.toLower());
+        qint64 id = 0;
+        for (const auto &t : store.tags())
+            if (!t.deleted && t.name.compare(name, Qt::CaseInsensitive) == 0)
+                id = t.id;
+        if (!id) {
+            Tag t;
+            t.id = store.nextId("tags");
+            t.name = name;
+            store.putTag(t);
+            id = t.id;
+            ++result.tags;
+        }
+        tagIds.insert(name.toLower(), id);
+        return id;
+    };
+
+    QHash<QString, qint64> byTickTickId;
+    QHash<qint64, QString> parentOf;
+    for (int i = 1; i < rows.size(); ++i) {
+        const QStringList &row = rows.at(i);
+        const QString title = col(row, "Title");
+        const QString tickId = col(row, "taskId");
+        if (title.trimmed().isEmpty() && col(row, "Content").trimmed().isEmpty())
+            continue;
+        const QString uid = "TICKTICK-" + (tickId.isEmpty() ? QString::number(i) : tickId);
+        if (existingUids.contains(uid))
+            continue;  // Imported before.
+
+        Task t;
+        t.id = store.nextId("tasks");
+        t.uid = uid;
+        t.listId = listFor(col(row, "Folder Name"), col(row, "List Name"));
+        t.title = title.trimmed().isEmpty() ? QStringLiteral("Untitled") : title.trimmed().left(1000);
+        const QString status = col(row, "Status").trimmed();
+
+        const QTimeZone zone(col(row, "Timezone").isEmpty() ? commonZone.toUtf8() : col(row, "Timezone").toUtf8());
+        const bool allDay = col(row, "Is All Day") != "false";
+        auto local = [&](const QString &text) {
+            const QDateTime utc = tickTickInstant(text);
+            if (!utc.isValid())
+                return QDateTime();
+            return zone.isValid() ? utc.toTimeZone(zone) : utc.toLocalTime();
+        };
+        const QDateTime due = local(col(row, "Due Date"));
+        const QDateTime start = local(col(row, "Start Date"));
+        if (due.isValid()) {
+            t.dueDate = due.date();
+            if (!allDay)
+                t.dueTime = due.time().hour() * 60 + due.time().minute();
+        }
+        // TickTick gives single-date tasks the same start and due; only a
+        // real span becomes a start date.
+        if (start.isValid() && (!due.isValid() || start < due)) {
+            t.startDate = start.date();
+            if (!allDay && start.date() != due.date())
+                t.startTime = start.time().hour() * 60 + start.time().minute();
+            if (!due.isValid()) {
+                t.startDate = start.date();
+                if (!allDay)
+                    t.startTime = start.time().hour() * 60 + start.time().minute();
+            }
+        }
+        if (!t.dueDate.isValid() && start.isValid() && !t.startDate.isValid()) {
+            t.dueDate = start.date();
+            if (!allDay)
+                t.dueTime = start.time().hour() * 60 + start.time().minute();
+        }
+
+        // TickTick priorities: 0 none, 1 low, 3 medium, 5 high.
+        const int priority = col(row, "Priority").toInt();
+        t.priority = priority >= 5 ? Priority::High : priority >= 3 ? Priority::Medium : priority >= 1 ? Priority::Low : Priority::None;
+
+        const QString repeat = col(row, "Repeat").trimmed();
+        if (!repeat.isEmpty()) {
+            t.recurrence = parseRrule(repeat.startsWith("RRULE:") ? repeat.mid(6) : repeat);
+            if (t.recurrence.isSet() && !t.dueDate.isValid() && !t.startDate.isValid())
+                t.dueDate = QDate::currentDate();
+        }
+
+        const QDateTime created = tickTickInstant(col(row, "Created Time"));
+        if (created.isValid())
+            t.created = created.toLocalTime();
+        if (status == "2" || status == "-1") {
+            t.completed = true;
+            const QDateTime done = tickTickInstant(col(row, "Completed Time"));
+            t.completedAt = done.isValid() ? done.toLocalTime() : (created.isValid() ? created.toLocalTime() : QDateTime::currentDateTime());
+            if (status == "-1")
+                t.tagIds.append(tagFor("abandoned"));  // TickTick's "Won't Do".
+        }
+        for (const auto &name : col(row, "Tags").split(QRegularExpression("[,，]"), Qt::SkipEmptyParts))
+            if (const qint64 id = tagFor(name); id && !t.tagIds.contains(id))
+                t.tagIds.append(id);
+        t.order = col(row, "Order").toDouble();
+
+        // A checklist's items are packed into its content: "▫" open, "▪" done.
+        const QString content = col(row, "Content");
+        QList<QPair<QString, bool>> items;
+        if (col(row, "Kind") == "CHECKLIST" || col(row, "Is Check list") == "Y") {
+            t.type = TaskType::Checklist;
+            QString notes;
+            QString current;
+            int state = -1;  // -1 before the first marker (description text).
+            for (const QChar c : content) {
+                if (c == QChar(0x25AB) || c == QChar(0x25AA)) {
+                    if (state >= 0 && !current.trimmed().isEmpty())
+                        items.append({current.trimmed(), state == 1});
+                    else if (state < 0)
+                        notes = current.trimmed();
+                    current.clear();
+                    state = c == QChar(0x25AA) ? 1 : 0;
+                } else {
+                    current += c;
+                }
+            }
+            if (state >= 0 && !current.trimmed().isEmpty())
+                items.append({current.trimmed(), state == 1});
+            else if (state < 0)
+                notes = current.trimmed();
+            t.notes = notes;
+        } else {
+            t.notes = content;
+        }
+
+        // Reminders: relative to a timed task's due time; for an all-day
+        // task, relative to the start of its day, so they become fixed times.
+        for (const auto &trigger : col(row, "Reminder").split(',', Qt::SkipEmptyParts)) {
+            bool ok = false;
+            const int before = tickTickReminderMinutesBefore(trigger, &ok);
+            if (!ok || !t.dueDate.isValid() || t.completed)
+                continue;
+            Alarm a;
+            a.id = store.nextId("alarms");
+            a.taskId = t.id;
+            if (allDay) {
+                a.kind = Alarm::Absolute;
+                a.at = QDateTime(t.dueDate, QTime(0, 0)).addSecs(-qint64(before) * 60);
+            } else {
+                a.offset = before;
+            }
+            store.putAlarm(a);
+            ++result.alarms;
+        }
+
+        store.putTask(t);
+        ++result.tasks;
+        if (!tickId.isEmpty())
+            byTickTickId.insert(tickId, t.id);
+        if (!col(row, "parentId").isEmpty())
+            parentOf.insert(t.id, col(row, "parentId"));
+
+        int order = 0;
+        for (const auto &[itemTitle, done] : items) {
+            Task item;
+            item.id = store.nextId("tasks");
+            item.listId = t.listId;
+            item.parentId = t.id;
+            item.title = itemTitle.left(1000);
+            item.completed = done || t.completed;
+            if (item.completed)
+                item.completedAt = t.completedAt.isValid() ? t.completedAt : QDateTime::currentDateTime();
+            item.order = ++order;
+            store.putTask(item);
+        }
+    }
+
+    // Sub-tasks point at their parent by TickTick id; link them once every
+    // task exists. A parent with sub-tasks becomes a project.
+    for (auto it = parentOf.cbegin(); it != parentOf.cend(); ++it) {
+        const qint64 parentId = byTickTickId.value(it.value(), 0);
+        if (!parentId || parentId == it.key())
+            continue;
+        Task child = store.task(it.key());
+        Task parent = store.task(parentId);
+        child.parentId = parentId;
+        child.listId = parent.listId;
+        store.putTask(child);
+        if (parent.type == TaskType::Task) {
+            parent.type = TaskType::Project;
+            store.putTask(parent);
+        }
+    }
+    store.commit();
+    return result;
+}
+
+}  // namespace Exchange
+

@@ -41,6 +41,7 @@ Window {
             else if (purpose === "export-ics") backend.exportTo(path, "ics")
             else if (purpose === "import-ics") backend.importFrom(path, "ics")
             else if (purpose === "import-taskdb") backend.importFrom(path, "taskapp")
+            else if (purpose === "import-ticktick") backend.importFrom(path, "ticktick")
             else if (purpose === "restore") backend.restoreBackup(path)
         }
         function onFailed(message) { status.text = message }
@@ -324,9 +325,11 @@ Window {
                     }
                     Label { text: "Import"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
+                        Button { text: "From TickTick…"; onClicked: filePicker.open("Choose a TickTick backup (.csv)", "import-ticktick") }
                         Button { text: "From the reference app…"; onClicked: filePicker.open("Choose a the reference app database (tasks.db or a .taskdb backup)", "import-taskdb") }
                         Button { text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
                     }
+                    Hint { text: "From TickTick: in TickTick's web app, Settings → Account → Generate Backup, then choose the .csv here. Lists, tags, dates, repeats, reminders, checklists and completed history come across; importing the same backup again adds only what's new." }
                     Hint { text: "From the reference app: on the Mac, use a backup from the reference app > Settings > Backups (a .taskdb file). Lists, groups, tags, dates, repeats and alerts come across; one Ctrl+Z undoes the whole import, and a backup is made first." }
                 }
 
