@@ -143,6 +143,7 @@ QVariantMap TaskList::toMap() const {
         {"show_in_done", showInDone},
         {"archived", archived},
         {"smart_query", smartQuery},
+        {"smart_range", smartRange},
         {"modified", stampValue(modified)},
         {"deleted", deleted},
     };
@@ -165,6 +166,7 @@ TaskList TaskList::fromMap(const QVariantMap &m) {
     l.showInDone = m.value("show_in_done", true).toBool();
     l.archived = m.value("archived").toBool();
     l.smartQuery = m.value("smart_query").toString();
+    l.smartRange = m.value("smart_range").toString();
     l.modified = stampFrom(m.value("modified"));
     l.deleted = m.value("deleted").toBool();
     return l;

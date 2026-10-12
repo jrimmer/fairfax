@@ -47,6 +47,7 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList focusConditions READ focusConditions NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsSmart READ sourceIsSmart NOTIFY viewChanged)
     Q_PROPERTY(QString smartQuery READ smartQuery NOTIFY viewChanged)
+    Q_PROPERTY(QString smartRangeText READ smartRangeText NOTIFY viewChanged)
     Q_PROPERTY(QVariantList tagFilter READ tagFilter NOTIFY viewChanged)
     Q_PROPERTY(QString dayFilter READ dayFilter NOTIFY viewChanged)
     Q_PROPERTY(QString selectionSummary READ selectionSummary NOTIFY selectionChanged)
@@ -99,6 +100,7 @@ public:
     QStringList focusConditions() const;
     bool sourceIsSmart() const;
     QString smartQuery() const;
+    QString smartRangeText() const;
     QVariantList tagFilter() const;
     QString dayFilter() const;
     QString selectionSummary() const;

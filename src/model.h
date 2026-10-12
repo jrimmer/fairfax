@@ -130,6 +130,10 @@ struct TaskList {
     bool showInDone = true;
     bool archived = false;
     QString smartQuery;
+    // A Smart List's date filter, after the reference app's Search Options: "" (none),
+    // "next:N:unit" with unit d/w/m/y ("In the next 3 days"),
+    // "fixed:yyyy-MM-dd:yyyy-MM-dd", or "nodue".
+    QString smartRange;
     QDateTime modified;
     bool deleted = false;
 

@@ -89,6 +89,7 @@ public:
 
     bool isPaused(const Task &task) const;
     bool isSmartList(qint64 listId) const;
+    bool inSmartRange(const Task &task, const QString &range) const;
     static bool matchesFocusCondition(const Task &task, const QString &condition, const QDateTime &now,
                                       const ScheduleSettings &settings);
     bool listVisible(qint64 listId) const;

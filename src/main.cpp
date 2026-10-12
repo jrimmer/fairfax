@@ -25,6 +25,7 @@
 #include "alarms.h"
 #include "automation.h"
 #include "calendar.h"
+#include "exchange.h"
 #include "markdown.h"
 #include "selftest.h"
 #include "sounds.h"
@@ -80,6 +81,23 @@ int runHeadless(int argc, char *argv[]) {
         out << QJsonDocument(json).toJson(QJsonDocument::Compact) << Qt::endl;
         return 0;
     }
+    if (mode == "import") {
+        // precrime import FILE: a the reference app database or .taskdb backup, or .ics.
+        const QString file = args.value(2);
+        if (file.isEmpty()) {
+            err << "usage: precrime import <tasks.db | backup.taskdb | tasks.ics> [--db PATH]" << Qt::endl;
+            return 2;
+        }
+        const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive)
+                                   ? Exchange::importIcs(store, file, 0)
+                                   : Exchange::importTwoDo(store, file);
+        if (!r.error.isEmpty()) {
+            err << "precrime: import failed: " << r.error << Qt::endl;
+            return 1;
+        }
+        out << QStringLiteral("Imported %1 lists, %2 tasks, %3 tags, %4 alerts.").arg(r.lists).arg(r.tasks).arg(r.tags).arg(r.alarms) << Qt::endl;
+        return 0;
+    }
     Automation automation(store);
     int status = 0;
     if (mode == "mcp") {
@@ -97,7 +115,7 @@ int runHeadless(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
     {
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
-        if (first == "mcp" || first == "ctl" || first == "--waybar")
+        if (first == "mcp" || first == "ctl" || first == "--waybar" || first == "import")
             return runHeadless(argc, argv);
     }
 

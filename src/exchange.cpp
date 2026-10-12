@@ -603,6 +603,11 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
     // List groups.
     QHash<QString, qint64> groupByUid;
     if (!rows("calgroups", "COALESCE(isdeleted,0)=0", "displayorder", [&](const Row &r) {
+            // the reference app's sidebar sections (FOCUS, LISTS, SMART LISTS, …) are rows
+            // here too, with uids like AppCalGroupFocus and grouptype 2–4;
+            // only the user's own groups become list groups.
+            if (r.str("uid").startsWith("AppCalGroup") || (r.num("grouptype") >= 2 && r.num("grouptype") <= 5))
+                return;
             ListGroup g;
             g.id = store.nextId("list_groups");
             g.name = r.str("groupname");
@@ -637,7 +642,25 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
                 l.name = inbox ? QStringLiteral("Inbox") : QStringLiteral("Untitled");
             const QString smart = r.str("smartsearch");
             l.kind = inbox ? ListKind::Inbox : (!smart.isEmpty() ? ListKind::Smart : ListKind::Normal);
-            l.smartQuery = smart;
+            // "*" is the reference app's match-everything search, used with a date range.
+            l.smartQuery = smart.trimmed() == "*" ? QString() : smart;
+            if (l.kind == ListKind::Smart) {
+                // the reference app's date filter: small numbers are a Dynamic Range (N, unit
+                // 1 days … 4 years, as in its "Next 3 Days" preset: 3, 1);
+                // large ones are a fixed range of timestamps.
+                const double from = r.dbl("smartrangefrom", 0), to = r.dbl("smartrangeto", 0);
+                if (from > 0 && from < 10000 && to >= 1 && to <= 4)
+                    l.smartRange = QStringLiteral("next:%1:%2").arg(int(from)).arg(QString("dwmy").at(int(to) - 1));
+                else if (from > 100000 && to > 100000)
+                    l.smartRange = QStringLiteral("fixed:%1:%2")
+                                       .arg(QDateTime::fromSecsSinceEpoch(qint64(from), QTimeZone::UTC).date().toString(Qt::ISODate),
+                                            QDateTime::fromSecsSinceEpoch(qint64(to), QTimeZone::UTC).date().toString(Qt::ISODate));
+            }
+            // the reference app's list sorts as seen in a real database: 1 due date,
+            // 11 start date, 8 completion; anything else falls back to due date.
+            const int sort = int(r.num("tasksortfield", 1));
+            l.sortField = sort == 11 ? SortField::StartDate : sort == 8 ? SortField::Completion : SortField::DueDate;
+            l.sortAscending = r.num("tasksortorder", 0) == 0;
             l.color = int(qAbs(r.num("colorid")) % 13);
             l.order = r.dbl("displayorder", l.id);
             l.groupId = groupByUid.value(r.str("parentuid"), 0);

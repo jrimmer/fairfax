@@ -92,6 +92,30 @@ bool ViewBuilder::listVisible(qint64 listId) const {
     return it != m_store.lists().cend() && !it->deleted && !it->archived && it->kind != ListKind::Smart;
 }
 
+bool ViewBuilder::inSmartRange(const Task &t, const QString &range) const {
+    if (range.isEmpty())
+        return true;
+    const QStringList parts = range.split(':');
+    if (parts.value(0) == "nodue")
+        return !t.dueDate.isValid();
+    if (!t.dueDate.isValid())
+        return false;
+    if (parts.value(0) == "next") {
+        // "In the next N days/weeks/months/years", from today, overdue excluded.
+        const int n = qMax(1, parts.value(1).toInt());
+        const QString unit = parts.value(2);
+        const QDate end = unit == "w" ? m_today.addDays(7 * n) : unit == "m" ? m_today.addMonths(n)
+                        : unit == "y" ? m_today.addYears(n) : m_today.addDays(n);
+        return t.dueDate >= m_today && t.dueDate < end;
+    }
+    if (parts.value(0) == "fixed") {
+        const QDate from = QDate::fromString(parts.value(1), Qt::ISODate);
+        const QDate to = QDate::fromString(parts.value(2), Qt::ISODate);
+        return (!from.isValid() || t.dueDate >= from) && (!to.isValid() || t.dueDate <= to);
+    }
+    return true;
+}
+
 bool ViewBuilder::isSmartList(qint64 listId) const {
     const auto it = m_store.lists().constFind(listId);
     return it != m_store.lists().cend() && !it->deleted && it->kind == ListKind::Smart;
@@ -427,7 +451,7 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         if (smart) {
             if (t.parentId && m_store.task(t.parentId).type != TaskType::Project)
                 continue;
-            if (!passesFilters(t, source, o, &saved))
+            if (!passesFilters(t, source, o, &saved) || !inSmartRange(t, m_store.list(source.id).smartRange))
                 continue;
         } else if (source.isFocus()) {
             // Checklist items and a task's own sub-tasks never surface on

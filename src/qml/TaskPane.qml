@@ -160,6 +160,12 @@ Item {
                 font.pixelSize: backend.fontSize - 2
                 elide: Text.ElideRight
             }
+            Text {
+                visible: backend.smartRangeText !== ""
+                text: backend.smartRangeText
+                color: theme.today
+                font.pixelSize: backend.fontSize - 2
+            }
             CheckBox {
                 text: "Sounds like"
                 checked: backend.soundex

@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 4;
+constexpr int SchemaVersion = 5;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -193,6 +193,11 @@ bool Store::migrate(QString *error) {
             %1))").arg(SyncColumns),
     };
 
+    // Version 5 gives Smart Lists a date range.
+    const QStringList version5{
+        QStringLiteral("ALTER TABLE lists ADD COLUMN smart_range TEXT NOT NULL DEFAULT ''"),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -202,6 +207,8 @@ bool Store::migrate(QString *error) {
         steps += version3;
     if (version < 4)
         steps += version4;
+    if (version < 5)
+        steps += version5;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();

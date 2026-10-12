@@ -2158,6 +2158,22 @@ bool Backend::sourceIsSmart() const {
 
 QString Backend::smartQuery() const { return sourceIsSmart() ? m_store->list(m_source.id).smartQuery : QString(); }
 
+QString Backend::smartRangeText() const {
+    if (!sourceIsSmart())
+        return {};
+    const QStringList parts = m_store->list(m_source.id).smartRange.split(':');
+    if (parts.value(0) == "nodue")
+        return QStringLiteral("Without due date");
+    if (parts.value(0) == "next") {
+        const int n = parts.value(1).toInt();
+        static const QHash<QString, QString> units{{"d", "day"}, {"w", "week"}, {"m", "month"}, {"y", "year"}};
+        return QStringLiteral("In the next %1 %2%3").arg(n).arg(units.value(parts.value(2), "day")).arg(n == 1 ? "" : "s");
+    }
+    if (parts.value(0) == "fixed")
+        return QStringLiteral("Due %1 – %2").arg(parts.value(1), parts.value(2));
+    return {};
+}
+
 void Backend::setSoundex(bool on) {
     m_options.soundex = on;
     rebuild();
