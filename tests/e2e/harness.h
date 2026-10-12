@@ -129,6 +129,24 @@ inline QQuickItem *findText(const QString &text, const char *type = nullptr) {
     return nullptr;
 }
 
+// A non-visual object (a Popup or Dialog) by objectName: they hang off the
+// QObject tree of whichever item declares them, which a Loader may have
+// reparented, so look through every visible item's own children.
+inline QObject *findObject(const QString &name) {
+    for (QQuickWindow *w : quickWindows()) {
+        if (QObject *o = w->findChild<QObject *>(name))
+            return o;
+        QObject *found = nullptr;
+        findIn(w->contentItem(), [&](QQuickItem *i) {
+            found = i->findChild<QObject *>(name, Qt::FindDirectChildrenOnly);
+            return found != nullptr;
+        }, false);
+        if (found)
+            return found;
+    }
+    return nullptr;
+}
+
 inline QQuickWindow *windowTitled(const QString &part) {
     for (QQuickWindow *w : quickWindows())
         if (w->title().contains(part))
@@ -270,6 +288,19 @@ public:
             if (!t.deleted && t.title == title)
                 return t;
         return {};
+    }
+    // What has keyboard focus, for failure messages.
+    QString focusDescription() const {
+        QQuickItem *f = window->activeFocusItem();
+        return f ? className(f) + " \"" + f->objectName() + "\"" : QString("nothing");
+    }
+    // Every live title, for failure messages.
+    QString titles() const {
+        QStringList out;
+        for (const Task &t : m_store.tasks())
+            if (!t.deleted)
+                out << t.title;
+        return out.join(" | ");
     }
     QQuickItem *row(qint64 id) const { return findItem(QString("taskRow:%1").arg(id)); }
     QQuickItem *sidebarRow(const QString &sourceKey) const { return findItem("sidebarRow:" + sourceKey); }
