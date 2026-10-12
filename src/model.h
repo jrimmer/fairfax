@@ -44,6 +44,7 @@ enum {
     Manual = 8,
     Tag = 9,
     Completion = 10,
+    Status = 11,
 };
 }
 

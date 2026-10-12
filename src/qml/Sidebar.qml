@@ -508,11 +508,11 @@ Rectangle {
                 anchors.rightMargin: 18
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 3
-                Text {
+                RollingNumber {
                     visible: (item.row.overdue || 0) > 0
-                    text: item.row.overdue > 999 ? "999+" : item.row.overdue || ""
+                    value: item.row.overdue || 0
                     color: theme.overdue
-                    font.pixelSize: backend.fontSize - 2
+                    pixelSize: backend.fontSize - 2
                 }
                 Text {
                     visible: (item.row.overdue || 0) > 0 && (item.row.undone || 0) > 0
@@ -520,11 +520,11 @@ Rectangle {
                     color: theme.faint
                     font.pixelSize: backend.fontSize - 2
                 }
-                Text {
+                RollingNumber {
                     visible: (item.row.undone || 0) > 0
-                    text: item.row.undone > 999 ? "999+" : item.row.undone || ""
+                    value: item.row.undone || 0
                     color: theme.muted
-                    font.pixelSize: backend.fontSize - 2
+                    pixelSize: backend.fontSize - 2
                 }
             }
 

@@ -60,6 +60,7 @@ ApplicationWindow {
             onToggleUtility: win.utilityShown = !win.utilityVisible
             onCommand: (kind) => win.openCommand(kind)
             onQuickLook: quickLook.toggle()
+            onTagSearch: { if (!win.utilityVisible) win.utilityShown = true; utility.focusSearch() }
             onHelp: help.toggle()
         }
 
@@ -78,9 +79,19 @@ ApplicationWindow {
     QuickEntry { id: quickEntry }
     SettingsWindow { id: settings }
 
+    // Files picked for a task's attachments.
+    Connections {
+        target: filePicker
+        function onPicked(path, purpose) {
+            if (purpose.startsWith("attach:"))
+                backend.dropFiles(Number(purpose.slice(7)), ["file://" + path])
+        }
+    }
+
     Connections {
         target: backend
         function onQuickEntryRequested() { quickEntry.summon() }
+        function onQuickEntryTextRequested(text) { quickEntry.summon(); quickEntry.prefill(text) }
         function onWindowRequested() { win.show(); win.raise(); win.requestActivate() }
     }
     QuickLook { id: quickLook; onClosed: win.focusList() }
@@ -180,6 +191,9 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+;"; onActivated: win.openCommand("repeat") }
     AppShortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
     AppShortcut { sequence: "Ctrl+Shift+2"; onActivated: quickEntry.summon() }
+    AppShortcut { sequence: "Shift+F5"; onActivated: backend.showLastSelected() }
+    AppShortcut { sequence: "Ctrl+Alt+F"; onActivated: backend.toggleSearchScope() }
+    AppShortcut { sequence: "Ctrl+Alt+W"; onActivated: backend.requestNewWindow() }
     AppShortcut { sequence: "Ctrl+S"; onActivated: if (gitSync && gitSync.configured) gitSync.syncNow() }
     AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
     AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }

@@ -23,7 +23,7 @@ namespace {
 const QLocale English(QLocale::English, QLocale::UnitedKingdom);
 
 const QStringList TaskRoles{
-    "hasAlarm", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
+    "hasAlarm", "hasLocation", "hasAttachment", "pictureUrl", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
     "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
@@ -94,9 +94,8 @@ SortSpec Backend::sortSpec() const {
         return {l.sortField, l.sortAscending, l.separated};
     }
     if (m_source.kind == Source::Project) {
-        spec.field = SortField::Manual;
-        spec.separated = false;
-        return spec;
+        ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+        return views.projectSort(m_source.id);
     }
     const QString prefix = "sort." + m_source.key() + ".";
     const int fallback = m_source.kind == Source::Scheduled ? SortField::StartDate
@@ -109,6 +108,10 @@ SortSpec Backend::sortSpec() const {
 }
 
 void Backend::storeSortSpec(const SortSpec &spec) {
+    if (m_source.kind == Source::Project) {
+        setProjectSort(m_source.id, spec.field, spec.ascending);
+        return;
+    }
     if (m_source.kind == Source::List) {
         TaskList l = m_store->list(m_source.id);
         l.sortField = spec.field;
@@ -183,7 +186,7 @@ QVariantList Backend::sortChoices() const {
         {SortField::DueDate, "Due Date"}, {SortField::StartDate, "Start Date"}, {SortField::Priority, "Priority"},
         {SortField::List, "To-do List"},  {SortField::Title, "Title"},          {SortField::Tag, "Tag"},
         {SortField::Duration, "Duration"}, {SortField::Creation, "Creation"},    {SortField::Modified, "Modified"},
-        {SortField::Manual, "Manually"},
+        {SortField::Status, "Status"},     {SortField::Manual, "Manually"},
     };
     if (m_source.kind == Source::Done)
         all = {{SortField::Priority, "Priority"}, {SortField::List, "To-do List"}, {SortField::Modified, "Modified"},
@@ -311,6 +314,14 @@ void Backend::setSort(int field) {
     SortSpec spec = sortSpec();
     spec.field = field;
     storeSortSpec(spec);
+    emit viewChanged();
+}
+
+void Backend::setProjectSort(qint64 projectId, int field, bool ascending) {
+    const QString prefix = QStringLiteral("sort.project:%1.").arg(projectId);
+    m_store->setSetting(prefix + "field", field);
+    m_store->setSetting(prefix + "ascending", ascending);
+    rebuild();
     emit viewChanged();
 }
 
@@ -556,10 +567,14 @@ void Backend::newTask(int type, bool subtask) {
     }
     // Context inheritance: added in Today it's due today; in Starred, starred.
     if (!t.parentId || m_store->task(t.parentId).type == TaskType::Project) {
-        if (m_source.kind == Source::Today)
+        if (m_source.kind == Source::Today && m_store->setting("tasks.todayDue", true).toBool())
             t.dueDate = QDate::currentDate();
         if (m_source.kind == Source::Starred)
             t.starred = true;
+        // "Default due date for new tasks": days from today, -1 when off.
+        const int offset = m_store->setting("tasks.defaultDueOffset", -1).toInt();
+        if (!t.dueDate.isValid() && offset >= 0 && !m_store->setting("tasks.defaultDueQuickEntryOnly", false).toBool())
+            t.dueDate = offset == 30 ? QDate::currentDate().addMonths(1) : QDate::currentDate().addDays(offset);
     }
     t.order = nextOrder(t.listId, t.parentId);
     m_store->begin(type == TaskType::Project ? "New Project" : type == TaskType::Checklist ? "New Checklist" : "New Task");
@@ -628,6 +643,14 @@ void Backend::toggleComplete(qint64 id) {
         completeTask(m_store->task(i), !allDone, now);
     }
     m_store->commit();
+    emit taskCompleted(!allDone);
+    if (!allDone) {
+        bool anyOpen = false;
+        for (const auto &row : m_tasks.rows())
+            anyOpen = anyOpen || (row.value("kind") == "task" && !row.value("completed").toBool());
+        if (!anyOpen)
+            emit celebrate();
+    }
 }
 
 void Backend::setCompleted(bool done) {
@@ -1038,7 +1061,7 @@ void Backend::setTitle(qint64 id, const QString &title) {
     // A new task's title is read for dates, tags, repeats and the rest, which
     // then come out of the title, as the reference app's natural-language input does.
     if (id == m_newTask && m_store->setting("nl.editor", true).toBool())
-        applyParsed(t, NaturalLanguage::parse(head, QDateTime::currentDateTime(), listNames()));
+        applyParsed(t, NaturalLanguage::parse(head, QDateTime::currentDateTime(), listNames(), locationNames()));
     m_store->putTask(t);
     m_store->commit();
 }
@@ -1066,11 +1089,14 @@ void Backend::setDue(qint64 id, const QString &iso, int minutes) {
         return;
     const QDate date = isoDate(iso);
     m_store->begin("Change Due Date");
+    const bool hadDue = t.dueDate.isValid();
     t.dueDate = date;
     if (!date.isValid())
         t.dueTime = -1;
     else if (minutes != -2)
         t.dueTime = minutes;
+    else if (!hadDue && m_store->setting("tasks.useDefaultDueTime", false).toBool())
+        t.dueTime = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();  // "Default due time".
     m_store->putTask(t);
     // Rescheduling a project sets its finished children back to active.
     if (t.type == TaskType::Project) {
@@ -1902,7 +1928,7 @@ void Backend::pasteTasks() {
         if (m_source.kind == Source::Today) t.dueDate = QDate::currentDate();
         if (m_source.kind == Source::Starred) t.starred = true;
         if (m_store->setting("nl.editor", true).toBool())
-            applyParsed(t, NaturalLanguage::parse(line, QDateTime::currentDateTime(), listNames()));
+            applyParsed(t, NaturalLanguage::parse(line, QDateTime::currentDateTime(), listNames(), locationNames()));
         m_store->putTask(t);
         created.append(t.id);
     }
@@ -2118,7 +2144,30 @@ QString Backend::backupFolder() const {
     return QFileInfo(m_store->path()).absolutePath() + "/backups";
 }
 
+void Backend::completeAfterAutoDelete() {
+    // "Auto-delete completed tasks": completed tasks older than N days are
+    // removed for good (soft-deleted, so sync carries the deletion).
+    const int days = m_store->setting("tasks.autoDeleteDays", 0).toInt();
+    if (days <= 0)
+        return;
+    const QDateTime cutoff = QDateTime::currentDateTime().addDays(-days);
+    const QDateTime childCutoff = m_store->setting("tasks.autoDeleteDelaySubtasks", false).toBool() ? cutoff.addDays(-21) : cutoff;
+    QVector<Task> old;
+    for (const auto &t : m_store->tasks())
+        if (!t.deleted && t.completed && t.completedAt.isValid() && t.completedAt < (t.parentId ? childCutoff : cutoff))
+            old.append(t);
+    if (old.isEmpty())
+        return;
+    m_store->begin("Auto-Delete Completed Tasks", false);
+    for (auto t : old) {
+        t.deleted = true;
+        m_store->putTask(t);
+    }
+    m_store->commit();
+}
+
 void Backend::maybeBackup() {
+    completeAfterAutoDelete();
     // "Back up every 24 / 48 hours", 0 meaning off.
     const int hours = m_store->setting("backup.intervalHours", 24).toInt();
     if (hours <= 0 || m_store->path().isEmpty())
@@ -2229,6 +2278,14 @@ void Backend::setInboxEnabled(bool on) {
 
 // ---------------------------------------------------------- quick entry
 
+QStringList Backend::locationNames() const {
+    QStringList names;
+    for (const auto &l : m_store->locations())
+        if (!l.deleted)
+            names << l.name;
+    return names;
+}
+
 QStringList Backend::listNames() const {
     QStringList names;
     for (const auto &l : m_store->lists())
@@ -2259,7 +2316,7 @@ qint64 Backend::quickEntryListId() const {
 }
 
 QVariantMap Backend::previewEntry(const QString &text) const {
-    const ParsedEntry p = NaturalLanguage::parse(text, QDateTime::currentDateTime(), listNames());
+    const ParsedEntry p = NaturalLanguage::parse(text, QDateTime::currentDateTime(), listNames(), locationNames());
     const QDate today = QDate::currentDate();
     QVariantList chips;
     auto chip = [&](const QString &kind, const QString &label) { chips.append(QVariantMap{{"kind", kind}, {"label", label}}); };
@@ -2281,6 +2338,8 @@ QVariantMap Backend::previewEntry(const QString &text) const {
         chip("tag", "#" + tag);
     if (!p.list.isEmpty())
         chip("list", p.list);
+    if (!p.location.isEmpty())
+        chip("location", "@ " + p.location);
     for (int offset : p.alertOffsets)
         chip("alert", "Alert " + Schedule::durationBadge(offset) + " before");
     QVariantList spans;
@@ -2319,6 +2378,11 @@ void Backend::applyParsed(Task &t, const ParsedEntry &p) {
         const qint64 tagId = tagIdForName(tag, true);
         if (tagId && !t.tagIds.contains(tagId))
             t.tagIds.append(tagId);
+    }
+    if (!p.location.isEmpty()) {
+        for (const auto &l : m_store->locations())
+            if (!l.deleted && l.name.compare(p.location, Qt::CaseInsensitive) == 0 && !t.locationIds.contains(l.id))
+                t.locationIds.append(l.id);
     }
     for (int offset : p.alertOffsets) {
         Alarm a;
@@ -2359,7 +2423,10 @@ qint64 Backend::quickAdd(const QString &text, const QString &notes, int type, qi
     t.order = nextOrder(t.listId, 0);
     m_store->begin("Quick Entry");
     if (m_store->setting("nl.quickEntry", true).toBool())
-        applyParsed(t, NaturalLanguage::parse(text, QDateTime::currentDateTime(), listNames()));
+        applyParsed(t, NaturalLanguage::parse(text, QDateTime::currentDateTime(), listNames(), locationNames()));
+    const int offset = m_store->setting("tasks.defaultDueOffset", -1).toInt();
+    if (!t.dueDate.isValid() && offset >= 0 && !m_store->setting("tasks.defaultDueNotQuickEntry", false).toBool())
+        t.dueDate = offset == 30 ? QDate::currentDate().addMonths(1) : QDate::currentDate().addDays(offset);
     m_store->putTask(t);
     m_store->commit();
     m_options.keepVisible.insert(t.id);
@@ -2546,11 +2613,15 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         {"dimmed", views.isPaused(t) || (Schedule::isScheduled(t, now) && m_source.kind != Source::Scheduled)},
         {"progress", childCount ? (childCount - childOpen) * 100 / childCount : 0},
         {"hasAlarm", !m_store->alarmsFor(t.id).isEmpty()},
+        {"hasLocation", !t.locationIds.isEmpty()},
+        {"hasAttachment", !m_store->attachmentsFor(t.id).isEmpty()},
     };
 }
 
 void Backend::rebuildTasks(const ViewBuilder &views) {
     m_options.focusConditions = focusOn() ? focusConditions() : QStringList();
+    m_options.groupedDates = m_store->setting("sort.groupedDates", false).toBool();
+    m_options.starredAboveHigh = m_store->setting("sort.starredAboveHigh", false).toBool();
     // With the scope set to all lists, a search looks everywhere.
     const Source viewed = (m_searchAll && !m_options.search.isEmpty()) ? Source{Source::All, 0} : m_source;
     const auto sections = views.build(viewed, sortSpec(), m_options);
@@ -2684,6 +2755,44 @@ void Backend::rebuildEditor() {
                             Schedule::formatTime(t.created.time().hour() * 60 + t.created.time().minute())},
             {"isChecklistItem", parent.id && parent.type == TaskType::Checklist},
             {"isNew", t.id == m_newTask},
+            {"subtasks", [&] {
+                 QVariantList items;
+                 ViewBuilder views(*m_store, now, scheduleSettings());
+                 for (const auto &c : views.children(t.id))
+                     items.append(QVariantMap{{"id", c.id}, {"title", c.title}, {"completed", c.completed}});
+                 return items;
+             }()},
+            {"attachments", [&] {
+                 QVariantList items;
+                 for (const auto &a : m_store->attachmentsFor(t.id))
+                     items.append(QVariantMap{{"id", a.id}, {"kind", a.kind}, {"name", a.name},
+                                              {"url", QUrl::fromLocalFile(m_store->attachmentsFolder() + "/" + a.fileName).toString()}});
+                 return items;
+             }()},
+            {"alarms", [&] {
+                 QVariantList items;
+                 for (const auto &a : m_store->alarmsFor(t.id)) {
+                     QString label;
+                     if (a.kind == Alarm::Absolute)
+                         label = Schedule::friendlyDateTime(a.at.date(), a.at.time().hour() * 60 + a.at.time().minute(), today, false);
+                     else if (a.offset == 0)
+                         label = "At due time";
+                     else
+                         label = Schedule::durationBadge(a.offset) + " before";
+                     items.append(QVariantMap{{"id", a.id}, {"label", label}, {"absolute", a.kind == Alarm::Absolute}});
+                 }
+                 return items;
+             }()},
+            {"locations", [&] {
+                 QVariantList items;
+                 for (auto id : t.locationIds) {
+                     const Location l = m_store->locations().value(id);
+                     if (l.id && !l.deleted)
+                         items.append(QVariantMap{{"id", l.id}, {"name", l.name}, {"address", l.address}});
+                 }
+                 return items;
+             }()},
+            {"link", Automation::shareableLink(t)},
             {"alarmOffsets", [&] {
                  QVariantList offsets;
                  for (const auto &a : m_store->alarmsFor(t.id))

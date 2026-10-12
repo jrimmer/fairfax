@@ -12,6 +12,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlApplicationEngine>
+#include <QQmlComponent>
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
@@ -19,11 +20,13 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QUrl>
+#include <functional>
 
 #include "alarms.h"
 #include "automation.h"
 #include "calendar.h"
 #include "markdown.h"
+#include "sounds.h"
 #include "views.h"
 #include "backend.h"
 #include "filepicker.h"
@@ -163,6 +166,11 @@ int main(int argc, char *argv[]) {
     Backend backend(&store);
     NotesHighlighter::registerType();
 
+    Sounds sounds;
+    sounds.setEnabled(store.setting("general.sounds", true).toBool());
+    QObject::connect(&backend, &Backend::settingsChanged, &sounds, [&] { sounds.setEnabled(store.setting("general.sounds", true).toBool()); });
+    QObject::connect(&backend, &Backend::taskCompleted, &sounds, [&sounds](bool done) { if (done) sounds.complete(); else sounds.uncomplete(); });
+
     CalendarFeed calendar;
     calendar.setPalette(theme.listPalette());
     calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
@@ -213,6 +221,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("filePicker", &filePicker);
     engine.rootContext()->setContextProperty("gitSync", gitSync.get());
     engine.rootContext()->setContextProperty("calendar", &calendar);
+    engine.rootContext()->setContextProperty("sounds", &sounds);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("storeError", opened ? QString() : dbPath + ": " + error);
@@ -259,6 +268,32 @@ int main(int argc, char *argv[]) {
         QObject::connect(alarms.get(), &AlarmService::completeTask, &backend, [&backend](qint64 id) { backend.toggleComplete(id); });
         app.setQuitOnLastWindowClosed(!store.setting("general.keepRunning", true).toBool());
     }
+
+    // File > New Window: another window over the same store, with its own
+    // selection, list and search, as the reference app's multiple windows have.
+    std::function<void()> openWindow;
+    openWindow = [&engine, &store, &app, &openWindow]() {
+        auto *extra = new Backend(&store, &app);
+        auto *context = new QQmlContext(engine.rootContext(), extra);
+        context->setContextProperty("backend", extra);
+        context->setContextProperty("startHidden", false);
+        QQmlComponent component(&engine, QUrl("qrc:/qml/Main.qml"));
+        QObject *window = component.create(context);
+        if (!window) {
+            qWarning("precrime: couldn't open another window: %s", qPrintable(component.errorString()));
+            delete extra;
+            return;
+        }
+        // Closing the window releases its backend.
+        QObject::connect(qobject_cast<QQuickWindow *>(window), &QQuickWindow::visibleChanged, extra, [window, extra](bool shown) {
+            if (!shown) {
+                window->deleteLater();
+                extra->deleteLater();
+            }
+        });
+        QObject::connect(extra, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
+    };
+    QObject::connect(&backend, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
 
     if (cli.isSet(editOption))
         backend.beginEdit(cli.value(editOption).toLongLong());

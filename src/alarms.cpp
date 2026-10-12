@@ -36,6 +36,28 @@ AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_s
     connect(m_store, &Store::changed, this, &AlarmService::schedule);
     m_connected = QDBusConnection::sessionBus().connect(Service, Path, Interface, "ActionInvoked", this,
                                                         SLOT(onAction(uint, QString)));
+    QDBusConnection::sessionBus().connect(Service, Path, Interface, "NotificationClosed", this,
+                                          SLOT(onClosed(uint, uint)));
+    // Nagging, like the reference app's: an unanswered alert comes back every five minutes
+    // until it's completed, snoozed or dismissed.
+    m_nagTimer.setInterval(30 * 1000);
+    connect(&m_nagTimer, &QTimer::timeout, this, [this] {
+        const QDateTime now = QDateTime::currentDateTime();
+        for (auto it = m_nagging.begin(); it != m_nagging.end();) {
+            const Alarm a = m_store->alarms().value(it.key());
+            const Task t = m_store->task(a.taskId);
+            if (!a.id || a.deleted || t.completed || t.deleted) {
+                it = m_nagging.erase(it);
+                continue;
+            }
+            if (it.value() <= now) {
+                it.value() = now.addSecs(5 * 60);
+                notify(a, t, now);
+            }
+            ++it;
+        }
+    });
+    m_nagTimer.start();
     // Alarms that came due while Precrime wasn't running go off now.
     QTimer::singleShot(1500, this, &AlarmService::check);
 }
@@ -103,6 +125,8 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
     if (reply.isValid())
         m_notifications.insert(reply.value(), a.id);
+    if (m_store->setting("alerts.nag", false).toBool() && !m_nagging.contains(a.id))
+        m_nagging.insert(a.id, QDateTime::currentDateTime().addSecs(5 * 60));
     else
         qWarning("precrime: couldn't show a notification: %s", qPrintable(reply.error().message()));
 
@@ -135,10 +159,17 @@ void AlarmService::snooze(qint64 alarmId, int minutes) {
     m_store->commit();
 }
 
+void AlarmService::onClosed(uint id, uint reason) {
+    // Reason 2 is "dismissed by the user", which ends nagging for that alarm.
+    if (reason == 2 && m_notifications.contains(id))
+        m_nagging.remove(m_notifications.take(id));
+}
+
 void AlarmService::onAction(uint id, const QString &key) {
     if (!m_notifications.contains(id))
         return;
     const qint64 alarmId = m_notifications.take(id);
+    m_nagging.remove(alarmId);
     const qint64 taskId = m_store->alarms().value(alarmId).taskId;
     if (key == "complete")
         emit completeTask(taskId);

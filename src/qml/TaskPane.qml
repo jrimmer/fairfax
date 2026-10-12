@@ -15,6 +15,8 @@ Item {
     signal command(string kind)
     signal quickLook()
     signal help()
+    signal tagSearch()
+    property bool altHeld: false
 
     function focusList() { list.forceActiveFocus() }
     function focusSearch() { search.expanded = true; search.field.forceActiveFocus() }
@@ -29,7 +31,7 @@ Item {
         if (target) backend.selectSource("project:" + target)
     }
 
-    readonly property real contentMargin: Math.max(28, (width - 980) / 2)
+    readonly property real contentMargin: Math.max(28, (width - backend.contentWidth) / 2)
 
     ColumnLayout {
         anchors.fill: parent
@@ -172,6 +174,16 @@ Item {
             }
         }
 
+        // Today's calendar events, above Today (or every list, by setting).
+        DayBar {
+            Layout.fillWidth: true
+            Layout.leftMargin: root.contentMargin
+            Layout.rightMargin: root.contentMargin
+            Layout.bottomMargin: 6
+            visible: !!calendar && calendar.sources.length > 0
+                     && (backend.sourceKey === "today" || (backend.setting("calendar.inLists").value === "true" && !backend.sourceIsSmart && !backend.sourceKey.startsWith("project:")))
+        }
+
         ListView {
             id: list
             Layout.fillWidth: true
@@ -202,7 +214,7 @@ Item {
             }
             Component {
                 id: rowComponent
-                TaskRow { row: parent.model; margin: root.contentMargin }
+                TaskRow { row: parent.model; margin: root.contentMargin; revealNames: root.altHeld }
             }
             Component {
                 id: editorComponent
@@ -237,7 +249,62 @@ Item {
             }
 
             Keys.onPressed: (event) => root.handleKey(event)
+            Keys.onReleased: (event) => { if (event.key === Qt.Key_Alt) root.altHeld = false }
+            onActiveFocusChanged: if (!activeFocus) root.altHeld = false
+
+            // Files dropped below the tasks make a new task named after them.
+            DropArea {
+                z: -2
+                anchors.fill: parent
+                keys: ["text/uri-list"]
+                onDropped: (drop) => { if (drop.hasUrls) { backend.dropFiles(0, drop.urls); drop.accept() } }
+            }
+
+            // Section heat bars: one per section, longer for fuller sections;
+            // click or drag along the rail to jump.
+            Column {
+                id: rail
+                anchors.right: parent.right
+                anchors.rightMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 5
+                visible: sections.length > 1
+                readonly property var sections: {
+                    const out = []
+                    for (let i = 0; i < backend.tasks.count; ++i) {
+                        const r = backend.tasks.get(i)
+                        if (r.kind === "section") out.push({ index: i, title: r.title, count: r.count || 0, tone: r.tone })
+                    }
+                    return out
+                }
+                readonly property int most: Math.max(1, ...sections.map(s => s.count))
+                Repeater {
+                    model: rail.sections
+                    Rectangle {
+                        required property var modelData
+                        anchors.right: parent.right
+                        width: 4 + 10 * modelData.count / rail.most
+                        height: 3
+                        radius: 1.5
+                        color: modelData.tone === "overdue" ? theme.overdue : theme.faint
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            hoverEnabled: true
+                            onClicked: list.positionViewAtIndex(modelData.index, ListView.Beginning)
+                            ToolTip.visible: containsMouse
+                            ToolTip.text: modelData.title + " · " + modelData.count
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    Confetti { id: confetti; anchors.fill: parent; enabled: backend.setting("general.celebrate").value !== "false" }
+    Connections {
+        target: backend
+        function onCelebrate() { if (confetti.enabled) confetti.burst(root.width / 2, root.height / 3) }
     }
 
     function handleKey(e) {
@@ -249,11 +316,19 @@ Item {
 
         if (k === Qt.Key_Down) { backend.moveCursor(1, shift); return done() }
         if (k === Qt.Key_Up) { backend.moveCursor(-1, shift); return done() }
-        if (k === Qt.Key_Return || k === Qt.Key_Enter) { backend.beginEdit(); return done() }
+        if (k === Qt.Key_Return || k === Qt.Key_Enter) {
+            // the reference app's option: Return creates a new task and Ctrl+Return edits.
+            const returnCreates = backend.setting("tasks.returnCreates").value === "true"
+            if (returnCreates !== !!ctrl) backend.newTask(0); else backend.beginEdit()
+            return done()
+        }
         if (k === Qt.Key_Escape) { backend.clearSelection(); return done() }
         if (k === Qt.Key_Space) { root.quickLook(); return done() }
         if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && !ctrl)) { backend.deleteSelection(); return done() }
+        if (k === Qt.Key_Alt) { root.altHeld = true; return }
         if (ctrl && k === Qt.Key_A) { backend.selectAll(); return done() }
+        if (ctrl && k === Qt.Key_C) { backend.copySelection(); return done() }
+        if (ctrl && k === Qt.Key_V) { backend.pasteTasks(); return done() }
         if (ctrl && k === Qt.Key_T) { backend.setStartInDays(0); return done() }
         if (ctrl && k === Qt.Key_S) { backend.setStarred(0); return done() }
         if (ctrl) return
@@ -285,7 +360,7 @@ Item {
         case Qt.Key_M: root.command("move"); return done()
         case Qt.Key_J: root.command("jump"); return done()
         case Qt.Key_F: root.command("find"); return done()
-        case Qt.Key_Slash: root.command("tagsearch"); return done()
+        case Qt.Key_Slash: root.tagSearch(); return done()
         case Qt.Key_Question: root.help(); return done()
         case Qt.Key_Q: Qt.quit(); return done()
         }

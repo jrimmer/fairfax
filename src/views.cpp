@@ -130,6 +130,15 @@ QVector<Task> ViewBuilder::children(qint64 parentId) const {
     return result;
 }
 
+SortSpec ViewBuilder::projectSort(qint64 parentId) const {
+    const QString prefix = QStringLiteral("sort.project:%1.").arg(parentId);
+    SortSpec spec;
+    spec.field = m_store.setting(prefix + "field", SortField::Manual).toInt();
+    spec.ascending = m_store.setting(prefix + "ascending", true).toBool();
+    spec.separated = false;
+    return spec;
+}
+
 QVector<TaskList> ViewBuilder::orderedLists() const {
     QVector<TaskList> lists;
     for (const auto &l : m_store.lists())
@@ -282,7 +291,8 @@ void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
     });
 }
 
-QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort) const {
+QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort,
+                                         const ViewOptions &options) const {
     const auto lists = orderedLists();
     QHash<qint64, int> listRank;
     for (int i = 0; i < lists.size(); ++i)
@@ -298,12 +308,30 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
             if (Schedule::isOverdue(t, m_now, m_settings)) return {"overdue", "Overdue", "overdue", -1, RankFirst};
             if (source.kind == Source::Today && Schedule::isInProgress(t, m_now))
                 return {"progress", "In Progress", "progress", -1, RankFirst + 1};
+            if (options.groupedDates) {
+                const qint64 days = m_today.daysTo(t.dueDate);
+                if (days <= 0) return {"g:today", "Today", {}, -1, 0};
+                if (days == 1) return {"g:tomorrow", "Tomorrow", {}, -1, 1};
+                if (days <= 7) return {"g:week", "Next 7 Days", {}, -1, 2};
+                return {"g:future", "Future", {}, -1, 3};
+            }
             return {"d:" + t.dueDate.toString(Qt::ISODate), dayTitle(t.dueDate, m_today), {}, -1, t.dueDate.toJulianDay()};
         case SortField::StartDate:
             if (!t.startDate.isValid()) return {"nostart", "No Start Date", {}, -1, RankLast};
             if (t.startDate < m_today) return {"started", "Started", {}, -1, RankFirst};
             return {"s:" + t.startDate.toString(Qt::ISODate), dayTitle(t.startDate, m_today), {}, -1, t.startDate.toJulianDay()};
+        case SortField::Status: {
+            // the reference app's Status sort: what needs attention first.
+            if (t.completed) return {"st:done", "Completed", {}, -1, 6};
+            if (Schedule::isOverdue(t, m_now, m_settings)) return {"st:overdue", "Overdue", "overdue", -1, 0};
+            if (Schedule::isInProgress(t, m_now)) return {"st:progress", "In Progress", "progress", -1, 1};
+            if (Schedule::isDueToday(t, m_now)) return {"st:today", "Due Today", {}, -1, 2};
+            if (Schedule::isScheduled(t, m_now)) return {"st:scheduled", "Scheduled", {}, -1, 4};
+            if (t.dueDate.isValid()) return {"st:upcoming", "Upcoming", {}, -1, 3};
+            return {"st:nodate", "No Date", {}, -1, 5};
+        }
         case SortField::Priority: {
+            if (options.starredAboveHigh && t.starred) return {"p-star", "Starred", {}, -1, -1};
             static const char *names[] = {"None", "Low", "Medium", "High"};
             const int p = qBound(0, t.priority, 3);
             return {QStringLiteral("p%1").arg(p), names[p], {}, -1, 3 - p};
@@ -424,7 +452,7 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         items.append(t);
     }
 
-    QVector<Section> sections = sectionize(items, source, sort);
+    QVector<Section> sections = sectionize(items, source, sort, o);
 
     // Expand each row with its nested children: checklist items and sub-tasks
     // everywhere, project children only where the project is their home.
@@ -438,7 +466,11 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
             QVector<TaskRow> nested;
             const bool nestHere = t.type != TaskType::Project || (!source.isFocus() && !smart);
             if (nestHere) {
-                for (const auto &c : children(t.id)) {
+                QVector<Task> kids = children(t.id);
+                const SortSpec childSort = projectSort(t.id);
+                if (childSort.field != SortField::Manual)
+                    sortItems(kids, childSort);
+                for (const auto &c : kids) {
                     if (!passesFilters(c, Source{Source::List, c.listId}, o))
                         continue;
                     // Completed checklist items stay with their checklist.

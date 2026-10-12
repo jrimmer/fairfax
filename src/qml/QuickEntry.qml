@@ -42,6 +42,11 @@ Window {
         title_.forceActiveFocus()
     }
 
+    function prefill(text) {
+        title_.text = text
+        title_.cursorPosition = text.length
+    }
+
     function reset() {
         title_.text = ""
         notes.text = ""

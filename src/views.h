@@ -42,6 +42,8 @@ struct ViewOptions {
     QDate dayFilterTo;
     QSet<qint64> keepVisible;  // Just-completed tasks that stay until the view changes.
     QSet<QString> collapsedSections;
+    bool groupedDates = false;      // Today / Tomorrow / Next 7 Days / Future instead of one heading per day.
+    bool starredAboveHigh = false;  // A Starred section above High when sorting by priority.
 };
 
 struct SortSpec {
@@ -93,13 +95,16 @@ public:
     QString sourceTitle(const Source &source) const;
     QVector<TaskList> orderedLists() const;  // Sidebar order: ungrouped first, then by group.
     QVector<Task> children(qint64 parentId) const;  // Sorted by manual order.
+    // A project or checklist's own sort (the reference app's Sort Project), or manual.
+    SortSpec projectSort(qint64 parentId) const;
 
 private:
     bool matchesFocus(const Task &task, int kind) const;
     bool passesFilters(const Task &task, const Source &source, const ViewOptions &options,
                        const Query *query = nullptr) const;
     bool completedVisible(const Task &task, const Source &source, const ViewOptions &options) const;
-    QVector<Section> sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort) const;
+    QVector<Section> sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort,
+                                const ViewOptions &options) const;
     void sortItems(QVector<Task> &items, const SortSpec &sort) const;
 
     const Store &m_store;

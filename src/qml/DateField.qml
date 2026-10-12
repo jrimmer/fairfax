@@ -9,6 +9,7 @@ Plain.TextField {
     id: root
 
     property string value
+    property string iso  // The current date, for the picker.
     property bool timeOnly: false
     property var suggestions: []
     property int highlighted: 0
@@ -53,7 +54,11 @@ Plain.TextField {
         picked(s.date, s.minutes)
     }
 
-    Keys.onDownPressed: if (popup.visible) highlighted = Math.min(highlighted + 1, suggestions.length - 1)
+    // Down with no suggestions open shows the calendar, as in the reference app.
+    Keys.onDownPressed: {
+        if (popup.visible) highlighted = Math.min(highlighted + 1, suggestions.length - 1)
+        else if (!timeOnly) picker.openAt(root, root.iso)
+    }
     Keys.onUpPressed: if (popup.visible) highlighted = Math.max(highlighted - 1, 0)
     Keys.onReturnPressed: (e) => {
         if (popup.visible && suggestions.length) apply(highlighted)
@@ -65,6 +70,13 @@ Plain.TextField {
         dirty = false
         text = value
         e.accepted = false
+    }
+
+    TapHandler { enabled: !root.timeOnly; onTapped: if (!popup.visible) picker.openAt(root, root.iso) }
+
+    DatePicker {
+        id: picker
+        onPicked: (iso) => { root.dirty = false; root.picked(iso, -1) }
     }
 
     Popup {

@@ -10,10 +10,13 @@ Item {
 
     property var row
     property real margin: 40
+    property bool revealNames: false  // Alt held: show list names, like the reference app.
+    readonly property real lineHeight: Math.round(backend.fontSize * [2.05, 2.5, 2.8][backend.density])
+    readonly property bool showNotes: !!row.notesPreview && (backend.showNotesPreview || backend.density === 2)
 
     readonly property real indent: (row.depth || 0) * 28
     readonly property bool hasCrumb: !!row.breadcrumb
-    height: Math.round(backend.fontSize * 2.5) + (hasCrumb ? backend.fontSize + 2 : 0)
+    height: lineHeight + (hasCrumb ? backend.fontSize + 2 : 0) + (showNotes ? backend.fontSize + 2 : 0)
     opacity: row.dimmed ? 0.55 : 1
 
     // The list's colour runs down the pane's leading edge, row by row.
@@ -47,7 +50,7 @@ Item {
     Icon {
         visible: root.row.hasChildren && (root.row.depth || 0) === 0
         x: root.margin + root.indent - 20
-        y: (Math.round(backend.fontSize * 2.5) - height) / 2
+        y: (root.lineHeight - height) / 2
         name: root.row.collapsed ? "chevronRight" : "chevronDown"
         size: 11
         stroke: 2
@@ -60,7 +63,7 @@ Item {
     Item {
         id: check
         x: root.margin + root.indent
-        y: (Math.round(backend.fontSize * 2.5) - height) / 2
+        y: (root.lineHeight - height) / 2
         width: 18
         height: 18
 
@@ -103,7 +106,7 @@ Item {
         visible: root.row.type === 1
         anchors.left: check.right
         anchors.leftMargin: 8
-        y: (Math.round(backend.fontSize * 2.5) - height) / 2
+        y: (root.lineHeight - height) / 2
         width: visible ? 16 : 0
         height: 16
         Icon { anchors.centerIn: parent; name: "project"; size: 15; color: theme.muted }
@@ -115,7 +118,7 @@ Item {
         anchors.leftMargin: 10
         anchors.right: details.left
         anchors.rightMargin: 12
-        y: (Math.round(backend.fontSize * 2.5) - height) / 2
+        y: (root.lineHeight - height) / 2
         text: root.row.title || "New Task"
         elide: Text.ElideRight
         font.pixelSize: backend.fontSize
@@ -125,7 +128,21 @@ Item {
              : root.row.overdue ? theme.overdue : theme.foreground
     }
 
+    Text {
+        id: notesLine
+        visible: root.showNotes
+        anchors.left: title.left
+        anchors.right: title.right
+        anchors.top: root.hasCrumb ? crumb.bottom : title.bottom
+        anchors.topMargin: 1
+        text: root.row.notesPreview || ""
+        elide: Text.ElideRight
+        color: theme.muted
+        font.pixelSize: backend.fontSize - 2
+    }
+
     Row {
+        id: crumb
         visible: root.hasCrumb
         anchors.left: title.left
         anchors.top: title.bottom
@@ -140,9 +157,19 @@ Item {
         id: details
         anchors.right: parent.right
         anchors.rightMargin: root.margin
-        height: Math.round(backend.fontSize * 2.5)
+        height: root.lineHeight
         spacing: 10
 
+        // List name, always in focus lists when chosen in Settings, or while
+        // Alt is held.
+        Text {
+            visible: (root.revealNames || backend.showListNames) && backend.sourceIsFocus
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.row.listName || ""
+            color: theme.listColor(root.row.listColor || 0)
+            font.pixelSize: backend.fontSize - 3
+            font.weight: Font.DemiBold
+        }
         // Project progress pill.
         Rectangle {
             visible: root.row.type === 1 && root.row.childCount > 0
@@ -155,7 +182,7 @@ Item {
         }
 
         Repeater {
-            model: root.width > 760 ? (root.row.tags || []).slice(0, 3) : []
+            model: root.width > 760 || root.revealNames ? (root.row.tags || []).slice(0, 3) : []
             Rectangle {
                 required property string modelData
                 anchors.verticalCenter: parent.verticalCenter
@@ -170,6 +197,20 @@ Item {
             visible: root.width <= 760 && (root.row.tags || []).length > 0
             anchors.verticalCenter: parent.verticalCenter
             name: "tag"; size: 14; color: theme.faint
+        }
+        Icon {
+            visible: !!root.row.hasLocation
+            anchors.verticalCenter: parent.verticalCenter
+            name: "pin"
+            size: 14
+            color: theme.faint
+        }
+        Icon {
+            visible: !!root.row.hasAttachment
+            anchors.verticalCenter: parent.verticalCenter
+            name: "attach"
+            size: 14
+            color: theme.faint
         }
         Icon {
             visible: !!root.row.hasAlarm
@@ -260,6 +301,21 @@ Item {
     }
 
     readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
+
+    // A tag dragged from the Tags panel tags this task; files dropped from
+    // the file manager attach to it.
+    DropArea {
+        anchors.fill: parent
+        keys: ["precrime-tag"]
+        onDropped: (drop) => backend.tagTask(root.row.taskId, Number(drop.getDataAsString("text/x-precrime-tag")))
+        Rectangle { anchors.fill: parent; color: "transparent"; border.color: theme.accent; border.width: 2; radius: 6; visible: parent.containsDrag }
+    }
+    DropArea {
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        onDropped: (drop) => { if (drop.hasUrls) { backend.dropFiles(root.row.taskId, drop.urls); drop.accept() } }
+        Rectangle { anchors.fill: parent; color: "transparent"; border.color: theme.accent; border.width: 2; radius: 6; visible: parent.containsDrag }
+    }
 
     // Dropping tasks onto this row moves them in front of it.
     DropArea {

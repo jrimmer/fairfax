@@ -47,10 +47,13 @@ private:
 
 private slots:
     void onAction(uint id, const QString &key);
+    void onClosed(uint id, uint reason);
 
 private:
     Store *m_store;
     QTimer m_timer;
     QHash<uint, qint64> m_notifications;  // Notification id → alarm id.
+    QHash<qint64, QDateTime> m_nagging;   // Alarm id → when to remind again.
+    QTimer m_nagTimer;
     bool m_connected = false;
 };

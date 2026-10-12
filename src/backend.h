@@ -132,6 +132,7 @@ public:
     Q_INVOKABLE void toggleSection(const QString &sectionKey, bool all = false);
     Q_INVOKABLE void setSort(int field);
     Q_INVOKABLE void toggleSortDirection();
+    Q_INVOKABLE void setProjectSort(qint64 projectId, int field, bool ascending = true);
     Q_INVOKABLE void setSeparated(bool on);
     Q_INVOKABLE void toggleTagFilter(qint64 tagId);
     Q_INVOKABLE void clearTagFilter();
@@ -251,6 +252,7 @@ public:
     Q_INVOKABLE void setInboxEnabled(bool on);
     Q_INVOKABLE bool inboxEnabled() const;
     Q_INVOKABLE void requestWindow() { emit windowRequested(); }
+    Q_INVOKABLE void requestNewWindow() { emit newWindowRequested(); }
     Q_INVOKABLE void setTagPaused(qint64 tagId, bool paused);
     Q_INVOKABLE qint64 newTag(const QString &name, qint64 groupId = 0);
 
@@ -325,6 +327,9 @@ signals:
     void statusChanged();
     void revealTask(qint64 id);  // Asks the list to scroll a task into view.
     void quickEntryRequested();
+    void taskCompleted(bool done);   // For the completion sound.
+    void celebrate();                // The last open task in view was just completed.
+    void newWindowRequested();
     void quickEntryTextRequested(const QString &text);
     void windowRequested();
 
@@ -343,6 +348,7 @@ private:
     void setStatus(const QString &message);
     void applyParsed(Task &task, const ParsedEntry &parsed);
     QStringList listNames() const;
+    QStringList locationNames() const;
     QString focusSettingKey() const { return "focus." + m_source.key(); }
 
     void rebuild();

@@ -21,7 +21,7 @@ Window {
     Material.foreground: theme.foreground
 
     property int pane: 0
-    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export"]
+    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation"]
 
     function value(key, fallback) {
         const v = backend.setting(key).value
@@ -100,6 +100,8 @@ Window {
                     Layout.fillWidth: true
                     Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Precrime running. Q or Ctrl+Q quits for real." }
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
+                    Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
+                    Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }
                     Hint { text: "Quick Entry from anywhere: add to ~/.config/hypr/bindings.conf\nbindd = SUPER SHIFT, T, Precrime quick entry, exec, precrime --quick\nwindowrule = float, title:^(Precrime Quick Entry)$\nTo get alarms after signing in: exec-once = precrime --background" }
                 }
 
@@ -112,7 +114,22 @@ Window {
                         Slider { from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }
                         Label { text: backend.textSizeName; Layout.preferredWidth: 70 }
                     }
+                    RowLayout {
+                        Label { text: "Content width"; Layout.preferredWidth: 160 }
+                        Slider { from: 1400; to: 640; stepSize: 20; value: Number(root.value("appearance.contentWidth", 980)); onMoved: backend.setSetting("appearance.contentWidth", value); Layout.fillWidth: true }
+                        Label { text: "Compact"; color: theme.muted }
+                    }
+                    RowLayout {
+                        Label { text: "Task rows"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            model: ["Compressed", "Normal", "Extended"]
+                            currentIndex: Number(root.value("appearance.density", 1))
+                            onActivated: (i) => backend.setSetting("appearance.density", i)
+                        }
+                    }
                     Toggle { key: "appearance.friendlyDates"; fallback: true; label: "Use friendly dates (Today, Tomorrow, In 28 days)" }
+                    Toggle { key: "appearance.notesPreview"; fallback: false; label: "Show notes under tasks" }
+                    Toggle { key: "appearance.listNames"; fallback: false; label: "Always show list names"; note: "Otherwise hold Alt in the task list to reveal list and tag names." }
                     Hint { text: "Colours follow your Omarchy theme, light or dark, and change with it." }
                 }
 
@@ -149,6 +166,28 @@ Window {
                         }
                     }
                     Toggle { key: "tasks.overdueUsesTime"; fallback: false; label: "Due time taken into account when marking a task overdue" }
+                    RowLayout {
+                        Label { text: "Default due date for new tasks"; Layout.preferredWidth: 220 }
+                        ComboBox {
+                            readonly property var days: [-1, 0, 1, 2, 3, 7, 14, 30]
+                            model: ["None", "Same Day", "Day After", "2 Days Later", "3 Days Later", "1 Week Later", "2 Weeks Later", "Next Month"]
+                            currentIndex: Math.max(0, days.indexOf(Number(root.value("tasks.defaultDueOffset", -1))))
+                            onActivated: (i) => backend.setSetting("tasks.defaultDueOffset", days[i])
+                        }
+                    }
+                    Toggle { key: "tasks.todayDue"; fallback: true; label: "Use today's date in the Today list" }
+                    Toggle { key: "tasks.useDefaultDueTime"; fallback: false; label: "Give new due dates the default due time (Alerts pane)" }
+                    RowLayout {
+                        Label { text: "Auto-delete completed tasks"; Layout.preferredWidth: 220 }
+                        ComboBox {
+                            readonly property var days: [0, 1, 7, 30, 90, 180, 365]
+                            model: ["Never", "After 1 day", "After 1 week", "After 1 month", "After 3 months", "After 6 months", "After 1 year"]
+                            currentIndex: Math.max(0, days.indexOf(Number(root.value("tasks.autoDeleteDays", 0))))
+                            onActivated: (i) => backend.setSetting("tasks.autoDeleteDays", days[i])
+                        }
+                    }
+                    Toggle { key: "tasks.autoDeleteDelaySubtasks"; fallback: false; label: "Delay sub-tasks by 3 weeks" }
+                    Toggle { key: "tasks.returnCreates"; fallback: false; label: "Hit Return to create a new task, Ctrl+Return to edit" }
                 }
 
                 // Today & Lists
@@ -158,6 +197,8 @@ Window {
                     Toggle { key: "today.overdue"; fallback: true; label: "Include overdue items in Today" }
                     Toggle { key: "today.starred"; fallback: false; label: "Include starred items in Today" }
                     Toggle { key: "today.stillWorking"; fallback: true; label: "Include 'Still Working On' tasks in Today"; note: "Tasks whose start date has passed stay in Today until done." }
+                    Toggle { key: "sort.groupedDates"; fallback: false; label: "Sorting by due date uses grouped dates"; note: "Today, Tomorrow, Next 7 Days and Future instead of one heading per day." }
+                    Toggle { key: "sort.starredAboveHigh"; fallback: false; label: "Sort starred items above high priority" }
                 }
 
                 // Alerts
@@ -174,6 +215,7 @@ Window {
                         }
                     }
                     Toggle { key: "alerts.respectExclusions"; fallback: false; label: "Silence alerts from lists excluded from Today" }
+                    Toggle { key: "alerts.nag"; fallback: false; label: "Nag: repeat an alert every 5 minutes until it's handled" }
                     Hint { text: "Alerts appear as notifications with Complete and Snooze. Precrime has to be running to deliver them." }
                 }
 
@@ -271,6 +313,47 @@ Window {
                         Button { text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
                     }
                     Hint { text: "From the reference app: on the Mac, use a backup from the reference app > Settings > Backups (a .taskdb file). Lists, groups, tags, dates, repeats and alerts come across; one Ctrl+Z undoes the whole import, and a backup is made first." }
+                }
+
+                // Calendar
+                ColumnLayout {
+                    visible: root.pane === 8
+                    Layout.fillWidth: true
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Show your calendar's events in a day bar above Today. Add one iCalendar source per line: a file path, or an https:// or webcal:// address (Google, Fastmail and Nextcloud offer private .ics links). Drag a task onto the bar to block out time for it."
+                    }
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 120
+                        TextArea {
+                            id: calendarSources
+                            text: String(root.value("calendar.sources", ""))
+                            placeholderText: "https://calendar.example.com/private.ics"
+                            wrapMode: TextEdit.NoWrap
+                            font.family: "monospace"
+                            font.pixelSize: backend.fontSize - 2
+                        }
+                    }
+                    Button {
+                        text: "Apply"
+                        onClicked: {
+                            backend.setSetting("calendar.sources", calendarSources.text.trim())
+                            calendar.sources = calendarSources.text.split("\n").map(l => l.trim()).filter(l => l.length)
+                        }
+                    }
+                    Toggle { key: "calendar.inLists"; fallback: false; label: "Show events above every list, not just Today" }
+                    Text { visible: !!calendar && calendar.error !== ""; text: calendar ? calendar.error : ""; color: theme.overdue; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                }
+
+                // Automation
+                ColumnLayout {
+                    visible: root.pane === 9
+                    Layout.fillWidth: true
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Let Claude work with your tasks: add Precrime as an MCP server. In Claude Code run:\n  claude mcp add precrime -- precrime mcp\n\nScripts can use the same commands from a terminal:\n  precrime ctl help\n  precrime ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like precrime://x-callback-url/add?task=Buy%20milk open in the app.\n\nWaybar: add a custom module that runs  precrime --waybar  every 60 seconds to show overdue and due-today counts."
+                    }
                 }
 
                 Text { id: status; color: theme.overdue; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
