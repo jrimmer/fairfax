@@ -116,10 +116,25 @@ Rectangle {
         background: Item {}
         selectionColor: theme.selection
 
-        onActiveFocusChanged: if (!activeFocus) root.commit()
+        onActiveFocusChanged: if (!activeFocus) { linkPicker.close(); root.commit() }
         Keys.onEscapePressed: {
+            if (linkPicker.opened) { linkPicker.close(); return }
             root.commit()
             root.escaped()
+        }
+
+        // Typing "@{" starts a task link: the picker follows what comes
+        // after it, and the link is completed with the chosen title.
+        onTextChanged: linkPicker.sync()
+        onCursorPositionChanged: linkPicker.sync()
+        Keys.onPressed: (e) => {
+            if (!linkPicker.opened) return
+            if (e.key === Qt.Key_Down) linkPicker.move(1)
+            else if (e.key === Qt.Key_Up) linkPicker.move(-1)
+            else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Tab) {
+                if (!linkPicker.choose()) return
+            } else return
+            e.accepted = true
         }
 
         // Ctrl+click follows a link. A TapHandler is passive, so ordinary
@@ -137,6 +152,78 @@ Rectangle {
                 if (!(point.modifiers & Qt.ControlModifier)) return Qt.IBeamCursor
                 return highlighter.linkAt(area.text, area.positionAt(point.position.x, point.position.y)).kind
                     ? Qt.PointingHandCursor : Qt.IBeamCursor
+            }
+        }
+    }
+
+    // The task-link picker: recent tasks, narrowed by the title typed after "@{".
+    Popup {
+        id: linkPicker
+        property int anchorAt: -1
+        property var hits: []
+        property int index: 0
+        readonly property rect caret: area.cursorRectangle
+
+        parent: area
+        x: Math.min(caret.x, area.width - width)
+        y: caret.y + caret.height + 2
+        width: Math.min(320, area.width)
+        padding: 4
+        focus: false
+        closePolicy: Popup.NoAutoClose
+
+        // Opens, refreshes or closes the picker to match the text before the caret.
+        function sync() {
+            const before = area.text.substring(0, area.cursorPosition)
+            const at = before.lastIndexOf("@{")
+            const query = at < 0 ? "" : before.substring(at + 2)
+            if (at < 0 || query.indexOf("}") >= 0 || query.indexOf("\n") >= 0 || root.preview) { close(); anchorAt = -1; return }
+            anchorAt = at
+            hits = backend.findTasks(query, 8)
+            index = 0
+            if (hits.length) open(); else close()
+        }
+        function move(step) { index = (index + step + hits.length) % hits.length }
+        // Replaces "@{query" with the finished link; false when nothing is chosen.
+        function choose() {
+            if (!hits.length) return false
+            const title = hits[index].title.replace(/[{}\n]/g, " ").trim()
+            const end = area.cursorPosition
+            const start = anchorAt
+            close()
+            anchorAt = -1
+            area.remove(start, end)
+            area.insert(start, "@{" + title + "}")
+            area.cursorPosition = start + title.length + 3
+            return true
+        }
+
+        background: Rectangle { color: theme.raised; radius: 6; border.color: theme.divider }
+        contentItem: ListView {
+            implicitHeight: Math.min(contentHeight, 8 * 30)
+            model: linkPicker.hits
+            clip: true
+            delegate: Rectangle {
+                required property var modelData
+                required property int index
+                width: ListView.view.width
+                height: 30
+                radius: 4
+                color: index === linkPicker.index ? Qt.alpha(theme.accent, 0.25) : "transparent"
+                Text {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                    text: parent.modelData.title + "  ·  " + parent.modelData.listName
+                    color: theme.foreground
+                    font.pixelSize: root.fontSize - 1
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: { linkPicker.index = parent.index; linkPicker.choose(); area.forceActiveFocus() }
+                }
             }
         }
     }
