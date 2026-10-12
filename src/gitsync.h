@@ -33,26 +33,13 @@
 #include <QTimer>
 #include <functional>
 
+#include "synctree.h"
+
 class Store;
 
-namespace GitSyncFiles {
-
-// Writes the whole store into `directory` (creating it), removing files for
-// records that no longer exist and pruning tombstones older than 60 days
-// relative to `now`. Returns false with `error` on failure.
-bool writeTree(const Store &store, const QString &directory, const QDateTime &now, QString *error = nullptr);
-
-// Merges the record files under `directory` into the store as one
-// non-undoable change: records new to this machine are inserted, records
-// whose file is newer than the local copy (by `modified`) are updated, and
-// records whose files are listed in `removedPaths` (relative paths deleted
-// on the remote since the last sync) are deleted locally. `onlyPaths`, when
-// non-empty, limits reading to those relative paths. Returns how many local
-// records changed.
-int readTree(Store &store, const QString &directory, const QStringList &onlyPaths = {},
-             const QStringList &removedPaths = {}, QString *error = nullptr);
-
-}  // namespace GitSyncFiles
+// The per-record file layout and its merge are shared with the folder and
+// WebDAV providers; see synctree.h.
+namespace GitSyncFiles = SyncTree;
 
 class GitSync : public QObject {
     Q_OBJECT
