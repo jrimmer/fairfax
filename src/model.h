@@ -46,6 +46,8 @@ enum {
     Completion = 10,
     Status = 11,
     Section = 12,
+    Note = 13,
+    Location = 14,
 };
 }
 

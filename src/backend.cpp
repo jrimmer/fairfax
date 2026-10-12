@@ -210,11 +210,12 @@ QVariantList Backend::sortChoices() const {
         {SortField::DueDate, "Due Date"}, {SortField::StartDate, "Start Date"}, {SortField::Priority, "Priority"},
         {SortField::List, "To-do List"},  {SortField::Title, "Title"},          {SortField::Tag, "Tag"},
         {SortField::Duration, "Duration"}, {SortField::Creation, "Creation"},    {SortField::Modified, "Modified"},
-        {SortField::Status, "Status"},     {SortField::Manual, "Manually"},
+        {SortField::Status, "Status"},     {SortField::Note, "Note"},
+        {SortField::Location, "Location"}, {SortField::Manual, "Manually"},
     };
     if (m_source.kind == Source::Done)
         all = {{SortField::Priority, "Priority"}, {SortField::List, "To-do List"}, {SortField::Modified, "Modified"},
-               {SortField::Completion, "Completion"}, {SortField::Title, "Title"}};
+               {SortField::Completion, "Completion"}, {SortField::Note, "Note"}, {SortField::Title, "Title"}};
     if (sourceIsSmart())
         all.removeIf([](const auto &choice) { return choice.first == SortField::Manual; });
     if (m_source.kind == Source::List && !m_store->sectionsOf(m_source.id).isEmpty())
@@ -278,6 +279,12 @@ void Backend::selectSource(const QString &key) {
     if (next == m_source)
         return;
     endEdit();
+    // Remember the Smart List a project is opened from, for "Inherit Search
+    // in Project View".
+    if (next.kind == Source::Project)
+        m_inheritFrom = sourceIsSmart() ? m_source.id : (m_source.kind == Source::Project ? m_inheritFrom : 0);
+    else
+        m_inheritFrom = 0;
     m_source = next;
     m_options.keepVisible.clear();
     m_options.dayFilterFrom = {};
@@ -1468,6 +1475,36 @@ void Backend::setListFlag(qint64 id, const QString &flag, bool on) {
     m_store->commit();
 }
 
+void Backend::setListCompletedMode(qint64 id, int mode) {
+    TaskList l = m_store->list(id);
+    if (!l.id || l.completedMode == mode)
+        return;
+    l.completedMode = qBound(0, mode, 2);
+    m_store->begin(l.completedMode == 2 ? "Exclude Completed" : l.completedMode == 1 ? "Include Completed" : "Change List");
+    m_store->putList(l);
+    m_store->commit();
+    rebuild();
+    emit viewChanged();
+}
+
+void Backend::deleteAllTasks(qint64 id) {
+    if (!m_store->list(id).id)
+        return;
+    m_store->begin("Delete All Tasks");
+    for (const auto &t : m_store->tasks()) {
+        if (t.listId == id && !t.deleted) {
+            Task copy = t;
+            copy.deleted = true;
+            m_store->putTask(copy);
+        }
+    }
+    m_store->commit();
+    m_selected.clear();
+    rebuild();
+    emit viewChanged();
+    emit selectionChanged();
+}
+
 void Backend::deleteList(qint64 id) {
     TaskList l = m_store->list(id);
     if (!l.id)
@@ -1491,7 +1528,7 @@ QVariantMap Backend::listInfo(qint64 id) const {
     const TaskList l = m_store->list(id);
     return {{"id", l.id}, {"name", l.name}, {"color", l.color}, {"showInAll", l.showInAll},
             {"showInToday", l.showInToday}, {"showInDone", l.showInDone}, {"archived", l.archived},
-            {"muteAlerts", l.muteAlerts}};
+            {"muteAlerts", l.muteAlerts}, {"completedMode", l.completedMode}, {"kind", l.kind}};
 }
 
 QVariantMap Backend::taskInfo(qint64 id) const {
@@ -2413,14 +2450,18 @@ void Backend::setSoundex(bool on) {
     emit viewChanged();
 }
 
-qint64 Backend::saveSmartList(const QString &name, const QString &query) {
-    if (query.trimmed().isEmpty())
+qint64 Backend::saveSmartList(const QString &name, const QString &query, const QString &range, int completedMode,
+                              bool includeScheduled) {
+    if (query.trimmed().isEmpty() && range.isEmpty())
         return 0;
     TaskList l;
     l.id = m_store->nextId("lists");
     l.kind = ListKind::Smart;
-    l.name = name.trimmed().isEmpty() ? query.trimmed() : name.trimmed();
+    l.name = name.trimmed().isEmpty() ? (query.trimmed().isEmpty() ? QStringLiteral("Smart List") : query.trimmed()) : name.trimmed();
     l.smartQuery = query.trimmed();
+    l.smartRange = range;
+    l.completedMode = qBound(0, completedMode, 2);
+    l.includeScheduled = includeScheduled;
     l.order = l.id;
     l.sortField = SortField::DueDate;
     m_store->begin("New Smart List");
@@ -2439,6 +2480,32 @@ void Backend::setSmartQuery(qint64 listId, const QString &query) {
     m_store->begin("Edit Smart List");
     m_store->putList(l);
     m_store->commit();
+    emit viewChanged();
+}
+
+QVariantMap Backend::smartListInfo(qint64 listId) const {
+    const TaskList l = m_store->list(listId);
+    if (!l.id || l.deleted || l.kind != ListKind::Smart)
+        return {};
+    return {{"id", l.id}, {"name", l.name}, {"query", l.smartQuery}, {"range", l.smartRange},
+            {"completedMode", l.completedMode}, {"includeScheduled", l.includeScheduled}};
+}
+
+void Backend::updateSmartList(qint64 listId, const QString &name, const QString &query, const QString &range,
+                              int completedMode, bool includeScheduled) {
+    TaskList l = m_store->list(listId);
+    if (!l.id || l.deleted || l.kind != ListKind::Smart)
+        return;
+    if (!name.trimmed().isEmpty())
+        l.name = name.trimmed();
+    l.smartQuery = query.trimmed();
+    l.smartRange = range;
+    l.completedMode = qBound(0, completedMode, 2);
+    l.includeScheduled = includeScheduled;
+    m_store->begin("Edit Smart List");
+    m_store->putList(l);
+    m_store->commit();
+    rebuild();
     emit viewChanged();
 }
 
@@ -2956,18 +3023,32 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
     static const char *focusTitles[] = {"All", "Today", "Starred", "Scheduled", "Done"};
     const auto lists = views.orderedLists();
 
+    // "Counts on lists": which numbers the rows carry, and whether the undone
+    // count includes what is overdue.
+    const int countMode = m_store->setting("lists.counts", 2).toInt();
+    const bool undoneIncludesOverdue = m_store->setting("lists.undoneIncludesOverdue", true).toBool();
+    auto shown = [&](ListCounts c) {
+        if (!undoneIncludesOverdue)
+            c.undone = qMax(0, c.undone - c.overdue);
+        if (countMode < 2)
+            c.undone = 0;
+        if (countMode < 1)
+            c.overdue = 0;
+        return c;
+    };
+
     // The GTD Inbox, when present, sits in its own group above the focus lists.
     for (const auto &l : lists) {
         if (l.kind != ListKind::Inbox)
             continue;
-        const auto c = views.countsForList(l.id);
+        const auto c = shown(views.countsForList(l.id));
         const QString key = Source{Source::List, l.id}.key();
         rows.append({{"key", "inbox"}, {"kind", "focus"}, {"sourceKey", key}, {"title", "Inbox"}, {"icon", "inbox"},
                      {"overdue", c.overdue}, {"undone", c.undone}, {"selected", m_source.key() == key}, {"listId", l.id}});
         rows.append({{"key", "gap:inbox"}, {"kind", "gap"}});
     }
     for (int k = Source::All; k <= Source::Done; ++k) {
-        const auto c = views.countsForFocus(k);
+        const auto c = shown(views.countsForFocus(k));
         const bool showOverdue = k == Source::All || k == Source::Today;
         rows.append({{"key", focusKey(k)}, {"kind", "focus"}, {"sourceKey", focusKey(k)}, {"title", focusTitles[k]},
                      {"icon", focusIcons[k]}, {"overdue", showOverdue ? c.overdue : 0}, {"undone", c.undone},
@@ -2992,7 +3073,8 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         }
         if (groupId && g.collapsed)
             continue;
-        const auto c = views.countsForList(l.id);
+        const auto raw = views.countsForList(l.id);
+        const auto c = shown(raw);
         const QString key = Source{Source::List, l.id}.key();
         QVector<Task> projects;
         for (const auto &t : m_store->tasks())
@@ -3002,7 +3084,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         const bool expanded = m_expandedLists.contains(l.id);
         rows.append({{"key", key}, {"kind", "list"}, {"sourceKey", key}, {"title", l.name}, {"overdue", c.overdue},
                      {"undone", c.undone}, {"color", l.color}, {"selected", m_source.key() == key},
-                     {"dot", c.overdue ? "overdue" : c.dueToday ? "today" : ""}, {"listId", l.id},
+                     {"dot", raw.overdue ? "overdue" : raw.dueToday ? "today" : ""}, {"listId", l.id},
                      {"groupId", groupId}, {"expandable", !projects.isEmpty()}, {"expanded", expanded},
                      {"excluded", !l.showInAll || !l.showInToday}});
         if (expanded) {
@@ -3033,7 +3115,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
             for (const auto &row : section.rows)
                 count += row.depth == 0;
         rows.append({{"key", source.key()}, {"kind", "smart"}, {"sourceKey", source.key()}, {"title", l.name},
-                     {"icon", "search"}, {"undone", count}, {"selected", m_source.key() == source.key()},
+                     {"icon", "search"}, {"undone", countMode < 2 ? 0 : count}, {"selected", m_source.key() == source.key()},
                      {"listId", l.id}});
     }
     m_sidebar.setRows(rows);
@@ -3110,6 +3192,13 @@ void Backend::rebuildTasks(const ViewBuilder &views) {
     m_options.starredAboveHigh = m_store->setting("sort.starredAboveHigh", false).toBool();
     // With the scope set to all lists, a search looks everywhere.
     const Source viewed = (m_searchAll && !m_options.search.isEmpty()) ? Source{Source::All, 0} : m_source;
+    m_options.inheritSearch = m_source.kind == Source::Project && m_store->setting("search.inheritInProject", false).toBool();
+    m_options.inheritedRule.clear();
+    m_options.inheritedRange.clear();
+    if (m_options.inheritSearch && m_inheritFrom && m_store->lists().contains(m_inheritFrom)) {
+        m_options.inheritedRule = m_store->list(m_inheritFrom).smartQuery;
+        m_options.inheritedRange = m_store->list(m_inheritFrom).smartRange;
+    }
     const auto sections = views.build(viewed, sortSpec(), m_options);
     QVector<QVariantMap> rows;
     QVector<qint64> order;

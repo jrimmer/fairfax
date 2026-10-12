@@ -20,6 +20,18 @@ Popup {
     property bool loading: false              // Suppresses rebuilds while state is being set.
     property bool editingPreview: false
 
+    // Smart List options (the reference app's Search Options sheet): the date range stored in
+    // TaskList.smartRange, and the per-list completed/scheduled switches.
+    property int editingListId: 0             // The Smart List being edited, or 0 when building a plain search.
+    property string rangeKind: "none"         // "none" | "fixed" | "next" | "nodue"
+    property string rangeFrom: ""
+    property string rangeTo: ""
+    property int rangeN: 3
+    property string rangeUnit: "d"
+    property int completedMode: 0             // 0 follows the setting, 1 include, 2 exclude.
+    property bool includeScheduled: false
+    readonly property string range: rangeString()
+
     readonly property var typeGroups: [
         { title: "Priority", items: [["hiprio", "High"], ["medprio", "Medium"], ["lowprio", "Low"], ["prio", "Any priority"], ["noprio", "No priority"], ["starred", "Starred"]] },
         { title: "Dates", items: [["overdue", "Overdue"], ["duetoday", "Due today"], ["tomorrow", "Due tomorrow"], ["duethisweek", "Due this week"],
@@ -59,7 +71,51 @@ Popup {
     dim: false
     background: Rectangle { color: theme.raised; radius: 12; border.color: theme.divider }
 
+    function resetSmartOptions() {
+        editingListId = 0
+        rangeKind = "none"; rangeFrom = ""; rangeTo = ""; rangeN = 3; rangeUnit = "d"
+        completedMode = 0
+        includeScheduled = false
+    }
+
+    function isoOk(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)) }
+
+    // The smartRange string for the controls, in the format model.h documents.
+    function rangeString() {
+        if (rangeKind === "nodue") return "nodue"
+        if (rangeKind === "next") return rangeN > 0 ? "next:" + rangeN + ":" + rangeUnit : ""
+        if (rangeKind === "fixed" && (isoOk(rangeFrom) || isoOk(rangeTo)))
+            return "fixed:" + (isoOk(rangeFrom) ? rangeFrom : "") + ":" + (isoOk(rangeTo) ? rangeTo : "")
+        return ""
+    }
+
+    function loadRange(r) {
+        const p = (r || "").split(":")
+        rangeKind = "none"; rangeFrom = ""; rangeTo = ""; rangeN = 3; rangeUnit = "d"
+        if (p[0] === "nodue") rangeKind = "nodue"
+        else if (p[0] === "next") { rangeKind = "next"; rangeN = Math.max(1, parseInt(p[1]) || 1); rangeUnit = p[2] || "d" }
+        else if (p[0] === "fixed") { rangeKind = "fixed"; rangeFrom = p[1] || ""; rangeTo = p[2] || "" }
+    }
+
+    // Opens on an existing Smart List: its rules, range and switches. The
+    // Update button writes them back.
+    function openForList(listId) {
+        const info = backend.smartListInfo(listId)
+        if (!info.id) return
+        resetSmartOptions()
+        editingListId = info.id
+        loadRange(info.range)
+        completedMode = info.completedMode
+        includeScheduled = info.includeScheduled
+        loadFrom(info.query)
+        open()
+        x = (parent.width - width) / 2
+        y = Math.max(20, parent.height * 0.08)
+        freeInput.forceActiveFocus()
+    }
+
     function openAt(item) {
+        resetSmartOptions()
         loadFrom(backend.search)
         open()
         if (item) {
@@ -592,6 +648,91 @@ Popup {
                         }
                     }
                 }
+
+                Heading { text: "SMART LIST OPTIONS"; Layout.topMargin: 6 }
+                RowLayout {
+                    spacing: 6
+                    Text { Layout.preferredWidth: 72; text: "Due date"; color: theme.foreground; font.pixelSize: backend.fontSize }
+                    Segment { objectName: "rangeNone"; label: "Any"; active: root.rangeKind === "none"; onClicked: root.rangeKind = "none" }
+                    Segment { objectName: "rangeFixed"; label: "Between"; active: root.rangeKind === "fixed"; onClicked: root.rangeKind = "fixed" }
+                    Segment { objectName: "rangeNext"; label: "In the next"; active: root.rangeKind === "next"; onClicked: root.rangeKind = "next" }
+                    Segment { objectName: "rangeNoDue"; label: "No due date"; active: root.rangeKind === "nodue"; onClicked: root.rangeKind = "nodue" }
+                }
+                RowLayout {
+                    visible: root.rangeKind === "fixed"
+                    spacing: 6
+                    Item { Layout.preferredWidth: 72 }
+                    TextField {
+                        id: fromField
+                        objectName: "rangeFrom"
+                        Layout.preferredWidth: 120
+                        placeholderText: "yyyy-mm-dd"
+                        text: root.rangeFrom
+                        font.pixelSize: backend.fontSize
+                        color: root.rangeFrom && !root.isoOk(root.rangeFrom) ? theme.overdue : theme.foreground
+                        background: Rectangle { radius: 8; color: theme.background; border.color: fromField.activeFocus ? theme.accent : theme.divider }
+                        onTextEdited: root.rangeFrom = text.trim()
+                    }
+                    Text { text: "to"; color: theme.muted; font.pixelSize: backend.fontSize }
+                    TextField {
+                        id: toField
+                        objectName: "rangeTo"
+                        Layout.preferredWidth: 120
+                        placeholderText: "yyyy-mm-dd"
+                        text: root.rangeTo
+                        font.pixelSize: backend.fontSize
+                        color: root.rangeTo && !root.isoOk(root.rangeTo) ? theme.overdue : theme.foreground
+                        background: Rectangle { radius: 8; color: theme.background; border.color: toField.activeFocus ? theme.accent : theme.divider }
+                        onTextEdited: root.rangeTo = text.trim()
+                    }
+                }
+                RowLayout {
+                    visible: root.rangeKind === "next"
+                    spacing: 6
+                    Item { Layout.preferredWidth: 72 }
+                    TextField {
+                        id: nextField
+                        objectName: "rangeN"
+                        Layout.preferredWidth: 60
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: backend.fontSize
+                        color: theme.foreground
+                        validator: IntValidator { bottom: 1; top: 999 }
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        text: String(root.rangeN)
+                        background: Rectangle { radius: 8; color: theme.background; border.color: nextField.activeFocus ? theme.accent : theme.divider }
+                        onTextEdited: root.rangeN = parseInt(text) || 0
+                    }
+                    Repeater {
+                        model: [["d", "days"], ["w", "weeks"], ["m", "months"], ["y", "years"]]
+                        Segment {
+                            required property var modelData
+                            label: modelData[1]
+                            active: root.rangeUnit === modelData[0]
+                            onClicked: root.rangeUnit = modelData[0]
+                        }
+                    }
+                }
+                RowLayout {
+                    spacing: 6
+                    Text { Layout.preferredWidth: 72; text: "Completed"; color: theme.foreground; font.pixelSize: backend.fontSize }
+                    Segment { objectName: "completedDefault"; label: "Default"; active: root.completedMode === 0; onClicked: root.completedMode = 0 }
+                    Segment { objectName: "completedInclude"; label: "Include"; active: root.completedMode === 1; onClicked: root.completedMode = 1 }
+                    Segment { objectName: "completedExclude"; label: "Exclude"; active: root.completedMode === 2; onClicked: root.completedMode = 2 }
+                }
+                RowLayout {
+                    spacing: 6
+                    Text { Layout.preferredWidth: 72; text: "Scheduled"; color: theme.foreground; font.pixelSize: backend.fontSize }
+                    Segment { objectName: "scheduledHide"; label: "Hide"; active: !root.includeScheduled; onClicked: root.includeScheduled = false }
+                    Segment { objectName: "scheduledInclude"; label: "Include"; active: root.includeScheduled; onClicked: root.includeScheduled = true }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "These apply to the Smart List you save or update; a plain search ignores them."
+                    color: theme.faint
+                    font.pixelSize: backend.fontSize - 3
+                    wrapMode: Text.Wrap
+                }
                 Item { implicitHeight: 4 }
             }
         }
@@ -652,12 +793,21 @@ Popup {
                 Item { Layout.fillWidth: true }
                 Segment {
                     objectName: "saveButton"
-                    label: "Save as Smart List\u2026"
-                    enabled: root.query.length > 0
+                    label: root.editingListId ? "Save as New\u2026" : "Save as Smart List\u2026"
+                    enabled: root.query.length > 0 || root.range !== ""
                     onClicked: { nameInput.text = ""; nameDialog.open(); nameInput.forceActiveFocus() }
                 }
                 Segment {
+                    objectName: "updateButton"
+                    visible: root.editingListId > 0
+                    label: "Update Smart List"
+                    active: true
+                    enabled: root.query.length > 0 || root.range !== ""
+                    onClicked: root.updateList()
+                }
+                Segment {
                     objectName: "searchButton"
+                    visible: !root.editingListId
                     label: "Search"
                     active: true
                     onClicked: root.doSearch()
@@ -673,9 +823,15 @@ Popup {
 
     function saveAs(name) {
         const n = name.trim()
-        if (!n || !query) return
-        backend.saveSmartList(n, query)
+        if (!n || (!query && !range)) return
+        backend.saveSmartList(n, query, range, completedMode, includeScheduled)
         nameDialog.close()
+        close()
+    }
+
+    function updateList() {
+        if (!editingListId || (!query && !range)) return
+        backend.updateSmartList(editingListId, "", query, range, completedMode, includeScheduled)
         close()
     }
 

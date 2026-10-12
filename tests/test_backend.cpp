@@ -380,6 +380,65 @@ private slots:
         QVERIFY(!f.backend->addToCalendar(undated, f.dir.filePath("none.ics")));
         QVERIFY(!QFile::exists(f.dir.filePath("none.ics")));
     }
+
+    void deleteAllTasksKeepsListAndUndoes() {
+        Fixture f;
+        const qint64 list = f.firstList();
+        f.backend->selectSource("list:" + QString::number(list));
+        f.backend->newTask();
+        f.backend->setTitle(f.only().id, "One");
+        f.backend->endEdit();
+        f.backend->deleteAllTasks(list);
+        QCOMPARE(f.only().id, qint64(0));
+        QVERIFY(!f.store.list(list).deleted);
+        f.backend->undo();
+        QCOMPARE(f.only().title, QString("One"));
+    }
+
+    void smartListCanBeLoadedAndUpdated() {
+        Fixture f;
+        const qint64 id = f.backend->saveSmartList("Hot", "type: hiprio", "next:3:d", 1, true);
+        QVariantMap info = f.backend->smartListInfo(id);
+        QCOMPARE(info.value("query").toString(), QString("type: hiprio"));
+        QCOMPARE(info.value("range").toString(), QString("next:3:d"));
+        QCOMPARE(info.value("completedMode").toInt(), 1);
+        QVERIFY(info.value("includeScheduled").toBool());
+        f.backend->updateSmartList(id, "", "starred", "nodue", 2, false);
+        info = f.backend->smartListInfo(id);
+        QCOMPARE(info.value("name").toString(), QString("Hot"));
+        QCOMPARE(info.value("query").toString(), QString("starred"));
+        QCOMPARE(info.value("range").toString(), QString("nodue"));
+        QCOMPARE(info.value("completedMode").toInt(), 2);
+        QVERIFY(!info.value("includeScheduled").toBool());
+    }
+
+    void listCountsFollowTheSettings() {
+        Fixture f;
+        f.backend->selectSource("today");
+        f.backend->newTask();
+        f.backend->setTitle(f.only().id, "Late");
+        f.backend->endEdit();
+        Task t = f.only();
+        t.dueDate = QDate::currentDate().addDays(-2);
+        f.store.begin("late");
+        f.store.putTask(t);
+        f.store.commit();
+        auto counts = [&](const char *source) {
+            f.backend->setSetting("test.refresh", f.backend->setting("test.refresh").value("value").toInt() + 1);
+            for (const auto &row : f.backend->sidebar()->rows())
+                if (row.value("sourceKey") == source)
+                    return QPair<int, int>{row.value("overdue").toInt(), row.value("undone").toInt()};
+            return QPair<int, int>{-1, -1};
+        };
+        QCOMPARE(counts("all"), (QPair<int, int>{1, 1}));
+        f.backend->setSetting("lists.undoneIncludesOverdue", false);
+        QCOMPARE(counts("all"), (QPair<int, int>{1, 0}));
+        f.backend->setSetting("lists.counts", 1);
+        QCOMPARE(counts("all"), (QPair<int, int>{1, 0}));
+        f.backend->setSetting("lists.undoneIncludesOverdue", true);
+        f.backend->setSetting("lists.counts", 0);
+        QCOMPARE(counts("all"), (QPair<int, int>{0, 0}));
+    }
 };
 
 REGISTER_TEST(BackendTest)

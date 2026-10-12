@@ -300,6 +300,16 @@ Window {
                     Toggle { key: "today.stillWorking"; fallback: true; label: "Include 'Still Working On' tasks in Today"; note: "Tasks whose start date has passed stay in Today until done." }
                     Toggle { key: "sort.groupedDates"; fallback: false; label: "Sorting by due date uses grouped dates"; note: "Today, Tomorrow, Next 7 Days and Future instead of one heading per day." }
                     Toggle { key: "sort.starredAboveHigh"; fallback: false; label: "Sort starred items above high priority" }
+                    RowLayout {
+                        Label { text: "Counts on lists"; Layout.preferredWidth: 260 }
+                        ComboBox {
+                            model: ["None", "Overdue", "Overdue + Undone"]
+                            currentIndex: Math.max(0, Math.min(2, Number(root.value("lists.counts", 2))))
+                            onActivated: (i) => backend.setSetting("lists.counts", i)
+                        }
+                    }
+                    Toggle { key: "lists.undoneIncludesOverdue"; fallback: true; label: "Undone counts include overdue"; note: "Off shows only the tasks that are not yet late next to the red overdue number." }
+                    Toggle { key: "search.inheritInProject"; fallback: false; label: "Inherit search in project view"; note: "Opening a project from a search or Smart List shows only the sub-tasks that match it." }
                 }
 
                 // Alerts

@@ -289,6 +289,23 @@ QStringList tagNamesOf(const Task &t, const QueryContext &c) {
     return names;
 }
 
+QStringList locationNamesOf(const Task &t, const QueryContext &c) {
+    QStringList names;
+    if (!c.store) return names;
+    for (qint64 id : t.locationIds) {
+        auto it = c.store->locations().constFind(id);
+        if (it != c.store->locations().constEnd() && !it->deleted) names << it->name;
+    }
+    return names;
+}
+
+bool hasAttachment(const Task &t, const QueryContext &c, int kind) {
+    if (!c.store) return false;
+    for (const Attachment &a : c.store->attachmentsFor(t.id))
+        if (a.kind == kind) return true;
+    return false;
+}
+
 const Folded &foldedFor(const Task &t, const QueryContext &c) {
     thread_local Folded cache;
     const QStringList tags = tagNamesOf(t, c);
@@ -437,8 +454,12 @@ const QHash<QString, Predicate> &typePresets() {
         add({"visit"}, action(ActionType::Visit));
         add({"google"}, action(ActionType::Google));
 
-        add({"audio", "picture", "pict", "capturedmail", "alarms", "anylocation"}, [](T, C) { return false; });
-        add({"nolocation"}, [](T, C) { return true; });
+        add({"capturedmail"}, [](T, C) { return false; });  // Precrime has no mail capture.
+        add({"anylocation"}, [](T t, C c) { return !locationNamesOf(t, c).isEmpty(); });
+        add({"nolocation"}, [](T t, C c) { return locationNamesOf(t, c).isEmpty(); });
+        add({"alarms"}, [](T t, C c) { return c.store && !c.store->alarmsFor(t.id).isEmpty(); });
+        add({"picture", "pict"}, [](T t, C c) { return hasAttachment(t, c, Attachment::Image); });
+        add({"audio"}, [](T t, C c) { return hasAttachment(t, c, Attachment::Audio); });
         add({"note"}, [](T t, C) { return !t.notes.trimmed().isEmpty(); });
 
         add({"prio"}, [](T t, C) { return t.priority != Priority::None; });
@@ -575,7 +596,9 @@ NameSet namesFor(NameKind kind, const Task &t, const QueryContext &c) {
         break;
     }
     case NameKind::Locations:
-        break;  // No location model yet.
+        for (const QString &n : locationNamesOf(t, c)) r.names << fold(n);
+        r.hasAny = !r.names.isEmpty();
+        break;
     }
     return r;
 }
@@ -703,6 +726,10 @@ Query Query::parse(const QString &text, QString *error) {
         QStringLiteral(R"((?<!\S)(?:type:|tags:|locations:|lists:|groups:|taggroups:|!?(?:modified:|created:|completed:)|\{datefilter\}))"),
         QRegularExpression::CaseInsensitiveOption);
 
+    // A negated value (!donetoday) does not ask for completed tasks.
+    static const QRegularExpression doneTypes(QStringLiteral(R"((?<![!\w])done(?:today|yesterday|thisweek)\b)"),
+                                              QRegularExpression::CaseInsensitiveOption);
+
     QStringList errors;
     std::vector<Segment> segs;
 
@@ -776,6 +803,13 @@ Query Query::parse(const QString &text, QString *error) {
     if (error) *error = errors.join(QStringLiteral("; "));
     Query q;
     q.m_root = root;
+    for (const Segment &s : segs) {
+        const bool done = s.kind == Segment::Completed && !s.negated;
+        const bool doneType = s.kind == Segment::Type && !s.negated &&
+                              s.value.contains(doneTypes);
+        if (done || doneType) q.m_namesCompleted = q.m_replacesScope = true;
+        if (s.kind == Segment::Lists || s.kind == Segment::Groups) q.m_replacesScope = true;
+    }
     return q;
 }
 

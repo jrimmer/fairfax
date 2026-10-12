@@ -12,10 +12,9 @@
 #include <QVector>
 
 #include "model.h"
+#include "query.h"
 #include "schedule.h"
 #include "store.h"
-
-class Query;
 
 struct Source {
     enum Kind { All = 0, Today = 1, Starred = 2, Scheduled = 3, Done = 4, List = 5, Project = 6 };
@@ -44,6 +43,12 @@ struct ViewOptions {
     QSet<QString> collapsedSections;
     bool groupedDates = false;      // Today / Tomorrow / Next 7 Days / Future instead of one heading per day.
     bool starredAboveHigh = false;  // A Starred section above High when sorting by priority.
+    // "Inherit Search in Project View": a project's children also have to
+    // match the search that was active when it was opened, and the rule and
+    // range of the Smart List it was opened from (both may be empty).
+    bool inheritSearch = false;
+    QString inheritedRule;
+    QString inheritedRange;
 };
 
 struct SortSpec {
@@ -100,10 +105,14 @@ public:
     SortSpec projectSort(qint64 parentId) const;
 
 private:
+    QueryContext queryContext(const ViewOptions &options) const;
     bool matchesFocus(const Task &task, int kind) const;
+    QString firstLocation(const Task &task) const;  // Alphabetically first, or empty.
     bool passesFilters(const Task &task, const Source &source, const ViewOptions &options,
                        const Query *query = nullptr) const;
-    bool completedVisible(const Task &task, const Source &source, const ViewOptions &options) const;
+    // `policy` overrides the completed-visibility setting: 0 follows it,
+    // 1 shows every completed task, 2 hides them all.
+    bool completedVisible(const Task &task, const Source &source, const ViewOptions &options, int policy = 0) const;
     QVector<Section> sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort,
                                 const ViewOptions &options) const;
     void sortItems(QVector<Task> &items, const SortSpec &sort) const;

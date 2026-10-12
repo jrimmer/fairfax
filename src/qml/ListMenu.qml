@@ -43,6 +43,10 @@ Menu {
     }
     MenuSeparator {}
     MenuItem {
+        text: root.info.completedMode === 2 ? "Include Completed" : "Exclude Completed"
+        onTriggered: backend.setListCompletedMode(root.listId, root.info.completedMode === 2 ? 1 : 2)
+    }
+    MenuItem {
         text: "Mute Alerts"
         checkable: true
         checked: !!root.info.muteAlerts
@@ -50,7 +54,20 @@ Menu {
     }
     MenuSeparator {}
     MenuItem { text: "Archive"; onTriggered: backend.setListFlag(root.listId, "archived", true) }
+    MenuItem { text: "Delete all Tasks…"; onTriggered: confirmTasks.open() }
     MenuItem { text: "Delete List…"; onTriggered: confirm.open() }
+
+    Dialog {
+        id: confirmTasks
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: "Delete all tasks in “" + (root.info.name || "") + "”?"
+        Label { text: "The list stays. Undo (Ctrl+Z) brings the tasks back." }
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        onAccepted: backend.deleteAllTasks(root.listId)
+    }
 
     Dialog {
 

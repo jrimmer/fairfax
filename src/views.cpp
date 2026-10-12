@@ -184,6 +184,18 @@ QVector<TaskList> ViewBuilder::orderedLists() const {
     return lists;
 }
 
+QString ViewBuilder::firstLocation(const Task &t) const {
+    QString first;
+    for (auto id : t.locationIds) {
+        const auto it = m_store.locations().constFind(id);
+        if (it == m_store.locations().cend() || it->deleted)
+            continue;
+        if (first.isEmpty() || QString::localeAwareCompare(it->name, first) < 0)
+            first = it->name;
+    }
+    return first;
+}
+
 QString ViewBuilder::sourceTitle(const Source &s) const {
     switch (s.kind) {
     case Source::All: return QStringLiteral("All");
@@ -210,6 +222,18 @@ bool ViewBuilder::matchesFocus(const Task &t, int kind) const {
     case Source::Done: return t.completed && list.showInDone;
     }
     return false;
+}
+
+QueryContext ViewBuilder::queryContext(const ViewOptions &o) const {
+    QueryContext context;
+    context.store = &m_store;
+    context.now = m_now;
+    context.settings = m_settings;
+    context.soundex = o.soundex;
+    context.rangeFrom = o.dayFilterFrom;
+    context.rangeTo = o.dayFilterTo.isValid() ? o.dayFilterTo : o.dayFilterFrom;
+    context.isPaused = [this](const Task &task) { return isPaused(task); };
+    return context;
 }
 
 bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewOptions &o, const Query *query) const {
@@ -239,18 +263,8 @@ bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewO
         if (!t.dueDate.isValid() || t.dueDate < o.dayFilterFrom || t.dueDate > to)
             return false;
     }
-    if (query && !query->isEmpty()) {
-        QueryContext context;
-        context.store = &m_store;
-        context.now = m_now;
-        context.settings = m_settings;
-        context.soundex = o.soundex;
-        context.rangeFrom = o.dayFilterFrom;
-        context.rangeTo = o.dayFilterTo.isValid() ? o.dayFilterTo : o.dayFilterFrom;
-        context.isPaused = [this](const Task &task) { return isPaused(task); };
-        if (!query->matches(t, context))
-            return false;
-    }
+    if (query && !query->isEmpty() && !query->matches(t, queryContext(o)))
+        return false;
     if (!o.focusConditions.isEmpty()) {
         bool any = false;
         for (const auto &c : o.focusConditions)
@@ -261,9 +275,11 @@ bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewO
     return true;
 }
 
-bool ViewBuilder::completedVisible(const Task &t, const Source &source, const ViewOptions &o) const {
-    if (!t.completed || source.kind == Source::Done || o.keepVisible.contains(t.id))
+bool ViewBuilder::completedVisible(const Task &t, const Source &source, const ViewOptions &o, int policy) const {
+    if (!t.completed || source.kind == Source::Done || o.keepVisible.contains(t.id) || policy == 1)
         return true;
+    if (policy == 2)
+        return false;
     // Today never shows completed tasks, whatever the window says.
     if (source.kind == Source::Today || o.hideCompleted || o.completedWindowMinutes == 0)
         return false;
@@ -297,6 +313,17 @@ void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
         case SortField::Creation: return a.created == b.created ? 0 : (a.created < b.created ? -1 : 1);
         case SortField::Modified: return a.modified == b.modified ? 0 : (a.modified > b.modified ? -1 : 1);
         case SortField::Duration: return a.duration - b.duration;
+        case SortField::Note: {
+            // Tasks without a note trail, whichever way the sort runs.
+            const bool an = a.notes.trimmed().isEmpty(), bn = b.notes.trimmed().isEmpty();
+            if (an != bn) return sort.ascending == an ? 1 : -1;
+            return an ? 0 : QString::localeAwareCompare(a.notes.trimmed(), b.notes.trimmed());
+        }
+        case SortField::Location: {
+            const QString la = firstLocation(a), lb = firstLocation(b);
+            if (la.isEmpty() != lb.isEmpty()) return sort.ascending == la.isEmpty() ? 1 : -1;
+            return la.isEmpty() ? 0 : QString::localeAwareCompare(la, lb);
+        }
         case SortField::Completion: return a.completedAt == b.completedAt ? 0 : (a.completedAt > b.completedAt ? -1 : 1);
         case SortField::Manual:
         case SortField::Section: return a.order == b.order ? 0 : (a.order < b.order ? -1 : 1);
@@ -382,6 +409,14 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
             if (first.isEmpty()) return {"notag", "No Tags", {}, -1, RankLast};
             return {"t:" + first.toLower(), first, {}, -1, 0};
         }
+        case SortField::Note:
+            if (t.notes.trimmed().isEmpty()) return {"nonote", "No Note", {}, -1, RankLast};
+            return {"hasnote", "Has Note", {}, -1, 0};
+        case SortField::Location: {
+            const QString first = firstLocation(t);
+            if (first.isEmpty()) return {"noloc", "No Location", {}, -1, RankLast};
+            return {"loc:" + first.toLower(), first, {}, -1, 0};
+        }
         case SortField::Duration:
             return {QStringLiteral("u%1").arg(t.duration), durationTitle(t.duration), {}, -1,
                     t.duration > 0 ? t.duration : RankLast};
@@ -446,12 +481,37 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
     return sections;
 }
 
-QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, const ViewOptions &o) const {
+QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, const ViewOptions &options) const {
     // A Smart List is a saved search over every list, combined with whatever
     // is typed in the search field.
     const bool smart = source.kind == Source::List && isSmartList(source.id);
-    const Query search = Query::parse(o.search);
-    const Query saved = smart ? Query::parse(m_store.list(source.id).smartQuery) : Query();
+    const TaskList smartList = smart ? m_store.list(source.id) : TaskList();
+    const Query search = Query::parse(options.search);
+    const Query saved = smart ? Query::parse(smartList.smartQuery) : Query();
+    // Naming lists, groups or completed tasks in a search widens it to every
+    // list, whatever is selected; a project keeps its own scope.
+    const bool wide = !smart && source.kind != Source::Project && search.replacesScope();
+    const bool flat = smart || wide || source.isFocus();
+
+    ViewOptions o = options;
+    if (smart && smartList.includeScheduled)
+        o.showScheduled = true;
+    // Completed tasks: a query that asks for them shows them all; otherwise
+    // the list's own Include/Exclude Completed switch decides.
+    int policy = 0;
+    if (search.namesCompleted() || saved.namesCompleted()) {
+        policy = 1;
+    } else if (!wide) {
+        qint64 listId = 0;
+        if (source.kind == Source::List) listId = source.id;
+        else if (source.kind == Source::Project) listId = m_store.task(source.id).listId;
+        const int mode = listId ? m_store.list(listId).completedMode : 0;
+        policy = mode == 1 ? 1 : mode == 2 ? 2 : 0;
+    }
+
+    const bool inherit = source.kind == Source::Project && o.inheritSearch;
+    const Query inheritedRule = inherit ? Query::parse(o.inheritedRule) : Query();
+
     QVector<Task> items;
     for (const auto &t : m_store.tasks()) {
         if (t.deleted)
@@ -459,7 +519,10 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         if (smart) {
             if (t.parentId && m_store.task(t.parentId).type != TaskType::Project)
                 continue;
-            if (!passesFilters(t, source, o, &saved) || !inSmartRange(t, m_store.list(source.id).smartRange))
+            if (!passesFilters(t, source, o, &saved) || !inSmartRange(t, smartList.smartRange))
+                continue;
+        } else if (wide) {
+            if (t.parentId && m_store.task(t.parentId).type != TaskType::Project)
                 continue;
         } else if (source.isFocus()) {
             // Checklist items and a task's own sub-tasks never surface on
@@ -479,7 +542,9 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
             if (t.id != source.id)
                 continue;
         }
-        if (!passesFilters(t, source, o, &search) || !completedVisible(t, source, o))
+        // An inherited search filters the project's children, not the project
+        // the user chose to look at.
+        if (!passesFilters(t, source, o, inherit ? nullptr : &search) || !completedVisible(t, source, o, policy))
             continue;
         items.append(t);
     }
@@ -515,19 +580,21 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         for (const auto &row : s.rows) {
             const Task t = m_store.task(row.taskId);
             TaskRow top = row;
-            top.breadcrumb = (source.isFocus() || smart) && t.parentId != 0;
+            top.breadcrumb = flat && t.parentId != 0;
             QVector<TaskRow> nested;
-            const bool nestHere = t.type != TaskType::Project || (!source.isFocus() && !smart);
+            const bool nestHere = t.type != TaskType::Project || !flat;
             if (nestHere) {
                 QVector<Task> kids = children(t.id);
                 const SortSpec childSort = projectSort(t.id);
                 if (childSort.field != SortField::Manual)
                     sortItems(kids, childSort);
                 for (const auto &c : kids) {
-                    if (!passesFilters(c, Source{Source::List, c.listId}, o))
+                    if (!passesFilters(c, Source{Source::List, c.listId}, o, inherit ? &search : nullptr))
+                        continue;
+                    if (inherit && (!inheritedRule.matches(c, queryContext(o)) || !inSmartRange(c, o.inheritedRange)))
                         continue;
                     // Completed checklist items stay with their checklist.
-                    if (t.type == TaskType::Project && !completedVisible(c, source, o))
+                    if (t.type == TaskType::Project && !completedVisible(c, source, o, policy))
                         continue;
                     nested.append(TaskRow{c.id, 1, false, 0});
                 }

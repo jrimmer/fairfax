@@ -89,7 +89,14 @@ offers your lists and `pc done <Tab>` your open tasks.
 - **Tags.** Group them, filter by them from the right panel, and *pause* one (right-click) to
   hide every task that carries it until you resume it.
 - **Smart Lists.** Type a search in the reference app's syntax (`type: hiprio tags: !work`,
-  `"exact phrase"`, `OR`, `-word`) and save it as a Smart List.
+  `"exact phrase"`, `OR`, `-word`) and save it as a Smart List. Search Options
+  (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) also sets a due-date range
+  (between two dates, in the next N days to years, or no due date) and whether the list
+  includes completed or scheduled tasks. `lists:`, `groups:` and `completed:` search every
+  list, and `completed:` or `type: donetoday` find finished tasks.
+- **List options.** Right-click a list for Exclude/Include Completed and Delete all Tasks;
+  Settings → Today & Lists chooses the counts on lists and whether a project view inherits
+  the search it was opened from. Lists also sort by Note and Location.
 - **Focus Filter.** The sun in the sort bar narrows any list to tasks that are overdue,
   due today, this week, high priority, starred and so on, each list remembering its own.
 - **Repeats.** Completing a repeating task keeps a done copy and moves it to the next

@@ -78,6 +78,17 @@ class ViewsTest : public QObject {
         return t;
     }
 
+    void storeList(const TaskList &l) {
+        m_store->begin("edit");
+        m_store->putList(l);
+        m_store->commit();
+    }
+
+    static QStringList sorted(QStringList l) {
+        l.sort();
+        return l;
+    }
+
     static Source list(qint64 id) { return Source{Source::List, id}; }
 
 private slots:
@@ -443,6 +454,229 @@ private slots:
         QCOMPARE(vb.countsForFocus(Source::All).undone, 2);
         QCOMPARE(vb.countsForFocus(Source::Scheduled).undone, 1);
         QCOMPARE(vb.countsForFocus(Source::Done).undone, 0);
+    }
+
+    // ---- queries, scope and completed tasks ----
+
+    void completedQueryReturnsCompletedTasks() {
+        const auto l = addList("L");
+        addTask(l, "open");
+        addTask(l, "old", [](Task &t) { t.completed = true; t.completedAt = Now.addDays(-3); });
+        addTask(l, "fresh", [](Task &t) { t.completed = true; t.completedAt = Now.addSecs(-3600); });
+        ViewOptions o;
+        o.completedWindowMinutes = 0;
+        // The window would hide every completed task; the query overrides it.
+        o.search = "completed: 7d";
+        QCOMPARE(sorted(titles(build(list(l), o))), (QStringList{"fresh", "old"}));
+        o.search = "type: donetoday";
+        QCOMPARE(titles(build(Source{Source::Today}, o)), QStringList{"fresh"});
+        o.search = "completed: 1d";
+        QCOMPARE(titles(build(Source{Source::All}, o)), QStringList{"fresh"});
+    }
+
+    void negatedCompletedDoesNotRevealCompleted() {
+        const auto l = addList("L");
+        addTask(l, "open");
+        addTask(l, "done", [](Task &t) { t.completed = true; t.completedAt = Now.addSecs(-60); });
+        ViewOptions o;
+        o.completedWindowMinutes = 0;
+        o.search = "type: !donetoday";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"open"});
+    }
+
+    void listsTokenSearchesEveryList() {
+        const auto work = addList("Work");
+        const auto home = addList("Home");
+        addTask(work, "report");
+        addTask(home, "laundry");
+        ViewOptions o;
+        o.search = "lists: Work";
+        // Whatever is on screen, the search leaves it.
+        QCOMPARE(titles(build(list(home), o)), QStringList{"report"});
+        QCOMPARE(titles(build(Source{Source::Today}, o)), QStringList{"report"});
+        o.search = "report";
+        QCOMPARE(titles(build(list(home), o)), QStringList{});
+    }
+
+    void groupsTokenSearchesEveryList() {
+        ListGroup g;
+        g.id = m_store->nextId("list_groups");
+        g.name = "Office";
+        m_store->begin("group");
+        m_store->putGroup(g);
+        m_store->commit();
+        const auto work = addList("Work", [&](TaskList &l) { l.groupId = g.id; });
+        const auto home = addList("Home");
+        addTask(work, "report");
+        addTask(home, "laundry");
+        ViewOptions o;
+        o.search = "groups: Office";
+        QCOMPARE(titles(build(list(home), o)), QStringList{"report"});
+    }
+
+    void locationTokensMatchLocations() {
+        Location place;
+        place.id = m_store->nextId("locations");
+        place.name = "Shop";
+        m_store->begin("place");
+        m_store->putLocation(place);
+        m_store->commit();
+        const auto l = addList("L");
+        addTask(l, "buy", [&](Task &t) { t.locationIds = {place.id}; });
+        addTask(l, "stay");
+        ViewOptions o;
+        o.search = "locations: Shop";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"buy"});
+        o.search = "type: anylocation";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"buy"});
+        o.search = "type: nolocation";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"stay"});
+    }
+
+    void alarmAndAttachmentTypes() {
+        const auto l = addList("L");
+        const auto ringing = addTask(l, "ringing");
+        const auto pic = addTask(l, "pic");
+        const auto voice = addTask(l, "voice");
+        Alarm a;
+        a.id = m_store->nextId("alarms");
+        a.taskId = ringing;
+        m_store->begin("alarm");
+        m_store->putAlarm(a);
+        Attachment image;
+        image.id = m_store->nextId("attachments");
+        image.taskId = pic;
+        image.kind = Attachment::Image;
+        m_store->putAttachment(image);
+        Attachment audio;
+        audio.id = m_store->nextId("attachments");
+        audio.taskId = voice;
+        audio.kind = Attachment::Audio;
+        m_store->putAttachment(audio);
+        m_store->commit();
+        ViewOptions o;
+        o.search = "type: alarms";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"ringing"});
+        o.search = "type: pict";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"pic"});
+        o.search = "type: audio";
+        QCOMPARE(titles(build(list(l), o)), QStringList{"voice"});
+    }
+
+    void smartListHonoursCompletedAndScheduledSwitches() {
+        const auto l = addList("L");
+        addTask(l, "open", [](Task &t) { t.priority = Priority::High; });
+        addTask(l, "later", [](Task &t) { t.priority = Priority::High; t.startDate = day(5); });
+        addTask(l, "done", [](Task &t) {
+            t.priority = Priority::High;
+            t.completed = true;
+            t.completedAt = Now.addDays(-5);
+        });
+        const auto smart = addList("Hot", [](TaskList &sl) { sl.kind = ListKind::Smart; sl.smartQuery = "type: hiprio"; });
+        QCOMPARE(titles(build(list(smart))), QStringList{"open"});
+
+        TaskList sl = m_store->list(smart);
+        sl.includeScheduled = true;
+        storeList(sl);
+        QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"later", "open"}));
+
+        sl.completedMode = 1;
+        storeList(sl);
+        QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"done", "later", "open"}));
+
+        sl.completedMode = 2;
+        storeList(sl);
+        QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"later", "open"}));
+    }
+
+    void smartListDateRange() {
+        const auto l = addList("L");
+        addTask(l, "soon", [](Task &t) { t.dueDate = day(2); });
+        addTask(l, "far", [](Task &t) { t.dueDate = day(40); });
+        addTask(l, "undated");
+        const auto smart = addList("Range", [](TaskList &sl) { sl.kind = ListKind::Smart; sl.smartRange = "next:1:w"; });
+        QCOMPARE(titles(build(list(smart))), QStringList{"soon"});
+        TaskList sl = m_store->list(smart);
+        sl.smartRange = "nodue";
+        storeList(sl);
+        QCOMPARE(titles(build(list(smart))), QStringList{"undated"});
+        sl.smartRange = "fixed:" + day(30).toString(Qt::ISODate) + ":";
+        storeList(sl);
+        QCOMPARE(titles(build(list(smart))), QStringList{"far"});
+    }
+
+    void listCompletedModeOverridesSetting() {
+        const auto l = addList("L");
+        addTask(l, "open");
+        addTask(l, "done", [](Task &t) { t.completed = true; t.completedAt = Now.addDays(-9); });
+        ViewOptions o;
+        o.completedWindowMinutes = 24 * 60;
+        QCOMPARE(titles(build(list(l), o)), QStringList{"open"});
+        TaskList ll = m_store->list(l);
+        ll.completedMode = 1;
+        storeList(ll);
+        QCOMPARE(sorted(titles(build(list(l), o))), (QStringList{"done", "open"}));
+        ll.completedMode = 2;
+        storeList(ll);
+        o.completedWindowMinutes = -1;
+        QCOMPARE(titles(build(list(l), o)), QStringList{"open"});
+    }
+
+    void inheritedSearchFiltersProjectChildren() {
+        const auto l = addList("L");
+        const auto proj = addTask(l, "proj", [](Task &t) { t.type = TaskType::Project; });
+        addTask(l, "urgent", [&](Task &t) { t.parentId = proj; t.priority = Priority::High; });
+        addTask(l, "casual", [&](Task &t) { t.parentId = proj; });
+        QCOMPARE(titles(build(Source{Source::Project, proj})).size(), 3);
+        ViewOptions o;
+        o.inheritSearch = true;
+        o.inheritedRule = "type: hiprio";
+        QCOMPARE(sorted(titles(build(Source{Source::Project, proj}, o))), (QStringList{"proj", "urgent"}));
+        // The typed search applies too, without hiding the project itself.
+        o.inheritedRule.clear();
+        o.search = "casual";
+        QCOMPARE(sorted(titles(build(Source{Source::Project, proj}, o))), (QStringList{"casual", "proj"}));
+        // Off, the project shows everything.
+        o.inheritSearch = false;
+        o.search.clear();
+        QCOMPARE(titles(build(Source{Source::Project, proj}, o)).size(), 3);
+    }
+
+    // ---- sorting ----
+
+    void sortByNote() {
+        const auto l = addList("L");
+        addTask(l, "none");
+        addTask(l, "b", [](Task &t) { t.notes = "banana"; });
+        addTask(l, "a", [](Task &t) { t.notes = "apple"; });
+        SortSpec s;
+        s.field = SortField::Note;
+        s.separated = false;
+        QCOMPARE(titles(build(list(l), {}, s)), (QStringList{"a", "b", "none"}));
+        s.ascending = false;
+        QCOMPARE(titles(build(list(l), {}, s)), (QStringList{"b", "a", "none"}));
+    }
+
+    void sortByLocation() {
+        Location attic, zoo;
+        attic.id = m_store->nextId("locations");
+        attic.name = "Attic";
+        zoo.id = attic.id + 1;
+        zoo.name = "Zoo";
+        m_store->begin("places");
+        m_store->putLocation(attic);
+        m_store->putLocation(zoo);
+        m_store->commit();
+        const auto l = addList("L");
+        addTask(l, "nowhere");
+        addTask(l, "zoo", [&](Task &t) { t.locationIds = {zoo.id}; });
+        addTask(l, "attic", [&](Task &t) { t.locationIds = {attic.id}; });
+        SortSpec s;
+        s.field = SortField::Location;
+        s.separated = false;
+        QCOMPARE(titles(build(list(l), {}, s)), (QStringList{"attic", "zoo", "nowhere"}));
+        s.separated = true;
+        QCOMPARE(keys(build(list(l), {}, s)), (QStringList{"loc:attic", "loc:zoo", "noloc"}));
     }
 };
 

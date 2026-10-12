@@ -229,8 +229,16 @@ public:
     Q_INVOKABLE void setFocusCondition(const QString &condition, bool on);
 
     // Smart Lists are saved searches.
-    Q_INVOKABLE qint64 saveSmartList(const QString &name, const QString &query);
+    Q_INVOKABLE qint64 saveSmartList(const QString &name, const QString &query, const QString &range = {},
+                                     int completedMode = 0, bool includeScheduled = false);
     Q_INVOKABLE void setSmartQuery(qint64 listId, const QString &query);
+    // The pieces of a Smart List the search builder edits.
+    Q_INVOKABLE QVariantMap smartListInfo(qint64 listId) const;
+    Q_INVOKABLE void updateSmartList(qint64 listId, const QString &name, const QString &query, const QString &range,
+                                     int completedMode, bool includeScheduled);
+    // Include/Exclude Completed on a list (0 follows the global setting).
+    Q_INVOKABLE void setListCompletedMode(qint64 id, int mode);
+    Q_INVOKABLE void deleteAllTasks(qint64 id);
 
     // Quick Entry and natural-language input.
     Q_INVOKABLE QVariantMap previewEntry(const QString &text) const;
@@ -415,6 +423,7 @@ private:
     RowModel m_tags;
     RowModel m_places;
     bool m_searchAll = false;
+    qint64 m_inheritFrom = 0;  // The Smart List a project view was opened from.
     class QProcess *m_recorder = nullptr;
     qint64 m_recordingTask = 0;
     QString m_recordingFile;

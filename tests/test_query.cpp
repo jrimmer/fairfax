@@ -740,6 +740,19 @@ private slots:
         QVERIFY(!Query::parse("type: emptyproj").matches(t, c));
         QVERIFY(Query::parse("type: notag").matches(t, c));
     }
+
+    void flagsNameCompletedAndScope() {
+        QVERIFY(Query::parse("completed: 7d").namesCompleted());
+        QVERIFY(Query::parse("type: donetoday OR overdue").namesCompleted());
+        QVERIFY(!Query::parse("type: !donetoday").namesCompleted());
+        QVERIFY(!Query::parse("!completed: 3").namesCompleted());
+        QVERIFY(!Query::parse("type: overdue").namesCompleted());
+        QVERIFY(Query::parse("lists: Work").replacesScope());
+        QVERIFY(Query::parse("groups: Home").replacesScope());
+        QVERIFY(Query::parse("completed: 1d").replacesScope());
+        QVERIFY(!Query::parse("tags: x milk").replacesScope());
+        QVERIFY(!Query::parse("milk").namesCompleted());
+    }
 };
 
 REGISTER_TEST(QueryTest)

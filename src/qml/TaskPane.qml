@@ -19,8 +19,11 @@ Item {
     property bool altHeld: false
 
     function focusList() { list.forceActiveFocus() }
-    function openSearchBuilder() { searchBuilder.openAt(search) }
-    function editSmartQuery() { Qt.callLater(() => { smartQuery.forceActiveFocus(); smartQuery.selectAll() }) }
+    function openSearchBuilder() {
+        if (backend.sourceIsSmart) editSmartQuery()
+        else searchBuilder.openAt(search)
+    }
+    function editSmartQuery() { searchBuilder.openForList(Number(backend.sourceKey.split(":")[1])) }
     function focusSearch() { search.expanded = true; search.field.forceActiveFocus() }
     function toggleProjectView() {
         if (backend.sourceKey.startsWith("project:")) {

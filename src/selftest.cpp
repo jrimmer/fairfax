@@ -80,6 +80,7 @@ void SelfTest::run(QQuickWindow *window, Backend *backend) {
         {"Escape", 400}, {"Ctrl+.", 200}, {"Ctrl+Alt+."}, {"Delete"}, {"Ctrl+Z"},
         {"Ctrl+Shift+Alt+F", 400}, {"Escape", 400}, {"Ctrl+1"}, {"Down"}, {"Return", 400}, {"Tab"}, {"Tab"},
         {"Tab"}, {"Down", 300}, {"Escape", 400}, {"Escape", 400}, {"Ctrl+,", 500}, {"Escape", 400},
+        {"j", 250}, {"type:Important"}, {"Return", 400}, {"Ctrl+Shift+Alt+F", 400}, {"Escape", 400},
         {"Ctrl+Alt+W", 600},
     };
 

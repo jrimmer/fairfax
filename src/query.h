@@ -42,8 +42,17 @@ public:
     static Query parse(const QString &text, QString *error = nullptr);
 
     bool isEmpty() const;
+    // Whether the query asks for completed tasks (completed:, type: donetoday
+    // and friends); views then show them whatever the completed-visibility
+    // setting says.
+    bool namesCompleted() const { return m_namesCompleted; }
+    // Whether the query names lists, groups or completed tasks. Such a search
+    // looks across every list, not just the one on screen.
+    bool replacesScope() const { return m_replacesScope; }
     bool matches(const Task &task, const QueryContext &context) const;
 
 private:
     std::shared_ptr<const Node> m_root;
+    bool m_namesCompleted = false;
+    bool m_replacesScope = false;
 };
