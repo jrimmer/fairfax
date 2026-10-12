@@ -221,7 +221,7 @@ Item {
             Layout.leftMargin: root.contentMargin
             Layout.rightMargin: root.contentMargin
             Layout.bottomMargin: 6
-            visible: !!calendar && calendar.sources.length > 0
+            visible: !!calendar && calendar.sources.length > 0 && backend.search === ""
                      && (backend.sourceKey === "today" || (backend.setting("calendar.inLists").value === "true" && !backend.sourceIsSmart && !backend.sourceKey.startsWith("project:")))
         }
 

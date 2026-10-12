@@ -22,6 +22,7 @@
 #include "diagnostics.h"
 #include "automation.h"
 #include "exchange.h"
+#include "markdown.h"
 #include "query.h"
 #include "recurrence.h"
 
@@ -1403,8 +1404,15 @@ void Backend::setNotes(qint64 id, const QString &notes) {
     Task t = m_store->task(id);
     if (!t.id || t.notes == notes)
         return;
+    // Notes stop at 500 KB; anything past it is cut, and the status line says so.
+    bool truncated = false;
+    const QString kept = Markdown::clampNotes(notes, &truncated);
+    if (truncated)
+        setStatus(QStringLiteral("Notes are limited to 500 KB; the rest was cut."));
+    if (t.notes == kept)
+        return;
     m_store->begin("Change Notes");
-    t.notes = notes;
+    t.notes = kept;
     m_store->putTask(t);
     m_store->commit();
 }
@@ -1821,6 +1829,27 @@ QVariantMap Backend::taskInfo(qint64 id) const {
                      return QUrl::fromLocalFile(m_store->attachmentsFolder() + "/" + a.fileName).toString();
              return QString();
          }()},
+        // The alert that fires next, as "Thu 15 Oct, 9:00 AM"; empty with none pending.
+        {"nextAlarm", [&] {
+             const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+             QDateTime next;
+             for (const auto &a : m_store->alarmsFor(t.id)) {
+                 const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
+                 if (moment.isValid() && moment > now && (!next.isValid() || moment < next))
+                     next = moment;
+             }
+             if (!next.isValid())
+                 return QString();
+             return Schedule::friendlyDateTime(next.date(), next.time().hour() * 60 + next.time().minute(), now.date(), false);
+         }()},
+        {"audio", [&] {
+             QVariantList items;
+             for (const auto &a : m_store->attachmentsFor(t.id))
+                 if (a.kind == Attachment::Audio)
+                     items.append(QVariantMap{{"id", a.id}, {"name", a.name}});
+             return items;
+         }()},
+        {"link", shareableLink(t.id)},
     };
 }
 
@@ -1872,6 +1901,64 @@ QVariantList Backend::findTasks(const QString &text, int limit, bool exact) cons
                                   {"completed", t.completed}});
     }
     return result;
+}
+
+qint64 Backend::resolveTaskLink(const QString &title, qint64 fromId) const {
+    const QString wanted = title.trimmed();
+    if (wanted.isEmpty())
+        return 0;
+    const qint64 homeList = fromId ? m_store->task(fromId).listId : 0;
+    // Tier 0 is an exact match, 1 ignores case, 2 is a prefix. The best task
+    // of the first tier that has any wins.
+    const Task *best = nullptr;
+    int bestTier = 3;
+    for (const auto &t : m_store->tasks()) {
+        if (t.deleted || t.id == fromId || t.title.isEmpty() || !m_store->lists().contains(t.listId) || m_store->list(t.listId).deleted)
+            continue;
+        const QString name = t.title.trimmed();
+        const int tier = name == wanted ? 0 : name.compare(wanted, Qt::CaseInsensitive) == 0 ? 1
+                         : name.startsWith(wanted, Qt::CaseInsensitive)                        ? 2
+                                                                                               : 3;
+        if (tier > bestTier || tier == 3)
+            continue;
+        bool better = tier < bestTier;
+        if (!better) {
+            const bool sameList = t.listId == homeList, bestSame = best->listId == homeList;
+            // Newest wins; edits within the same second fall back to the later task.
+            better = sameList != bestSame ? sameList
+                     : t.modified != best->modified ? t.modified > best->modified : t.id > best->id;
+        }
+        if (better) {
+            best = &t;
+            bestTier = tier;
+        }
+    }
+    return best ? best->id : 0;
+}
+
+bool Backend::openTaskLink(const QString &title, qint64 fromId) {
+    const qint64 id = resolveTaskLink(title, fromId);
+    if (!id) {
+        setStatus(QStringLiteral("No task named “%1”.").arg(title.trimmed()));
+        return false;
+    }
+    revealInList(id);
+    return true;
+}
+
+QString Backend::taskAsText(qint64 id) const {
+    const Task t = m_store->task(id);
+    if (!t.id)
+        return {};
+    return t.notes.trimmed().isEmpty() ? t.title : t.title + "\n" + t.notes.trimmed();
+}
+
+QString Backend::renderNotes(const QString &notes) const { return Markdown::previewSource(notes); }
+
+void Backend::copyText(const QString &text, const QString &status) {
+    QGuiApplication::clipboard()->setText(text);
+    if (!status.isEmpty())
+        setStatus(status);
 }
 
 void Backend::revealInList(qint64 taskId) {

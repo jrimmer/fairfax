@@ -211,6 +211,109 @@ private slots:
         QCOMPARE(Markdown::linkAt(multi, 3).start, 2);
     }
 
+    void returnContinuesLists() {
+        auto edit = [](const QString &t) { return Markdown::listContinuation(t, t.size()); };
+        QCOMPARE(edit("- milk").insert, QString("\n- "));
+        QCOMPARE(edit("  * nested").insert, QString("\n  * "));
+        QCOMPARE(edit("+ plus").insert, QString("\n+ "));
+        QCOMPARE(edit("9. nine").insert, QString("\n10. "));
+        QCOMPARE(edit("3) three").insert, QString("\n4) "));
+        QCOMPARE(edit("- [ ] todo").insert, QString("\n- [ ] "));
+        QCOMPARE(edit("- [x] done").insert, QString("\n- [ ] "));
+        QCOMPARE(edit("intro\n- a").insert, QString("\n- "));
+        QCOMPARE(edit("plain text").action, Markdown::ListEdit::None);
+        QCOMPARE(edit("**bold**").action, Markdown::ListEdit::None);
+        QCOMPARE(edit("***").action, Markdown::ListEdit::None);
+    }
+
+    void returnOnEmptyItemEndsList() {
+        const QString t = "- a\n- ";
+        const auto e = Markdown::listContinuation(t, t.size());
+        QCOMPARE(e.action, Markdown::ListEdit::End);
+        QCOMPARE(e.from, 4);
+        QCOMPARE(e.to, 6);
+        const QString box = "1. a\n2. [ ] ";
+        QCOMPARE(Markdown::listContinuation(box, box.size()).action, Markdown::ListEdit::End);
+    }
+
+    void returnLeavesFencesAndMidLine() {
+        const QString fenced = "```\n- not a list";
+        QCOMPARE(Markdown::listContinuation(fenced, fenced.size()).action, Markdown::ListEdit::None);
+        const QString mid = "- one two";
+        QCOMPARE(Markdown::listContinuation(mid, 5).action, Markdown::ListEdit::None);
+        const QString after = "```\ncode\n```\n- real";
+        QCOMPARE(Markdown::listContinuation(after, after.size()).action, Markdown::ListEdit::Continue);
+    }
+
+    void stamps() {
+        const QDateTime t(QDate(2026, 10, 12), QTime(15, 4, 5), QTimeZone::UTC);
+        QCOMPARE(Markdown::stampNames().size(), 10);
+        QCOMPARE(Markdown::stamp(4, t), QString("2026-10-12"));
+        QCOMPARE(Markdown::stamp(6, t), QString("2026-10-12T15:04:05Z"));
+        QVERIFY(Markdown::stamp(5, t).startsWith("2026-10-12 "));
+        QCOMPARE(Markdown::stamp(8, t), QLocale::system().dayName(t.date().dayOfWeek(), QLocale::LongFormat));
+        QCOMPARE(Markdown::stamp(9, t), QLocale::system().monthName(10, QLocale::LongFormat));
+        for (int i = 0; i < 10; ++i) QVERIFY(!Markdown::stamp(i, t).isEmpty());
+        QVERIFY(Markdown::stamp(10, t).isEmpty());
+    }
+
+    void copyLinksText() {
+        const QString t = "see https://a.example/x, mail bob@example.com\nand @{Other task} plus [doc](https://b.example)";
+        QCOMPARE(Markdown::linksAsText(t), QString("https://a.example/x\nbob@example.com\n@{Other task}\nhttps://b.example"));
+        QVERIFY(Markdown::linksAsText("nothing here").isEmpty());
+    }
+
+    void notesLimit() {
+        bool cut = true;
+        QCOMPARE(Markdown::clampNotes("short", &cut), QString("short"));
+        QVERIFY(!cut);
+        const QString big(Markdown::kNotesLimit + 100, QLatin1Char('a'));
+        const QString kept = Markdown::clampNotes(big, &cut);
+        QVERIFY(cut);
+        QCOMPARE(kept.toUtf8().size(), Markdown::kNotesLimit);
+        // Three-byte characters put the limit in the middle of one.
+        const QString euro(Markdown::kNotesLimit, QChar(0x20AC));
+        const QString kept2 = Markdown::clampNotes(euro, &cut);
+        QVERIFY(cut);
+        QVERIFY(kept2.toUtf8().size() <= Markdown::kNotesLimit);
+        QVERIFY(!kept2.contains(QChar::ReplacementCharacter));
+        QCOMPARE(kept2.size(), Markdown::kNotesLimit / 3);
+    }
+
+    void unresolvedTaskLinksAreStruck() {
+        QTextDocument doc;
+        doc.setPlainText("see @{Gone} and @{Here}");
+        MarkdownHighlighter h(&doc);
+        h.setDocument(&doc);
+        h.setColors(text, muted, accent, code, link, heading);
+        h.setUnresolved({"Gone"});
+        const QTextBlock b = doc.firstBlock();
+        QVERIFY(formatAt(b, 6).fontStrikeOut());
+        QCOMPARE(formatAt(b, 6).foreground().color(), muted);
+        QVERIFY(!formatAt(b, 18).fontStrikeOut());
+        QVERIFY(formatAt(b, 18).fontUnderline());
+    }
+
+    void highlightAndUnderlineRender() {
+        QTextDocument doc;
+        doc.setPlainText("a ::mark:: b <u>under</u> c [u]two[/u]");
+        MarkdownHighlighter h(&doc);
+        h.setDocument(&doc);
+        h.setColors(text, muted, accent, code, link, heading);
+        const QTextBlock b = doc.firstBlock();
+        QVERIFY(formatAt(b, 5).background().style() != Qt::NoBrush);
+        QVERIFY(formatAt(b, 17).fontUnderline());
+        QVERIFY(formatAt(b, 33).fontUnderline());
+    }
+
+    void previewSourceConverts() {
+        QCOMPARE(Markdown::previewSource("x ::hot:: y"), QString("x <mark>hot</mark> y"));
+        QCOMPARE(Markdown::previewSource("[u]a[/u]"), QString("<u>a</u>"));
+        QCOMPARE(Markdown::previewSource("see @{Weekly review}"), QString("see [Weekly review](precrime-task:Weekly%20review)"));
+        QCOMPARE(Markdown::previewSource("`::no::`"), QString("`::no::`"));
+        QCOMPARE(Markdown::previewSource("```\n::no:: @{x}\n```"), QString("```\n::no:: @{x}\n```"));
+    }
+
     void qmlWrapper() {
         NotesHighlighter n;
         const auto l = n.links("x @{A}");

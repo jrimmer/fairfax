@@ -132,7 +132,11 @@ offers your lists and `pc done <Tab>` your open tasks.
   .ics); the task right-click menu has Add to Calendar (opens the task as an event in your
   calendar app), Save as Event (.ics)… and Export Selection….
 - **Calendar day bar.** Add an iCalendar address in Settings → Calendar and today's events
-  appear above Today; drag a task onto the bar to block out time for it.
+  appear above Today; drag a task onto the bar to block out time for it. The arrows beside the
+  caption browse other days (Today jumps back), clicking an event shows its details and link,
+  and the expanded or collapsed state is remembered. Each calendar can be switched off or given
+  a colour, and invitations you declined (matched by your email addresses) are struck through.
+  The bar is hidden while searching.
 - **Mini calendar.** Busy days as a heat map, dots or nothing (the ⌄ beside the calendar
   button under the lists, which also shows or hides it and can shade weekends). Click a day
   to filter to it, drag across days for a range, ⌥-click to add a task due that day, scroll

@@ -668,6 +668,62 @@ Window {
                         }
                     }
                     Toggle { key: "calendar.inLists"; fallback: false; label: "Show events above every list, not just Today" }
+
+                    Label { text: "Calendars"; font.weight: Font.DemiBold; Layout.topMargin: 8; visible: calendarRows.count > 0 }
+                    Repeater {
+                        id: calendarRows
+                        model: calendar ? calendar.sourceInfo : []
+                        delegate: RowLayout {
+                            id: calendarRow
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: 8
+                            CheckBox {
+                                checked: modelData.enabled
+                                text: modelData.name
+                                Layout.fillWidth: true
+                                onToggled: {
+                                    const off = calendar.disabledSources.filter(s => s !== modelData.source)
+                                    if (!checked) off.push(modelData.source)
+                                    calendar.disabledSources = off
+                                    backend.setSetting("calendar.disabled", off.join("\n"))
+                                }
+                            }
+                            Repeater {
+                                model: calendar ? calendar.palette : []
+                                delegate: Rectangle {
+                                    required property string modelData
+                                    readonly property var info: calendarRow.modelData
+                                    width: 16; height: 16; radius: 8
+                                    color: modelData
+                                    opacity: info.enabled ? 1 : 0.4
+                                    border.width: Qt.colorEqual(modelData, info.color) ? 2 : 0
+                                    border.color: theme.foreground
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            const colors = Object.assign({}, calendar.sourceColors)
+                                            colors[parent.info.source] = parent.modelData
+                                            calendar.sourceColors = colors
+                                            backend.setSetting("calendar.colors", JSON.stringify(colors))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Label { text: "My email addresses"; Layout.topMargin: 8 }
+                    TextField {
+                        Layout.fillWidth: true
+                        text: String(root.value("calendar.emails", ""))
+                        placeholderText: "me@example.com, me@work.example"
+                        onEditingFinished: {
+                            backend.setSetting("calendar.emails", text.trim())
+                            calendar.myEmails = text.trim()
+                        }
+                    }
+                    Hint { Layout.topMargin: 0; text: "Invitations you declined, matched by these comma-separated addresses, show struck through and leave their time free." }
                     Text { visible: !!calendar && calendar.error !== ""; text: calendar ? calendar.error : ""; color: theme.overdue; wrapMode: Text.Wrap; Layout.fillWidth: true }
                 }
 

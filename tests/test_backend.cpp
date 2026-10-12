@@ -2,6 +2,7 @@
 #include <QtTest>
 
 #include "backend.h"
+#include "markdown.h"
 #include "store.h"
 #include "testregistry.h"
 #include "views.h"
@@ -839,6 +840,92 @@ private slots:
         f.addTask("Log in to bank");
         QCOMPARE(f.backend->findTasks("log", 10, false).size(), 2);
         QCOMPARE(f.backend->findTasks("log", 10, true).size(), 1);
+    }
+
+    void taskLinksResolveByTitleTiers() {
+        // Titles avoid words like "weekly" that the title parser would read as a repeat.
+        Fixture f;
+        const qint64 home = f.addTask("Home base");
+        QTest::qWait(5);
+        const qint64 exact = f.addTask("Budget review");
+        QTest::qWait(5);
+        f.addTask("budget REVIEW");
+        QTest::qWait(5);
+        const qint64 prefix = f.addTask("Budget review notes");
+        // Exact beats the case-insensitive and prefix matches.
+        QCOMPARE(f.backend->resolveTaskLink("Budget review", home), exact);
+        // Without an exact match, ignoring case comes next, then prefix.
+        QVERIFY(f.backend->resolveTaskLink("BUDGET review", home) != prefix);
+        QCOMPARE(f.backend->resolveTaskLink("budget review n", home), prefix);
+        QCOMPARE(f.backend->resolveTaskLink("nothing like it", home), qint64(0));
+        QCOMPARE(f.backend->resolveTaskLink("", home), qint64(0));
+    }
+
+    void taskLinkPrefersSameListThenNewest() {
+        Fixture f;
+        qint64 other = 0;
+        for (const auto &l : f.store.lists())
+            if (!l.deleted && l.kind != ListKind::Smart && l.id != f.firstList() && (!other || l.id < other)) other = l.id;
+        QVERIFY(other);
+        const qint64 older = f.addTask("Call plumber");
+        QTest::qWait(5);
+        const qint64 newer = f.addTask("Call plumber");
+        QTest::qWait(5);
+        const qint64 source = f.addTask("Source");
+        // Same list, same title: the most recently changed wins.
+        QCOMPARE(f.backend->resolveTaskLink("Call plumber", source), newer);
+        // Move the newer one elsewhere: the one in the source's list wins even though it is older.
+        Task moved = f.store.task(newer);
+        moved.listId = other;
+        f.store.begin("move");
+        f.store.putTask(moved);
+        f.store.commit();
+        QCOMPARE(f.backend->resolveTaskLink("Call plumber", source), older);
+    }
+
+    void taskLinkNeverResolvesToItself() {
+        Fixture f;
+        const qint64 only = f.addTask("Lonely");
+        QCOMPARE(f.backend->resolveTaskLink("Lonely", only), qint64(0));
+        QVERIFY(!f.backend->openTaskLink("Lonely", only));
+        const qint64 twin = f.addTask("Lonely");
+        QCOMPARE(f.backend->resolveTaskLink("Lonely", only), twin);
+        QCOMPARE(f.backend->resolveTaskLink("Lonely", twin), only);
+    }
+
+    void taskLinksIncludeCompletedAndSkipDeleted() {
+        Fixture f;
+        const qint64 done = f.addTask("Archived idea");
+        Task t = f.store.task(done);
+        t.completed = true;
+        f.store.begin("done");
+        f.store.putTask(t);
+        f.store.commit();
+        QCOMPARE(f.backend->resolveTaskLink("Archived idea"), done);
+        t.deleted = true;
+        f.store.begin("del");
+        f.store.putTask(t);
+        f.store.commit();
+        QCOMPARE(f.backend->resolveTaskLink("Archived idea"), qint64(0));
+    }
+
+    void notesAreCappedAt500KB() {
+        Fixture f;
+        const qint64 id = f.addTask("Big notes");
+        f.backend->setNotes(id, QString(Markdown::kNotesLimit + 5000, QLatin1Char('x')));
+        QCOMPARE(f.store.task(id).notes.toUtf8().size(), Markdown::kNotesLimit);
+        f.backend->setNotes(id, "small");
+        QCOMPARE(f.store.task(id).notes, QString("small"));
+    }
+
+    void taskInfoCarriesAudioAndNextAlarm() {
+        Fixture f;
+        const qint64 id = f.addTask("Remind me");
+        QVERIFY(f.backend->taskInfo(id).value("nextAlarm").toString().isEmpty());
+        QVERIFY(f.backend->taskInfo(id).value("audio").toList().isEmpty());
+        QCOMPARE(f.backend->taskAsText(id), QString("Remind me"));
+        f.backend->setNotes(id, "line two");
+        QCOMPARE(f.backend->taskAsText(id), QString("Remind me\nline two"));
     }
 };
 

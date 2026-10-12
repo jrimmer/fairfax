@@ -260,6 +260,18 @@ public:
     Q_INVOKABLE QVariantMap taskInfo(qint64 id) const;
     Q_INVOKABLE QVariantList findTasks(const QString &text, int limit = 12, bool exact = false) const;
     Q_INVOKABLE void revealInList(qint64 taskId);
+    // @{Title} links. A link resolves to the task whose title matches exactly,
+    // else case-insensitively, else by prefix; within a tier a task in the same
+    // list as `fromId` wins, then the most recently changed. A task never
+    // links to itself. Returns 0 when nothing matches.
+    Q_INVOKABLE qint64 resolveTaskLink(const QString &title, qint64 fromId = 0) const;
+    // Reveals the linked task, or says in the status line that there is none.
+    Q_INVOKABLE bool openTaskLink(const QString &title, qint64 fromId = 0);
+    // A task as plain text (title, then notes), as Quick Look's "Copy as Text" puts it.
+    Q_INVOKABLE QString taskAsText(qint64 id) const;
+    // Notes as Quick Look renders them: Markdown with clickable task links.
+    Q_INVOKABLE QString renderNotes(const QString &notes) const;
+    Q_INVOKABLE void copyText(const QString &text, const QString &status = QString());
     // The jump, find and quick-open bars. Jump lists every list, including
     // those in collapsed groups; find looks inside collapsed projects too;
     // Quick Open starts from what was visited lately.

@@ -217,12 +217,15 @@ void Backend::seedDemo() {
             return QStringLiteral("BEGIN:VEVENT\r\nUID:%1\r\nSUMMARY:%2\r\nDTSTART:%3T%4\r\nDTEND:%3T%5\r\nEND:VEVENT\r\n")
                 .arg(uid, title, day, start, end);
         };
-        file.write(("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Precrime//Demo//EN\r\n" +
+        file.write(("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Precrime//Demo//EN\r\nX-WR-CALNAME:Work\r\n" +
                     event("standup", "Team stand-up", "093000", "100000") + event("jeremy", "Call with Jeremy", "110000", "114500") +
                     event("lunch", "Lunch with Ana", "123000", "133000") + event("review", "Design review", "150000", "160000") +
+                    // Declined by the demo user, so the bar shows it struck through.
+                    event("sync", "Vendor sync", "163000", "170000").replace("END:VEVENT", "ATTENDEE;PARTSTAT=DECLINED:mailto:me@example.com\r\nEND:VEVENT") +
                     "END:VCALENDAR\r\n").toUtf8());
         file.close();
         m_store->setSetting("calendar.sources", ics);
+        m_store->setSetting("calendar.emails", "me@example.com");
     }
     rebuild();
 }

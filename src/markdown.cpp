@@ -1,6 +1,8 @@
 #include "markdown.h"
 
 #include <QFont>
+#include <QLocale>
+#include <QUrl>
 #include <QQuickTextDocument>
 #include <QRegularExpression>
 #include <QTextCharFormat>
@@ -136,6 +138,139 @@ Link linkAt(const QString &notes, int position) {
     return {};
 }
 
+ListEdit listContinuation(const QString &notes, int cursor) {
+    cursor = std::clamp(cursor, 0, int(notes.size()));
+    int start = cursor;
+    while (start > 0 && !isLineBreak(notes[start - 1])) --start;
+    int end = cursor;
+    while (end < notes.size() && !isLineBreak(notes[end])) ++end;
+    if (cursor != end) return {};
+
+    // Inside a fenced block (or on a fence line) Return is just a newline.
+    bool fenced = false;
+    for (int pos = 0; pos < start;) {
+        int e = pos;
+        while (e < notes.size() && !isLineBreak(notes[e])) ++e;
+        if (fenceRe().match(notes.mid(pos, e - pos)).hasMatch()) fenced = !fenced;
+        pos = e + 1;
+    }
+    const QString line = notes.mid(start, end - start);
+    if (fenced || fenceRe().match(line).hasMatch()) return {};
+
+    static const QRegularExpression itemRe(R"(^(\s*)(?:([-*+])|(\d{1,9})([.)]))(\s+)(\[[ xX]\](?=\s|$)\s*)?)");
+    const auto m = itemRe.match(line);
+    if (!m.hasMatch()) return {};
+
+    ListEdit edit;
+    if (line.mid(m.capturedEnd()).trimmed().isEmpty()) {
+        edit.action = ListEdit::End;
+        edit.from = start;
+        edit.to = end;
+        return edit;
+    }
+    QString marker = m.captured(2);
+    if (marker.isEmpty()) marker = QString::number(m.captured(3).toLongLong() + 1) + m.captured(4);
+    edit.action = ListEdit::Continue;
+    edit.insert = QStringLiteral("\n") + m.captured(1) + marker + m.captured(5) + (m.capturedStart(6) >= 0 ? QStringLiteral("[ ] ") : QString());
+    return edit;
+}
+
+QStringList stampNames() {
+    return {QStringLiteral("Short Date"),        QStringLiteral("Short Date & Time"), QStringLiteral("Long Date"),
+            QStringLiteral("Long Date & Time"),  QStringLiteral("Universal Date"),    QStringLiteral("Universal Date & Time"),
+            QStringLiteral("ISO 8601 Date & Time"), QStringLiteral("Time"),           QStringLiteral("Weekday"),
+            QStringLiteral("Month")};
+}
+
+QString stamp(int format, const QDateTime &moment) {
+    const QLocale locale = QLocale::system();
+    const QDate date = moment.date();
+    const QString time = locale.toString(moment.time(), QLocale::ShortFormat);
+    switch (format) {
+    case 0: return locale.toString(date, QLocale::ShortFormat);
+    case 1: return locale.toString(date, QLocale::ShortFormat) + QStringLiteral(" ") + time;
+    case 2: return locale.toString(date, QLocale::LongFormat);
+    case 3: return locale.toString(date, QLocale::LongFormat) + QStringLiteral(" ") + time;
+    case 4: return date.toString(QStringLiteral("yyyy-MM-dd"));
+    case 5: return date.toString(QStringLiteral("yyyy-MM-dd")) + QStringLiteral(" ") + time;
+    case 6: return moment.toUTC().toString(QStringLiteral("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+    case 7: return time;
+    case 8: return locale.dayName(date.dayOfWeek(), QLocale::LongFormat);
+    case 9: return locale.monthName(date.month(), QLocale::LongFormat);
+    default: return {};
+    }
+}
+
+QString linksAsText(const QString &notes) {
+    QStringList lines;
+    for (const Link &l : links(notes)) {
+        if (l.kind == QLatin1String("task")) lines << QStringLiteral("@{") + l.target + u'}';
+        else if (l.kind == QLatin1String("email")) lines << l.target.mid(l.target.startsWith(u"mailto:", Qt::CaseInsensitive) ? 7 : 0);
+        else lines << l.target;
+    }
+    return lines.join(u'\n');
+}
+
+QString clampNotes(const QString &notes, bool *truncated) {
+    if (truncated) *truncated = false;
+    // A UTF-16 unit is at most 3 bytes of UTF-8, so short notes need no encoding pass.
+    if (qint64(notes.size()) * 3 <= kNotesLimit) return notes;
+    const QByteArray bytes = notes.toUtf8();
+    if (bytes.size() <= kNotesLimit) return notes;
+    // Back up to the start of the character the limit falls inside.
+    int cut = kNotesLimit;
+    while (cut > 0 && (static_cast<uchar>(bytes[cut]) & 0xC0) == 0x80) --cut;
+    if (truncated) *truncated = true;
+    return QString::fromUtf8(bytes.constData(), cut);
+}
+
+QString previewSource(const QString &notes) {
+    static const QRegularExpression codeRe(R"((`+)(?!`)(.+?)(?<!`)\1(?!`))");
+    static const QRegularExpression markRe(R"((?<![\\:]):{2}(?=[^\s:])(.+?)(?<=[^\s:]):{2}(?!:))");
+    static const QRegularExpression underRe(R"(\[u\](.+?)\[/u\])", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression taskRe(R"(@\{([^{}\n]+)\})");
+
+    auto convert = [](QString s) {
+        s.replace(underRe, QStringLiteral("<u>\\1</u>"));
+        s.replace(markRe, QStringLiteral("<mark>\\1</mark>"));
+        QString out;
+        int last = 0;
+        for (auto it = taskRe.globalMatch(s); it.hasNext();) {
+            const auto m = it.next();
+            const QString title = m.captured(1).trimmed();
+            if (title.isEmpty()) continue;
+            QString label = title;
+            label.replace(u'\\', QStringLiteral("\\\\")).replace(u'[', QStringLiteral("\\[")).replace(u']', QStringLiteral("\\]"));
+            out += s.mid(last, m.capturedStart() - last) + u'[' + label + QStringLiteral("](precrime-task:")
+                   + QString::fromLatin1(QUrl::toPercentEncoding(title)) + u')';
+            last = m.capturedEnd();
+        }
+        return out + s.mid(last);
+    };
+
+    QStringList out;
+    bool fenced = false;
+    for (const QString &line : notes.split(u'\n')) {
+        if (fenceRe().match(line).hasMatch()) {
+            fenced = !fenced;
+            out << line;
+        } else if (fenced) {
+            out << line;
+        } else {
+            // Code spans keep their text exactly as typed.
+            QString result;
+            int last = 0;
+            for (auto it = codeRe.globalMatch(line); it.hasNext();) {
+                const auto m = it.next();
+                result += convert(line.mid(last, m.capturedStart() - last)) + m.captured(0);
+                last = m.capturedEnd();
+            }
+            out << result + convert(line.mid(last));
+        }
+    }
+    return out.join(u'\n');
+}
+
 }  // namespace Markdown
 
 // ---------------------------------------------------------------------------
@@ -160,6 +295,12 @@ void MarkdownHighlighter::setColors(const QColor &text, const QColor &muted, con
     m_code = code;
     m_link = link;
     m_heading = heading;
+    rehighlight();
+}
+
+void MarkdownHighlighter::setUnresolved(const QStringList &titles) {
+    if (titles == m_unresolved) return;
+    m_unresolved = titles;
     rehighlight();
 }
 
@@ -286,6 +427,12 @@ void MarkdownHighlighter::highlightBlock(const QString &text) {
             markers.append({l.start, 1});
             markers.append({l.start + 1 + l.text.size(), l.length - 1 - l.text.size()});
             blank(l.start, l.length, u'x');
+        } else if (l.kind == QLatin1String("task") && m_unresolved.contains(l.target)) {
+            // A link to nothing: dimmed and struck through so it reads as dead.
+            QTextCharFormat dead = fg(m_muted);
+            dead.setFontStrikeOut(true);
+            apply(l.start, l.length, dead);
+            blank(l.start, l.length, u'x');
         } else {
             apply(l.start, l.length, linkFormat);
             blank(l.start, l.length, u'x');
@@ -367,6 +514,32 @@ void NotesHighlighter::set(QColor &field, const QColor &value) {
     field = value;
     emit colorsChanged();
 }
+
+void NotesHighlighter::setUnresolved(const QStringList &titles) {
+    if (titles == m_unresolved) return;
+    m_unresolved = titles;
+    m_highlighter->setUnresolved(titles);
+    emit unresolvedChanged();
+}
+
+QVariantMap NotesHighlighter::listContinuation(const QString &text, int cursor) const {
+    const Markdown::ListEdit e = Markdown::listContinuation(text, cursor);
+    const char *action = e.action == Markdown::ListEdit::Continue ? "continue" : e.action == Markdown::ListEdit::End ? "end" : "none";
+    return {{"action", QString::fromLatin1(action)}, {"insert", e.insert}, {"from", e.from}, {"to", e.to}};
+}
+
+QVariantList NotesHighlighter::stampFormats() const {
+    QVariantList out;
+    const QDateTime now = QDateTime::currentDateTime();
+    const QStringList names = Markdown::stampNames();
+    for (int i = 0; i < names.size(); ++i) out.append(QVariantMap{{"name", names[i]}, {"example", Markdown::stamp(i, now)}});
+    return out;
+}
+
+QString NotesHighlighter::stamp(int format) const { return Markdown::stamp(format, QDateTime::currentDateTime()); }
+QString NotesHighlighter::linksAsText(const QString &text) const { return Markdown::linksAsText(text); }
+QString NotesHighlighter::clamp(const QString &text) const { return Markdown::clampNotes(text); }
+QString NotesHighlighter::previewSource(const QString &text) const { return Markdown::previewSource(text); }
 
 QVariantList NotesHighlighter::links(const QString &text) const {
     QVariantList out;

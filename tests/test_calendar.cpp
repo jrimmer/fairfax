@@ -298,6 +298,52 @@ private slots:
         QCOMPARE(feed.today().size(), 0);
     }
 
+    void parsesCalendarNameAndDetails() {
+        const QByteArray ics = wrap(QStringLiteral("X-WR-CALNAME:Team\\, Work\n") + vevent("DTSTART:20260715T090000Z\nDTEND:20260715T100000Z\nDESCRIPTION:Agenda\\nSecond line\nURL:https://example.com/m\nLOCATION:Room 1"));
+        // Calendar-level properties must precede the events, and wrap() puts them there.
+        QCOMPARE(Ics::calendarName(ics), QStringLiteral("Team, Work"));
+        QCOMPARE(Ics::calendarName(wrap(vevent("DTSTART:20260715T090000Z"))), QString());
+        const auto events = Ics::parse(ics, "cal");
+        QCOMPARE(events[0].description, QStringLiteral("Agenda\nSecond line"));
+        QCOMPARE(events[0].url, QStringLiteral("https://example.com/m"));
+    }
+
+    void feedUsesCalendarNameAndDisablesSources() {
+        Zone z("UTC");
+        CalendarFeed feed;
+        feed.setSources({"/nonexistent/a.ics", "/nonexistent/b.ics"});
+        feed.loadData("/nonexistent/a.ics", wrap(QStringLiteral("X-WR-CALNAME:Personal\n") + vevent("DTSTART:20260715T090000Z\nDTEND:20260715T100000Z")));
+        feed.loadData("/nonexistent/b.ics", wrap(vevent("DTSTART:20260715T110000Z\nDTEND:20260715T120000Z")));
+        auto info = feed.sourceInfo();
+        QCOMPARE(info[0].toMap()["name"].toString(), QStringLiteral("Personal"));
+        QCOMPARE(info[1].toMap()["name"].toString(), QStringLiteral("b"));
+        QCOMPARE(feed.eventsFor("2026-07-15").size(), 2);
+        QCOMPARE(feed.eventsFor("2026-07-15")[0].toMap()["calendar"].toString(), QStringLiteral("Personal"));
+
+        feed.setDisabledSources({"/nonexistent/a.ics"});
+        QCOMPARE(feed.eventsFor("2026-07-15").size(), 1);
+        QVERIFY(!feed.sourceInfo()[0].toMap()["enabled"].toBool());
+
+        feed.setSourceColors({{"/nonexistent/b.ics", "#123456"}});
+        QCOMPARE(feed.eventsFor("2026-07-15")[0].toMap()["color"].value<QColor>(), QColor("#123456"));
+        QVERIFY(feed.sourceInfo()[1].toMap()["customColor"].toBool());
+    }
+
+    void declinedEventsMatchMyAddresses() {
+        Zone z("UTC");
+        CalendarFeed feed;
+        feed.setSources({"/nonexistent/d.ics"});
+        feed.loadData("/nonexistent/d.ics", wrap(vevent("DTSTART:20260715T090000Z\nDTEND:20260715T100000Z\nATTENDEE;CN=Me;PARTSTAT=DECLINED:mailto:Me@Example.com\nATTENDEE;PARTSTAT=ACCEPTED:mailto:other@example.com")));
+        QVERIFY(!feed.eventsFor("2026-07-15")[0].toMap()["declined"].toBool());
+        feed.setMyEmails("x@y.org, me@example.com");
+        QVERIFY(feed.eventsFor("2026-07-15")[0].toMap()["declined"].toBool());
+        // A declined meeting no longer blocks the time.
+        QCOMPARE(feed.freeSlots("2026-07-15", 8 * 60, 12 * 60).size(), 1);
+        QCOMPARE(feed.freeSlots("2026-07-15", 8 * 60, 12 * 60)[0].toMap()["end"].toInt(), 12 * 60);
+        feed.setMyEmails("someone@else.org");
+        QVERIFY(!feed.eventsFor("2026-07-15")[0].toMap()["declined"].toBool());
+    }
+
     void dayBarLoadsAndTimeBlocks() {
         Zone z("UTC");
         const QString path = findQml();

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 
 // The Calendar Day Bar: today's calendar events as a slim timeline above the
 // task list, expandable into a scrollable hour grid with the free gaps marked.
@@ -12,12 +13,30 @@ Item {
     id: root
 
     property bool expanded: false
-    // The day shown; always today for now, but kept as a property so a date
-    // picker can drive it later.
-    property string isoDate: Qt.formatDate(new Date(), "yyyy-MM-dd")
-    readonly property var events: calendar ? calendar.today : []
+    // Days away from today that the bar shows; 0 is today.
+    property int dayOffset: 0
+    // Today's date, kept current by the minute timer independently of dayOffset
+    // so browsing survives midnight without jumping back.
+    property string baseIso: Qt.formatDate(new Date(), "yyyy-MM-dd")
+    readonly property string isoDate: addDays(baseIso, dayOffset)
+    readonly property date shownDate: parseIso(isoDate)
+    // Reading calendar.today makes the binding re-run whenever the feed changes.
+    readonly property var events: {
+        if (!calendar) return []
+        const today = calendar.today
+        return dayOffset === 0 ? today : calendar.eventsFor(isoDate)
+    }
     readonly property int nowMinute: calendar ? calendar.nowMinute : 0
-    readonly property bool isToday: isoDate === Qt.formatDate(new Date(), "yyyy-MM-dd")
+    readonly property bool isToday: dayOffset === 0
+    // The caption for another day describes that day; today's comes from the feed.
+    readonly property string captionText: {
+        if (!calendar) return ""
+        if (dayOffset === 0) return calendar.caption
+        const n = events.length
+        const name = dayOffset === 1 ? "Tomorrow" : dayOffset === -1 ? "Yesterday" : Qt.formatDate(shownDate, "ddd, MMM d")
+        return name + " · " + (n === 0 ? "no events" : n === 1 ? "1 event" : n + " events")
+    }
+    property var detailEvent: null
 
     // Show 7:00-22:00 unless an event falls outside it, so a late meeting is
     // never clipped off the edge.
@@ -48,7 +67,57 @@ Item {
         interval: 60 * 1000
         running: root.visible
         repeat: true
-        onTriggered: root.isoDate = Qt.formatDate(new Date(), "yyyy-MM-dd")
+        onTriggered: root.baseIso = Qt.formatDate(new Date(), "yyyy-MM-dd")
+    }
+
+    function parseIso(iso) {
+        const p = iso.split("-")
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
+    }
+
+    function addDays(iso, n) {
+        const d = parseIso(iso)
+        d.setDate(d.getDate() + n)
+        return Qt.formatDate(d, "yyyy-MM-dd")
+    }
+
+    // Expanded or collapsed is remembered between sessions. The backend is
+    // absent or minimal in tests, so every call is guarded.
+    readonly property bool canPersist: !!backend && typeof backend.setting === "function" && typeof backend.setSetting === "function"
+    property bool restored: false
+    Component.onCompleted: {
+        if (canPersist) expanded = backend.setting("calendar.expanded").value === "true"
+        restored = true
+    }
+    onExpandedChanged: {
+        // Collapsing returns to today, as the collapsed strip is always about today.
+        if (!expanded) dayOffset = 0
+        else Qt.callLater(scrollToNow)
+        if (restored && canPersist) backend.setSetting("calendar.expanded", expanded ? "true" : "false")
+    }
+
+    function fmt(minute) {
+        const h = Math.floor(minute / 60) % 24, m = minute % 60
+        return (h % 12 === 0 ? 12 : h % 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? " AM" : " PM")
+    }
+
+    function timeRange(e) {
+        return e.allDay ? "All day" : fmt(e.start) + " – " + fmt(e.end === 1440 ? 0 : e.end)
+    }
+
+    function showDetails(e, item) {
+        detailEvent = e
+        const p = item.mapToItem(root, 0, item.height + 4)
+        details.x = Math.max(0, Math.min(p.x, root.width - details.width))
+        details.y = p.y
+        details.open()
+    }
+
+    // The link to offer: the event's URL, else the first address in its text.
+    function linkFor(e) {
+        if (e.url) return e.url
+        const m = (e.location + " " + e.description).match(/https?:\/\/[^\s<>"]+/)
+        return m ? m[0] : ""
     }
 
     function snap(minute) {
@@ -106,7 +175,7 @@ Item {
         const y = (nowMinute - firstMinute) / 60 * rowHeight - rowHeight
         grid.contentY = Math.max(0, Math.min(y, grid.contentHeight - grid.height))
     }
-    onExpandedChanged: if (expanded) Qt.callLater(scrollToNow)
+
 
     Column {
         id: column
@@ -118,7 +187,7 @@ Item {
             width: parent.width
             height: 20
 
-            readonly property int sep: calendar ? calendar.caption.indexOf(" · ") : -1
+            readonly property int sep: root.captionText.indexOf(" · ")
 
             Row {
                 anchors.verticalCenter: parent.verticalCenter
@@ -127,17 +196,17 @@ Item {
                     visible: parent.parent.sep >= 0
                     anchors.verticalCenter: parent.verticalCenter
                     width: 8; height: 8; radius: 4
-                    color: calendar && calendar.captionColor.valid ? calendar.captionColor : theme.accent
+                    color: calendar && root.isToday && calendar.captionColor.valid ? calendar.captionColor : theme.accent
                 }
                 Text {
                     visible: parent.parent.sep >= 0
-                    text: calendar ? calendar.caption.substring(0, parent.parent.sep) : ""
+                    text: root.captionText.substring(0, parent.parent.sep)
                     color: theme.foreground
                     font.pixelSize: root.pointSize
                     font.weight: Font.DemiBold
                 }
                 Text {
-                    text: !calendar ? "" : parent.parent.sep >= 0 ? calendar.caption.substring(parent.parent.sep + 3) : calendar.caption
+                    text: parent.parent.sep >= 0 ? root.captionText.substring(parent.parent.sep + 3) : root.captionText
                     color: theme.muted
                     font.pixelSize: root.pointSize
                 }
@@ -153,6 +222,39 @@ Item {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.expanded = !root.expanded
+            }
+
+            // Browse other days: a "Today" link appears once away from today.
+            Row {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                Text {
+                    visible: root.dayOffset !== 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Today"
+                    color: theme.accent
+                    font.pixelSize: root.pointSize
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.dayOffset = 0
+                    }
+                }
+                Repeater {
+                    model: [{ icon: "chevronLeft", step: -1 }, { icon: "chevronRight", step: 1 }]
+                    delegate: Item {
+                        required property var modelData
+                        width: 20; height: 20
+                        Icon { anchors.centerIn: parent; name: modelData.icon; size: 12; color: theme.muted }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.dayOffset += modelData.step
+                        }
+                    }
+                }
             }
         }
 
@@ -174,6 +276,12 @@ Item {
                         radius: 8
                         width: Math.min(110, pillText.implicitWidth + 12)
                         color: Qt.alpha(modelData.color, 0.7)
+                        opacity: modelData.declined ? 0.4 : 1
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.showDetails(modelData, parent)
+                        }
                         Text {
                             id: pillText
                             anchors.centerIn: parent
@@ -182,6 +290,7 @@ Item {
                             text: modelData.title
                             color: theme.foreground
                             font.pixelSize: root.pointSize - 1
+                            font.strikeout: modelData.declined
                         }
                     }
                 }
@@ -217,6 +326,13 @@ Item {
                         height: parent.height - 6
                         radius: 2
                         color: Qt.alpha(modelData.color, 0.7)
+                        opacity: modelData.declined ? 0.35 : 1
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -2
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.showDetails(modelData, parent)
+                        }
                     }
                 }
                 Rectangle {
@@ -266,7 +382,7 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
 
             readonly property real labelWidth: 48
-            readonly property var slots: root.expanded
+            readonly property var slots: root.expanded && root.events
                 ? calendar.freeSlots(root.isoDate, root.isToday ? Math.max(root.firstMinute, root.nowMinute) : root.firstMinute, root.lastMinute) : []
 
             function yFor(minute) { return (minute - root.firstMinute) / 60 * root.rowHeight + 4 }
@@ -324,7 +440,13 @@ Item {
                     height: Math.max(18, (modelData.e.end - modelData.e.start) / 60 * root.rowHeight - 1)
                     radius: 5
                     color: Qt.alpha(modelData.e.color, 0.7)
+                    opacity: modelData.e.declined ? 0.4 : 1
                     clip: true
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.showDetails(modelData.e, parent)
+                    }
                     Column {
                         x: 6; y: 2
                         width: parent.width - 12
@@ -335,6 +457,7 @@ Item {
                             color: theme.foreground
                             font.pixelSize: root.pointSize
                             font.weight: Font.DemiBold
+                            font.strikeout: modelData.e.declined
                         }
                         Text {
                             visible: modelData.e.location !== "" && parent.parent.height > 38
@@ -386,6 +509,81 @@ Item {
                     root.commitDrop(root.firstMinute + (drop.y + y - 4) / root.rowHeight * 60)
                     drop.accept()
                 }
+            }
+        }
+    }
+
+    // Details of the clicked event. Events are read-only here, as in the reference app.
+    Popup {
+        id: details
+        parent: root
+        width: Math.min(320, root.width)
+        padding: 12
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle {
+            color: theme.raised
+            border.color: theme.divider
+            radius: 8
+        }
+        contentItem: Column {
+            spacing: 4
+            readonly property var e: root.detailEvent || ({ title: "", start: 0, end: 0, allDay: false, color: "transparent", location: "", calendar: "", description: "", url: "", declined: false })
+            Text {
+                width: parent.width
+                text: parent.e.title
+                wrapMode: Text.Wrap
+                color: theme.foreground
+                font.pixelSize: root.pointSize + 1
+                font.weight: Font.DemiBold
+                font.strikeout: parent.e.declined
+            }
+            Text {
+                width: parent.width
+                text: Qt.formatDate(root.shownDate, "dddd, MMMM d") + " · " + root.timeRange(parent.e)
+                color: theme.muted
+                font.pixelSize: root.pointSize
+                wrapMode: Text.Wrap
+            }
+            Text {
+                visible: parent.e.declined
+                text: "You declined this invitation"
+                color: theme.overdue
+                font.pixelSize: root.pointSize
+            }
+            Text {
+                visible: parent.e.location !== ""
+                width: parent.width
+                text: parent.e.location
+                color: theme.foreground
+                font.pixelSize: root.pointSize
+                wrapMode: Text.Wrap
+            }
+            Row {
+                visible: parent.e.calendar !== ""
+                spacing: 6
+                Rectangle { y: 4; width: 8; height: 8; radius: 4; color: parent.parent.e.color }
+                Text { text: parent.parent.e.calendar; color: theme.muted; font.pixelSize: root.pointSize }
+            }
+            Text {
+                visible: parent.e.description !== ""
+                width: parent.width
+                text: parent.e.description
+                maximumLineCount: 6
+                elide: Text.ElideRight
+                wrapMode: Text.Wrap
+                color: theme.foreground
+                font.pixelSize: root.pointSize
+            }
+            Text {
+                readonly property string link: root.linkFor(parent.e)
+                visible: link !== ""
+                width: parent.width
+                text: "<a href=\"" + link + "\">" + link + "</a>"
+                textFormat: Text.StyledText
+                elide: Text.ElideRight
+                linkColor: theme.accent
+                font.pixelSize: root.pointSize
+                onLinkActivated: url => Qt.openUrlExternally(url)
             }
         }
     }

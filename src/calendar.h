@@ -34,7 +34,8 @@ namespace Ics {
 // events they are local midnights and end is exclusive (a one-day event ends
 // at the next midnight), as in iCalendar itself.
 struct Event {
-    QString uid, title, location, calendar;
+    QString uid, title, location, calendar, description, url;
+    QStringList declinedBy;  // Lower-cased addresses of attendees whose PARTSTAT is DECLINED.
     QColor color;
     QDateTime start, end;
     bool allDay = false;
@@ -70,6 +71,10 @@ struct Component {
     bool cancelled = false;    // Kept only for overrides, which must still hide their occurrence.
 };
 
+// The calendar's own name from X-WR-CALNAME (Google, Apple and Nextcloud all
+// write it), or an empty string when the feed has none.
+QString calendarName(const QByteArray &ics);
+
 // Parses every VEVENT, dropping cancelled ones (except cancelled overrides).
 QList<Component> parseComponents(const QByteArray &ics, const QString &calendarName);
 
@@ -87,6 +92,11 @@ class CalendarFeed : public QObject {
     Q_OBJECT
     Q_PROPERTY(QStringList sources READ sources WRITE setSources NOTIFY sourcesChanged)
     Q_PROPERTY(QStringList palette READ palette WRITE setPalette NOTIFY paletteChanged)
+    Q_PROPERTY(QStringList disabledSources READ disabledSources WRITE setDisabledSources NOTIFY sourceInfoChanged)
+    Q_PROPERTY(QVariantMap sourceColors READ sourceColors WRITE setSourceColors NOTIFY sourceInfoChanged)
+    Q_PROPERTY(QString myEmails READ myEmails WRITE setMyEmails NOTIFY changed)
+    // Per source: {source, name, color, customColor, enabled}, for the settings pane.
+    Q_PROPERTY(QVariantList sourceInfo READ sourceInfo NOTIFY sourceInfoChanged)
     Q_PROPERTY(QVariantList today READ today NOTIFY changed)
     Q_PROPERTY(QString caption READ caption NOTIFY changed)
     Q_PROPERTY(QColor captionColor READ captionColor NOTIFY changed)
@@ -102,6 +112,17 @@ public:
     void setSources(const QStringList &sources);
     QStringList palette() const { return m_palette; }
     void setPalette(const QStringList &palette);
+    // Sources switched off are kept configured but contribute no events.
+    QStringList disabledSources() const { return m_disabled; }
+    void setDisabledSources(const QStringList &sources);
+    // Source -> colour name, overriding the palette colour a source would get.
+    QVariantMap sourceColors() const { return m_colors; }
+    void setSourceColors(const QVariantMap &colors);
+    // Comma-separated addresses that count as "me" when deciding whether an
+    // invitation was declined.
+    QString myEmails() const { return m_myEmails; }
+    void setMyEmails(const QString &emails);
+    QVariantList sourceInfo() const;
     QVariantList today() const;
     QString caption() const;
     QColor captionColor() const;
@@ -125,6 +146,7 @@ public:
 signals:
     void sourcesChanged();
     void paletteChanged();
+    void sourceInfoChanged();
     void changed();
     void errorChanged();
 
@@ -132,12 +154,18 @@ private:
     QDateTime now() const;
     QList<Ics::Component> components() const;
     QVariantList eventMaps(const QDate &day) const;
+    QVariantMap eventMap(const Ics::Event &e, const QDate &day) const;
+    QStringList myAddresses() const;
+    QColor colorFor(int index) const;
     void tick();
     void fetch(const QString &source);
     void fail(const QString &source, const QString &message);
     QString cachePath(const QString &source) const;
 
-    QStringList m_sources, m_palette;
+    QStringList m_sources, m_palette, m_disabled;
+    QVariantMap m_colors;
+    QString m_myEmails;
+    QHash<QString, QString> m_names;
     QHash<QString, QList<Ics::Component>> m_data;
     QHash<QString, QString> m_errors;
     QHash<QString, QNetworkReply *> m_pending;

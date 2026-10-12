@@ -14,6 +14,9 @@ Rectangle {
     // binding is never broken.
     property string text
     property real fontSize: 14
+    // The task being edited: a link never resolves to its own task, and a task
+    // in the same list is preferred when two share a title.
+    property real taskId: 0
     readonly property string currentText: area.text
     readonly property bool previewing: preview
 
@@ -27,6 +30,18 @@ Rectangle {
     property bool preview: false
     readonly property var detectedLinks: highlighter.links(area.text)
     readonly property alias cursorPosition: area.cursorPosition
+    // Bumped when tasks change, so links re-check whether their target exists.
+    property int linkRevision: 0
+    // Titles of @{links} that match no task; the highlighter draws them struck through.
+    readonly property var unresolvedTitles: {
+        root.linkRevision
+        const dead = []
+        for (const l of root.detectedLinks)
+            if (l.kind === "task" && !backend.resolveTaskLink(l.target, root.taskId) && dead.indexOf(l.target) < 0) dead.push(l.target)
+        return dead
+    }
+    // Set when typing or pasting ran into the 500 KB notes limit.
+    property bool limitHit: false
 
     color: theme.notes
     implicitHeight: Math.max(84, (preview ? previewText.implicitHeight : area.implicitHeight) + 16)
@@ -34,8 +49,25 @@ Rectangle {
     function commit() { if (area.text !== root.text) committed(area.text) }
     function insert(position, string) { area.insert(position, string) }
     function forceEditorFocus() { preview = false; area.forceActiveFocus() }
+    // Copies every link in the notes, one per line.
+    function copyLinks() {
+        const n = root.detectedLinks.length
+        backend.copyText(highlighter.linksAsText(area.text), n === 0 ? "No links in these notes." : n === 1 ? "Copied 1 link" : "Copied " + n + " links")
+    }
+    // Inserts a date or time stamp at the caret, replacing the selection.
+    function insertStamp(format) {
+        if (area.selectionStart !== area.selectionEnd) area.remove(area.selectionStart, area.selectionEnd)
+        area.insert(area.cursorPosition, highlighter.stamp(format) + " ")
+        area.forceActiveFocus()
+    }
 
     onTextChanged: if (area.text !== text) area.text = text
+
+    Connections {
+        target: backend
+        function onDataChanged() { root.linkRevision++ }
+    }
+    Timer { id: limitTimer; interval: 5000; onTriggered: root.limitHit = false }
     Component.onCompleted: area.text = text
 
     NotesHighlighter {
@@ -47,6 +79,7 @@ Rectangle {
         code: theme.today
         link: theme.today
         heading: theme.foreground
+        unresolved: root.unresolvedTitles
     }
 
     Column {
@@ -79,10 +112,7 @@ Rectangle {
                 anchors.margins: -3
                 enabled: !root.preview
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    area.insert(area.cursorPosition, Qt.formatDateTime(new Date(), "ddd d MMM yyyy, h:mm AP") + " ")
-                    area.forceActiveFocus()
-                }
+                onClicked: stampMenu.popup()
             }
         }
         Icon {
@@ -113,6 +143,8 @@ Rectangle {
         color: theme.foreground
         font.pixelSize: root.fontSize
         selectByMouse: true
+        // The selection survives the menus that take focus, so a stamp replaces it.
+        persistentSelection: true
         background: Item {}
         selectionColor: theme.selection
 
@@ -125,16 +157,56 @@ Rectangle {
 
         // Typing "@{" starts a task link: the picker follows what comes
         // after it, and the link is completed with the chosen title.
-        onTextChanged: linkPicker.sync()
+        onTextChanged: {
+            linkPicker.sync()
+            // Notes stop at 500 KB. Short text can't be near that, so the exact
+            // size is only worked out for long notes.
+            if (length > 170000) {
+                const kept = highlighter.clamp(text)
+                if (kept.length < length) {
+                    remove(kept.length, length)
+                    root.limitHit = true
+                    limitTimer.restart()
+                }
+            }
+        }
         onCursorPositionChanged: linkPicker.sync()
         Keys.onPressed: (e) => {
-            if (!linkPicker.opened) return
-            if (e.key === Qt.Key_Down) linkPicker.move(1)
-            else if (e.key === Qt.Key_Up) linkPicker.move(-1)
-            else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Tab) {
-                if (!linkPicker.choose()) return
-            } else return
-            e.accepted = true
+            const enter = e.key === Qt.Key_Return || e.key === Qt.Key_Enter
+            if (linkPicker.opened) {
+                if (e.key === Qt.Key_Down) linkPicker.move(1)
+                else if (e.key === Qt.Key_Up) linkPicker.move(-1)
+                else if (enter || e.key === Qt.Key_Tab) {
+                    if (!linkPicker.choose()) return
+                } else return
+                e.accepted = true
+                return
+            }
+            // Return at the end of a list item starts the next one; on an empty
+            // item it ends the list.
+            if (enter && !(e.modifiers & (Qt.ControlModifier | Qt.ShiftModifier | Qt.AltModifier)) && selectionStart === selectionEnd) {
+                const edit = highlighter.listContinuation(text, cursorPosition)
+                if (edit.action === "continue") insert(cursorPosition, edit.insert)
+                else if (edit.action === "end") { remove(edit.from, edit.to); cursorPosition = edit.from }
+                else return
+                e.accepted = true
+            }
+        }
+
+        // The unresolved task link under the pointer, if any, for the tooltip.
+        readonly property string deadLink: {
+            if (!hover.hovered) return ""
+            const l = highlighter.linkAt(text, positionAt(hover.point.position.x, hover.point.position.y))
+            return l.kind === "task" && root.unresolvedTitles.indexOf(l.target) >= 0 ? l.target : ""
+        }
+        ToolTip.visible: deadLink !== ""
+        ToolTip.delay: 300
+        ToolTip.text: "No task named “" + deadLink + "”"
+
+        // Right-click: the usual edit commands plus the notes extras.
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            onTapped: contextMenu.popup()
         }
 
         // Ctrl+click follows a link. A TapHandler is passive, so ordinary
@@ -237,11 +309,62 @@ Rectangle {
         visible: root.preview
         wrapMode: Text.Wrap
         textFormat: Text.MarkdownText
-        text: area.text.length ? area.text : " "
+        text: area.text.length ? highlighter.previewSource(area.text) : " "
         color: theme.foreground
         linkColor: theme.today
         font.pixelSize: root.fontSize
-        onLinkActivated: (link) => root.linkActivated(link, link.indexOf("@") > 0 && link.indexOf(":") < 0 ? "email" : "url")
+        onLinkActivated: (link) => {
+            if (link.startsWith("precrime-task:")) root.linkActivated(decodeURIComponent(link.substring(14)), "task")
+            else root.linkActivated(link, link.indexOf("@") > 0 && link.indexOf(":") < 0 ? "email" : "url")
+        }
+    }
+
+    // Shown when typing or pasting hit the notes size limit.
+    Rectangle {
+        visible: root.limitHit
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 6
+        width: limitText.implicitWidth + 16
+        height: limitText.implicitHeight + 8
+        radius: 6
+        color: theme.raised
+        border.color: theme.overdue
+        Text {
+            id: limitText
+            anchors.centerIn: parent
+            text: "Notes are limited to 500 KB"
+            color: theme.overdue
+            font.pixelSize: root.fontSize - 2
+        }
+    }
+
+    // Insert Date & Time: the stamp formats, each with today's example.
+    Menu {
+        id: stampMenu
+        onAboutToShow: stamps.model = highlighter.stampFormats()
+        Instantiator {
+            id: stamps
+            delegate: MenuItem {
+                required property var modelData
+                required property int index
+                text: modelData.name + "\t" + modelData.example
+                onTriggered: root.insertStamp(index)
+            }
+            onObjectAdded: (index, object) => stampMenu.insertItem(index, object)
+            onObjectRemoved: (index, object) => stampMenu.removeItem(object)
+        }
+    }
+
+    Menu {
+        id: contextMenu
+        MenuItem { text: "Cut"; enabled: area.selectedText !== ""; onTriggered: area.cut() }
+        MenuItem { text: "Copy"; enabled: area.selectedText !== ""; onTriggered: area.copy() }
+        MenuItem { text: "Paste"; onTriggered: area.paste() }
+        MenuItem { text: "Select All"; onTriggered: area.selectAll() }
+        MenuSeparator {}
+        MenuItem { text: "Insert Time Stamp…"; onTriggered: stampMenu.popup() }
+        MenuItem { text: "Copy Links from Notes"; enabled: root.detectedLinks.length > 0; onTriggered: root.copyLinks() }
     }
 
     Menu {

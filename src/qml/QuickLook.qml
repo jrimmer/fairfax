@@ -32,6 +32,7 @@ Popup {
             if (e.key === Qt.Key_Down) { backend.moveCursor(1); e.accepted = true }
             else if (e.key === Qt.Key_Up) { backend.moveCursor(-1); e.accepted = true }
             else if (e.key === Qt.Key_Space || e.key === Qt.Key_Escape) { root.close(); e.accepted = true }
+            else if (e.key === Qt.Key_W && (e.modifiers & Qt.ControlModifier)) { root.close(); e.accepted = true }
         }
 
         Rectangle { width: 4; height: parent.height; radius: 2; color: theme.listColor(root.t.listColor || 0) }
@@ -64,6 +65,22 @@ Popup {
                     font.strikeout: !!root.t.completed
                 }
                 Icon { visible: !!root.t.starred; name: "starred"; filled: true; size: 16; color: theme.star }
+                // Copy the task out in the forms the reference app's Quick Look offers.
+                IconButton {
+                    id: copyButton
+                    icon: "copy"
+                    size: 15
+                    tip: "Copy"
+                    checked: copyMenu.opened
+                    onClicked: copyMenu.popup(copyButton, 0, copyButton.height + 2)
+                    Menu {
+                        id: copyMenu
+                        MenuItem { text: "Copy Title"; onTriggered: backend.copyText(root.t.title || "", "Title copied.") }
+                        MenuItem { text: "Copy Notes"; enabled: !!root.t.notes; onTriggered: backend.copyText(root.t.notes || "", "Notes copied.") }
+                        MenuItem { text: "Copy as Text"; onTriggered: backend.copyText(backend.taskAsText(root.t.id), "Task copied.") }
+                        MenuItem { text: "Copy Link"; enabled: !!root.t.link; onTriggered: backend.copyText(root.t.link || "", "Link copied.") }
+                    }
+                }
             }
             // The task's picture as a cover banner.
             Image {
@@ -93,12 +110,16 @@ Popup {
             Text {
                 visible: !!root.t.notes
                 Layout.fillWidth: true
-                text: root.t.notes || ""
+                text: root.t.notes ? backend.renderNotes(root.t.notes) : ""
                 textFormat: Text.MarkdownText
                 wrapMode: Text.Wrap
                 color: theme.foreground
+                linkColor: theme.today
                 font.pixelSize: backend.fontSize - 1
-                onLinkActivated: (link) => Qt.openUrlExternally(link)
+                onLinkActivated: (link) => {
+                    if (link.startsWith("precrime-task:")) backend.openTaskLink(decodeURIComponent(link.substring(14)), root.t.id || 0)
+                    else Qt.openUrlExternally(link)
+                }
             }
             Rectangle {
                 visible: (root.t.actionType || 0) > 0
@@ -124,12 +145,33 @@ Popup {
                 Text { visible: !!root.t.due; text: root.t.due || ""; color: root.t.overdue ? theme.overdue : theme.foreground; font.pixelSize: backend.fontSize - 1 }
                 Text { visible: !!root.t.repeat; text: "Repeats"; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
                 Text { visible: !!root.t.repeat; text: root.t.repeat || ""; color: theme.foreground; font.pixelSize: backend.fontSize - 1 }
+                Text { visible: !!root.t.nextAlarm; text: "Alert"; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
+                Text { visible: !!root.t.nextAlarm; text: root.t.nextAlarm || ""; color: theme.foreground; font.pixelSize: backend.fontSize - 1 }
                 Text { visible: !!root.t.duration; text: "Duration"; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
                 Text { visible: !!root.t.duration; text: root.t.duration || ""; color: theme.duration; font.pixelSize: backend.fontSize - 1 }
                 Text { visible: !!root.t.hint; text: "Status"; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
                 Text { visible: !!root.t.hint; text: root.t.hint || ""; color: theme.today; font.pixelSize: backend.fontSize - 1 }
                 Text { visible: (root.t.tags || []).length > 0; text: "Tags"; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
                 Text { visible: (root.t.tags || []).length > 0; text: (root.t.tags || []).join(", "); color: theme.foreground; font.pixelSize: backend.fontSize - 1 }
+            }
+            // Audio notes play in the desktop's player.
+            Repeater {
+                model: root.t.audio || []
+                Rectangle {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 32
+                    radius: 8
+                    color: Qt.alpha(theme.duration, 0.12)
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        Icon { name: "play"; filled: true; size: 12; color: theme.duration }
+                        Text { Layout.fillWidth: true; text: modelData.name || "Audio note"; color: theme.foreground; elide: Text.ElideRight; font.pixelSize: backend.fontSize - 1 }
+                    }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: backend.openAttachment(modelData.id) }
+                }
             }
         }
     }

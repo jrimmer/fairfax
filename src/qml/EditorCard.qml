@@ -83,6 +83,7 @@ Item {
                     MenuItem { text: "Copy"; onTriggered: backend.copySelection() }
                     MenuItem { text: "Copy Title"; onTriggered: { clip.text = root.e.title; clip.selectAll(); clip.copy() } }
                     MenuItem { text: "Copy Notes"; enabled: !!root.e.notes; onTriggered: { clip.text = root.e.notes; clip.selectAll(); clip.copy() } }
+                    MenuItem { text: "Copy Links from Notes"; enabled: notesArea.detectedLinks.length > 0; onTriggered: notesArea.copyLinks() }
                     MenuItem { text: "Copy Embeddable Link"; onTriggered: { clip.text = "@{" + root.e.title + "}"; clip.selectAll(); clip.copy() } }
                     MenuItem { text: "Copy Shareable Link"; onTriggered: { clip.text = root.e.link; clip.selectAll(); clip.copy() } }
                 }
@@ -596,10 +597,10 @@ Item {
                         fontSize: backend.fontSize - 1
                         onCommitted: (t) => backend.setNotes(root.e.id, t)
                         onEscaped: root.finish()
+                        taskId: root.e.id || 0
                         onLinkActivated: (target, kind) => {
                             if (kind !== "task") { Qt.openUrlExternally(target); return }
-                            const hits = backend.findTasks(target, 1)
-                            if (hits.length) backend.revealInList(hits[0].id)
+                            backend.openTaskLink(target, root.e.id)
                         }
                     }
                 }

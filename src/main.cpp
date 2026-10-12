@@ -367,6 +367,11 @@ int main(int argc, char *argv[]) {
 
     CalendarFeed calendar;
     calendar.setPalette(theme.listPalette());
+    // Per-source switches and colours, and the addresses that mark a declined
+    // invitation as mine, all set before the sources so the first load is right.
+    calendar.setDisabledSources(store.setting("calendar.disabled").toString().split('\n', Qt::SkipEmptyParts));
+    calendar.setSourceColors(QJsonDocument::fromJson(store.setting("calendar.colors").toString().toUtf8()).object().toVariantMap());
+    calendar.setMyEmails(store.setting("calendar.emails").toString());
     calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
     QObject::connect(&theme, &Theme::changed, &calendar, [&] { calendar.setPalette(theme.listPalette()); });
 
@@ -394,6 +399,7 @@ int main(int argc, char *argv[]) {
     if (opened) {
         if (cli.isSet(demoOption)) {
             backend.seedDemo();
+            calendar.setMyEmails(store.setting("calendar.emails").toString());
             calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
         }
         backend.ensureDefaults();

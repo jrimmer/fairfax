@@ -297,6 +297,17 @@ bool overlaps(const Event &e, const QDateTime &from, const QDateTime &to) {
 
 }  // namespace
 
+QString calendarName(const QByteArray &ics) {
+    for (const QString &line : unfold(ics)) {
+        const QString upper = line.trimmed().toUpper();
+        if (upper == QLatin1String("BEGIN:VEVENT")) break;  // Calendar-level properties come first.
+        Property p;
+        if (upper.startsWith(QLatin1String("X-WR-CALNAME")) && parseLine(line, p) && p.name == QLatin1String("X-WR-CALNAME"))
+            return unescape(p.value).trimmed();
+    }
+    return QString();
+}
+
 QList<Component> parseComponents(const QByteArray &ics, const QString &calendarName) {
     QList<Component> out;
     QList<Property> props;
@@ -314,6 +325,15 @@ QList<Component> parseComponents(const QByteArray &ics, const QString &calendarN
             if (p.name == QLatin1String("UID")) c.event.uid = p.value.trimmed();
             else if (p.name == QLatin1String("SUMMARY")) c.event.title = unescape(p.value);
             else if (p.name == QLatin1String("LOCATION")) c.event.location = unescape(p.value);
+            else if (p.name == QLatin1String("DESCRIPTION")) c.event.description = unescape(p.value).trimmed();
+            else if (p.name == QLatin1String("URL")) c.event.url = p.value.trimmed();
+            else if (p.name == QLatin1String("ATTENDEE")) {
+                if (p.params.value(QStringLiteral("PARTSTAT")).toUpper() == QLatin1String("DECLINED")) {
+                    QString who = p.value.trimmed();
+                    if (who.startsWith(QLatin1String("mailto:"), Qt::CaseInsensitive)) who = who.mid(7);
+                    c.event.declinedBy << who.toLower();
+                }
+            }
             else if (p.name == QLatin1String("STATUS")) status = p.value.trimmed().toUpper();
             else if (p.name == QLatin1String("DTSTART")) dtstart = p;
             else if (p.name == QLatin1String("DTEND")) { dtend = p; haveEnd = true; }
@@ -471,7 +491,15 @@ QString freeLabel(int minutes) {
     return QStringLiteral("%1 hr %2 min free").arg(h).arg(m);
 }
 
-QVariantMap eventMap(const Ics::Event &e, const QDate &day) {
+}  // namespace
+
+QStringList CalendarFeed::myAddresses() const {
+    QStringList out;
+    for (const QString &a : m_myEmails.split(QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts)) out << a.toLower();
+    return out;
+}
+
+QVariantMap CalendarFeed::eventMap(const Ics::Event &e, const QDate &day) const {
     const QDateTime dayStart(day, QTime(0, 0)), dayEnd(day.addDays(1), QTime(0, 0));
     QVariantMap m;
     m[QStringLiteral("title")] = e.title;
@@ -481,10 +509,14 @@ QVariantMap eventMap(const Ics::Event &e, const QDate &day) {
     m[QStringLiteral("color")] = e.color;
     m[QStringLiteral("location")] = e.location;
     m[QStringLiteral("calendar")] = e.calendar;
+    m[QStringLiteral("description")] = e.description;
+    m[QStringLiteral("url")] = e.url;
+    const QStringList mine = myAddresses();
+    bool declined = false;
+    for (const QString &who : e.declinedBy) declined |= mine.contains(who);
+    m[QStringLiteral("declined")] = declined;
     return m;
 }
-
-}  // namespace
 
 CalendarFeed::CalendarFeed(QObject *parent) : QObject(parent), m_palette(kDefaultPalette) {
     m_clock = [] { return QDateTime::currentDateTime(); };
@@ -530,6 +562,7 @@ void CalendarFeed::setSources(const QStringList &sources) {
     for (const QString &gone : m_pending.keys())
         if (!m_sources.contains(gone)) m_pending.take(gone)->abort();
     emit sourcesChanged();
+    emit sourceInfoChanged();
     emit errorChanged();
     emit changed();
     refresh();
@@ -539,14 +572,57 @@ void CalendarFeed::setPalette(const QStringList &palette) {
     if (palette == m_palette) return;
     m_palette = palette;
     emit paletteChanged();
+    emit sourceInfoChanged();
     emit changed();
+}
+
+QColor CalendarFeed::colorFor(int index) const {
+    const QColor custom(m_colors.value(m_sources.at(index)).toString());
+    if (custom.isValid()) return custom;
+    const QStringList &colors = m_palette.isEmpty() ? kDefaultPalette : m_palette;
+    return QColor(colors.at(index % colors.size()));
+}
+
+void CalendarFeed::setDisabledSources(const QStringList &sources) {
+    if (sources == m_disabled) return;
+    m_disabled = sources;
+    emit sourceInfoChanged();
+    emit changed();
+}
+
+void CalendarFeed::setSourceColors(const QVariantMap &colors) {
+    if (colors == m_colors) return;
+    m_colors = colors;
+    emit sourceInfoChanged();
+    emit changed();
+}
+
+void CalendarFeed::setMyEmails(const QString &emails) {
+    if (emails == m_myEmails) return;
+    m_myEmails = emails;
+    emit changed();
+}
+
+QVariantList CalendarFeed::sourceInfo() const {
+    QVariantList out;
+    for (int i = 0; i < m_sources.size(); ++i) {
+        const QString &source = m_sources.at(i);
+        QVariantMap m;
+        m[QStringLiteral("source")] = source;
+        m[QStringLiteral("name")] = m_names.contains(source) ? m_names.value(source) : displayName(source);
+        m[QStringLiteral("color")] = colorFor(i);
+        m[QStringLiteral("customColor")] = m_colors.contains(source);
+        m[QStringLiteral("enabled")] = !m_disabled.contains(source);
+        out << m;
+    }
+    return out;
 }
 
 QList<Ics::Component> CalendarFeed::components() const {
     QList<Ics::Component> all;
-    const QStringList &colors = m_palette.isEmpty() ? kDefaultPalette : m_palette;
     for (int i = 0; i < m_sources.size(); ++i) {
-        const QColor color(colors.at(i % colors.size()));
+        if (m_disabled.contains(m_sources.at(i))) continue;
+        const QColor color = colorFor(i);
         for (Ics::Component c : m_data.value(m_sources.at(i))) {
             c.event.color = color;
             all << c;
@@ -582,7 +658,7 @@ QVariantMap headline(const QVariantList &today, int nowMinute, bool *ongoing) {
     bool haveUpcoming = false;
     for (const QVariant &v : today) {
         const QVariantMap e = v.toMap();
-        if (e.value(QStringLiteral("allDay")).toBool()) continue;
+        if (e.value(QStringLiteral("allDay")).toBool() || e.value(QStringLiteral("declined")).toBool()) continue;
         if (e.value(QStringLiteral("start")).toInt() <= nowMinute && nowMinute < e.value(QStringLiteral("end")).toInt()) {
             *ongoing = true;
             return e;
@@ -619,7 +695,8 @@ QVariantList CalendarFeed::freeSlots(const QString &isoDate, int fromMinute, int
     QList<QPair<int, int>> busy;
     for (const QVariant &v : eventsFor(isoDate)) {
         const QVariantMap e = v.toMap();
-        if (e.value(QStringLiteral("allDay")).toBool()) continue;
+        // A declined invitation leaves the time free.
+        if (e.value(QStringLiteral("allDay")).toBool() || e.value(QStringLiteral("declined")).toBool()) continue;
         busy.append({e.value(QStringLiteral("start")).toInt(), e.value(QStringLiteral("end")).toInt()});
     }
     std::sort(busy.begin(), busy.end());
@@ -651,9 +728,13 @@ QString CalendarFeed::error() const {
 }
 
 void CalendarFeed::loadData(const QString &source, const QByteArray &ics) {
-    m_data.insert(source, Ics::parseComponents(ics, displayName(source)));
+    const QString name = Ics::calendarName(ics);
+    if (name.isEmpty()) m_names.remove(source);
+    else m_names.insert(source, name);
+    m_data.insert(source, Ics::parseComponents(ics, name.isEmpty() ? displayName(source) : name));
     m_errors.remove(source);
     emit errorChanged();
+    emit sourceInfoChanged();
     emit changed();
 }
 
