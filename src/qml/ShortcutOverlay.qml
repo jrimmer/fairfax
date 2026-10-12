@@ -32,7 +32,7 @@ Popup {
             ["Ctrl+D", "Duplicate"], ["Ctrl+Return / Esc", "Finish editing"], ["Ctrl+Alt+0–3", "Priority while editing"],
             ["Ctrl+Alt+S", "Toggle star while editing"], ["Ctrl+E B G ' / ;", "Editor: notes, action, location, alerts, dates, repeat"], ["Ctrl+J", "Focus Filter"], ["Ctrl+Alt+P / C", "Project / checklist from selection"], ["Ctrl+Alt+T", "New tag (+Shift: group)"], ["Ctrl+L / Ctrl+R", "Move… / Tag…"],
             ["Ctrl+Shift+Alt+1–3", "Convert to task / project / checklist"],
-            ["Ctrl+Shift+↑ ↓", "Move task up / down"], ["Ctrl+Alt+↑ ↓", "Collapse / expand all projects"], ["Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"] ] },
+            ["Ctrl+Shift+↑ ↓", "Move task up / down"], ["Ctrl+Alt+↑ ↓", "Collapse / expand all projects"], ["Ctrl+Shift+Alt+↑ ↓", "Collapse / expand all list groups"], ["Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"] ] },
         { title: "View", keys: [
             ["Ctrl+1–5", "All, Today, Starred, Scheduled, Done"], ["Ctrl+0", "Inbox"], ["Ctrl+↑ ↓", "Previous / next list"],
             ["Ctrl+F", "Search"], ["Ctrl+Shift+O", "Quick Open"], ["Ctrl+K", "Show scheduled"], ["Ctrl+U", "Show paused"],

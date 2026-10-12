@@ -1,12 +1,15 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/ArchiveDialog.qml</file>
+        <file>qml/ColorMenu.qml</file>
+        <file>qml/ColorPickerDialog.qml</file>
         <file>qml/CommandPopup.qml</file>
         <file>qml/Confetti.qml</file>
         <file>qml/DateField.qml</file>
         <file>qml/DatePicker.qml</file>
         <file>qml/DayBar.qml</file>
         <file>qml/DragProxy.qml</file>
+        <file>qml/EditListDialog.qml</file>
         <file>qml/EditorCard.qml</file>
         <file>qml/ExportDialog.qml</file>
         <file>qml/FocusButton.qml</file>

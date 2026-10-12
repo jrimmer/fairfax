@@ -851,6 +851,51 @@ private slots:
         QCOMPARE(views.badgeCount("both"), 3);
         QCOMPARE(views.badgeCount("none"), 0);
     }
+
+    // ---- archived and hidden lists ----
+
+    void archivedListsStillFeedSmartListsAndDone() {
+        const auto live = addList("Live");
+        const auto old = addList("Old", [](TaskList &l) { l.archived = true; });
+        addTask(live, "open here");
+        addTask(old, "open there");
+        addTask(old, "finished there", [](Task &t) { t.completed = true; t.completedAt = Now.addSecs(-300); });
+        const auto smart = addList("Everything", [](TaskList &l) { l.kind = ListKind::Smart; l.smartRange = "nodue"; l.completedMode = 2; });
+
+        QCOMPARE(titles(build(Source{Source::All})), QStringList{"open here"});
+        QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"open here", "open there"}));
+        QCOMPARE(titles(build(Source{Source::Done})), QStringList{"finished there"});
+        // Counts and the sidebar order still leave the archive out.
+        QCOMPARE(ViewBuilder(*m_store, Now, m_settings).countsForFocus(Source::All).undone, 1);
+        QCOMPARE(ViewBuilder(*m_store, Now, m_settings).orderedLists().size(), 1);
+    }
+
+    void hiddenListsVanishUntilRevealed() {
+        const auto shown = addList("Shown");
+        const auto secret = addList("Secret");
+        addTask(shown, "visible");
+        addTask(secret, "tucked away");
+        m_store->setSetting("lists.hidden", m_store->list(secret).uid);
+
+        ViewBuilder hidden(*m_store, Now, m_settings);
+        QCOMPARE(titles(build(Source{Source::All})), QStringList{"visible"});
+        QCOMPARE(hidden.orderedLists().size(), 1);
+        QCOMPARE(hidden.countsForFocus(Source::All).undone, 1);
+        ViewOptions search;
+        search.search = "tucked";
+        QVERIFY(titles(build(Source{Source::All}, search)).isEmpty());
+
+        m_store->setSetting("lists.hiddenRevealed", true);
+        QCOMPARE(sorted(titles(build(Source{Source::All}))), (QStringList{"tucked away", "visible"}));
+        QCOMPARE(ViewBuilder(*m_store, Now, m_settings).orderedLists().size(), 2);
+    }
+
+    void customListColorsKeepPaletteIndexesApart() {
+        QVERIFY(!ListColor::isCustom(12));
+        const int c = ListColor::custom(0x336699);
+        QVERIFY(ListColor::isCustom(c));
+        QCOMPARE(ListColor::rgb(c), 0x336699u);
+    }
 };
 
 REGISTER_TEST(ViewsTest)

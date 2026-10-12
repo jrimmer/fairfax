@@ -1,32 +1,24 @@
 import QtQuick
 import QtQuick.Controls
 
-// The right-click menu on a list: rename, colour, focus-list exclusions,
-// archive and delete, as in the reference app's Lists panel.
+// The right-click menu on a list: edit, rename, colour, focus-list exclusions,
+// archive, hide and delete, as in the reference app's Lists panel.
 Menu {
     id: root
 
     property int listId: 0
     signal rename()
+    signal editList()
+    signal customColor()
     readonly property var info: listId ? backend.listInfo(listId) : ({})
 
+    MenuItem { text: "Edit List…"; onTriggered: root.editList() }
     MenuItem { text: "Rename…"; onTriggered: root.rename() }
     MenuItem { text: "New Section"; onTriggered: { backend.selectSource("list:" + root.listId); backend.newSection(root.listId, "") } }
-    Menu {
-        title: "Color"
-        Repeater {
-            model: theme.listPalette
-            MenuItem {
-                required property int index
-                required property string modelData
-                text: ["Blue", "Purple", "Green", "Red", "Orange", "Cyan", "Yellow", "Brown",
-                       "Light Blue", "Lavender", "Mint", "Coral", "Aqua"][index]
-                icon.color: modelData
-                checkable: true
-                checked: root.info.color === index
-                onTriggered: backend.setListColor(root.listId, index)
-            }
-        }
+    ColorMenu {
+        current: root.info.color === undefined ? -1 : root.info.color
+        onChosen: (color) => backend.setListColor(root.listId, color)
+        onCustomRequested: root.customColor()
     }
     MenuSeparator {}
     MenuItem {
@@ -54,6 +46,7 @@ Menu {
     }
     MenuSeparator {}
     MenuItem { text: "Archive"; onTriggered: backend.setListFlag(root.listId, "archived", true) }
+    MenuItem { text: "Hide List"; onTriggered: backend.setListHidden(root.listId, true) }
     MenuItem { text: "Delete all Tasks…"; onTriggered: confirmTasks.open() }
     MenuItem { text: "Delete List…"; onTriggered: confirm.open() }
     MenuSeparator {}

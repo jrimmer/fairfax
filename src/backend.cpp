@@ -39,7 +39,7 @@ const QStringList TaskRoles{
 };
 const QStringList SidebarRoles{"kind", "sourceKey", "title", "icon", "overdue", "undone", "color", "dot",
                                "selected", "depth", "expandable", "expanded", "collapsed", "excluded",
-                               "groupId", "listId", "taskId"};
+                               "groupId", "listId", "taskId", "warn"};
 const QStringList TagRoles{"kind", "tagId", "groupId", "title", "count", "paused", "filtered", "collapsed"};
 const QStringList PlaceRoles{"kind", "locationId", "title", "address", "count", "paused", "filtered"};
 
@@ -68,6 +68,8 @@ Backend::Backend(Store *store, QObject *parent)
         m_expandedLists.insert(id.toLongLong());
     m_options.completedWindowMinutes = m_store->setting("tasks.completedWindow", 24 * 60).toInt();
     m_options.soundex = m_store->setting("search.soundex", false).toBool();
+    // Hidden lists are only revealed for the session that asked.
+    m_store->setSetting("lists.hiddenRevealed", false);
     // Quick Entry once read its own list key, which Settings never wrote.
     // There is one default list now; an old choice carries over to it.
     if (const qint64 old = m_store->setting("tasks.quickEntryList", 0).toLongLong(); old > 0) {
@@ -295,6 +297,10 @@ void Backend::selectSource(const QString &key) {
     else
         m_inheritFrom = 0;
     m_source = next;
+    if (next.kind == Source::Done && doneWarningDue()) {
+        m_store->setSetting("lists.doneWarned", true);
+        emit doneWarningRequested();
+    }
     if (next.kind == Source::List || next.kind == Source::Project) {
         m_recentSources.removeAll(key);
         m_recentSources.prepend(key);
@@ -331,6 +337,73 @@ void Backend::toggleGroupCollapsed(qint64 groupId) {
     m_store->begin(g.collapsed ? "Collapse Group" : "Expand Group");
     m_store->putGroup(g);
     m_store->commit();
+}
+
+void Backend::setAllGroupsCollapsed(bool collapsed) {
+    bool any = false;
+    for (const auto &g : m_store->groups())
+        any = any || (!g.deleted && g.collapsed != collapsed);
+    if (!any)
+        return;
+    m_store->begin(collapsed ? "Collapse All List Groups" : "Expand All List Groups");
+    for (auto g : m_store->groups()) {
+        if (g.deleted || g.collapsed == collapsed)
+            continue;
+        g.collapsed = collapsed;
+        m_store->putGroup(g);
+    }
+    m_store->commit();
+}
+
+void Backend::setGroupColor(qint64 groupId, int color) {
+    ListGroup g = m_store->groups().value(groupId);
+    if (!g.id || g.deleted)
+        return;
+    // "Color grouped lists" recolours every list inside the group in one step.
+    g.color = color;
+    m_store->begin("Color Grouped Lists");
+    m_store->putGroup(g);
+    for (auto l : m_store->lists()) {
+        if (l.deleted || l.groupId != groupId || l.color == color)
+            continue;
+        l.color = color;
+        m_store->putList(l);
+    }
+    m_store->commit();
+    emit viewChanged();
+}
+
+QVariantList Backend::groupChoices() const {
+    QVector<ListGroup> groups;
+    for (const auto &g : m_store->groups())
+        if (!g.deleted)
+            groups.append(g);
+    std::sort(groups.begin(), groups.end(), [](const ListGroup &a, const ListGroup &b) { return a.order < b.order; });
+    QVariantList result;
+    for (const auto &g : groups)
+        result.append(QVariantMap{{"id", g.id}, {"name", g.name}, {"color", g.color}});
+    return result;
+}
+
+int Backend::completedCount() const {
+    int count = 0;
+    for (const auto &t : m_store->tasks())
+        count += !t.deleted && t.completed;
+    return count;
+}
+
+bool Backend::doneWarningShown() const {
+    return completedCount() >= DoneWarningThreshold && m_store->setting("tasks.autoDeleteDays", 0).toInt() == 0;
+}
+
+bool Backend::doneWarningDue() const {
+    // The prompt appears once; it re-arms when the pile shrinks again.
+    if (!doneWarningShown()) {
+        if (m_store->setting("lists.doneWarned", false).toBool())
+            m_store->setSetting("lists.doneWarned", false);
+        return false;
+    }
+    return !m_store->setting("lists.doneWarned", false).toBool();
 }
 
 void Backend::toggleListExpanded(qint64 listId) {
@@ -1785,6 +1858,7 @@ QVariantMap Backend::listInfo(qint64 id) const {
     return {{"id", l.id}, {"name", l.name}, {"color", l.color}, {"showInAll", l.showInAll},
             {"showInToday", l.showInToday}, {"showInDone", l.showInDone}, {"archived", l.archived},
             {"muteAlerts", l.muteAlerts}, {"completedMode", l.completedMode}, {"kind", l.kind},
+            {"groupId", l.groupId}, {"hidden", ViewBuilder::hiddenListUids(*m_store).contains(l.uid)},
             {"syncExcluded", SyncTree::isListExcluded(*m_store, id)}};
 }
 
@@ -1792,6 +1866,51 @@ void Backend::setListSyncExcluded(qint64 id, bool excluded) {
     SyncTree::setListExcluded(*m_store, id, excluded);
     emit settingsChanged();
     emit viewChanged();
+}
+
+void Backend::setListHidden(qint64 id, bool hidden) {
+    const TaskList l = m_store->list(id);
+    if (!l.id || l.kind == ListKind::Smart)
+        return;
+    QSet<QString> uids = ViewBuilder::hiddenListUids(*m_store);
+    if (hidden) uids.insert(l.uid); else uids.remove(l.uid);
+    QStringList sorted(uids.begin(), uids.end());
+    sorted.sort();
+    // Leaving a list hidden while it is the open one would strand the view.
+    if (hidden && m_source.kind == Source::List && m_source.id == id)
+        selectSource("today");
+    setSetting("lists.hidden", sorted.join(','));
+}
+
+QVariantList Backend::hideableLists() const {
+    const QSet<QString> hidden = ViewBuilder::hiddenListUids(*m_store);
+    QVector<TaskList> lists;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind == ListKind::Normal)
+            lists.append(l);
+    std::sort(lists.begin(), lists.end(), [](const TaskList &a, const TaskList &b) { return a.order < b.order; });
+    QVariantList result;
+    for (const auto &l : lists)
+        result.append(QVariantMap{{"id", l.id}, {"name", l.name}, {"color", l.color}, {"hidden", hidden.contains(l.uid)}});
+    return result;
+}
+
+bool Backend::hasHiddenLists() const {
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && ViewBuilder::hiddenListUids(*m_store).contains(l.uid))
+            return true;
+    return false;
+}
+
+bool Backend::hiddenRevealed() const { return m_store->setting("lists.hiddenRevealed", false).toBool(); }
+
+void Backend::setHiddenRevealed(bool revealed) { setSetting("lists.hiddenRevealed", revealed); }
+
+void Backend::newTaskInList(qint64 listId) {
+    if (!m_store->list(listId).id)
+        return;
+    selectSource(Source{Source::List, listId}.key());
+    newTask();
 }
 
 QVariantMap Backend::taskInfo(qint64 id) const {
@@ -3126,6 +3245,7 @@ qint64 Backend::saveSmartList(const QString &name, const QString &query, const Q
     l.includeScheduled = includeScheduled;
     l.order = l.id;
     l.sortField = SortField::DueDate;
+    l.color = -1;  // Uncoloured until given one from the list menu.
     m_store->begin("New Smart List");
     m_store->putList(l);
     m_store->commit();
@@ -3819,7 +3939,8 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         rows.append({{"key", focusKey(k)}, {"kind", "focus"}, {"sourceKey", focusKey(k)}, {"title", focusTitles[k]},
                      {"icon", focusIcons[k]}, {"overdue", showOverdue ? c.overdue : 0}, {"undone", c.undone},
                      {"selected", m_source.key() == focusKey(k)},
-                     {"dot", k == Source::Today && c.overdue ? "overdue" : ""}});
+                     {"dot", k == Source::Today && c.overdue ? "overdue" : ""},
+                     {"warn", k == Source::Done && doneWarningShown()}});
     }
 
     qint64 lastGroup = -1;
@@ -3832,7 +3953,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
             lastGroup = groupId;
             if (groupId) {
                 rows.append({{"key", QStringLiteral("g:%1").arg(groupId)}, {"kind", "header"}, {"title", g.name},
-                             {"groupId", groupId}, {"collapsed", g.collapsed}});
+                             {"groupId", groupId}, {"collapsed", g.collapsed}, {"color", g.color}});
             } else {
                 rows.append({{"key", "gap:ungrouped"}, {"kind", "gap"}});
             }
@@ -3882,7 +4003,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
                 count += row.depth == 0;
         rows.append({{"key", source.key()}, {"kind", "smart"}, {"sourceKey", source.key()}, {"title", l.name},
                      {"icon", "search"}, {"undone", countMode < 2 ? 0 : count}, {"selected", m_source.key() == source.key()},
-                     {"listId", l.id}});
+                     {"listId", l.id}, {"color", l.color}});
     }
     m_sidebar.setRows(rows);
 }

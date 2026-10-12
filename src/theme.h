@@ -74,7 +74,9 @@ public:
     QStringList listPalette() const;
     QString monoFont() const;
 
+    // A palette index, or a custom colour encoded as 0x1000000 | 0xRRGGBB.
     Q_INVOKABLE QColor listColor(int index) const;
+    Q_INVOKABLE int customListColor(const QColor &color) const;
     Q_INVOKABLE QColor mix(const QColor &a, const QColor &b, double amount) const;
 
     static QHash<QString, QColor> readColors(const QString &path, bool *dark = nullptr);

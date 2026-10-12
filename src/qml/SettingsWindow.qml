@@ -21,6 +21,12 @@ Window {
     Material.foreground: theme.foreground
 
     property int pane: 0
+    property var hideable: backend.hideableLists()
+    Connections {
+        target: backend
+        function onDataChanged() { root.hideable = backend.hideableLists() }
+        function onSettingsChanged() { root.hideable = backend.hideableLists() }
+    }
     property string copySource
     readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"]
 
@@ -391,6 +397,17 @@ Window {
                     }
                     Toggle { key: "lists.undoneIncludesOverdue"; fallback: true; label: "Undone counts include overdue"; note: "Off shows only the tasks that are not yet late next to the red overdue number." }
                     Toggle { key: "search.inheritInProject"; fallback: false; label: "Inherit search in project view"; note: "Opening a project from a search or Smart List shows only the sub-tasks that match it." }
+                    Label { text: "Hide lists"; font.bold: true; Layout.topMargin: 10 }
+                    Hint { text: "Hidden lists vanish from the sidebar, All, Today, Smart Lists and searches. Reveal them for this session with Show Hidden Lists in the sidebar's + menu." }
+                    Repeater {
+                        model: root.pane === 3 ? root.hideable : []
+                        CheckBox {
+                            required property var modelData
+                            text: modelData.name
+                            checked: modelData.hidden
+                            onToggled: backend.setListHidden(modelData.id, checked)
+                        }
+                    }
                 }
 
                 // Alerts

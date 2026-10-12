@@ -10,6 +10,8 @@
 #include <QRegularExpression>
 #include <cmath>
 
+#include "model.h"
+
 namespace {
 
 // Used for any key a theme leaves out, and wholesale when Omarchy isn't
@@ -168,8 +170,12 @@ QStringList Theme::listPalette() const {
 }
 
 QColor Theme::listColor(int index) const {
+    if (ListColor::isCustom(index))
+        return QColor::fromRgb(ListColor::rgb(index));
     return color(PaletteKeys.at(((index % PaletteKeys.size()) + PaletteKeys.size()) % PaletteKeys.size()));
 }
+
+int Theme::customListColor(const QColor &color) const { return ListColor::custom(color.rgb()); }
 
 void Theme::reload() {
     const auto paths = m_watcher.files() + m_watcher.directories();

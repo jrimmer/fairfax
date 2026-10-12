@@ -11,6 +11,7 @@ Rectangle {
     signal settingsRequested()
     signal newSmartListRequested()
     signal editSmartListRequested()
+    signal doneWarningRequested()
 
     color: theme.sidebar
     property int renamingListId: 0
@@ -21,10 +22,14 @@ Rectangle {
     property int deleteGroupId: 0
     readonly property bool calendarShown: backend.setting("appearance.showCalendar").value !== false
     property string deleteGroupName
+    // Re-read when settings change: the Hide Lists privacy option.
+    property bool hasHidden: backend.hasHiddenLists()
+    property bool hiddenRevealed: backend.hiddenRevealed()
 
     Connections {
         target: backend
         function onDataChanged() { root.archived = backend.archivedLists() }
+        function onSettingsChanged() { root.hasHidden = backend.hasHiddenLists(); root.hiddenRevealed = backend.hiddenRevealed() }
     }
 
     // What follows the pointer while dragging a list or a group.
@@ -76,6 +81,26 @@ Rectangle {
     }
 
     ArchiveDialog { id: archiveDialog; lists: root.archived }
+
+    // One colour picker serves every custom-colour entry; `colorDone` says
+    // what to do with the choice.
+    property var colorDone: null
+    ColorPickerDialog {
+        id: colorPicker
+        onPicked: (value) => { if (root.colorDone) root.colorDone(theme.customListColor(value)) }
+    }
+    function editList(id) { editListDialog.edit(id) }
+    function pickColor(initial, done) { colorDone = done; colorPicker.pick(initial) }
+
+    EditListDialog {
+        id: editListDialog
+    }
+    Connections {
+        target: editListDialog
+        function onCustomColorRequested(initial) {
+            root.pickColor(initial, (code) => { editListDialog.chosenColor = code })
+        }
+    }
 
     function selectInbox() {
         for (let i = 0; i < backend.sidebar.count; ++i) {
@@ -268,6 +293,17 @@ Rectangle {
                     MenuItem { text: "New List"; onTriggered: { backend.newList(); root.renameSelected() } }
                     MenuItem { text: "New List Group"; onTriggered: root.renamingGroupId = backend.newGroup() }
                     MenuItem { text: "New Smart List…"; onTriggered: root.newSmartListRequested() }
+                    MenuSeparator {}
+                    MenuItem { text: "Expand All List Groups"; onTriggered: backend.setAllGroupsCollapsed(false) }
+                    MenuItem { text: "Collapse All List Groups"; onTriggered: backend.setAllGroupsCollapsed(true) }
+                    MenuItem {
+                        visible: root.hasHidden
+                        height: visible ? implicitHeight : 0
+                        text: "Show Hidden Lists"
+                        checkable: true
+                        checked: root.hiddenRevealed
+                        onTriggered: backend.setHiddenRevealed(!root.hiddenRevealed)
+                    }
                 }
             }
             // Show or hide the mini calendar, and beside it its display style.
@@ -359,6 +395,7 @@ Rectangle {
             height: 34
             property var row: parent ? parent.model : ({})
             Text {
+                id: headerTitle
                 anchors.left: parent.left
                 anchors.leftMargin: 18
                 anchors.bottom: parent.bottom
@@ -368,6 +405,15 @@ Rectangle {
                 color: theme.muted
                 font.pixelSize: backend.fontSize - 1
                 font.weight: Font.Bold
+            }
+            // A colour-coded group shows its colour beside the name.
+            Rectangle {
+                visible: header.isGroup && typeof header.row.color === "number" && header.row.color >= 0 && root.renamingGroupId !== header.row.groupId
+                x: 18 + headerTitle.implicitWidth + 8
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 9
+                width: 8; height: 8; radius: 4
+                color: theme.listColor(header.row.color || 0)
             }
             Icon {
                 anchors.right: parent.right
@@ -447,7 +493,17 @@ Rectangle {
                         root.renamingListId = id
                     }
                 }
+                ColorMenu {
+                    title: "Color Grouped Lists"
+                    current: typeof header.row.color === "number" ? header.row.color : -1
+                    onChosen: (color) => backend.setGroupColor(header.row.groupId, color)
+                    onCustomRequested: root.pickColor(typeof header.row.color === "number" && header.row.color >= 0 ? theme.listColor(header.row.color) : theme.accent,
+                                                      (code) => backend.setGroupColor(header.row.groupId, code))
+                }
+                MenuSeparator {}
                 MenuItem { text: header.row.collapsed ? "Expand" : "Collapse"; onTriggered: backend.toggleGroupCollapsed(header.row.groupId) }
+                MenuItem { text: "Expand All Groups"; onTriggered: backend.setAllGroupsCollapsed(false) }
+                MenuItem { text: "Collapse All Groups"; onTriggered: backend.setAllGroupsCollapsed(true) }
                 MenuSeparator {}
                 MenuItem {
                     text: "Delete Group"
@@ -541,7 +597,9 @@ Rectangle {
                     visible: item.row.icon !== "today"
                     name: item.row.icon || ""
                     size: 19
-                    color: item.row.icon === "starred" ? theme.star : theme.muted
+                    color: item.row.icon === "starred" ? theme.star
+                         : item.row.kind === "smart" && typeof item.row.color === "number" && item.row.color >= 0 ? theme.listColor(item.row.color)
+                         : theme.muted
                 }
                 // A calendar page showing today's date, as the reference app draws it.
                 Rectangle {
@@ -596,8 +654,39 @@ Rectangle {
                 font.pixelSize: item.row.kind === "project" ? backend.fontSize - 1 : backend.fontSize
             }
 
+            // Done carries a warning once completed tasks pile up.
+            Rectangle {
+                visible: !!item.row.warn
+                z: 5
+                x: Math.min(label.x + label.contentWidth + 8, counts.x - 18)
+                anchors.verticalCenter: parent.verticalCenter
+                width: 14; height: 14; radius: 7
+                color: theme.priorityMedium
+                Text { anchors.centerIn: parent; text: "!"; color: theme.background; font.pixelSize: 10; font.bold: true }
+                ToolTip.visible: warnMouse.containsMouse
+                ToolTip.text: "A growing number of completed tasks. Click for the auto-delete setting."
+                MouseArea { id: warnMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.doneWarningRequested() }
+            }
+
+            // Hover [+]: a new task straight into this list.
+            IconButton {
+                id: addTask
+                readonly property bool eligible: !!item.row.listId && (item.isList || item.row.icon === "inbox")
+                visible: eligible && hover.hovered
+                z: 5
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "plus"
+                size: 13
+                tip: "New task in this list"
+                onClicked: backend.newTaskInList(item.row.listId)
+            }
+            HoverHandler { id: hover }
+
             Row {
                 id: counts
+                visible: !addTask.visible
                 anchors.right: parent.right
                 anchors.rightMargin: 18
                 anchors.verticalCenter: parent.verticalCenter
@@ -695,11 +784,24 @@ Rectangle {
                 onCancelled: root.renamingListId = 0
             }
 
-            ListMenu { id: listMenu; listId: item.row.listId || 0; onRename: root.renamingListId = item.row.listId }
+            ListMenu {
+                id: listMenu
+                listId: item.row.listId || 0
+                onRename: root.renamingListId = item.row.listId
+                onEditList: editListDialog.edit(item.row.listId)
+                onCustomColor: root.pickColor(theme.listColor(item.row.color || 0), (code) => backend.setListColor(item.row.listId, code))
+            }
             Menu {
                 id: smartMenu
                 MenuItem { text: "Edit Search…"; onTriggered: { backend.selectSource(item.row.sourceKey); root.editSmartListRequested() } }
+                MenuItem { text: "Edit List…"; onTriggered: editListDialog.edit(item.row.listId) }
                 MenuItem { text: "Rename…"; onTriggered: root.renamingListId = item.row.listId }
+                ColorMenu {
+                    current: typeof item.row.color === "number" ? item.row.color : -1
+                    onChosen: (color) => backend.setListColor(item.row.listId, color)
+                    onCustomRequested: root.pickColor(typeof item.row.color === "number" && item.row.color >= 0 ? theme.listColor(item.row.color) : theme.accent,
+                                                      (code) => backend.setListColor(item.row.listId, code))
+                }
                 MenuItem { text: "Delete Smart List"; onTriggered: backend.deleteList(item.row.listId) }
             }
         }

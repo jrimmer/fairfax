@@ -58,6 +58,7 @@ ApplicationWindow {
             // search builder, saved from there.
             onNewSmartListRequested: { backend.selectSource("all"); pane.openSearchBuilder() }
             onEditSmartListRequested: pane.editSmartQuery()
+            onDoneWarningRequested: { settings.pane = 2; settings.show(); settings.raise() }
         }
 
         Rectangle { Layout.fillHeight: true; implicitWidth: 1; color: theme.divider; visible: sidebar.visible }
@@ -90,6 +91,27 @@ ApplicationWindow {
     CommandPopup { id: command; onClosed: win.focusList() }
     QuickEntry { id: quickEntry }
     SettingsWindow { id: settings }
+
+    // Selecting Done with 500+ completed tasks and auto-delete off asks once
+    // whether to open the setting, as the reference app does.
+    Connections {
+        target: backend
+        function onDoneWarningRequested() { if (win.active) doneWarning.open() }
+    }
+    Dialog {
+        id: doneWarning
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(440, parent.width - 40)
+        title: "Growing number of completed tasks"
+        Label {
+            text: "Done holds " + backend.completedCount() + " completed tasks.\nShould they be deleted automatically after a while?\nNo leaves them as they are."
+        }
+        standardButtons: Dialog.Yes | Dialog.No
+        onAccepted: { settings.pane = 2; settings.show(); settings.raise() }
+        onClosed: win.focusList()
+    }
     ExportDialog { id: exportDialog; owner: "main" }
 
     // Files picked for a task's attachments.
@@ -177,6 +199,8 @@ ApplicationWindow {
     AppShortcut { sequence: "Ctrl+Down"; onActivated: backend.selectAdjacentSource(1) }
     AppShortcut { sequence: "Ctrl+Shift+Up"; onActivated: backend.moveSelection(-1) }
     AppShortcut { sequence: "Ctrl+Alt+Up"; onActivated: backend.setAllCollapsed(true) }
+    AppShortcut { sequence: "Ctrl+Shift+Alt+Up"; onActivated: backend.setAllGroupsCollapsed(true) }
+    AppShortcut { sequence: "Ctrl+Shift+Alt+Down"; onActivated: backend.setAllGroupsCollapsed(false) }
     AppShortcut { sequence: "Ctrl+Shift+Down"; onActivated: backend.moveSelection(1) }
     AppShortcut { sequence: "Ctrl+Alt+Down"; onActivated: backend.setAllCollapsed(false) }
     AppShortcut { sequence: "Ctrl+."; onActivated: backend.toggleComplete() }

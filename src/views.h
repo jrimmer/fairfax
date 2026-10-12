@@ -108,7 +108,11 @@ public:
     bool inSmartRange(const Task &task, const QString &range) const;
     static bool matchesFocusCondition(const Task &task, const QString &condition, const QDateTime &now,
                                       const ScheduleSettings &settings);
-    bool listVisible(qint64 listId) const;
+    // Archived lists are normally out of sight; Smart Lists and Done pass
+    // `allowArchived` because the reference app keeps feeding them from the archive.
+    bool listVisible(qint64 listId, bool allowArchived = false) const;
+    // The "lists.hidden" setting: uids of the lists kept out of sight.
+    static QSet<QString> hiddenListUids(const Store &store);
     QString sourceTitle(const Source &source) const;
     QVector<TaskList> orderedLists() const;  // Sidebar order: ungrouped first, then by group.
     QVector<Task> children(qint64 parentId) const;  // Sorted by manual order.
@@ -139,6 +143,7 @@ private:
     ScheduleSettings m_settings;
     QSet<qint64> m_pausedTags;
     QSet<qint64> m_pausedLocations;
+    QSet<qint64> m_hiddenLists;  // Empty while hidden lists are revealed.
     QHash<qint64, qint64> m_tagRank;
     QHash<qint64, QVector<qint64>> m_childrenOf;
 };

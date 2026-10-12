@@ -119,6 +119,15 @@ namespace ListKind {
 enum { Normal = 0, Inbox = 1, Smart = 2 };
 }
 
+// TaskList.color is a palette index (below 64) or, with the flag set, a custom
+// 0xRRGGBB picked in the colour dialog.
+namespace ListColor {
+constexpr int CustomFlag = 0x1000000;
+inline bool isCustom(int color) { return color >= CustomFlag; }
+inline int custom(unsigned rgb) { return CustomFlag | int(rgb & 0xFFFFFF); }
+inline unsigned rgb(int color) { return unsigned(color) & 0xFFFFFF; }
+}  // namespace ListColor
+
 struct TaskList {
     qint64 id = 0;
     QString uid;

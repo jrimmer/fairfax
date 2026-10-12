@@ -253,6 +253,23 @@ public:
     Q_INVOKABLE void setListColor(qint64 id, int color);
     Q_INVOKABLE void setListFlag(qint64 id, const QString &flag, bool on);
     Q_INVOKABLE void deleteList(qint64 id);
+    // Recolours the group and every list in it ("Color grouped lists…").
+    Q_INVOKABLE void setGroupColor(qint64 groupId, int color);
+    Q_INVOKABLE void setAllGroupsCollapsed(bool collapsed);
+    Q_INVOKABLE QVariantList groupChoices() const;
+    // New task in a given list: the sidebar's per-row [+].
+    Q_INVOKABLE void newTaskInList(qint64 listId);
+    // Hidden lists (Settings > Today & Lists): out of the sidebar, All,
+    // Today, searches and counts until revealed, which lasts one session.
+    Q_INVOKABLE void setListHidden(qint64 id, bool hidden);
+    Q_INVOKABLE QVariantList hideableLists() const;
+    Q_INVOKABLE bool hasHiddenLists() const;
+    Q_INVOKABLE bool hiddenRevealed() const;
+    Q_INVOKABLE void setHiddenRevealed(bool revealed);
+    // Done's "growing number of completed tasks" warning.
+    static constexpr int DoneWarningThreshold = 500;
+    Q_INVOKABLE int completedCount() const;
+    Q_INVOKABLE bool doneWarningShown() const;
     Q_INVOKABLE QVariantMap listInfo(qint64 id) const;
     // "Don't Sync This List": git, folder, WebDAV and Todoist sync skip it
     // and its tasks. Kept in a setting, on this machine only.
@@ -466,6 +483,7 @@ signals:
     void settingsChanged();
     void clockChanged();
     void statusChanged();
+    void doneWarningRequested();  // Done holds 500+ completed tasks and auto-delete is off.
     void revealTask(qint64 id);  // Asks the list to scroll a task into view.
     void quickEntryRequested();
     void taskCompleted(bool done);   // For the completion sound.
@@ -504,6 +522,7 @@ private:
 
     void rebuild();
     void rebuildSidebar(const ViewBuilder &views);
+    bool doneWarningDue() const;
     void rebuildTasks(const ViewBuilder &views);
     void rebuildTags(const ViewBuilder &views);
     void rebuildEditor();

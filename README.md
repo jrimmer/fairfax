@@ -143,7 +143,13 @@ offers your lists and `pc done <Tab>` your open tasks.
   to page through months, and drop tasks on a day to defer them.
 - **Arrange freely.** Drag lists and groups to reorder them, drag tasks onto lists, Today,
   Starred, Done, projects, tags, locations or calendar days, and between rows. Archived
-  lists wait under *Archived* in the sidebar.
+  lists wait under *Archived* in the sidebar; their tasks still show in Smart Lists and Done.
+- **List colours and groups.** Right-click a list, Smart List or group for a palette or a
+  custom colour; *Color Grouped Lists* recolours a whole group. *Edit List…* sets name,
+  colour, group, Focus List exclusions, completed tasks and muted alerts. Hover a list for a
+  `+` that adds a task to it. *Hide lists* (Settings > Today & Lists) takes lists out of the
+  sidebar, All, Today and searches until you pick *Show Hidden Lists* in the sidebar's `+` menu.
+  Selecting Done with 500+ completed tasks and auto-delete off asks once about auto-deleting.
 - **Tray.** Precrime sits in the bar's tray while it runs in the background; its menu is a
   quick view of today, with New Task, Find, Sync and Quit.
 - **Undo.** Every change is undoable with Ctrl+Z.
@@ -180,6 +186,7 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+↑` / `Ctrl+↓` | Previous / next list |
 | `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Move the task up / down |
 | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` | Collapse / expand every project |
+| `Ctrl+Shift+Alt+↑` / `Ctrl+Shift+Alt+↓` | Collapse / expand every list group |
 | `Ctrl+F` / `Ctrl+Shift+O` | Search / Quick Open |
 | `Ctrl+K` / `Ctrl+U` / `Ctrl+O` | Show scheduled / show paused / hide completed |
 | `Ctrl+Alt+J` | Project view |

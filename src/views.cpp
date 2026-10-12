@@ -75,6 +75,17 @@ ViewBuilder::ViewBuilder(const Store &store, const QDateTime &now, const Schedul
     for (const auto &task : store.tasks())
         if (!task.deleted && task.parentId)
             m_childrenOf[task.parentId].append(task.id);
+    // Hidden lists (Settings > Today & Lists) vanish everywhere until revealed.
+    const QSet<QString> hidden = hiddenListUids(store);
+    if (!hidden.isEmpty() && !store.setting("lists.hiddenRevealed", false).toBool())
+        for (const auto &l : store.lists())
+            if (hidden.contains(l.uid))
+                m_hiddenLists.insert(l.id);
+}
+
+QSet<QString> ViewBuilder::hiddenListUids(const Store &store) {
+    const QStringList uids = store.setting("lists.hidden").toString().split(',', Qt::SkipEmptyParts);
+    return QSet<QString>(uids.begin(), uids.end());
 }
 
 QVector<Tag> ViewBuilder::orderedTags(const Store &store) {
@@ -109,9 +120,10 @@ bool ViewBuilder::isPaused(const Task &task) const {
     return false;
 }
 
-bool ViewBuilder::listVisible(qint64 listId) const {
+bool ViewBuilder::listVisible(qint64 listId, bool allowArchived) const {
     const auto it = m_store.lists().constFind(listId);
-    return it != m_store.lists().cend() && !it->deleted && !it->archived && it->kind != ListKind::Smart;
+    return it != m_store.lists().cend() && !it->deleted && (allowArchived || !it->archived)
+        && it->kind != ListKind::Smart && !m_hiddenLists.contains(listId);
 }
 
 bool ViewBuilder::inSmartRange(const Task &t, const QString &range) const {
@@ -188,7 +200,7 @@ SortSpec ViewBuilder::projectSort(qint64 parentId) const {
 QVector<TaskList> ViewBuilder::orderedLists() const {
     QVector<TaskList> lists;
     for (const auto &l : m_store.lists())
-        if (!l.deleted && !l.archived && l.kind != ListKind::Smart)
+        if (!l.deleted && !l.archived && l.kind != ListKind::Smart && !m_hiddenLists.contains(l.id))
             lists.append(l);
     auto groupOrder = [this](qint64 groupId) -> double {
         const auto it = m_store.groups().constFind(groupId);
@@ -259,7 +271,11 @@ QueryContext ViewBuilder::queryContext(const ViewOptions &o) const {
 }
 
 bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewOptions &o, const Query *query) const {
-    if (t.deleted || !listVisible(t.listId))
+    // Archived lists stay out of everything but Smart Lists and Done, which
+    // is where the reference app still finds their tasks.
+    const bool reachesArchive = source.kind == Source::Done
+        || (source.kind == Source::List && isSmartList(source.id));
+    if (t.deleted || !listVisible(t.listId, reachesArchive))
         return false;
     if (!o.showPaused && isPaused(t))
         return false;

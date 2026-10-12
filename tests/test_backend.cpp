@@ -927,6 +927,89 @@ private slots:
         f.backend->setNotes(id, "line two");
         QCOMPARE(f.backend->taskAsText(id), QString("Remind me\nline two"));
     }
+
+    void groupColorRecoloursItsLists() {
+        Fixture f;
+        const qint64 group = f.backend->newGroup("Home");
+        const qint64 a = f.backend->newList("A");
+        const qint64 b = f.backend->newList("B");
+        const qint64 outside = f.backend->newList("C");
+        f.backend->moveList(a, 0, group);
+        f.backend->moveList(b, 0, group);
+        const int custom = ListColor::custom(0x112233);
+        f.backend->setGroupColor(group, custom);
+        QCOMPARE(f.store.groups().value(group).color, custom);
+        QCOMPARE(f.store.list(a).color, custom);
+        QCOMPARE(f.store.list(b).color, custom);
+        QVERIFY(f.store.list(outside).color != custom);
+        f.backend->undo();
+        QVERIFY(f.store.list(a).color != custom);
+    }
+
+    void expandAndCollapseAllGroups() {
+        Fixture f;
+        const qint64 g1 = f.backend->newGroup("One");
+        const qint64 g2 = f.backend->newGroup("Two");
+        f.backend->toggleGroupCollapsed(g1);
+        f.backend->setAllGroupsCollapsed(true);
+        QVERIFY(f.store.groups().value(g1).collapsed && f.store.groups().value(g2).collapsed);
+        f.backend->setAllGroupsCollapsed(false);
+        QVERIFY(!f.store.groups().value(g1).collapsed && !f.store.groups().value(g2).collapsed);
+    }
+
+    void hidingAListKeepsItOutOfTheSidebarUntilRevealed() {
+        Fixture f;
+        const qint64 id = f.backend->newList("Private");
+        auto inSidebar = [&] {
+            for (const auto &row : f.backend->sidebar()->rows())
+                if (row.value("listId").toLongLong() == id && row.value("kind") == "list") return true;
+            return false;
+        };
+        QVERIFY(inSidebar());
+        QVERIFY(!f.backend->hasHiddenLists());
+        f.backend->setListHidden(id, true);
+        QVERIFY(f.backend->hasHiddenLists());
+        QVERIFY(f.backend->listInfo(id).value("hidden").toBool());
+        QVERIFY(!inSidebar());
+        QVERIFY(f.backend->listChoices().size() < f.backend->hideableLists().size());
+        f.backend->setHiddenRevealed(true);
+        QVERIFY(inSidebar());
+        f.backend->setHiddenRevealed(false);
+        f.backend->setListHidden(id, false);
+        QVERIFY(inSidebar());
+    }
+
+    void doneWarnsAtFiveHundredCompletedTasks() {
+        Fixture f;
+        auto warned = [&] {
+            for (const auto &row : f.backend->sidebar()->rows())
+                if (row.value("sourceKey") == "done") return row.value("warn").toBool();
+            return false;
+        };
+        const qint64 list = f.firstList();
+        f.store.begin("bulk");
+        for (int i = 0; i < Backend::DoneWarningThreshold; ++i) {
+            Task t;
+            t.id = f.store.nextId("tasks");
+            t.listId = list;
+            t.title = QString("done %1").arg(i);
+            t.completed = true;
+            t.completedAt = QDateTime::currentDateTime().addDays(-3);
+            f.store.putTask(t);
+        }
+        f.store.commit();
+        QCOMPARE(f.backend->completedCount(), 500);
+        QVERIFY(warned());
+        // The prompt asks once.
+        QSignalSpy spy(f.backend.get(), &Backend::doneWarningRequested);
+        f.backend->selectSource("done");
+        f.backend->selectSource("all");
+        f.backend->selectSource("done");
+        QCOMPARE(spy.count(), 1);
+        // Automatic deletion makes the warning moot.
+        f.backend->setSetting("tasks.autoDeleteDays", 30);
+        QVERIFY(!warned());
+    }
 };
 
 REGISTER_TEST(BackendTest)
