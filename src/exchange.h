@@ -9,6 +9,8 @@
 #include <QList>
 #include <QSet>
 #include <QString>
+#include <QUrl>
+#include <QVector>
 
 class Store;
 struct Task;
@@ -67,5 +69,51 @@ bool isTickTickBackup(const QString &path);
 // Imports a the reference app database (tasks.db, or a .taskdb backup, which is the same
 // SQLite file) as one undoable change, skipping the reference app's built-in focus lists.
 ImportResult importTwoDo(Store &store, const QString &path);
+
+// Imports a Things 3 JSON export (things:///json style with "attributes", or
+// the flat title/notes/status/deadline/tags form other exporters write) as one
+// undoable change. Areas become lists, projects become projects, checklist
+// items stay checklists, "when" becomes the start date and the deadline the due
+// date. Items with an id keep it in their uid, so a second import skips them.
+ImportResult importThingsJson(Store &store, const QByteArray &json);
+ImportResult importThings(Store &store, const QString &path);
+bool isThingsExport(const QString &path);
+
+// Imports an OmniFocus TaskPaper export ("File > Export > TaskPaper"): folders
+// become list groups, projects lists, nested items sub-tasks (their parent
+// becomes a project), @due/@defer/@done/@estimate/@flagged map onto the task's
+// fields, other @tags become tags and indented plain lines become notes.
+ImportResult importTaskPaperText(Store &store, const QString &text);
+ImportResult importOmniFocus(Store &store, const QString &path);
+bool isTaskPaper(const QString &path);
+
+// Print / Save as PDF: a clean checklist of a list's tasks under their
+// section headings, with due dates, tags and (optionally) notes.
+struct PrintItem {
+    QString title, due, tags, notes;
+    int depth = 0;
+    int priority = 0;
+    bool done = false;
+    bool starred = false;
+};
+struct PrintSection {
+    QString heading;
+    QVector<PrintItem> items;
+};
+PrintItem printItem(const Store &store, const Task &task, int depth);
+QString printHtml(const QString &title, const QVector<PrintSection> &sections, bool includeNotes);
+bool writePdf(const QString &path, const QString &title, const QVector<PrintSection> &sections, bool includeNotes, QString *error = nullptr);
+
+// Tasks as plain text, one "[ ] Title (due …)" line each with notes
+// indented under it and listed sub-tasks nested under their parent. Used by
+// Email These Tasks and for dragging tasks out of the window as a file.
+QString tasksAsText(const Store &store, const QList<qint64> &taskIds);
+QUrl mailtoForTasks(const Store &store, const QList<qint64> &taskIds);
+
+// The headers of a mail message (.eml) that matter for linking to it.
+struct Eml {
+    QString subject, from, messageId;  // The id without its angle brackets.
+};
+Eml parseEml(const QByteArray &bytes);
 
 }  // namespace Exchange

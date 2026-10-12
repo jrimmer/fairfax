@@ -1010,6 +1010,14 @@ private slots:
         f.backend->setSetting("tasks.autoDeleteDays", 30);
         QVERIFY(!warned());
     }
+
+    void googleDomainFollowsLocale() {
+        QCOMPARE(Backend::googleDomain(QLocale(QLocale::English, QLocale::UnitedStates)), "google.com");
+        QCOMPARE(Backend::googleDomain(QLocale(QLocale::English, QLocale::UnitedKingdom)), "google.co.uk");
+        QCOMPARE(Backend::googleDomain(QLocale(QLocale::German, QLocale::Germany)), "google.de");
+        QCOMPARE(Backend::googleDomain(QLocale(QLocale::Japanese, QLocale::Japan)), "google.co.jp");
+        QCOMPARE(Backend::googleDomain(QLocale::c()), "google.com");
+    }
 };
 
 REGISTER_TEST(BackendTest)

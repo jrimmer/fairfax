@@ -10,7 +10,7 @@ Terminal=false
 Categories=Office;ProjectManagement;Utility;
 Keywords=todo;tasks;gtd;taskapp;
 StartupWMClass=precrime
-Actions=new-task;today;find;
+Actions=new-task;new-window;today;find;
 
 [Desktop Action new-task]
 Name=New Task
@@ -24,3 +24,6 @@ Exec=precrime precrime://x-callback-url/showtoday
 Name=Find a Task
 Exec=precrime --open
 
+[Desktop Action new-window]
+Name=New Window
+Exec=precrime --new-window

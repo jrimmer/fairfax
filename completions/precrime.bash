@@ -26,7 +26,7 @@ _pc() {
 
 _precrime() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]}
-    local options="--help --version --db --demo --quick --background --open --settings --source --theme-dir --screenshot --size --edit --selftest"
+    local options="--help --version --db --demo --quick --background --open --new-window --settings --source --theme-dir --screenshot --size --edit --selftest"
     case $prev in
         --db|--theme-dir|--screenshot) COMPREPLY=($(compgen -f -- "$cur")); return ;;
         --source) COMPREPLY=($(compgen -W "all today starred scheduled done" -- "$cur")); return ;;

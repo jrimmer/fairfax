@@ -615,6 +615,191 @@ private slots:
         QVERIFY(completed["ok"].toBool());
         QVERIFY(m_store->task(shown.id).completed);
     }
+
+    void urlPasteClipboardCallbacks() {
+        auto url = [&](const QString &u) { return m_auto->handleUrl(QUrl(u)); };
+        // paste: one task per non-empty line, optionally inside a project.
+        const auto pasted = url("precrime://x-callback-url/paste?forlist=Work&text=Buy%20milk%0A%0ACall%20Sam");
+        QVERIFY(pasted["ok"].toBool());
+        QCOMPARE(pasted["item_count"].toInt(), 2);
+        QCOMPARE(pasted["tasks"].toArray().at(1).toObject()["list"].toObject()["name"].toString(), "Work");
+        const qint64 proj = addTask({{"title", "Launch"}, {"task_type", "project"}, {"list_id", id(m_work)}});
+        const auto inProject = url("precrime://x-callback-url/paste?forlist=Work&inproject=launch&text=Copy");
+        QCOMPARE(inProject["tasks"].toArray().first().toObject()["parent_id"].toString(), id(proj));
+        QCOMPARE(code(url("precrime://x-callback-url/paste?text=%0A")), "invalid_arguments");
+        QCOMPARE(code(url("precrime://x-callback-url/paste?inproject=x&text=a")), "invalid_arguments");
+
+        // (clipboard) needs a clipboard, and reads it when there is one.
+        QCOMPARE(code(url("precrime://x-callback-url/add?task=(clipboard)")), "automation_unavailable");
+        m_auto->clipboardText = [] { return QStringLiteral("From the clipboard"); };
+        QCOMPARE(url("precrime://x-callback-url/add?task=(clipboard)")["task"].toObject()["title"].toString(), "From the clipboard");
+        QCOMPARE(url("precrime://x-callback-url/search?text=(clipboard)")["search"].toString(), "(clipboard)");
+
+        // saveinclipboard asks the window to copy the uid.
+        const auto saved = url("precrime://x-callback-url/add?task=Keep&saveinclipboard=1");
+        QCOMPARE(saved["clipboard"].toString(), saved["task"].toObject()["uid"].toString());
+
+        // x-error receives the failure; x-cancel is passed along.
+        const auto failed = url("precrime://x-callback-url/add?task=x&forlist=Nowhere&x-error=app%3A%2F%2Ffailed&x-cancel=app%3A%2F%2Fcancelled");
+        QVERIFY(!failed["ok"].toBool());
+        QVERIFY(failed["callback"].toString().startsWith("app://failed?errorCode=not_found&errorMessage="));
+        QCOMPARE(failed["cancel_callback"].toString(), "app://cancelled");
+    }
+
+    void urlLocationsPictureIgnoreDefaults() {
+        auto url = [&](const QString &u) { return m_auto->handleUrl(QUrl(u)); };
+        Location place;
+        place.id = m_store->nextId("locations");
+        place.name = "Office";
+        m_store->begin("loc");
+        m_store->putLocation(place);
+        m_store->commit();
+        const auto withPlace = url("precrime://x-callback-url/add?task=Badge&locations=office");
+        QCOMPARE(withPlace["task"].toObject()["locations"].toArray().first().toObject()["name"].toString(), "Office");
+        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&locations=Mars")), "not_found");
+
+        // A 1x1 PNG arrives as an attachment; text posing as one is refused.
+        const QString png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+        const auto pic = url("precrime://x-callback-url/add?task=Snap&picture=" + QString::fromUtf8(QUrl::toPercentEncoding(png)));
+        QVERIFY(pic["ok"].toBool());
+        const auto atts = m_store->attachmentsFor(pic["task"].toObject()["id"].toString().toLongLong());
+        QCOMPARE(atts.size(), 1);
+        QCOMPARE(atts.first().kind, int(Attachment::Image));
+        QVERIFY(QFile::exists(m_store->attachmentsFolder() + "/" + atts.first().fileName));
+        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&picture=bm90IGFuIGltYWdl")), "invalid_arguments");
+        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&audio=" + QString::fromUtf8(QUrl::toPercentEncoding(png)))), "invalid_arguments");
+
+        // ignoredefaults skips the default list and the default reminder.
+        m_store->setSetting("tasks.defaultList", m_work);
+        m_store->setSetting("alerts.defaultTimed", 15);
+        const auto plain = url("precrime://x-callback-url/add?task=Plain&due=2026-07-20&duetime=10:00&ignoredefaults=1");
+        QCOMPARE(plain["task"].toObject()["list"].toObject()["name"].toString(), "Inbox");
+        QCOMPARE(m_store->alarmsFor(plain["task"].toObject()["id"].toString().toLongLong()).size(), 0);
+        const auto normal = url("precrime://x-callback-url/add?task=Normal&due=2026-07-20&duetime=10:00");
+        QCOMPARE(normal["task"].toObject()["list"].toObject()["name"].toString(), "Work");
+        QCOMPARE(m_store->alarmsFor(normal["task"].toObject()["id"].toString().toLongLong()).size(), 1);
+    }
+
+    void alarmCommands() {
+        const qint64 t = addTask({{"title", "Meeting"}, {"due_date", "2026-07-12"}, {"due_time", "14:00"}});
+        QCOMPARE(ok("list_alarms", {{"task_id", id(t)}})["item_count"].toInt(), 0);
+        const auto rel = ok("add_alarm", {{"task_id", id(t)}, {"trigger_type", "relative"}, {"offset_seconds", -900}});
+        QCOMPARE(rel["alarm"].toObject()["offset_seconds"].toInt(), -900);
+        QCOMPARE(m_store->alarmsFor(t).first().offset, 15);
+        ok("add_alarm", {{"task_id", id(t)}, {"trigger_type", "absolute"}, {"at", "2026-07-11 09:15"}, {"sound", false}});
+        ok("add_alarm", {{"task_id", id(t)}, {"trigger_type", "days_before"}, {"days_before", 2}, {"time_of_day", "08:00"}});
+        const auto all = ok("list_alarms", {{"task_id", id(t)}})["alarms"].toArray();
+        QCOMPARE(all.size(), 3);
+        QCOMPARE(all.at(1).toObject()["at"].toString(), "2026-07-11 09:15");
+        QVERIFY(!all.at(1).toObject()["sound"].toBool());
+        QCOMPARE(all.at(2).toObject()["time_of_day"].toString(), "08:00");
+
+        QCOMPARE(code(m_auto->run("add_alarm", {{"task_id", id(t)}, {"trigger_type", "relative"}})), "invalid_arguments");
+        QCOMPARE(code(m_auto->run("add_alarm", {{"task_id", id(t)}, {"trigger_type", "absolute"}, {"at", "tomorrow"}})), "invalid_arguments");
+        QCOMPARE(code(m_auto->run("add_alarm", {{"task_id", id(t)}, {"trigger_type", "relative"}, {"offset_seconds", -30}})), "invalid_arguments");
+        const qint64 undated = addTask({{"title", "No date"}});
+        QCOMPARE(code(m_auto->run("add_alarm", {{"task_id", id(undated)}, {"trigger_type", "relative"}, {"offset_seconds", -60}})), "invalid_arguments");
+
+        const QString first = all.first().toObject()["id"].toString();
+        ok("remove_alarm", {{"alarm_id", first}});
+        QCOMPARE(ok("list_alarms", {{"task_id", id(t)}})["item_count"].toInt(), 2);
+        QCOMPARE(code(m_auto->run("remove_alarm", {{"alarm_id", first}})), "not_found");
+        QVERIFY(m_store->undo());
+        QCOMPARE(ok("list_alarms", {{"task_id", id(t)}})["item_count"].toInt(), 3);
+        // The limit is ten.
+        for (int i = 0; i < 7; ++i)
+            ok("add_alarm", {{"task_id", id(t)}, {"trigger_type", "relative"}, {"offset_seconds", -60 * (i + 1)}});
+        QCOMPARE(code(m_auto->run("add_alarm", {{"task_id", id(t)}, {"trigger_type", "relative"}, {"offset_seconds", -60}})), "invalid_arguments");
+    }
+
+    void recurrenceAndLocations() {
+        Location place;
+        place.id = m_store->nextId("locations");
+        place.name = "Gym";
+        Location other;
+        other.id = m_store->nextId("locations");
+        other.name = "Home";
+        m_store->begin("loc");
+        m_store->putLocation(place);
+        m_store->putLocation(other);
+        m_store->commit();
+
+        const qint64 t = addTask({{"title", "Workout"}, {"due_date", "2026-07-13"}});
+        auto r = ok("update_task", {{"task_id", id(t)},
+                                    {"recurrence", QJsonObject{{"frequency", "weekly"}, {"interval", 2}, {"weekdays", QJsonArray{"mon", "thu"}},
+                                                               {"based_on", "completion"},
+                                                               {"end_rule", QJsonObject{{"type", "after_count"}, {"occurrence_count", 5}}}}},
+                                    {"location_update", QJsonObject{{"mode", "set"}, {"location_ids", QJsonArray{id(place.id)}}}}});
+        const Task saved = m_store->task(t);
+        QCOMPARE(saved.recurrence.frequency, int(Repeat::Weekly));
+        QCOMPARE(saved.recurrence.interval, 2);
+        QCOMPARE(saved.recurrence.weekdays, 0b1001);
+        QCOMPARE(saved.recurrence.from, int(Repeat::FromCompletion));
+        QCOMPARE(saved.recurrence.endCount, 5);
+        const auto json = r["task"].toObject();
+        QCOMPARE(json["recurrence"].toObject()["weekdays"].toArray().size(), 2);
+        QCOMPARE(json["locations"].toArray().first().toObject()["name"].toString(), "Gym");
+
+        ok("update_task", {{"task_id", id(t)}, {"location_update", QJsonObject{{"mode", "append"}, {"location_ids", QJsonArray{id(other.id)}}}}});
+        QCOMPARE(m_store->task(t).locationIds.size(), 2);
+        ok("update_task", {{"task_id", id(t)}, {"location_update", QJsonObject{{"mode", "remove"}, {"location_ids", QJsonArray{id(place.id)}}}}});
+        QCOMPARE(m_store->task(t).locationIds, QList<qint64>{other.id});
+        QCOMPARE(code(m_auto->run("update_task", {{"task_id", id(t)}, {"location_update", QJsonObject{{"mode", "set"}, {"location_ids", QJsonArray{"999"}}}}})), "not_found");
+
+        ok("update_task", {{"task_id", id(t)}, {"recurrence", QJsonObject{{"frequency", "none"}}}});
+        QVERIFY(!m_store->task(t).recurrence.isSet());
+        QVERIFY(ok("get_task", {{"task_id", id(t)}})["task"].toObject()["recurrence"].isNull());
+
+        // A rule needs a date to count from; bad rules are refused whole.
+        const qint64 undated = addTask({{"title", "Someday"}});
+        QCOMPARE(code(m_auto->run("update_task", {{"task_id", id(undated)}, {"recurrence", QJsonObject{{"frequency", "daily"}}}})), "invalid_arguments");
+        QCOMPARE(code(m_auto->run("update_task", {{"task_id", id(t)}, {"recurrence", QJsonObject{{"frequency", "weekly"}, {"weekdays", QJsonArray{"funday"}}}}})), "invalid_arguments");
+        QCOMPARE(code(m_auto->run("update_task", {{"task_id", id(t)}, {"recurrence", QJsonObject{{"frequency", "daily"}, {"bogus", 1}}}})), "invalid_arguments");
+        const auto created = ok("create_task", {{"title", "Rent"}, {"due_date", "2026-08-01"},
+                                                {"recurrence", QJsonObject{{"frequency", "monthly"}, {"month_ordinal", -1}, {"month_weekday", "fri"}}}});
+        QCOMPARE(created["task"].toObject()["repeat"].toString(), "Monthly on the last Fri");
+    }
+
+    void queryGroupSortAndAfter() {
+        ListGroup group;
+        group.id = m_store->nextId("groups");
+        group.name = "Projects";
+        TaskList home;
+        home.id = m_store->nextId("lists");
+        home.name = "Home";
+        home.order = 2;
+        home.groupId = group.id;
+        m_store->begin("group");
+        m_store->putGroup(group);
+        m_store->putList(home);
+        m_store->commit();
+        addTask({{"title", "Banana"}, {"list_id", id(home.id)}, {"due_date", "2026-07-20"}, {"priority", "low"}});
+        addTask({{"title", "apple"}, {"list_id", id(home.id)}, {"due_date", "2026-07-05"}, {"priority", "high"}});
+        addTask({{"title", "Cherry"}, {"list_id", id(home.id)}});
+        addTask({{"title", "Outside"}, {"list_id", id(m_work)}, {"due_date", "2026-07-25"}});
+
+        auto titles = [](const QJsonObject &r) {
+            QStringList l;
+            for (const auto &t : r["tasks"].toArray())
+                l << t.toObject()["title"].toString();
+            return l;
+        };
+        QCOMPARE(titles(ok("query_tasks", {{"list_group_id", id(group.id)}})), (QStringList{"apple", "Banana", "Cherry"}));
+        QCOMPARE(code(m_auto->run("query_tasks", {{"list_group_id", id(group.id)}, {"list_id", id(m_work)}})), "invalid_arguments");
+        QCOMPARE(code(m_auto->run("query_tasks", {{"list_group_id", "999"}})), "not_found");
+
+        QCOMPARE(titles(ok("query_tasks", {{"due_on_or_after", "2026-07-20"}})), (QStringList{"Banana", "Outside"}));
+        QCOMPARE(titles(ok("query_tasks", {{"due_on_or_after", "2026-07-06"}, {"due_on_or_before", "2026-07-20"}})), (QStringList{"Banana"}));
+
+        QCOMPARE(titles(ok("query_tasks", {{"list_group_id", id(group.id)}, {"sort", QJsonObject{{"field", "title"}}}})), (QStringList{"apple", "Banana", "Cherry"}));
+        QCOMPARE(titles(ok("query_tasks", {{"list_group_id", id(group.id)}, {"sort", QJsonObject{{"field", "title"}, {"direction", "descending"}}}})),
+                 (QStringList{"Cherry", "Banana", "apple"}));
+        // Undated tasks stay last in either direction.
+        QCOMPARE(titles(ok("query_tasks", {{"list_group_id", id(group.id)}, {"sort", QJsonObject{{"field", "due_date"}, {"direction", "descending"}}}})),
+                 (QStringList{"Banana", "apple", "Cherry"}));
+        QCOMPARE(titles(ok("query_tasks", {{"list_group_id", id(group.id)}, {"sort", QJsonObject{{"field", "priority"}, {"direction", "descending"}}}})).first(), "apple");
+        QCOMPARE(code(m_auto->run("query_tasks", {{"sort", QJsonObject{{"field", "mood"}}}})), "invalid_arguments");
+    }
 };
 
 REGISTER_TEST(AutomationTest)

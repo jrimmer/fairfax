@@ -1,7 +1,10 @@
 #include "automation.h"
 #include "alarms.h"
 
+#include <QDir>
+#include <QFile>
 #include <QHash>
+#include <QMimeDatabase>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QRegularExpression>
@@ -127,6 +130,43 @@ QJsonObject actionSchema() {
                        {"additionalProperties", false}};
 }
 
+const QStringList kFrequencyNames = {"none", "daily", "weekly", "monthly", "yearly", "weekdays"};
+const QStringList kWeekdayNames = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+const QStringList kAlarmKinds = {"relative", "absolute", "days_before"};
+const QStringList kSortFields = {"title", "due_date", "start_date", "priority", "duration", "created", "modified", "completed"};
+
+QJsonObject recurrenceSchema() {
+    QJsonObject endRule{{"type", "object"},
+                        {"description", "When the series stops. Default: never."},
+                        {"properties", QJsonObject{{"type", enumStr("How the series ends.", {"never", "after_count", "on_date"})},
+                                                   {"occurrence_count", integer("1 through 99; for after_count.")},
+                                                   {"date", str("yyyy-MM-dd; for on_date.")}}},
+                        {"required", QJsonArray{"type"}},
+                        {"additionalProperties", false}};
+    return QJsonObject{
+        {"type", "object"},
+        {"description", "Replaces the repeat rule. frequency none clears it. Any other frequency needs a due or start date."},
+        {"properties", QJsonObject{{"frequency", enumStr("How often it repeats.", kFrequencyNames)},
+                                   {"interval", integer("Every N periods, 1 through 999. Default 1.")},
+                                   {"based_on", enumStr("Count from the due date or from completion. Default due_date.", {"due_date", "completion"})},
+                                   {"weekdays", stringArray("Weekly rules: days to repeat on, mon through sun.")},
+                                   {"month_ordinal", integer("Monthly rules: 1 through 5, or -1 for the last, with month_weekday.")},
+                                   {"month_weekday", enumStr("Monthly rules: the weekday for month_ordinal.", kWeekdayNames)},
+                                   {"end_rule", endRule}}},
+        {"required", QJsonArray{"frequency"}},
+        {"additionalProperties", false}};
+}
+
+QJsonObject locationUpdateSchema() {
+    return QJsonObject{
+        {"type", "object"},
+        {"description", "Changes locations: mode set replaces, append adds, remove removes the given locations. Use list_locations for ids."},
+        {"properties", QJsonObject{{"mode", enumStr("How to apply location_ids.", {"set", "append", "remove"})},
+                                   {"location_ids", stringArray("Location ids.")}}},
+        {"required", QJsonArray{"mode", "location_ids"}},
+        {"additionalProperties", false}};
+}
+
 QJsonObject taskWriteProps(bool create) {
     QJsonObject p{
         {"notes", str("Replaces the notes. An empty string clears them; omit to leave unchanged.")},
@@ -139,6 +179,8 @@ QJsonObject taskWriteProps(bool create) {
         {"start_time", nullableStr("HH:mm. Requires a start date. null clears it.")},
         {"duration_seconds", integer("Duration in seconds, 0 through 2147483647. Stored in whole minutes, rounded up.")},
         {"action", actionSchema()},
+        {"recurrence", recurrenceSchema()},
+        {"location_update", locationUpdateSchema()},
     };
     if (create) {
         p["title"] = str("Task title, up to 1000 characters.");
@@ -175,6 +217,10 @@ struct Fields {
     bool hasTags = false;
     QString tagMode = "set";
     QStringList tagNames;
+    std::optional<Recurrence> recurrence;
+    bool hasLocations = false;
+    QString locationMode = "set";
+    QList<qint64> locationIds;
 };
 
 QStringList parseNames(const QJsonValue &v, const QString &key) {
@@ -187,6 +233,52 @@ QStringList parseNames(const QJsonValue &v, const QString &key) {
         names << n.toString().trimmed();
     }
     return names;
+}
+
+Recurrence parseRecurrence(const QJsonValue &v) {
+    if (!v.isObject())
+        invalid("recurrence must be an object like {\"frequency\": \"weekly\", \"weekdays\": [\"mon\"]}.");
+    const QJsonObject o = v.toObject();
+    static const QStringList known = {"frequency", "interval", "based_on", "weekdays", "month_ordinal", "month_weekday", "end_rule"};
+    for (const auto &k : o.keys())
+        if (!known.contains(k))
+            invalid(QStringLiteral("Unknown recurrence key: %1.").arg(k));
+    Recurrence r;
+    r.frequency = parseEnum(o["frequency"], "recurrence.frequency", kFrequencyNames);  // none is index 0, Repeat::None.
+    if (r.frequency == Repeat::None)
+        return r;
+    if (o.contains("interval"))
+        r.interval = parseInt(o["interval"], "recurrence.interval", 1, 999);
+    if (o.contains("based_on"))
+        r.from = parseEnum(o["based_on"], "recurrence.based_on", {"due_date", "completion"});
+    if (o.contains("weekdays")) {
+        for (const auto &d : parseNames(o["weekdays"], "recurrence.weekdays")) {
+            const int i = kWeekdayNames.indexOf(d.toLower());
+            if (i < 0)
+                invalid(QStringLiteral("recurrence.weekdays must be among: %1.").arg(kWeekdayNames.join(", ")));
+            r.weekdays |= 1 << i;
+        }
+    }
+    if (o.contains("month_ordinal")) {
+        r.monthOrdinal = parseInt(o["month_ordinal"], "recurrence.month_ordinal", -1, 5);
+        if (r.monthOrdinal == 0 || !o.contains("month_weekday"))
+            invalid("recurrence.month_ordinal is 1 through 5 or -1 and needs month_weekday.");
+        r.monthWeekday = parseEnum(o["month_weekday"], "recurrence.month_weekday", kWeekdayNames) + 1;
+    }
+    if (o.contains("end_rule")) {
+        if (!o["end_rule"].isObject())
+            invalid("recurrence.end_rule must be an object.");
+        const QJsonObject e = o["end_rule"].toObject();
+        for (const auto &k : e.keys())
+            if (k != "type" && k != "occurrence_count" && k != "date")
+                invalid(QStringLiteral("Unknown end_rule key: %1.").arg(k));
+        r.endType = parseEnum(e["type"], "end_rule.type", {"never", "after_count", "on_date"});
+        if (r.endType == Repeat::AfterCount)
+            r.endCount = parseInt(e["occurrence_count"], "end_rule.occurrence_count", 1, 99);
+        else if (r.endType == Repeat::OnDate)
+            r.endDate = parseDate(e["date"], "end_rule.date");
+    }
+    return r;
 }
 
 Fields parseFields(const QJsonObject &a) {
@@ -249,6 +341,25 @@ Fields parseFields(const QJsonObject &a) {
         }
         f.action = {type, value};
     }
+    if (a.contains("recurrence"))
+        f.recurrence = parseRecurrence(a["recurrence"]);
+    if (a.contains("location_update")) {
+        if (!a["location_update"].isObject())
+            invalid("location_update must be an object.");
+        const QJsonObject u = a["location_update"].toObject();
+        for (const auto &k : u.keys())
+            if (k != "mode" && k != "location_ids")
+                invalid(QStringLiteral("Unknown location_update key: %1.").arg(k));
+        f.hasLocations = true;
+        f.locationMode = QStringList{"set", "append", "remove"}.value(parseEnum(u["mode"], "location_update.mode", {"set", "append", "remove"}));
+        for (const auto &id : parseNames(u["location_ids"], "location_update.location_ids")) {
+            bool ok = false;
+            const qint64 n = id.toLongLong(&ok);
+            if (!ok || n <= 0)
+                invalid("location_update.location_ids must be ids returned by list_locations.");
+            f.locationIds << n;
+        }
+    }
     if (a.contains("tag_names")) {
         f.hasTags = true;
         f.tagNames = parseNames(a["tag_names"], "tag_names");
@@ -292,6 +403,10 @@ void applyFields(Task &t, const Fields &f) {
         t.actionType = f.action->first;
         t.actionValue = f.action->second;
     }
+    if (f.recurrence)
+        t.recurrence = *f.recurrence;
+    if (t.recurrence.isSet() && !t.dueDate.isValid() && !t.startDate.isValid())
+        invalid("recurrence needs a due date or start date.");
     if (t.dueTime >= 0 && !t.dueDate.isValid())
         invalid("due_time requires a due date.");
     if (t.startTime >= 0 && !t.startDate.isValid())
@@ -310,6 +425,7 @@ struct Automation::Impl {
     std::unique_ptr<ViewBuilder> m_views;
     QHash<QString, qint64> newTags;                  // Tags created by the running command.
     QHash<QPair<qint64, qint64>, double> orders;     // Next sibling order handed out per (list, parent).
+    bool ignoreDefaults = false;                     // URL add with ignoredefaults=1: no default list or reminder.
 
     using Handler = QJsonObject (Impl::*)(const QJsonObject &);
 
@@ -423,6 +539,10 @@ struct Automation::Impl {
     }
 
     qint64 defaultListId() {
+        if (ignoreDefaults) {
+            const auto lists = views().orderedLists();
+            return lists.isEmpty() ? 0 : lists.first().id;
+        }
         const qint64 preferred = s.setting("tasks.defaultList", 0).toLongLong();
         if (preferred && s.lists().contains(preferred) && !s.list(preferred).deleted &&
             s.list(preferred).kind != ListKind::Smart)
@@ -476,10 +596,40 @@ struct Automation::Impl {
         o["duration_seconds"] = t.duration * 60;
         o["repeat"] = t.recurrence.isSet() ? QJsonValue(Recurrences::describe(t.recurrence)) : QJsonValue();
         o["tags"] = tags;
+        QJsonArray places;
+        for (auto id : t.locationIds) {
+            const Location place = s.locations().value(id);
+            if (place.id && !place.deleted)
+                places.append(QJsonObject{{"id", idString(place.id)}, {"name", place.name}});
+        }
+        o["locations"] = places;
+        o["recurrence"] = recurrenceJson(t.recurrence);
         o["action"] = QJsonObject{{"type", kActionNames.value(t.actionType)}, {"value", t.actionValue}};
         o["overdue"] = !t.completed && Schedule::isOverdue(t, now(), settings());
         o["scheduled"] = !t.completed && Schedule::isScheduled(t, now());
         o["paused"] = views().isPaused(t);
+        return o;
+    }
+
+    static QJsonValue recurrenceJson(const Recurrence &r) {
+        if (!r.isSet())
+            return QJsonValue();
+        QJsonArray days;
+        for (int i = 0; i < 7; ++i)
+            if (r.weekdays & (1 << i))
+                days.append(kWeekdayNames.at(i));
+        QJsonObject o{{"frequency", kFrequencyNames.value(r.frequency)},
+                      {"interval", r.interval},
+                      {"based_on", r.from == Repeat::FromCompletion ? "completion" : "due_date"}};
+        if (!days.isEmpty()) o["weekdays"] = days;
+        if (r.monthOrdinal) {
+            o["month_ordinal"] = r.monthOrdinal;
+            o["month_weekday"] = kWeekdayNames.value(r.monthWeekday - 1);
+        }
+        if (r.endType == Repeat::AfterCount)
+            o["end_rule"] = QJsonObject{{"type", "after_count"}, {"occurrence_count", r.endCount}};
+        else if (r.endType == Repeat::OnDate)
+            o["end_rule"] = QJsonObject{{"type", "on_date"}, {"date", dateValue(r.endDate)}};
         return o;
     }
 
@@ -554,6 +704,24 @@ struct Automation::Impl {
         for (auto id : ids)
             if (!t.tagIds.contains(id))
                 t.tagIds.append(id);
+    }
+
+    void applyLocations(Task &t, const Fields &f) {
+        if (!f.hasLocations)
+            return;
+        for (auto id : f.locationIds) {
+            const auto it = s.locations().constFind(id);
+            if (it == s.locations().cend() || it->deleted)
+                fail("not_found", QStringLiteral("No location with id %1.").arg(id));
+        }
+        if (f.locationMode == "set")
+            t.locationIds.clear();
+        for (auto id : f.locationIds) {
+            if (f.locationMode == "remove")
+                t.locationIds.removeAll(id);
+            else if (!t.locationIds.contains(id))
+                t.locationIds.append(id);
+        }
     }
 
     // Mirrors Backend::completeTask so the app and automation agree: a
@@ -739,9 +907,9 @@ struct Automation::Impl {
     }
 
     QJsonObject queryTasks(const QJsonObject &args) {
-        const int targets = int(args.contains("list_id")) + int(args.contains("smart_list_id")) + int(args.contains("focus"));
+        const int targets = int(args.contains("list_id")) + int(args.contains("list_group_id")) + int(args.contains("smart_list_id")) + int(args.contains("focus"));
         if (targets > 1)
-            invalid("Provide at most one of list_id, smart_list_id or focus.");
+            invalid("Provide at most one of list_id, list_group_id, smart_list_id or focus.");
         QString search;
         if (args.contains("search")) {
             search = parseString(args["search"], "search");
@@ -752,7 +920,8 @@ struct Automation::Impl {
         const bool includeArchived = args.contains("include_archived") && parseBool(args["include_archived"], "include_archived");
         const int limit = args.contains("limit") ? parseInt(args["limit"], "limit", 1, 200) : 50;
         const int offset = args.contains("offset") ? parseInt(args["offset"], "offset", 0, 1000000000) : 0;
-        QDate dueBefore, startAfter, startBefore;
+        QDate dueBefore, dueAfter, startAfter, startBefore;
+        if (args.contains("due_on_or_after")) dueAfter = parseDate(args["due_on_or_after"], "due_on_or_after");
         if (args.contains("due_on_or_before")) dueBefore = parseDate(args["due_on_or_before"], "due_on_or_before");
         if (args.contains("start_on_or_after")) startAfter = parseDate(args["start_on_or_after"], "start_on_or_after");
         if (args.contains("start_on_or_before")) startBefore = parseDate(args["start_on_or_before"], "start_on_or_before");
@@ -760,8 +929,28 @@ struct Automation::Impl {
         if (args.contains("paused_filter"))
             paused = QStringList{"hide", "include", "only"}.value(parseEnum(args["paused_filter"], "paused_filter", {"hide", "include", "only"}));
 
+        int sortField = -1;
+        bool sortAscending = true;
+        if (args.contains("sort")) {
+            if (!args["sort"].isObject())
+                invalid("sort must be an object like {\"field\": \"due_date\"}.");
+            const QJsonObject o = args["sort"].toObject();
+            for (const auto &k : o.keys())
+                if (k != "field" && k != "direction")
+                    invalid(QStringLiteral("Unknown sort key: %1.").arg(k));
+            sortField = parseEnum(o["field"], "sort.field", kSortFields);
+            if (o.contains("direction"))
+                sortAscending = parseEnum(o["direction"], "sort.direction", {"ascending", "descending"}) == 0;
+        }
+
         const QDateTime when = now();
         QVector<Task> found;
+        qint64 groupId = 0;
+        if (args.contains("list_group_id")) {
+            groupId = idFrom(args["list_group_id"], "list_group_id");
+            if (!s.groups().contains(groupId) || s.groups().value(groupId).deleted)
+                fail("not_found", QStringLiteral("No list group with id %1.").arg(groupId));
+        }
 
         if (args.contains("focus")) {
             const int kind = parseEnum(args["focus"], "focus", kFocusNames);
@@ -801,6 +990,8 @@ struct Automation::Impl {
                     continue;
                 if (listId ? t.listId != listId : (lit->archived && !includeArchived))
                     continue;
+                if (groupId && lit->groupId != groupId)
+                    continue;
                 if ((!saved.isEmpty() && !saved.matches(t, ctx)) || (!typed.isEmpty() && !typed.matches(t, ctx)))
                     continue;
                 found.append(t);
@@ -815,6 +1006,8 @@ struct Automation::Impl {
             if ((paused == "hide" && isPaused) || (paused == "only" && !isPaused))
                 continue;
             if (dueBefore.isValid() && !(t.dueDate.isValid() && t.dueDate <= dueBefore))
+                continue;
+            if (dueAfter.isValid() && !(t.dueDate.isValid() && t.dueDate >= dueAfter))
                 continue;
             if (startAfter.isValid() && !(t.startDate.isValid() && t.startDate >= startAfter))
                 continue;
@@ -833,6 +1026,29 @@ struct Automation::Impl {
             if (x.order != y.order) return x.order < y.order;
             return x.id < y.id;
         });
+        if (sortField >= 0) {
+            // Tasks lacking the field stay last whichever way it runs.
+            auto key = [&](const Task &t) -> QVariant {
+                switch (sortField) {
+                case 0: return t.title.toLower();
+                case 1: return t.dueDate.isValid() ? QVariant(Schedule::dueSortKey(t)) : QVariant();
+                case 2: return t.startDate.isValid() ? QVariant(QDateTime(t.startDate, QTime::fromMSecsSinceStartOfDay(qMax(0, t.startTime) * 60000))) : QVariant();
+                case 3: return t.priority;
+                case 4: return t.duration > 0 ? QVariant(t.duration) : QVariant();
+                case 5: return t.created.isValid() ? QVariant(t.created) : QVariant();
+                case 6: return t.modified.isValid() ? QVariant(t.modified) : QVariant();
+                default: return t.completedAt.isValid() ? QVariant(t.completedAt) : QVariant();
+                }
+            };
+            std::stable_sort(kept.begin(), kept.end(), [&](const Task &x, const Task &y) {
+                const QVariant kx = key(x), ky = key(y);
+                if (kx.isValid() != ky.isValid()) return kx.isValid();
+                if (!kx.isValid()) return false;
+                const bool less = QVariant::compare(kx, ky) == QPartialOrdering::Less;
+                const bool greater = QVariant::compare(kx, ky) == QPartialOrdering::Greater;
+                return sortAscending ? less : greater;
+            });
+        }
         QList<Task> page;
         for (int i = offset; i < kept.size() && page.size() < limit; ++i)
             page.append(kept.at(i));
@@ -917,6 +1133,7 @@ struct Automation::Impl {
             f.title.reset();  // The parsed title stands in for the typed one.
         }
         applyFields(t, f);
+        applyLocations(t, f);
         if (!parsed.tags.isEmpty()) {
             f.hasTags = true;
             f.tagNames << parsed.tags;
@@ -943,7 +1160,8 @@ struct Automation::Impl {
             alarm.offset = offset;
             s.putAlarm(alarm);
         }
-        AlarmTimes::applyDefaultReminder(s, t);
+        if (!ignoreDefaults)
+            AlarmTimes::applyDefaultReminder(s, t);
         QList<qint64> childIds;
         for (const auto &title : subtasks) {
             Task c;
@@ -971,6 +1189,7 @@ struct Automation::Impl {
         Task t = findTask(args["task_id"]);
         const Fields f = parseFields(args);
         applyFields(t, f);
+        applyLocations(t, f);
         s.begin("Edit Task");
         applyTags(t, f);
         s.putTask(t);
@@ -1102,6 +1321,88 @@ struct Automation::Impl {
     QJsonObject pauseTag(const QJsonObject &args) { return setPaused(args, true); }
     QJsonObject unpauseTag(const QJsonObject &args) { return setPaused(args, false); }
 
+    // ----- alarms
+
+    QJsonObject alarmJson(const Alarm &al) {
+        QJsonObject o{{"id", idString(al.id)}, {"task_id", idString(al.taskId)}, {"sound", al.sound},
+                      {"trigger_type", kAlarmKinds.value(al.kind)}};
+        if (al.kind == Alarm::Relative) {
+            o["offset_seconds"] = -al.offset * 60;
+        } else if (al.kind == Alarm::Absolute) {
+            o["at"] = al.at.toString("yyyy-MM-dd HH:mm");
+        } else {
+            o["days_before"] = al.offset;
+            o["time_of_day"] = al.at.toString("HH:mm");
+        }
+        if (al.snoozedUntil.isValid())
+            o["snoozed_until"] = al.snoozedUntil.toString("yyyy-MM-dd HH:mm");
+        return o;
+    }
+
+    QJsonObject listAlarms(const QJsonObject &args) {
+        const Task t = findTask(args["task_id"]);
+        QJsonArray out;
+        for (const auto &al : s.alarmsFor(t.id))
+            out.append(alarmJson(al));
+        QJsonObject r = collection("alarms", out);
+        r["task_id"] = idString(t.id);
+        return r;
+    }
+
+    QJsonObject addAlarm(const QJsonObject &args) {
+        const Task t = findTask(args["task_id"]);
+        const int kind = parseEnum(args["trigger_type"], "trigger_type", kAlarmKinds);
+        if (s.alarmsFor(t.id).size() >= 10)
+            invalid("A task can have at most 10 alarms.");
+        Alarm al;
+        al.taskId = t.id;
+        al.kind = kind;
+        if (args.contains("sound"))
+            al.sound = parseBool(args["sound"], "sound");
+        const bool hasOffset = args.contains("offset_seconds"), hasAt = args.contains("at"),
+                   hasDays = args.contains("days_before"), hasTime = args.contains("time_of_day");
+        if (kind == Alarm::Relative) {
+            if (!hasOffset || hasAt || hasDays || hasTime)
+                invalid("A relative alarm takes offset_seconds only (negative is before the due moment).");
+            const qint64 secs = parseInt(args["offset_seconds"], "offset_seconds", -63071999, 63071999);
+            if (secs % 60 != 0)
+                invalid("offset_seconds must be a whole number of minutes.");
+            al.offset = int(-secs / 60);
+            if (!t.dueDate.isValid() && !t.startDate.isValid())
+                invalid("A relative alarm needs the task to have a due date or start date.");
+        } else if (kind == Alarm::Absolute) {
+            if (!hasAt || hasOffset || hasDays || hasTime)
+                invalid("An absolute alarm takes at only, formatted yyyy-MM-dd HH:mm.");
+            al.at = QDateTime::fromString(parseString(args["at"], "at"), "yyyy-MM-dd HH:mm");
+            if (!al.at.isValid())
+                invalid("at must be formatted yyyy-MM-dd HH:mm.");
+        } else {
+            if (!hasDays || !hasTime || hasOffset || hasAt)
+                invalid("A days_before alarm takes days_before and time_of_day.");
+            al.offset = parseInt(args["days_before"], "days_before", 0, 365);
+            al.at = AlarmTimes::clockTime(parseTime(args["time_of_day"], "time_of_day"));
+            if (!t.dueDate.isValid() && !t.startDate.isValid())
+                invalid("A days_before alarm needs the task to have a due date or start date.");
+        }
+        al.id = s.nextId("alarms");
+        s.begin("Add Alert");
+        s.putAlarm(al);
+        commit();
+        return QJsonObject{{"alarm", alarmJson(al)}, {"task", taskJson(s.task(t.id))}};
+    }
+
+    QJsonObject removeAlarm(const QJsonObject &args) {
+        const qint64 id = idFrom(args["alarm_id"], "alarm_id");
+        Alarm al = s.alarms().value(id);
+        if (!al.id || al.deleted)
+            fail("not_found", QStringLiteral("No alarm with id %1.").arg(id));
+        al.deleted = true;
+        s.begin("Remove Alert");
+        s.putAlarm(al);
+        commit();
+        return QJsonObject{{"removed", idString(id)}, {"task_id", idString(al.taskId)}};
+    }
+
     // ----- navigation
 
     void needSelect() {
@@ -1185,18 +1486,26 @@ const QList<Command> &commands() {
         c << Command{"get_default_task_destination", "Say which list new tasks go to when no list is given.", {}, {}, &I::defaultDestination};
         c << Command{"get_task", "Get one task by task_id.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::getTask};
         c << Command{"query_tasks",
-                     "Search and filter tasks. Use at most one of list_id, smart_list_id or focus (default: all open tasks). "
+                     "Search and filter tasks. Use at most one of list_id, list_group_id, smart_list_id or focus (default: all open tasks). "
                      "search uses the reference app syntax: words, \"phrases\", OR, -word, type: hiprio, tags: work, lists: Home.",
                      {{"list_id", str("Only tasks in this list.")},
+                      {"list_group_id", str("Only tasks in the lists of this list group.")},
                       {"smart_list_id", str("Run this saved Smart List.")},
                       {"focus", enumStr("A focus list.", kFocusNames)},
                       {"search", str("the reference app search expression, at most 256 characters.")},
+                      {"due_on_or_after", str("yyyy-MM-dd; keep tasks due on or after this date.")},
                       {"due_on_or_before", str("yyyy-MM-dd; keep tasks due on or before this date.")},
                       {"start_on_or_after", str("yyyy-MM-dd; keep tasks starting on or after this date.")},
                       {"start_on_or_before", str("yyyy-MM-dd; keep tasks starting on or before this date.")},
                       {"include_completed", flag("Include completed tasks. Default false.")},
                       {"include_archived", flag("Include tasks in archived lists. Default false.")},
                       {"paused_filter", enumStr("hide (default), include or only tasks paused by a paused tag.", {"hide", "include", "only"})},
+                      {"sort", QJsonObject{{"type", "object"},
+                                           {"description", "Order the results by a field instead of the default (open first, soonest due). Tasks without the field come last."},
+                                           {"properties", QJsonObject{{"field", enumStr("Field to sort by.", kSortFields)},
+                                                                      {"direction", enumStr("Default ascending.", {"ascending", "descending"})}}},
+                                           {"required", QJsonArray{"field"}},
+                                           {"additionalProperties", false}}},
                       {"limit", integer("Page size, 1 through 200. Default 50.")},
                       {"offset", integer("Tasks to skip. Default 0.")}},
                      {}, &I::queryTasks};
@@ -1216,6 +1525,19 @@ const QList<Command> &commands() {
                      "Mark tasks done. A repeating task keeps a completed copy and advances to its next occurrence, so do not retry blindly.",
                      taskIds, {}, &I::completeTask};
         c << Command{"uncomplete_task", "Mark tasks not done.", taskIds, {}, &I::uncompleteTask};
+        c << Command{"list_alarms", "List a task's alarms.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::listAlarms};
+        c << Command{"add_alarm",
+                     "Add an alarm to a task (at most 10). relative: offset_seconds before (negative) the due moment; "
+                     "absolute: at, a local yyyy-MM-dd HH:mm; days_before: days_before and time_of_day. One undoable change.",
+                     {{"task_id", str("Task id or uid.")},
+                      {"trigger_type", enumStr("Kind of alarm.", kAlarmKinds)},
+                      {"offset_seconds", integer("relative: seconds from the due moment, -63071999 through 63071999, in whole minutes. -900 is 15 minutes before.")},
+                      {"at", str("absolute: yyyy-MM-dd HH:mm, local time.")},
+                      {"days_before", integer("days_before: 0 through 365 days before the due date.")},
+                      {"time_of_day", str("days_before: HH:mm.")},
+                      {"sound", flag("Play a sound. Default true.")}},
+                     {"task_id", "trigger_type"}, &I::addAlarm};
+        c << Command{"remove_alarm", "Remove an alarm by id (see list_alarms).", {{"alarm_id", str("Alarm id.")}}, {"alarm_id"}, &I::removeAlarm};
         c << Command{"pause_tag", "Pause a tag, hiding every task that carries it. Idempotent.",
                      {{"tag_id", str("Tag id.")}, {"tag_name", str("Tag name; use instead of tag_id.")}}, {}, &I::pauseTag};
         c << Command{"unpause_tag", "Resume a paused tag. Idempotent.",
@@ -1397,11 +1719,27 @@ QString Automation::shareableLink(const Task &task) {
 
 QJsonObject Automation::handleUrl(const QUrl &url) {
     d->reset();
+    d->ignoreDefaults = false;  // run() resets per command, so this one is set and cleared here.
+    QJsonObject result;
     try {
-        return d->urlCommand(url);
+        result = d->urlCommand(url);
     } catch (const Failure &f) {
-        return errorResponse(f.code, f.message);
+        result = errorResponse(f.code, f.message);
     }
+    d->ignoreDefaults = false;
+    // x-callback-url: x-error gets the failure as errorCode and errorMessage,
+    // and x-cancel is handed on for whoever can tell the user backed out.
+    const QUrlQuery q(url);
+    if (!result["ok"].toBool() && q.hasQueryItem("x-error")) {
+        const QJsonObject e = result["error"].toObject();
+        QString target = q.queryItemValue("x-error", QUrl::FullyDecoded);
+        target += QString(target.contains('?') ? "&" : "?") + "errorCode=" + QString::fromUtf8(QUrl::toPercentEncoding(e["code"].toString())) +
+                  "&errorMessage=" + QString::fromUtf8(QUrl::toPercentEncoding(e["message"].toString()));
+        result["callback"] = target;
+    }
+    if (q.hasQueryItem("x-cancel"))
+        result["cancel_callback"] = q.queryItemValue("x-cancel", QUrl::FullyDecoded);
+    return result;
 }
 
 QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
@@ -1411,7 +1749,18 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
     QString action = url.host().compare("x-callback-url", Qt::CaseInsensitive) == 0 ? url.path() : url.host();
     action = action.remove('/').toLower();
     const QUrlQuery q(url);
-    auto param = [&](const QString &key) { return q.queryItemValue(key, QUrl::FullyDecoded); };
+    // (clipboard) stands in for the clipboard's text in the add parameters
+    // that take it, as in the reference app.
+    auto param = [&](const QString &key) {
+        const QString v = q.queryItemValue(key, QUrl::FullyDecoded);
+        static const QStringList clipboardKeys = {"task", "note", "tags", "locations", "subtasks"};
+        if (v.trimmed() == "(clipboard)" && clipboardKeys.contains(key)) {
+            if (!a.clipboardText)
+                fail("automation_unavailable", "(clipboard) needs the Precrime window; this process has none.");
+            return a.clipboardText();
+        }
+        return v;
+    };
     auto has = [&](const QString &key) { return q.hasQueryItem(key); };
     auto truthy = [&](const QString &key) {
         const QString v = param(key).toLower();
@@ -1485,6 +1834,48 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
                 return finish(QJsonObject{{"uid", t.uid}, {"task", taskJson(t)}}, "uid", t.uid);
         fail("not_found", QStringLiteral("No project or checklist titled \"%1\".").arg(title));
     }
+    if (action == "paste") {
+        if (!has("text"))
+            invalid("paste needs text.");
+        QStringList lines;
+        for (const auto &line : param("text").split('\n', Qt::SkipEmptyParts))
+            if (!line.trimmed().isEmpty())
+                lines << line.trimmed();
+        if (lines.isEmpty())
+            invalid("paste needs at least one non-empty line.");
+        if (lines.size() > kMaxBatch)
+            invalid(QStringLiteral("paste takes at most %1 lines.").arg(kMaxBatch));
+        QJsonObject base;
+        if (has("forlist") && !param("forlist").isEmpty()) {
+            const TaskList list = listByName(param("forlist"), false);
+            if (list.kind == ListKind::Smart)
+                invalid("Tasks cannot be added to a Smart List.");
+            base["list_id"] = idString(list.id);
+            if (has("inproject")) {
+                qint64 found = 0;
+                for (const auto &t : s.tasks())
+                    if (!t.deleted && !t.parentId && t.type != TaskType::Task && t.listId == list.id &&
+                        t.title.compare(param("inproject"), Qt::CaseInsensitive) == 0)
+                        found = t.id;
+                if (!found)
+                    fail("not_found", QStringLiteral("No project or checklist titled \"%1\" in that list.").arg(param("inproject")));
+                base["parent_task_id"] = idString(found);
+                base.remove("list_id");
+            }
+        } else if (has("inproject")) {
+            invalid("inproject needs forlist.");
+        }
+        QJsonArray tasks;
+        for (const auto &line : lines) {
+            QJsonObject args = base;
+            args["title"] = line;
+            QJsonObject created = a.run("create_task", args);
+            if (!created["ok"].toBool())
+                return created;
+            tasks.append(created["task"]);
+        }
+        return finish(collection("tasks", tasks));
+    }
     if (action != "add" && action != "addnewtask")
         invalid(QStringLiteral("Unknown action \"%1\".").arg(action));
 
@@ -1512,6 +1903,35 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
     if (has("tags"))
         args["tag_names"] = QJsonArray::fromStringList(
             [&] { QStringList l; for (const auto &t : param("tags").split(',', Qt::SkipEmptyParts)) l << t.trimmed(); return l; }());
+    if (has("locations")) {
+        QJsonArray ids;
+        for (const auto &raw : param("locations").split(',', Qt::SkipEmptyParts)) {
+            const QString name = raw.trimmed();
+            if (name.isEmpty())
+                continue;
+            qint64 found = 0;
+            for (const auto &l : s.locations())
+                if (!l.deleted && l.name.compare(name, Qt::CaseInsensitive) == 0)
+                    found = l.id;
+            if (!found)
+                fail("not_found", QStringLiteral("No location named \"%1\".").arg(name));
+            ids.append(idString(found));
+        }
+        if (!ids.isEmpty())
+            args["location_update"] = QJsonObject{{"mode", "set"}, {"location_ids", ids}};
+    }
+    ignoreDefaults = truthy("ignoredefaults");
+    auto decodeMedia = [&](const QString &key, const QString &prefix) {
+        if (!has(key) || param(key).isEmpty())
+            return QByteArray();
+        // A literal + in base64 arrives as a space once the query is decoded.
+        const QByteArray bytes = QByteArray::fromBase64(param(key).replace(' ', '+').toLatin1(), QByteArray::Base64Encoding | QByteArray::AbortOnBase64DecodingErrors);
+        if (bytes.isEmpty() || !QMimeDatabase().mimeTypeForData(bytes).name().startsWith(prefix))
+            invalid(QStringLiteral("%1 must be base64-encoded %2 data.").arg(key, prefix.chopped(1)));
+        return bytes;
+    };
+    const QByteArray picture = decodeMedia("picture", "image/");
+    const QByteArray audio = decodeMedia("audio", "audio/");
     if (has("subtasks")) {
         QStringList titles;
         for (const auto &t : param("subtasks").split('\n', Qt::SkipEmptyParts))
@@ -1652,13 +2072,37 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
         m_views.reset();
         created["task"] = taskJson(s.task(id));
     }
+    if (!picture.isEmpty() || !audio.isEmpty()) {
+        s.begin("Add Attachment");
+        QDir().mkpath(s.attachmentsFolder());
+        const QList<QPair<QByteArray, int>> media = {{picture, Attachment::Image}, {audio, Attachment::Audio}};
+        for (const auto &m : media) {
+            if (m.first.isEmpty())
+                continue;
+            Attachment att;
+            att.id = s.nextId("attachments");
+            att.uid = Store::newUid();
+            att.taskId = id;
+            att.kind = m.second;
+            const QString suffix = QMimeDatabase().mimeTypeForData(m.first).preferredSuffix();
+            att.name = QString(m.second == Attachment::Image ? "Picture" : "Audio") + (suffix.isEmpty() ? QString() : "." + suffix);
+            att.fileName = att.uid + (suffix.isEmpty() ? QString() : "." + suffix);
+            att.bytes = m.first.size();
+            QFile file(s.attachmentsFolder() + "/" + att.fileName);
+            if (!file.open(QIODevice::WriteOnly) || file.write(m.first) != m.first.size())
+                fail("operation_failed", "Could not store the attachment.");
+            s.putAttachment(att);
+        }
+        commit();
+    }
     if (truthy("edit") && a.openTask)
         a.openTask(id);
     QJsonObject r = created;
-    r["uid"] = s.task(id).uid;
+    const QString uid = s.task(id).uid;
+    r["uid"] = uid;
     if (truthy("saveinclipboard"))
-        r["clipboard"] = r["uid"];
-    return finish(r, "add", r["uid"].toString());
+        r["clipboard"] = uid;
+    return finish(r, "add", uid);
 }
 
 // ================================================================ MCP

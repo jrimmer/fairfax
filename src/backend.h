@@ -221,6 +221,8 @@ public:
     Q_INVOKABLE QVariantList selectionTags() const;
     Q_INVOKABLE void untagSelection(const QVariantList &tagIds);
     Q_INVOKABLE void performAction(qint64 id = 0);
+    // The Google domain for a locale's country (google.co.uk, google.de, ...), .com when unknown.
+    static QString googleDomain(const QLocale &locale);
     Q_INVOKABLE void openLinks(qint64 id = 0);
 
     // Editor fields for one task.
@@ -378,6 +380,15 @@ public:
     // Add to Calendar: a one-event .ics for the task, opened with the desktop
     // calendar handler, or saved to `path` when one is given.
     Q_INVOKABLE bool addToCalendar(qint64 taskId, const QString &path = {});
+    // Print / Save as PDF of the list as shown, opened afterwards in the PDF viewer.
+    Q_INVOKABLE bool printView(const QString &path);
+    // Email These Tasks: a mailto: with the selected tasks as plain text.
+    Q_INVOKABLE void emailTasks(qint64 id = 0);
+    // A temporary .ics or .txt for the selection, as a file: URL, for dragging
+    // tasks out of the window.
+    Q_INVOKABLE QString dragOutFile();
+    // Drops of mail messages (.eml) become the task's action.
+    void dropMail(qint64 taskId, const QString &path);
 
     // The GTD Inbox: a real list that Quick Entry fills by default.
     Q_INVOKABLE void setInboxEnabled(bool on);

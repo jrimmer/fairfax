@@ -21,6 +21,16 @@ ColumnLayout {
     property var counts: style === "none" ? [] : backend.monthDays(year, month + 1)
     readonly property bool showingToday: year === new Date().getFullYear() && month === new Date().getMonth()
 
+    // While tasks are dragged over the top or bottom week, the month pages
+    // back or forward after a pause and keeps going while the pointer stays.
+    property int pageDir: 0
+    Timer {
+        interval: 900
+        repeat: true
+        running: root.pageDir !== 0
+        onTriggered: root.shown = new Date(root.year, root.month + root.pageDir, 1)
+    }
+
     // A drag across days, as indexes into the 42-cell grid.
     property int dragFrom: -1
     property int dragTo: -1
@@ -177,9 +187,12 @@ ColumnLayout {
                     anchors.fill: parent
                     keys: ["precrime-tasks"]
                     readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
-                    onEntered: if (proxy) proxy.hint = "Defer to " + Qt.formatDate(cell.day, "ddd d MMM")
-                    onExited: if (proxy) proxy.hint = ""
-                    onDropped: backend.dropOnDate(root.iso(cell.day))
+                    onEntered: {
+                        if (proxy) proxy.hint = "Defer to " + Qt.formatDate(cell.day, "ddd d MMM")
+                        root.pageDir = cell.index < 7 ? -1 : cell.index >= 35 ? 1 : 0
+                    }
+                    onExited: { if (proxy) proxy.hint = ""; root.pageDir = 0 }
+                    onDropped: { root.pageDir = 0; backend.dropOnDate(root.iso(cell.day)) }
                 }
                 Rectangle { anchors.centerIn: parent; width: 22; height: 22; radius: 11; color: "transparent"; border.width: 2; border.color: theme.accent; visible: dayDrop.containsDrag }
             }

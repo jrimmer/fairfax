@@ -46,6 +46,7 @@ _precrime_main() {
     '--background[start without a window, for alarms]' \
     '--open[open Quick Open]' \
     '--settings[open Settings]' \
+    '--new-window[open another window]' \
     '--source[open this list first]:list:(all today starred scheduled done)' \
     '--theme-dir[read the theme from this directory]:directory:_directories' \
     '--screenshot[render offscreen to a PNG and quit]:png:_files' \

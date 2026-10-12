@@ -140,7 +140,8 @@ offers your lists and `pc done <Tab>` your open tasks.
 - **Mini calendar.** Busy days as a heat map, dots or nothing (the ⌄ beside the calendar
   button under the lists, which also shows or hides it and can shade weekends). Click a day
   to filter to it, drag across days for a range, ⌥-click to add a task due that day, scroll
-  to page through months, and drop tasks on a day to defer them.
+  to page through months, and drop tasks on a day to defer them (hold over the top or
+  bottom week to page while dragging).
 - **Arrange freely.** Drag lists and groups to reorder them, drag tasks onto lists, Today,
   Starred, Done, projects, tags, locations or calendar days, and between rows. Archived
   lists wait under *Archived* in the sidebar; their tasks still show in Smart Lists and Done.
@@ -150,6 +151,11 @@ offers your lists and `pc done <Tab>` your open tasks.
   `+` that adds a task to it. *Hide lists* (Settings > Today & Lists) takes lists out of the
   sidebar, All, Today and searches until you pick *Show Hidden Lists* in the sidebar's `+` menu.
   Selecting Done with 500+ completed tasks and auto-delete off asks once about auto-deleting.
+- **Stars, mail and files.** Click a row's star to star or unstar it (right-click or hold for
+  the priority menu). Drop a mail message (.eml) on a task and it becomes the task's action
+  (or lands in the notes when it has one); drop one on empty space for a new task titled with
+  the subject. Drag tasks out of the window to hand a file manager or mail composer an
+  `.ics` (one dated task) or `.txt`, or use *Email These Tasks…* in the context menu.
 - **Tray.** Precrime sits in the bar's tray while it runs in the background; its menu is a
   quick view of today, with New Task, Find, Sync and Quit.
 - **Undo.** Every change is undoable with Ctrl+Z.
@@ -200,7 +206,9 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+Alt+T` / `Ctrl+Shift+Alt+T` / `Ctrl+Alt+R` | New tag / new tag group / remove all tags |
 | `Shift+F5` | Back to the previously selected task |
 | `Ctrl+Alt+F` | Search this list / all lists |
-| `Ctrl+Alt+W` | New window |
+| `Ctrl+Alt+W` | New window (open windows come back on the next launch) |
+| `F11` | Full screen |
+| `Ctrl+P` | Save the list as a PDF (sections, dates, notes) and open it for printing |
 | `Ctrl+S` | Sync now |
 | `Ctrl+,` | Settings |
 | `?` | All shortcuts |
@@ -215,6 +223,12 @@ list has focus. Press `?` in the app for the full list.
   completed history come across, and importing the same backup again adds only what's new
   (and fills in sections for tasks an earlier import brought in).
 - **From the reference app:** `precrime import tasks.db` (or a `.taskdb` backup).
+- **From Things 3:** a JSON export (`precrime import things.json`, or Settings → Import &
+  Export → From Things…). Areas become lists, projects stay projects, checklist items stay
+  checklists; "when" becomes the start date and the deadline the due date.
+- **From OmniFocus:** File → Export → TaskPaper, then `precrime import export.taskpaper` (or
+  From OmniFocus…). Folders become list groups and projects lists; `@due`, `@defer`, `@done`,
+  `@estimate`, `@flagged` and tags come across, and indented lines become notes.
 - **From anything with iCalendar export:** `precrime import tasks.ics`.
 
 Every import is one step that Ctrl+Z undoes, and a backup is taken first.
@@ -251,6 +265,33 @@ xdg-open 'precrime://x-callback-url/add?task=Buy%20milk&due=tomorrow'
 ```
 
 Changes made this way appear in the open window within a couple of seconds.
+
+`query_tasks` takes `list_id`, `list_group_id`, `smart_list_id` or `focus`, the date windows
+`due_on_or_after`, `due_on_or_before`, `start_on_or_after` and `start_on_or_before`, and a
+`sort` (`{"field": "due_date", "direction": "descending"}`; fields title, due_date,
+start_date, priority, duration, created, modified, completed). `create_task` and
+`update_task` also take `recurrence` (`{"frequency": "weekly", "weekdays": ["mon"],
+"end_rule": {...}}`, or `{"frequency": "none"}` to clear it) and `location_update`
+(`{"mode": "append", "location_ids": [...]}`). Alarms have their own commands:
+`list_alarms`, `add_alarm` (relative with `offset_seconds`, absolute with `at`, or
+`days_before` with `time_of_day`) and `remove_alarm`.
+
+The URL scheme follows the reference app's `twodo://` one under `precrime://x-callback-url/<action>`:
+`add` (with `task`, `note`, `forlist`, `forparentname`, `due`, `duetime`, `start`, `repeat`,
+`tags`, `locations`, `subtasks`, `priority`, `starred`, `action`, `picture` and `audio` as
+base64, `ignoredefaults`, `edit`, `usequickentry`, `saveinclipboard`), `paste`, `addnewtask`,
+`search`, `showall`/`showtoday`/`showstarred`/`showscheduled`, `showlist`, `showtask`,
+`completetasks`, `gettaskid` and `launch`. `(clipboard)` works as the value of `task`,
+`note`, `tags`, `locations` and `subtasks`; `x-success` is opened with the new task's uid,
+and `x-error` with `errorCode` and `errorMessage`.
+
+Alarms go off through the resident Precrime process. The Waybar module below turns red
+(class `no-daemon`, text `!`) when alarms are waiting and no Precrime is running to deliver
+them. Notifications show the list, the due time and a teaser of the notes, carry a button
+for the task's action (Call, Email, Open Link…), and stay silent while mako or dunst is in
+Do Not Disturb.
+
+The desktop file has a **New Window** action as well (`precrime --new-window`).
 
 If you use Waybar rather than Omarchy's own bar, a module with today's counts (like the reference app's
 Dock badge) goes in `~/.config/waybar/config.jsonc`:

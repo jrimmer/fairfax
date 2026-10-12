@@ -262,7 +262,7 @@ Item {
                      : root.r.dueTone === "today" ? theme.today : theme.muted
             }
         }
-        // Priority bars and star; clicking opens the priority menu.
+        // Priority bars and star; clicking toggles the star, right-click opens the priority menu.
         Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 16
@@ -296,7 +296,20 @@ Item {
                 visible: !root.r.starred && !root.r.priority && mouse.containsMouse
                 width: 13; height: 2; radius: 1; color: theme.faint
             }
-            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: priorityMenu.popup() }
+            // A click stars or unstars; the priority menu is for right-click
+            // and long-press, so one stray tap no longer opens a menu.
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -4
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                property bool held: false
+                onPressed: held = false
+                onPressAndHold: { held = true; priorityMenu.popup() }
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.RightButton) priorityMenu.popup()
+                    else if (!held) backend.setStarred(root.r.starred ? 0 : 1, root.r.taskId)
+                }
+            }
             Menu {
                 id: priorityMenu
                 MenuItem { text: "None"; onTriggered: backend.setPriority(0, root.r.taskId) }
@@ -365,6 +378,18 @@ Item {
             if (m.button === Qt.RightButton && root.r.selected) return
             backend.selectTask(root.r.taskId, mode)
         }
+        // Leaving the window turns the drag into a file drag-out.
+        property bool dragOut: false
+        onPositionChanged: (m) => {
+            if (!drag.active || dragOut || !root.proxy) return
+            const p = mapToItem(null, m.x, m.y)
+            const w = ApplicationWindow.window
+            if (w && (p.x < 0 || p.y < 0 || p.x > w.width || p.y > w.height)) {
+                dragOut = true
+                root.proxy.startExternal()
+            }
+        }
+        onReleased: dragOut = false
         onClicked: (m) => { if (m.button === Qt.RightButton) contextMenu.popup() }
         onDoubleClicked: backend.beginEdit(root.r.taskId)
     }

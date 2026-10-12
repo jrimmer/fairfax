@@ -45,6 +45,18 @@ struct DefaultReminders {
 // inside the transaction that sets the due date, after the task is saved.
 void applyDefaultReminder(Store &store, const Task &task);
 
+// True when some alarm has yet to go off (or was missed) for an open task, so
+// something has to be running to deliver it.
+bool hasPending(const Store &store, const QDateTime &now);
+
+// The first line of a task's notes, trimmed to a notification-sized teaser
+// (empty when there are no notes). Markdown bullets and headings are dropped.
+QString notesTeaser(const QString &notes, int maxChars = 120);
+
+// The button label for a task's action in a notification ("Call", "Email",
+// "Open Link"…), empty for a task without one.
+QString actionLabel(const Task &task);
+
 // When a snooze action ("snooze5", "snooze-evening", ...) lands. A negative
 // `morningMinutes` means no Default Due Time is in use (9:00 AM). Invalid for
 // an unknown key.
@@ -65,6 +77,8 @@ public:
 signals:
     void openTask(qint64 taskId);
     void completeTask(qint64 taskId);
+    // The notification's action button (Call, Open Link…) was pressed.
+    void performAction(qint64 taskId);
     // Where there's no freedesktop notification service (macOS, Windows),
     // alarms are shown through this instead, by the tray icon.
     void showFallback(const QString &title, const QString &body, qint64 taskId);
@@ -77,6 +91,9 @@ private:
     void closeStale();
     int nagMinutes() const;
     int morningMinutes() const;
+    // Whether the notification server is in Do Not Disturb (mako's mode or
+    // dunst's pause), which silences the alarm sound.
+    static bool doNotDisturb();
 
 private slots:
     void onAction(uint id, const QString &key);

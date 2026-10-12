@@ -2,6 +2,10 @@
 #include <QRegularExpression>
 
 #include <QFile>
+#include <QHash>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMap>
 #include <QSaveFile>
 #include <QSet>
@@ -9,7 +13,13 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QLocale>
+#include <QMarginsF>
+#include <QPageSize>
+#include <QPdfWriter>
+#include <QTextDocument>
 #include <QTimeZone>
+#include <QUrl>
 #include <QUuid>
 #include <algorithm>
 #include <functional>
@@ -1650,3 +1660,669 @@ ImportResult importTickTick(Store &store, const QString &path) {
 
 }  // namespace Exchange
 
+
+// ------------------------------------------------------------------ Things and OmniFocus
+
+namespace {
+
+// Finds or creates the lists, groups and tags an import refers to by name,
+// so the Things and OmniFocus importers (which both work from names) share
+// the bookkeeping. Everything runs inside the importer's one change.
+class NameResolver {
+public:
+    NameResolver(Store &store, ImportResult &result) : m_store(store), m_result(result) {}
+
+    qint64 group(const QString &raw) {
+        const QString name = raw.trimmed();
+        if (name.isEmpty())
+            return 0;
+        if (m_groups.contains(name.toLower()))
+            return m_groups.value(name.toLower());
+        qint64 id = 0;
+        for (const auto &g : m_store.groups())
+            if (!g.deleted && g.name.compare(name, Qt::CaseInsensitive) == 0)
+                id = g.id;
+        if (!id) {
+            ListGroup g;
+            g.id = m_store.nextId("list_groups");
+            g.name = name;
+            g.order = g.id;
+            m_store.putGroup(g);
+            id = g.id;
+        }
+        m_groups.insert(name.toLower(), id);
+        return id;
+    }
+
+    // An empty name means the Inbox, or a list called Inbox when it is off.
+    qint64 list(const QString &raw, qint64 groupId = 0) {
+        const QString name = raw.trimmed().isEmpty() ? QStringLiteral("Inbox") : raw.trimmed();
+        if (m_lists.contains(name.toLower()))
+            return m_lists.value(name.toLower());
+        qint64 id = 0;
+        for (const auto &l : m_store.lists()) {
+            if (l.deleted || l.kind == ListKind::Smart)
+                continue;
+            const bool inbox = name.compare("Inbox", Qt::CaseInsensitive) == 0 && l.kind == ListKind::Inbox;
+            if (inbox || l.name.compare(name, Qt::CaseInsensitive) == 0) {
+                id = l.id;
+                break;
+            }
+        }
+        if (!id) {
+            TaskList l;
+            l.id = m_store.nextId("lists");
+            l.name = name;
+            l.groupId = groupId;
+            l.color = int(m_store.lists().size()) % 13;
+            l.order = l.id;
+            m_store.putList(l);
+            id = l.id;
+            ++m_result.lists;
+        }
+        m_lists.insert(name.toLower(), id);
+        return id;
+    }
+
+    qint64 tag(const QString &raw) {
+        const QString name = QString(raw).remove(QRegularExpression("^#")).trimmed();
+        if (name.isEmpty())
+            return 0;
+        if (m_tags.contains(name.toLower()))
+            return m_tags.value(name.toLower());
+        qint64 id = 0;
+        for (const auto &t : m_store.tags())
+            if (!t.deleted && t.name.compare(name, Qt::CaseInsensitive) == 0)
+                id = t.id;
+        if (!id) {
+            Tag t;
+            t.id = m_store.nextId("tags");
+            t.name = name;
+            t.order = t.id;
+            m_store.putTag(t);
+            id = t.id;
+            ++m_result.tags;
+        }
+        m_tags.insert(name.toLower(), id);
+        return id;
+    }
+
+private:
+    Store &m_store;
+    ImportResult &m_result;
+    QHash<QString, qint64> m_groups, m_lists, m_tags;
+};
+
+// "2026-07-04", "2026-07-04T10:30:00Z" or "2026-07-04 17:00" → date and minutes.
+// A time with a zone suffix is dropped: it would shift the day for no reason.
+bool parseLooseDateTime(const QString &raw, QDate *date, int *minutes) {
+    static const QRegularExpression re("^(\\d{4}-\\d{2}-\\d{2})(?:[T ](\\d{1,2}):(\\d{2})(?::\\d{2})?\\s*([Zz+-].*)?)?");
+    const auto m = re.match(raw.trimmed());
+    if (!m.hasMatch())
+        return false;
+    *date = QDate::fromString(m.captured(1), "yyyy-MM-dd");
+    *minutes = -1;
+    if (!m.captured(2).isEmpty() && m.captured(4).isEmpty())
+        *minutes = m.captured(2).toInt() * 60 + m.captured(3).toInt();
+    return date->isValid();
+}
+
+}  // namespace
+
+namespace Exchange {
+
+ImportResult importThingsJson(Store &store, const QByteArray &json) {
+    ImportResult result;
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(json, &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        result.error = "Not valid JSON: " + parseError.errorString();
+        return result;
+    }
+    QJsonArray items;
+    if (doc.isArray()) {
+        items = doc.array();
+    } else {
+        const QJsonObject o = doc.object();
+        for (const char *key : {"items", "tasks", "todos", "to-dos"})
+            if (o[QString::fromLatin1(key)].isArray()) {
+                items = o[QString::fromLatin1(key)].toArray();
+                break;
+            }
+    }
+    if (items.isEmpty()) {
+        result.error = "The Things export has no items.";
+        return result;
+    }
+
+    QHash<QString, qint64> existingByUid;
+    for (const auto &t : store.tasks())
+        existingByUid.insert(t.uid, t.id);
+
+    store.begin("Import from Things");
+    NameResolver names(store, result);
+    int order = 0;
+
+    // Things' own JSON (things:///json) wraps fields in "attributes"; other
+    // exporters write them flat. Both are read the same way.
+    auto field = [](const QJsonObject &o, std::initializer_list<const char *> keys) {
+        const QJsonObject attrs = o["attributes"].toObject();
+        for (const char *k : keys) {
+            const QString key = QString::fromLatin1(k);
+            if (attrs.contains(key)) return attrs[key];
+            if (o.contains(key)) return o[key];
+        }
+        return QJsonValue();
+    };
+    auto text = [&](const QJsonObject &o, std::initializer_list<const char *> keys) {
+        const QJsonValue v = field(o, keys);
+        return v.isString() ? v.toString() : QString();
+    };
+
+    std::function<void(const QJsonObject &, qint64, qint64)> addItem = [&](const QJsonObject &o, qint64 listId, qint64 parentId) {
+        const QString kind = text(o, {"type"}).toLower();
+        const QString title = text(o, {"title", "name"}).trimmed();
+        if (title.isEmpty() || kind == "heading")
+            return;
+        const QString idText = text(o, {"uuid", "id"});
+        const QString uid = idText.isEmpty() ? QString() : "THINGS-" + idText;
+        if (!uid.isEmpty() && existingByUid.contains(uid))
+            return;
+
+        // Things files projects and to-dos under an area, which becomes the
+        // list; loose to-dos with neither go to the Inbox.
+        if (!listId) {
+            const QString area = text(o, {"area_title", "area", "area-title"});
+            listId = names.list(area);
+        }
+
+        Task t;
+        t.id = store.nextId("tasks");
+        t.uid = uid;
+        t.listId = listId;
+        t.parentId = parentId;
+        t.title = title.left(1000);
+        t.notes = text(o, {"notes"});
+        t.order = ++order;
+        QDate d;
+        int minutes = -1;
+        // "when" is Things' scheduling date: it hides the task until then,
+        // which is what a start date does here. Keywords other than today
+        // (someday, anytime) have no date to carry.
+        const QString when = text(o, {"when"});
+        if (parseLooseDateTime(!when.isEmpty() ? when : text(o, {"start_date", "start-date", "activation_date"}), &d, &minutes))
+            t.startDate = d;
+        else if (when.compare("today", Qt::CaseInsensitive) == 0 || when.compare("evening", Qt::CaseInsensitive) == 0)
+            t.startDate = QDate::currentDate();
+        if (parseLooseDateTime(text(o, {"deadline", "due_date", "due-date", "due"}), &d, &minutes)) {
+            t.dueDate = d;
+            t.dueTime = minutes;
+        }
+        const QString status = text(o, {"status"}).toLower();
+        if (field(o, {"completed"}).toBool() || status == "completed" || status == "canceled" || status == "cancelled") {
+            t.completed = true;
+            QDate doneDate;
+            int doneMinutes = -1;
+            const QString doneText = text(o, {"completion_date", "completion-date", "stop_date", "completed_at"});
+            t.completedAt = parseLooseDateTime(doneText, &doneDate, &doneMinutes)
+                                ? QDateTime(doneDate, QTime(0, 0).addSecs(qMax(0, doneMinutes) * 60))
+                                : QDateTime::currentDateTime();
+            if (status.startsWith("cancel"))
+                t.tagIds.append(names.tag("canceled"));
+        }
+        const QJsonValue tagValue = field(o, {"tags", "tag_names"});
+        QStringList tagNames;
+        if (tagValue.isArray())
+            for (const auto &v : tagValue.toArray())
+                tagNames << (v.isString() ? v.toString() : v.toObject()["title"].toString());
+        else
+            tagNames = tagValue.toString().split(QRegularExpression("\\s*,\\s*"), Qt::SkipEmptyParts);
+        for (const auto &n : tagNames)
+            if (const qint64 id = names.tag(n); id && !t.tagIds.contains(id))
+                t.tagIds.append(id);
+
+        const QJsonArray checklist = field(o, {"checklist-items", "checklist_items", "checklist"}).toArray();
+        const QJsonArray children = field(o, {"items", "children", "todos", "to-dos"}).toArray();
+        if (kind == "project" || !children.isEmpty())
+            t.type = TaskType::Project;
+        else if (!checklist.isEmpty())
+            t.type = TaskType::Checklist;
+        store.putTask(t);
+        ++result.tasks;
+
+        int itemOrder = 0;
+        for (const auto &v : checklist) {
+            const QJsonObject c = v.toObject();
+            const QString itemTitle = (v.isString() ? v.toString() : text(c, {"title", "name"})).trimmed();
+            if (itemTitle.isEmpty())
+                continue;
+            Task item;
+            item.id = store.nextId("tasks");
+            item.listId = listId;
+            item.parentId = t.id;
+            item.title = itemTitle.left(1000);
+            item.completed = t.completed || field(c, {"completed"}).toBool() || text(c, {"status"}).toLower() == "completed";
+            if (item.completed)
+                item.completedAt = t.completedAt.isValid() ? t.completedAt : QDateTime::currentDateTime();
+            item.order = ++itemOrder;
+            store.putTask(item);
+        }
+        for (const auto &v : children)
+            addItem(v.toObject(), listId, t.id);
+    };
+
+    for (const auto &v : items)
+        addItem(v.toObject(), 0, 0);
+    store.commit();
+    return result;
+}
+
+ImportResult importThings(Store &store, const QString &path) {
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        ImportResult r;
+        r.error = QStringLiteral("Can't read %1.").arg(path);
+        return r;
+    }
+    return importThingsJson(store, f.readAll());
+}
+
+bool isThingsExport(const QString &path) {
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    const QByteArray head = f.read(4096).trimmed();
+    return (head.startsWith('[') || head.startsWith('{')) && head.contains("\"title\"");
+}
+
+bool isTaskPaper(const QString &path) {
+    if (path.endsWith(".taskpaper", Qt::CaseInsensitive))
+        return true;
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    const QString head = QString::fromUtf8(f.read(4096));
+    static const QRegularExpression item("^\\s*- ", QRegularExpression::MultilineOption);
+    return item.match(head).hasMatch() && !head.trimmed().startsWith('[') && !head.trimmed().startsWith('{');
+}
+
+ImportResult importTaskPaperText(Store &store, const QString &text) {
+    ImportResult result;
+    struct Line {
+        int depth = 0;
+        QString body;
+    };
+    QList<Line> lines;
+    for (QString raw : text.split('\n')) {
+        if (raw.endsWith('\r'))
+            raw.chop(1);
+        if (raw.trimmed().isEmpty())
+            continue;
+        int tabs = 0, spaces = 0, i = 0;
+        for (; i < raw.size() && (raw[i] == '\t' || raw[i] == ' '); ++i)
+            (raw[i] == '\t' ? tabs : spaces)++;
+        lines.append({tabs + spaces / 2, raw.mid(i)});
+    }
+    if (lines.isEmpty()) {
+        result.error = "The file is empty.";
+        return result;
+    }
+
+    struct Parsed {
+        QString title;
+        QStringList tags;
+        QHash<QString, QString> attrs;
+    };
+    // "Title @tag @due(2026-07-04 17:00)": the @words after the title are
+    // tags, or attributes when they carry a value in parentheses.
+    auto parse = [](const QString &s) {
+        Parsed p;
+        static const QRegularExpression at("(?:^|\\s)@([A-Za-z][\\w-]*)(\\(([^)]*)\\))?");
+        int firstAt = -1;
+        auto it = at.globalMatch(s);
+        while (it.hasNext()) {
+            const auto m = it.next();
+            if (firstAt < 0)
+                firstAt = int(m.capturedStart());
+            if (m.captured(2).isEmpty())
+                p.tags << m.captured(1);
+            else
+                p.attrs.insert(m.captured(1).toLower(), m.captured(3));
+        }
+        p.title = (firstAt >= 0 ? s.left(firstAt) : s).trimmed();
+        return p;
+    };
+    auto isItem = [](const Line &l) { return l.body.startsWith("- "); };
+    auto headingTitle = [&](const Line &l) {
+        QString title = parse(l.body).title;
+        if (title.endsWith(':'))
+            title.chop(1);
+        return title.trimmed();
+    };
+    auto isHeading = [&](const Line &l) { return !isItem(l) && parse(l.body).title.endsWith(':'); };
+
+    QHash<QString, qint64> existingByUid;
+    for (const auto &t : store.tasks())
+        existingByUid.insert(t.uid, t.id);
+
+    store.begin("Import from OmniFocus");
+    NameResolver names(store, result);
+
+    // A heading that holds other headings is a folder (a list group); a
+    // heading that holds tasks is a project, which becomes a list. Tasks
+    // before any heading are Inbox items.
+    QString folder;
+    qint64 listId = 0;
+    QList<qint64> stack;
+    QList<int> stackDepths;
+    qint64 lastTask = 0;
+    int order = 0;
+
+    for (int i = 0; i < lines.size(); ++i) {
+        const Line &line = lines.at(i);
+        if (isHeading(line)) {
+            stack.clear();
+            stackDepths.clear();
+            lastTask = 0;
+            const bool holdsProjects = i + 1 < lines.size() && isHeading(lines.at(i + 1)) && lines.at(i + 1).depth > line.depth;
+            if (holdsProjects) {
+                folder = headingTitle(line);
+                listId = 0;
+            } else {
+                if (line.depth == 0)
+                    folder.clear();
+                listId = names.list(headingTitle(line), names.group(folder));
+            }
+            continue;
+        }
+        if (!isItem(line)) {
+            if (lastTask) {
+                Task t = store.task(lastTask);
+                t.notes += (t.notes.isEmpty() ? QString() : QStringLiteral("\n")) + line.body.trimmed();
+                store.putTask(t);
+            }
+            continue;
+        }
+
+        const Parsed p = parse(line.body.mid(2));
+        if (p.title.isEmpty())
+            continue;
+        if (!listId)
+            listId = names.list(QString());
+        while (!stackDepths.isEmpty() && stackDepths.last() >= line.depth) {
+            stackDepths.removeLast();
+            stack.removeLast();
+        }
+        const QString idText = p.attrs.value("id");
+        const QString uid = idText.isEmpty() ? QString() : "OMNIFOCUS-" + idText;
+        if (!uid.isEmpty() && existingByUid.contains(uid)) {
+            lastTask = 0;
+            continue;
+        }
+        Task t;
+        t.id = store.nextId("tasks");
+        t.uid = uid;
+        t.listId = listId;
+        t.parentId = stack.isEmpty() ? 0 : stack.last();
+        t.title = p.title.left(1000);
+        t.order = ++order;
+        QDate d;
+        int minutes = -1;
+        if (parseLooseDateTime(p.attrs.value("due"), &d, &minutes)) {
+            t.dueDate = d;
+            t.dueTime = minutes;
+        }
+        if (parseLooseDateTime(p.attrs.value("defer"), &d, &minutes)) {
+            t.startDate = d;
+            t.startTime = minutes;
+        }
+        if (p.attrs.contains("done") || p.tags.contains("done", Qt::CaseInsensitive)) {
+            t.completed = true;
+            t.completedAt = parseLooseDateTime(p.attrs.value("done"), &d, &minutes)
+                                ? QDateTime(d, QTime(0, 0).addSecs(qMax(0, minutes) * 60))
+                                : QDateTime::currentDateTime();
+        }
+        // @estimate(1h30m), @estimate(45m), @estimate(2h).
+        static const QRegularExpression est("^(?:(\\d+)\\s*h)?\\s*(?:(\\d+)\\s*m)?");
+        const auto em = est.match(p.attrs.value("estimate").trimmed());
+        if (em.hasMatch())
+            t.duration = em.captured(1).toInt() * 60 + em.captured(2).toInt();
+        QStringList tagNames;
+        static const QStringList ignored = {"parallel", "autodone", "done", "dropped"};
+        for (const auto &tag : p.tags) {
+            if (tag.compare("flagged", Qt::CaseInsensitive) == 0)
+                t.starred = true;
+            else if (!ignored.contains(tag.toLower()))
+                tagNames << tag;
+        }
+        tagNames << p.attrs.value("tags").split(QRegularExpression("\\s*,\\s*"), Qt::SkipEmptyParts);
+        for (const auto &n : tagNames)
+            if (const qint64 id = names.tag(n); id && !t.tagIds.contains(id))
+                t.tagIds.append(id);
+        if (t.parentId) {
+            Task parent = store.task(t.parentId);
+            if (parent.type == TaskType::Task) {
+                parent.type = TaskType::Project;
+                store.putTask(parent);
+            }
+        }
+        store.putTask(t);
+        ++result.tasks;
+        stack.append(t.id);
+        stackDepths.append(line.depth);
+        lastTask = t.id;
+    }
+    store.commit();
+    if (!result.tasks)
+        result.error = "No tasks found; expected an OmniFocus TaskPaper export.";
+    return result;
+}
+
+ImportResult importOmniFocus(Store &store, const QString &path) {
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        ImportResult r;
+        r.error = QStringLiteral("Can't read %1.").arg(path);
+        return r;
+    }
+    return importTaskPaperText(store, QString::fromUtf8(f.readAll()));
+}
+
+}  // namespace Exchange
+
+// ------------------------------------------------------------------ printing, mail and text
+
+namespace {
+
+QString htmlEscape(const QString &s) { return s.toHtmlEscaped().replace('\n', "<br/>"); }
+
+QString dateText(const QDate &d, int minutes) {
+    if (!d.isValid())
+        return {};
+    QString text = QLocale().toString(d, QLocale::ShortFormat);
+    if (minutes >= 0)
+        text += QStringLiteral(" %1").arg(QTime(0, 0).addSecs(minutes * 60).toString("HH:mm"));
+    return text;
+}
+
+// Header names are case-insensitive; folded lines continue with whitespace.
+QString decodeMimeWords(const QString &raw) {
+    static const QRegularExpression word("=\\?([^?]+)\\?([bBqQ])\\?([^?]*)\\?=");
+    QString out;
+    qsizetype last = 0;
+    auto it = word.globalMatch(raw);
+    while (it.hasNext()) {
+        const auto m = it.next();
+        // Whitespace between two encoded words is not part of the text.
+        const QString gap = raw.mid(last, m.capturedStart() - last);
+        if (!gap.trimmed().isEmpty() || last == 0)
+            out += gap;
+        QByteArray bytes;
+        if (m.captured(2).toLower() == "b") {
+            bytes = QByteArray::fromBase64(m.captured(3).toLatin1());
+        } else {
+            QByteArray q = m.captured(3).toLatin1().replace('_', ' ');
+            for (int i = 0; i < q.size(); ++i)
+                if (q[i] == '=' && i + 2 < q.size()) {
+                    bytes.append(char(q.mid(i + 1, 2).toInt(nullptr, 16)));
+                    i += 2;
+                } else {
+                    bytes.append(q[i]);
+                }
+        }
+        const QString charset = m.captured(1).toLower();
+        out += charset.contains("8859-1") || charset == "latin1" ? QString::fromLatin1(bytes) : QString::fromUtf8(bytes);
+        last = m.capturedEnd();
+    }
+    return out + raw.mid(last);
+}
+
+}  // namespace
+
+namespace Exchange {
+
+QString printHtml(const QString &title, const QVector<PrintSection> &sections, bool includeNotes) {
+    QString html = "<html><body style=\"font-family: sans-serif; font-size: 10pt;\">";
+    html += "<h1 style=\"font-size: 18pt; margin-bottom: 2pt;\">" + htmlEscape(title) + "</h1>";
+    html += "<p style=\"color: #666666; margin-top: 0;\">" + htmlEscape(QLocale().toString(QDate::currentDate(), QLocale::LongFormat)) + "</p>";
+    for (const auto &section : sections) {
+        if (section.items.isEmpty())
+            continue;
+        if (!section.heading.isEmpty())
+            html += "<h2 style=\"font-size: 12pt; margin: 12pt 0 3pt 0; border-bottom: 1px solid #999999;\">" + htmlEscape(section.heading) + "</h2>";
+        html += "<table cellspacing=\"0\" cellpadding=\"2\" width=\"100%\">";
+        for (const auto &item : section.items) {
+            const QString box = item.done ? QStringLiteral("&#9745;") : QStringLiteral("&#9744;");
+            QString name = htmlEscape(item.title);
+            if (item.done)
+                name = "<s style=\"color: #888888;\">" + name + "</s>";
+            if (item.starred)
+                name += " &#9733;";
+            else if (item.priority > 0)
+                name += QStringLiteral(" <span style=\"color: #888888;\">%1</span>").arg(QString(item.priority, QChar('!')));
+            QString detail;
+            if (!item.tags.isEmpty())
+                detail += "<span style=\"color: #555555;\">" + htmlEscape(item.tags) + "</span>";
+            if (includeNotes && !item.notes.trimmed().isEmpty())
+                detail += (detail.isEmpty() ? "" : "<br/>") + QStringLiteral("<span style=\"color: #444444;\">") + htmlEscape(item.notes.trimmed()) + "</span>";
+            html += QStringLiteral("<tr><td width=\"%1\"></td><td width=\"16\" valign=\"top\">%2</td><td valign=\"top\">%3%4</td><td align=\"right\" valign=\"top\" width=\"22%\" style=\"color: #555555;\">%5</td></tr>")
+                        .arg(item.depth * 18).arg(box).arg(name).arg(detail.isEmpty() ? QString() : "<br/>" + detail).arg(htmlEscape(item.due));
+        }
+        html += "</table>";
+    }
+    html += "</body></html>";
+    return html;
+}
+
+bool writePdf(const QString &path, const QString &title, const QVector<PrintSection> &sections, bool includeNotes, QString *error) {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        setError(error, file.errorString());
+        return false;
+    }
+    QPdfWriter writer(&file);
+    writer.setPageSize(QPageSize(QPageSize::A4));
+    writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+    writer.setTitle(title);
+    writer.setCreator("Precrime");
+    QTextDocument document;
+    document.setHtml(printHtml(title, sections, includeNotes));
+    document.print(&writer);
+    return true;
+}
+
+PrintItem printItem(const Store &store, const Task &t, int depth) {
+    PrintItem item;
+    item.title = t.title;
+    item.depth = depth;
+    item.done = t.completed;
+    item.starred = t.starred;
+    item.priority = t.priority;
+    item.notes = t.notes;
+    item.due = dateText(t.dueDate, t.dueTime);
+    QStringList tags;
+    for (auto id : t.tagIds) {
+        const Tag tag = store.tag(id);
+        if (tag.id && !tag.deleted)
+            tags << "#" + tag.name;
+    }
+    item.tags = tags.join(' ');
+    return item;
+}
+
+QString tasksAsText(const Store &store, const QList<qint64> &taskIds) {
+    QString out;
+    QSet<qint64> wanted(taskIds.begin(), taskIds.end());
+    std::function<void(const Task &, int)> add = [&](const Task &t, int depth) {
+        const QString pad(depth * 4, ' ');
+        out += pad + (t.completed ? "[x] " : "[ ] ") + t.title;
+        const QString due = dateText(t.dueDate, t.dueTime);
+        if (!due.isEmpty())
+            out += "  (due " + due + ")";
+        out += '\n';
+        if (!t.notes.trimmed().isEmpty()) {
+            for (const auto &line : t.notes.trimmed().split('\n'))
+                out += pad + "    " + line + '\n';
+        }
+    };
+    for (auto id : taskIds) {
+        const Task t = store.task(id);
+        if (!t.id || t.deleted)
+            continue;
+        // A sub-task whose parent is also listed is shown under the parent.
+        if (t.parentId && wanted.contains(t.parentId))
+            continue;
+        add(t, 0);
+        QList<Task> kids;
+        for (auto cid : taskIds) {
+            const Task c = store.task(cid);
+            if (c.id && c.parentId == t.id && !c.deleted)
+                kids.append(c);
+        }
+        for (const auto &c : kids)
+            add(c, 1);
+    }
+    return out;
+}
+
+QUrl mailtoForTasks(const Store &store, const QList<qint64> &taskIds) {
+    QString subject = QStringLiteral("Tasks");
+    if (taskIds.size() == 1 && store.task(taskIds.first()).id)
+        subject = store.task(taskIds.first()).title;
+    else if (taskIds.size() > 1)
+        subject = QStringLiteral("%1 tasks").arg(taskIds.size());
+    // QUrl's own query handling leaves characters mail clients read as
+    // separators; percent-encode every value by hand.
+    const QString body = tasksAsText(store, taskIds);
+    return QUrl(QStringLiteral("mailto:?subject=%1&body=%2")
+                    .arg(QString::fromUtf8(QUrl::toPercentEncoding(subject)), QString::fromUtf8(QUrl::toPercentEncoding(body))));
+}
+
+Eml parseEml(const QByteArray &bytes) {
+    Eml mail;
+    const QString text = QString::fromUtf8(bytes);
+    const qsizetype end = text.indexOf(QRegularExpression("\\r?\\n\\r?\\n"));
+    const QString head = end < 0 ? text : text.left(end);
+    // Unfold continuation lines, then read "Name: value" pairs.
+    QString unfolded = head;
+    unfolded.replace(QRegularExpression("\\r?\\n[ \\t]+"), " ");
+    for (const auto &line : unfolded.split(QRegularExpression("\\r?\\n"))) {
+        const int colon = line.indexOf(':');
+        if (colon <= 0)
+            continue;
+        const QString name = line.left(colon).trimmed().toLower();
+        const QString value = line.mid(colon + 1).trimmed();
+        if (name == "subject" && mail.subject.isEmpty())
+            mail.subject = decodeMimeWords(value);
+        else if (name == "from" && mail.from.isEmpty())
+            mail.from = decodeMimeWords(value);
+        else if (name == "message-id" && mail.messageId.isEmpty()) {
+            mail.messageId = value;
+            mail.messageId.remove('<').remove('>');
+            mail.messageId = mail.messageId.trimmed();
+        }
+    }
+    return mail;
+}
+
+}  // namespace Exchange

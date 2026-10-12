@@ -33,6 +33,7 @@ public:
     std::function<void(const QString &key)> selectSource;  // "today", "list:3", "project:5", "group:2".
     std::function<void(qint64 taskId)> openTask;
     std::function<QList<qint64>()> selectedTaskIds;
+    std::function<QString()> clipboardText;  // For (clipboard) in URL parameters.
 
     // Overrides the clock, for tests that need overdue and "today" to be stable.
     void setNow(const QDateTime &now) { m_now = now; }

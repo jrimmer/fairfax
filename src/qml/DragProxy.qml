@@ -27,6 +27,23 @@ Rectangle {
         hint = ""
     }
 
+    // Once the pointer leaves the window, the same drag becomes a system
+    // drag carrying the tasks as a file (an .ics for one dated task, else a
+    // .txt), so they can be dropped on a file manager, a mail composer or a
+    // calendar. The internal drag is cancelled first so no row sees a drop.
+    function startExternal() {
+        if (!Drag.active) return false
+        const url = backend.dragOutFile()
+        if (!url) return false
+        Drag.cancel()
+        hint = ""
+        Drag.dragType = Drag.None
+        Drag.mimeData = { "text/uri-list": url + "\r\n", "text/plain": url }
+        Drag.startDrag(Qt.CopyAction)
+        Drag.dragType = Drag.Internal
+        return true
+    }
+
     visible: Drag.active
     z: 1000
     width: content.implicitWidth + 22

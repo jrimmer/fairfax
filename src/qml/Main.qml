@@ -122,6 +122,8 @@ ApplicationWindow {
                 backend.dropFiles(Number(purpose.slice(7)), [path])
             else if (purpose.startsWith("event:"))
                 backend.addToCalendar(Number(purpose.slice(6)), path)
+            else if (purpose === "print-pdf")
+                backend.printView(path)
             else if (purpose === "export-selection")
                 backend.exportTo(path, path.endsWith(".ics") ? "ics" : "csv", true)
             else if (purpose.startsWith("link:"))
@@ -253,6 +255,9 @@ ApplicationWindow {
     AppShortcut { sequence: "Shift+F5"; onActivated: backend.showLastSelected() }
     AppShortcut { sequence: "Ctrl+Alt+F"; onActivated: backend.toggleSearchScope() }
     AppShortcut { sequence: "Ctrl+Alt+W"; onActivated: backend.requestNewWindow() }
+    AppShortcut { sequence: "Ctrl+P"; onActivated: filePicker.save("Save this list as a PDF", (backend.sourceTitle || "Tasks") + ".pdf", "print-pdf") }
+    // the reference app's Ctrl+Cmd+F; Ctrl+Alt+F is taken by the search scope.
+    AppShortcut { sequence: "F11"; onActivated: win.visibility = win.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
     AppShortcut {
         sequence: "Ctrl+S"
         onActivated: {

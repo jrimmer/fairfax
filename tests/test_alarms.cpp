@@ -202,6 +202,54 @@ private slots:
         AlarmService service(&f.store);
         QCOMPARE(f.store.setting("alerts.nagMinutes").toInt(), 5);
     }
+
+    void notesTeaserTakesTheFirstUsefulLine() {
+        QCOMPARE(AlarmTimes::notesTeaser(""), "");
+        QCOMPARE(AlarmTimes::notesTeaser("\n  \n## Agenda\nsecond"), "Agenda");
+        QCOMPARE(AlarmTimes::notesTeaser("- [ ] bring the laptop\n- more"), "bring the laptop");
+        const QString teaser = AlarmTimes::notesTeaser(QString(300, 'x'), 50);
+        QCOMPARE(teaser.size(), 50);
+        QVERIFY(teaser.endsWith(QStringLiteral("…")));
+    }
+
+    void actionLabelsNameTheAction() {
+        Task t;
+        QCOMPARE(AlarmTimes::actionLabel(t), "");
+        t.actionType = ActionType::Call;
+        QCOMPARE(AlarmTimes::actionLabel(t), "");  // No number to call.
+        t.actionValue = "+15551234567";
+        QCOMPARE(AlarmTimes::actionLabel(t), "Call");
+        t.actionType = ActionType::Mail;
+        QCOMPARE(AlarmTimes::actionLabel(t), "Email");
+        t.actionType = ActionType::Url;
+        QCOMPARE(AlarmTimes::actionLabel(t), "Open Link");
+    }
+
+    void pendingAlarmsNeedADaemon() {
+        Fixture f;
+        QVERIFY(!AlarmTimes::hasPending(f.store, QDateTime::currentDateTime()));
+        Task t;
+        t.id = f.store.nextId("tasks");
+        t.listId = f.store.lists().isEmpty() ? 0 : f.store.lists().cbegin()->id;
+        t.title = "Call";
+        t.dueDate = QDate::currentDate().addDays(3);
+        t.dueTime = 10 * 60;
+        Alarm a;
+        a.id = f.store.nextId("alarms");
+        a.taskId = t.id;
+        a.offset = 15;
+        f.store.begin("alarm");
+        f.store.putTask(t);
+        f.store.putAlarm(a);
+        f.store.commit();
+        QVERIFY(AlarmTimes::hasPending(f.store, QDateTime::currentDateTime()));
+        // Once it has gone off for its moment, nothing is pending.
+        a.firedFor = AlarmTimes::fireTime(a, t, 9 * 60);
+        f.store.begin("fired");
+        f.store.putAlarm(a);
+        f.store.commit();
+        QVERIFY(!AlarmTimes::hasPending(f.store, QDateTime::currentDateTime()));
+    }
 };
 
 REGISTER_TEST(AlarmsTest)

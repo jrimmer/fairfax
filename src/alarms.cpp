@@ -2,11 +2,13 @@
 
 #if defined(Q_OS_LINUX)
 #include <QDBusConnection>
+#include <QDBusInterface>
 #include <QDBusMessage>
 #include <QDBusReply>
 #endif
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 
 #include "schedule.h"
 #include "store.h"
@@ -45,6 +47,46 @@ QDateTime AlarmTimes::fireTime(const Alarm &a, const Task &t, int defaultDueMinu
     if (minutes < 0)
         minutes = defaultDueMinutes;
     return QDateTime(date, QTime(0, 0)).addSecs(qint64(minutes - a.offset) * 60);
+}
+
+bool AlarmTimes::hasPending(const Store &store, const QDateTime &now) {
+    Q_UNUSED(now);
+    const int defaultDue = store.setting("tasks.defaultDueTime", 9 * 60).toInt();
+    for (const auto &a : store.alarms()) {
+        if (a.deleted)
+            continue;
+        const Task t = store.task(a.taskId);
+        const QDateTime moment = fireTime(a, t, defaultDue);
+        if (moment.isValid() && a.firedFor != moment && !store.list(t.listId).muteAlerts)
+            return true;
+    }
+    return false;
+}
+
+QString AlarmTimes::notesTeaser(const QString &notes, int maxChars) {
+    static const QRegularExpression marker("^(#+\\s+|[-*+]\\s+(\\[[ xX]\\]\\s+)?|>\\s*)");
+    for (QString line : notes.split('\n')) {
+        line = line.trimmed();
+        line.remove(marker);
+        if (line.isEmpty())
+            continue;
+        return line.size() > maxChars ? line.left(maxChars - 1).trimmed() + QStringLiteral("…") : line;
+    }
+    return {};
+}
+
+QString AlarmTimes::actionLabel(const Task &t) {
+    if (t.actionValue.isEmpty())
+        return {};
+    switch (t.actionType) {
+    case ActionType::Call: return QStringLiteral("Call");
+    case ActionType::Message: return QStringLiteral("Message");
+    case ActionType::Mail: return QStringLiteral("Email");
+    case ActionType::Visit: return QStringLiteral("Show on Map");
+    case ActionType::Url: return QStringLiteral("Open Link");
+    case ActionType::Google: return QStringLiteral("Search Google");
+    }
+    return {};
 }
 
 AlarmTimes::DefaultReminders AlarmTimes::DefaultReminders::load(const Store &store) {
@@ -190,6 +232,11 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     const QString list = m_store->list(t.listId).name;
     if (!list.isEmpty())
         body = body.isEmpty() ? list : list + " · " + body;
+    // A teaser of the notes under the headline, so the alert says what the
+    // task is about without opening it.
+    const QString teaser = AlarmTimes::notesTeaser(t.notes);
+    if (!teaser.isEmpty())
+        body += (body.isEmpty() ? "" : "\n") + teaser;
 
 #if !defined(Q_OS_LINUX)
     emit showFallback(t.title, body, t.id);
@@ -199,13 +246,20 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     QDBusMessage call = QDBusMessage::createMethodCall(Service, Path, Interface, "Notify");
     QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-precrime.alarm"},
                       {"desktop-entry", "precrime"}};
-    if (a.sound)
+    // In Do Not Disturb the notification still appears, quietly.
+    const bool quiet = a.sound && doNotDisturb();
+    if (a.sound && !quiet)
         hints.insert("sound-name", "alarm-clock-elapsed");
     // the reference app's snooze menu: the two date-based rows show the time they land on,
     // and "This evening" is left out when 7 PM is less than 30 minutes away.
     const QDateTime now = QDateTime::currentDateTime();
     QStringList actions{"default", "Open", "complete", "Complete", "snooze5", "Snooze 5 Minutes", "snooze", "Snooze 15 Minutes",
                         "snooze-hour", "Snooze 1 Hour"};
+    // The task's own action (Call, Email, Open Link…) is one tap away.
+    if (const QString label = AlarmTimes::actionLabel(t); !label.isEmpty()) {
+        actions.insert(4, "act");
+        actions.insert(5, label);
+    }
     const QDateTime evening(now.date(), QTime(19, 0));
     if (now.secsTo(evening) >= 30 * 60)
         actions << "snooze-evening" << "This Evening (" + Schedule::formatTime(19 * 60) + ")";
@@ -222,7 +276,7 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
         m_nagging.insert(a.id, now.addSecs(qint64(nagMinutes()) * 60));
 
     // Notification daemons rarely play sounds themselves.
-    if (a.sound) {
+    if (a.sound && !quiet) {
         const QString file = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga";
         if (QFileInfo::exists(file))
             QProcess::startDetached("pw-play", {file});
@@ -249,6 +303,29 @@ void AlarmService::snooze(qint64 alarmId, const QDateTime &until) {
     m_store->begin("Snooze", false);
     m_store->putAlarm(a);
     m_store->commit();
+}
+
+bool AlarmService::doNotDisturb() {
+#if defined(Q_OS_LINUX)
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    // dunst exposes a "paused" property on its command interface.
+    QDBusInterface dunst("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.dunstproject.cmd0", bus);
+    if (dunst.isValid()) {
+        const QVariant paused = dunst.property("paused");
+        if (paused.isValid() && paused.toBool())
+            return true;
+    }
+    // mako (Omarchy's notification daemon) reports its active modes; Omarchy
+    // turns Do Not Disturb on as the "do-not-disturb" mode.
+    QDBusInterface mako("fi.emersion.mako", "/fi/emersion/mako", "fi.emersion.mako", bus);
+    if (mako.isValid()) {
+        mako.setTimeout(300);
+        const QDBusReply<QStringList> modes = mako.call("ListModes");
+        if (modes.isValid() && modes.value().contains("do-not-disturb"))
+            return true;
+    }
+#endif
+    return false;
 }
 
 int AlarmService::nagMinutes() const {
@@ -300,6 +377,8 @@ void AlarmService::onAction(uint id, const QString &key) {
     const qint64 taskId = m_store->alarms().value(alarmId).taskId;
     if (key == "complete")
         emit completeTask(taskId);
+    else if (key == "act")
+        emit performAction(taskId);
     else if (key.startsWith("snooze"))
         snooze(alarmId, AlarmTimes::snoozeTarget(key, QDateTime::currentDateTime(), morningMinutes()));
     else

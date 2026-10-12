@@ -328,16 +328,26 @@ Item {
                         height: 3
                         radius: 1.5
                         color: modelData.tone === "overdue" && backend.overdueInRed ? theme.overdue : theme.faint
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            hoverEnabled: true
-                            onClicked: list.positionViewAtIndex(modelData.index, ListView.Beginning)
-                            ToolTip.visible: containsMouse
-                            ToolTip.text: modelData.title + " · " + modelData.count
-                        }
                     }
                 }
+            }
+            // One area over the whole rail, so a press scrubs along it and the
+            // list follows (bars are 3 px high with 5 px between them).
+            MouseArea {
+                anchors.fill: rail
+                anchors.margins: -6
+                visible: rail.visible
+                hoverEnabled: true
+                property int hovered: -1
+                function indexAt(y) { return Math.max(0, Math.min(rail.sections.length - 1, Math.floor((y - 6) / 8))) }
+                function jump(y) {
+                    hovered = indexAt(y)
+                    list.positionViewAtIndex(rail.sections[hovered].index, ListView.Beginning)
+                }
+                onPressed: (m) => jump(m.y)
+                onPositionChanged: (m) => { if (pressed) jump(m.y); else hovered = indexAt(m.y) }
+                ToolTip.visible: containsMouse && hovered >= 0 && hovered < rail.sections.length
+                ToolTip.text: hovered >= 0 && hovered < rail.sections.length ? rail.sections[hovered].title + " · " + rail.sections[hovered].count : ""
             }
         }
     }

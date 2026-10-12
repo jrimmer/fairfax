@@ -507,6 +507,164 @@ private slots:
         t.startDate = QDate(2026, 10, 20);
         QVERIFY(QString::fromUtf8(Exchange::eventIcs(*s, t)).contains("DTSTART;VALUE=DATE:20261020"));
     }
+
+    void thingsJson() {
+        auto s = freshStore();
+        const QByteArray json = R"([
+          {"type":"project","uuid":"P1","title":"Garden","area":"Home","notes":"Spring work","deadline":"2026-07-04",
+           "items":[{"type":"to-do","uuid":"T1","title":"Buy seeds","tags":["errand","shop"],"when":"2026-06-20"},
+                    {"type":"to-do","uuid":"T2","title":"Done thing","status":"completed","completion_date":"2026-06-01T10:00:00Z"}]},
+          {"type":"to-do","uuid":"T3","title":"Plan trip","checklist":[{"title":"Passport"},{"title":"Tickets","completed":true}]},
+          {"type":"to-do","attributes":{"title":"Wrapped","deadline":"2026-08-01","tags":["x"],"notes":"hi"}},
+          {"type":"to-do","uuid":"T4","title":"Dropped","status":"canceled"}
+        ])";
+        const ImportResult r = Exchange::importThingsJson(*s, json);
+        QVERIFY2(r.error.isEmpty(), qPrintable(r.error));
+        QCOMPARE(r.tasks, 6);  // Checklist items are not counted.
+        const Task garden = byTitle(*s, "Garden");
+        QCOMPARE(garden.type, int(TaskType::Project));
+        QCOMPARE(garden.dueDate, QDate(2026, 7, 4));
+        QCOMPARE(s->list(garden.listId).name, "Home");
+        const Task seeds = byTitle(*s, "Buy seeds");
+        QCOMPARE(seeds.parentId, garden.id);
+        QCOMPARE(seeds.startDate, QDate(2026, 6, 20));
+        QCOMPARE(seeds.tagIds.size(), 2);
+        QVERIFY(byTitle(*s, "Done thing").completed);
+        const Task trip = byTitle(*s, "Plan trip");
+        QCOMPARE(trip.type, int(TaskType::Checklist));
+        QCOMPARE(s->list(trip.listId).name, "Inbox");
+        QVERIFY(byTitle(*s, "Tickets").completed);
+        QVERIFY(!byTitle(*s, "Passport").completed);
+        QCOMPARE(byTitle(*s, "Wrapped").dueDate, QDate(2026, 8, 1));
+        QCOMPARE(byTitle(*s, "Wrapped").notes, "hi");
+        QVERIFY(byTitle(*s, "Dropped").completed);
+
+        // Importing again adds nothing for items that carry an id.
+        const ImportResult again = Exchange::importThingsJson(*s, json);
+        QCOMPARE(again.tasks, 1);  // Only the one without an id.
+        QVERIFY(!Exchange::importThingsJson(*s, "nope").error.isEmpty());
+        QVERIFY(!Exchange::importThingsJson(*s, "[]").error.isEmpty());
+    }
+
+    void omniFocusTaskPaper() {
+        auto s = freshStore();
+        const QString text = QString::fromUtf8(
+            "- Inbox thing @flagged\n"
+            "Work:\n"
+            "\tWebsite:\n"
+            "\t\t- Write copy @due(2026-07-04 17:00) @tags(writing, urgent) @estimate(1h30m)\n"
+            "\t\t\tNeeds the brief.\n"
+            "\t\t\t- Outline @home\n"
+            "\t\t- Ship it @defer(2026-07-01) @done(2026-07-02)\n"
+            "Personal:\n"
+            "\t- Call mom @due(2026-07-10)\n");
+        const ImportResult r = Exchange::importTaskPaperText(*s, text);
+        QVERIFY2(r.error.isEmpty(), qPrintable(r.error));
+        QCOMPARE(r.tasks, 5);
+        QCOMPARE(s->list(byTitle(*s, "Inbox thing").listId).name, "Inbox");
+        QVERIFY(byTitle(*s, "Inbox thing").starred);
+        const Task copy = byTitle(*s, "Write copy");
+        QCOMPARE(copy.dueDate, QDate(2026, 7, 4));
+        QCOMPARE(copy.dueTime, 17 * 60);
+        QCOMPARE(copy.duration, 90);
+        QCOMPARE(copy.notes, "Needs the brief.");
+        QCOMPARE(copy.tagIds.size(), 2);
+        QCOMPARE(copy.type, int(TaskType::Project));
+        QCOMPARE(byTitle(*s, "Outline").parentId, copy.id);
+        QCOMPARE(byTitle(*s, "Outline").tagIds.size(), 1);
+        const Task ship = byTitle(*s, "Ship it");
+        QVERIFY(ship.completed);
+        QCOMPARE(ship.startDate, QDate(2026, 7, 1));
+        QCOMPARE(ship.parentId, 0);
+        // The folder became a group holding the Website list; Personal is its own list.
+        const TaskList website = s->list(copy.listId);
+        QCOMPARE(website.name, "Website");
+        QCOMPARE(s->groups().value(website.groupId).name, "Work");
+        QCOMPARE(s->list(byTitle(*s, "Call mom").listId).groupId, qint64(0));
+        QVERIFY(!Exchange::importTaskPaperText(*s, "").error.isEmpty());
+    }
+
+    void tasksAsTextAndMailto() {
+        auto s = freshStore();
+        const qint64 list = addList(*s, "Home");
+        Task parent;
+        parent.listId = list;
+        parent.title = "Trip";
+        parent.type = TaskType::Checklist;
+        parent.dueDate = QDate(2026, 7, 4);
+        parent.notes = "Bring snacks\nand water";
+        const qint64 pid = addTask(*s, parent);
+        Task child;
+        child.listId = list;
+        child.parentId = pid;
+        child.title = "Passport";
+        child.completed = true;
+        const qint64 cid = addTask(*s, child);
+        Task other;
+        other.listId = list;
+        other.title = "Mail & more";
+        const qint64 oid = addTask(*s, other);
+
+        const QString text = Exchange::tasksAsText(*s, {pid, cid, oid});
+        QVERIFY(text.startsWith("[ ] Trip  (due "));
+        QVERIFY(text.contains("    Bring snacks\n    and water\n"));
+        QVERIFY(text.contains("    [x] Passport\n"));
+        QVERIFY(text.contains("[ ] Mail & more\n"));
+        // The sub-task appears once, under its parent.
+        QCOMPARE(text.count("Passport"), 1);
+
+        const QUrl one = Exchange::mailtoForTasks(*s, {oid});
+        QCOMPARE(one.scheme(), "mailto");
+        const QString raw = one.toString(QUrl::FullyEncoded);
+        QVERIFY(raw.contains("subject=Mail%20%26%20more"));
+        QVERIFY(raw.contains("body=%5B%20%5D%20Mail%20%26%20more"));
+        QVERIFY(Exchange::mailtoForTasks(*s, {pid, oid}).toString(QUrl::FullyEncoded).contains("subject=2%20tasks"));
+    }
+
+    void printHtmlAndPdf() {
+        auto s = freshStore();
+        Exchange::PrintItem item;
+        item.title = "Pay <rent>";
+        item.due = "Fri";
+        item.notes = "Landlord";
+        item.starred = true;
+        Exchange::PrintItem done;
+        done.title = "Done thing";
+        done.done = true;
+        done.depth = 1;
+        const QVector<Exchange::PrintSection> sections = {{"Overdue", {item, done}}, {"Empty", {}}};
+        const QString withNotes = Exchange::printHtml("Home", sections, true);
+        QVERIFY(withNotes.contains("Pay &lt;rent&gt;"));
+        QVERIFY(withNotes.contains("Landlord"));
+        QVERIFY(withNotes.contains("Overdue"));
+        QVERIFY(!withNotes.contains("Empty"));
+        QVERIFY(withNotes.contains("<s style"));
+        QVERIFY(!Exchange::printHtml("Home", sections, false).contains("Landlord"));
+
+        const QString pdf = file("out.pdf");
+        QString error;
+        QVERIFY2(Exchange::writePdf(pdf, "Home", sections, true, &error), qPrintable(error));
+        QFile f(pdf);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QVERIFY(f.readAll().startsWith("%PDF-"));
+        QVERIFY(!Exchange::writePdf(file("missing/dir/out.pdf"), "Home", sections, true, &error));
+    }
+
+    void emlHeaders() {
+        const QByteArray mail =
+            "From: =?UTF-8?B?SsO8cmdlbg==?= <j@example.com>\r\n"
+            "Subject: =?UTF-8?Q?Caf=C3=A9_menu?=\r\n =?UTF-8?Q?_for_Friday?=\r\n"
+            "Message-ID: <abc.123@mail.example.com>\r\n"
+            "\r\nSubject: not a header\r\n";
+        const Exchange::Eml eml = Exchange::parseEml(mail);
+        QCOMPARE(eml.subject, QString::fromUtf8("Café menu for Friday"));
+        QCOMPARE(eml.from, QString::fromUtf8("Jürgen <j@example.com>"));
+        QCOMPARE(eml.messageId, "abc.123@mail.example.com");
+        const Exchange::Eml plain = Exchange::parseEml("Subject: Hello\nmessage-id: <x@y>\n\nbody");
+        QCOMPARE(plain.subject, "Hello");
+        QCOMPARE(plain.messageId, "x@y");
+        QVERIFY(Exchange::parseEml("just text").subject.isEmpty());
+    }
 };
 
 REGISTER_TEST(ExchangeTest)

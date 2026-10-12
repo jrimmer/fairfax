@@ -1421,6 +1421,20 @@ void Backend::untagSelection(const QVariantList &tagIds) {
     });
 }
 
+QString Backend::googleDomain(const QLocale &locale) {
+    // Google serves each country from its own domain; most are the country
+    // code, a few use a second-level suffix, and anything unknown gets .com.
+    static const QHash<QString, QString> special = {
+        {"GB", "co.uk"}, {"JP", "co.jp"}, {"AU", "com.au"}, {"NZ", "co.nz"}, {"IN", "co.in"}, {"ZA", "co.za"},
+        {"BR", "com.br"}, {"MX", "com.mx"}, {"AR", "com.ar"}, {"TR", "com.tr"}, {"SG", "com.sg"}, {"HK", "com.hk"},
+        {"IL", "co.il"}, {"KR", "co.kr"}, {"TH", "co.th"}, {"ID", "co.id"}, {"UA", "com.ua"}, {"EG", "com.eg"},
+        {"US", "com"}, {"VN", "com.vn"}, {"TW", "com.tw"}, {"PH", "com.ph"}, {"PK", "com.pk"}, {"NG", "com.ng"}, {"CO", "com.co"}};
+    const QString country = QLocale::territoryToCode(locale.territory());
+    if (country.size() != 2 || country == "ZZ")
+        return QStringLiteral("google.com");
+    return "google." + special.value(country, country.toLower());
+}
+
 void Backend::performAction(qint64 id) {
     const Task t = m_store->task(id ? id : m_cursor);
     if (t.actionType == ActionType::None || t.actionValue.isEmpty()) {
@@ -1435,7 +1449,7 @@ void Backend::performAction(qint64 id) {
     case ActionType::Mail: url = QUrl("mailto:" + t.actionValue); break;
     case ActionType::Visit: url = QUrl("https://www.openstreetmap.org/search?query=" + v); break;
     case ActionType::Url: url = QUrl::fromUserInput(t.actionValue); break;
-    case ActionType::Google: url = QUrl("https://www.google.com/search?q=" + v); break;
+    case ActionType::Google: url = QUrl("https://www." + googleDomain(QLocale()) + "/search?q=" + v); break;
     }
     if (!QDesktopServices::openUrl(url))
         setStatus("Nothing on this system opens " + url.scheme() + ": links.");
@@ -2945,6 +2959,47 @@ void Backend::pasteText(const QString &text) {
     emit selectionChanged();
 }
 
+void Backend::dropMail(qint64 taskId, const QString &path) {
+    // As in the reference app: the message becomes the task's action, so one click reopens
+    // it (a mid: link, which Thunderbird and most Linux mail clients open). A
+    // task that already has an action gets the subject and link in its notes
+    // instead; dropped on empty space, a new task is titled with the subject.
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        setStatus("Couldn't read " + QFileInfo(path).fileName());
+        return;
+    }
+    const Exchange::Eml mail = Exchange::parseEml(file.read(256 * 1024));
+    if (mail.messageId.isEmpty() && mail.subject.isEmpty()) {
+        setStatus(QFileInfo(path).fileName() + " doesn't look like a mail message");
+        return;
+    }
+    const QString link = mail.messageId.isEmpty() ? QUrl::fromLocalFile(QFileInfo(path).absoluteFilePath()).toString()
+                                                  : "mid:" + QString::fromUtf8(QUrl::toPercentEncoding(mail.messageId, "@"));
+    const QString subject = mail.subject.isEmpty() ? QStringLiteral("Mail message") : mail.subject;
+    Task t = m_store->task(taskId);
+    m_store->begin("Drop Mail");
+    if (!t.id) {
+        t.id = m_store->nextId("tasks");
+        t.listId = m_source.kind == Source::List && m_store->list(m_source.id).kind != ListKind::Smart ? m_source.id : defaultListId();
+        t.parentId = m_source.kind == Source::Project ? m_source.id : 0;
+        if (m_source.kind == Source::Project)
+            t.listId = m_store->task(m_source.id).listId;
+        t.title = subject.left(1000);
+        t.order = nextOrder(t.listId, t.parentId);
+    }
+    if (t.actionType == ActionType::None) {
+        t.actionType = ActionType::Url;
+        t.actionValue = link;
+    } else {
+        t.notes += (t.notes.isEmpty() || t.notes.endsWith('\n') ? "" : "\n") + subject + "\n" + link;
+    }
+    m_store->putTask(t);
+    m_store->commit();
+    m_options.keepVisible.insert(t.id);
+    selectTask(t.id);
+}
+
 void Backend::dropFiles(qint64 taskId, const QVariantList &urls) {
     // A picture becomes the task's picture (one per task, the first wins);
     // other files are linked in the notes. Dropped on empty space, the files
@@ -2962,6 +3017,12 @@ void Backend::dropFiles(qint64 taskId, const QVariantList &urls) {
             paths << text;
         }
     }
+    // Mail messages saved from a mail client (.eml) become the task's action.
+    for (const auto &path : QStringList(paths))
+        if (path.endsWith(".eml", Qt::CaseInsensitive)) {
+            dropMail(taskId, path);
+            paths.removeAll(path);
+        }
     if (paths.isEmpty())
         return;
     m_store->begin("Add Files");
@@ -3504,6 +3565,68 @@ void Backend::exportTo(const QString &path, const QString &format, bool selectio
     setStatus(ok ? "Exported to " + QFileInfo(path).fileName() : "Export failed: " + error);
 }
 
+bool Backend::printView(const QString &path) {
+    // Print / Save as PDF: the tasks as they are listed now, with section
+    // headings; collapsed sections are printed open. The PDF then opens in the
+    // desktop viewer, which is where it gets printed.
+    const ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    ViewOptions options = m_options;
+    options.collapsedSections.clear();
+    const Source viewed = (m_searchAll && !m_options.search.isEmpty()) ? Source{Source::All, 0} : m_source;
+    QVector<Exchange::PrintSection> sections;
+    for (const auto &section : views.build(viewed, sortSpec(), options)) {
+        Exchange::PrintSection printed;
+        printed.heading = section.title;
+        for (const auto &row : section.rows)
+            printed.items.append(Exchange::printItem(*m_store, m_store->task(row.taskId), row.depth));
+        sections.append(printed);
+    }
+    QString error;
+    const bool notes = m_store->setting("print.notes", true).toBool();
+    if (!Exchange::writePdf(path, sourceTitle(), sections, notes, &error)) {
+        setStatus("Couldn't save the PDF: " + error);
+        return false;
+    }
+    setStatus("Saved " + QFileInfo(path).fileName());
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    return true;
+}
+
+void Backend::emailTasks(qint64 id) {
+    const QVector<qint64> ids = targetIds(id);
+    if (ids.isEmpty())
+        return;
+    if (!QDesktopServices::openUrl(Exchange::mailtoForTasks(*m_store, QList<qint64>(ids.begin(), ids.end()))))
+        setStatus("Nothing on this system opens mailto: links.");
+}
+
+QString Backend::dragOutFile() {
+    // What a task dragged out of the window carries: an event file for a
+    // single dated task, otherwise the selected tasks as plain text.
+    const QVector<qint64> ids = targetIds();
+    if (ids.isEmpty())
+        return {};
+    const QString folder = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("precrime-drag");
+    QDir().mkpath(folder);
+    const Task first = m_store->task(ids.first());
+    QByteArray bytes;
+    QString name;
+    if (ids.size() == 1)
+        bytes = Exchange::eventIcs(*m_store, first);
+    if (!bytes.isEmpty()) {
+        name = first.title;
+    } else {
+        bytes = Exchange::tasksAsText(*m_store, QList<qint64>(ids.begin(), ids.end())).toUtf8();
+        name = ids.size() == 1 ? first.title : QStringLiteral("%1 tasks").arg(ids.size());
+    }
+    name.replace(QRegularExpression("[/\\\\:*?\"<>|\\n]"), "-");
+    const QString file = QDir(folder).filePath(name.left(60).trimmed() + (bytes.startsWith("BEGIN:VCALENDAR") ? ".ics" : ".txt"));
+    QFile out(file);
+    if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size())
+        return {};
+    return QUrl::fromLocalFile(file).toString();
+}
+
 int Backend::exportLists(const QString &path, const QString &format, const QVariantList &listIds, int scope) {
     QSet<qint64> lists;
     for (const auto &v : listIds)
@@ -3556,6 +3679,8 @@ void Backend::importFrom(const QString &path, const QString &format) {
     backupNow("before-import");
     const ImportResult r = format == "taskapp"        ? Exchange::importTwoDo(*m_store, path)
                          : format == "ticktick" ? Exchange::importTickTick(*m_store, path)
+                         : format == "things"   ? Exchange::importThings(*m_store, path)
+                         : format == "omnifocus" ? Exchange::importOmniFocus(*m_store, path)
                                                 : Exchange::importIcs(*m_store, path, defaultListId());
     if (!r.error.isEmpty()) {
         setStatus("Import failed: " + r.error);

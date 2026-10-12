@@ -57,6 +57,8 @@ Window {
             else if (purpose === "import-ics") backend.importFrom(path, "ics")
             else if (purpose === "import-taskdb") backend.importFrom(path, "taskapp")
             else if (purpose === "import-ticktick") backend.importFrom(path, "ticktick")
+            else if (purpose === "import-things") backend.importFrom(path, "things")
+            else if (purpose === "import-omnifocus") backend.importFrom(path, "omnifocus")
             else if (purpose === "restore") backend.restoreBackup(path)
             else if (purpose === "sync-folder" && folderSync) folderSync.setFolder(path)
             else if (purpose === "backup-copy") backend.saveBackupCopy(copySource, path)
@@ -653,6 +655,11 @@ Window {
                         Button { text: "From the reference app…"; onClicked: filePicker.open("Choose a the reference app database (tasks.db or a .taskdb backup)", "import-taskdb") }
                         Button { text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
                     }
+                    RowLayout {
+                        Button { text: "From Things…"; onClicked: filePicker.open("Choose a Things 3 JSON export", "import-things") }
+                        Button { text: "From OmniFocus…"; onClicked: filePicker.open("Choose an OmniFocus TaskPaper export", "import-omnifocus") }
+                    }
+                    Hint { text: "From Things 3 (a JSON export) and OmniFocus (File > Export > TaskPaper): areas, folders and projects become lists and projects; dates, tags, flags, notes and checklists come across." }
                     Hint { text: "From TickTick: in TickTick's web app, Settings → Account → Generate Backup, then choose the .csv here. Lists, tags, dates, repeats, reminders, checklists and completed history come across; importing the same backup again adds only what's new." }
                     Hint { text: "From the reference app: on the Mac, use a backup from the reference app > Settings > Backups (a .taskdb file). Lists, groups, tags, dates, repeats and alerts come across; one Ctrl+Z undoes the whole import, and a backup is made first." }
                 }

@@ -1,6 +1,8 @@
 // precrime — a keyboard-first task manager for Omarchy, modelled on the reference app.
 
+#include <QClipboard>
 #include <QCommandLineParser>
+#include <QDesktopServices>
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -26,6 +28,7 @@
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QQuickStyle>
+#include <QPointer>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -177,9 +180,25 @@ int runHeadless(int argc, char *argv[]) {
         const int dueToday = settings.todayIncludesOverdue ? today.undone - today.overdue : today.undone;
         const QString text = metric == "both" && today.overdue ? QStringLiteral("%1 | %2").arg(today.overdue).arg(dueToday)
                                                                : QString::number(count);
-        const QJsonObject json{{"text", count ? text : QString()},
-                               {"tooltip", QStringLiteral("%1 overdue, %2 in Today").arg(today.overdue).arg(today.undone)},
-                               {"class", today.overdue ? "overdue" : today.undone ? "due" : "clear"}};
+        QString tooltip = QStringLiteral("%1 overdue, %2 in Today").arg(today.overdue).arg(today.undone);
+        QString cls = today.overdue ? "overdue" : today.undone ? "due" : "clear";
+        // Alarms are delivered by the resident app; with alarms waiting and
+        // no instance listening, say so rather than let them silently miss.
+        if (AlarmTimes::hasPending(store, QDateTime::currentDateTime())) {
+            const int dbAt = args.indexOf("--db");
+            const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME", "user"));
+            const QString socket = QStringLiteral("precrime-%1").arg(user)
+                                   + (dbAt >= 0 && dbAt + 1 < args.size() ? "-" + QString::number(qHash(args.at(dbAt + 1))) : QString());
+            QLocalSocket probe;
+            probe.connectToServer(socket);
+            if (!probe.waitForConnected(300)) {
+                cls = "no-daemon";
+                tooltip += QStringLiteral("\nAlarms won't go off: Precrime isn't running.");
+            }
+        }
+        const QJsonObject json{{"text", count ? text : cls == "no-daemon" ? QStringLiteral("!") : QString()},
+                               {"tooltip", tooltip},
+                               {"class", cls}};
         out << QJsonDocument(json).toJson(QJsonDocument::Compact) << Qt::endl;
         return 0;
     }
@@ -187,11 +206,13 @@ int runHeadless(int argc, char *argv[]) {
         // precrime import FILE: a the reference app database or .taskdb backup, or .ics.
         const QString file = args.value(2);
         if (file.isEmpty()) {
-            err << "usage: precrime import <tasks.db | backup.taskdb | tasks.ics | TickTick-backup.csv> [--db PATH]" << Qt::endl;
+            err << "usage: precrime import <tasks.db | backup.taskdb | tasks.ics | TickTick-backup.csv | Things.json | OmniFocus.taskpaper> [--db PATH]" << Qt::endl;
             return 2;
         }
         const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive) ? Exchange::importIcs(store, file, 0)
                                : Exchange::isTickTickBackup(file)          ? Exchange::importTickTick(store, file)
+                               : file.endsWith(".json", Qt::CaseInsensitive) && Exchange::isThingsExport(file) ? Exchange::importThings(store, file)
+                               : Exchange::isTaskPaper(file)               ? Exchange::importOmniFocus(store, file)
                                                                            : Exchange::importTwoDo(store, file);
         if (!r.error.isEmpty()) {
             err << "precrime: import failed: " << r.error << Qt::endl;
@@ -256,10 +277,11 @@ int main(int argc, char *argv[]) {
     QCommandLineOption quickTextOption("quick-text", "Type this into Quick Entry (for screenshots).", "text");
     QCommandLineOption evalOption("shot-eval", "Evaluate this QML expression in the main window before --screenshot.", "js");
     QCommandLineOption shotWindowOption("shot-window", "Capture the window whose title contains this instead of the main one.", "title");
+    QCommandLineOption newWindowOption("new-window", "Open another window (the desktop file's New Window action).");
     QCommandLineOption daemonOption("background", "Start without a window, to deliver alarms (for exec-once).");
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
                     daemonOption, quickTextOption, selfTestOption, openOption, settingsOption, schemeOption,
-                    evalOption, shotWindowOption});
+                    evalOption, shotWindowOption, newWindowOption});
     cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
@@ -329,6 +351,8 @@ int main(int argc, char *argv[]) {
                 probe.write("open\n");
             else if (cli.isSet(settingsOption))
                 probe.write("settings\n");
+            else if (cli.isSet(newWindowOption))
+                probe.write("newwindow\n");
             else
                 probe.write(cli.isSet(quickOption) ? "quick\n" : "show\n");
             probe.waitForBytesWritten(300);
@@ -383,8 +407,16 @@ int main(int argc, char *argv[]) {
         backend.revealInList(id);
     };
     automation.selectedTaskIds = [&backend] { return backend.selectedIds(); };
+    automation.clipboardText = [] { return QGuiApplication::clipboard()->text(); };
     auto handleUrl = [&](const QString &url) {
         const QJsonObject result = automation.handleUrl(QUrl(url));
+        if (result.contains("clipboard"))
+            QGuiApplication::clipboard()->setText(result.value("clipboard").toString());
+        // x-success and x-error are other apps' URLs to open; a file: URL is
+        // never a callback.
+        const QUrl callback(result.value("callback").toString());
+        if (callback.isValid() && !callback.scheme().isEmpty() && callback.scheme() != "file")
+            QDesktopServices::openUrl(callback);
         if (result.value("quickEntry").toBool())
             backend.requestQuickEntryWith(result.value("text").toString());
         else if (result.contains("search"))
@@ -494,6 +526,8 @@ int main(int argc, char *argv[]) {
                         backend.requestPanel("open");
                     else if (request == "settings")
                         backend.requestPanel("settings");
+                    else if (request == "newwindow")
+                        backend.requestNewWindow();
                     else
                         backend.requestWindow();
                     client->disconnectFromServer();
@@ -523,14 +557,31 @@ int main(int argc, char *argv[]) {
             backend.revealInList(id);
         });
         QObject::connect(alarms.get(), &AlarmService::completeTask, &backend, [&backend](qint64 id) { backend.toggleComplete(id); });
+        QObject::connect(alarms.get(), &AlarmService::performAction, &backend, [&backend](qint64 id) { backend.performAction(id); });
         app.setQuitOnLastWindowClosed(!store.setting("general.keepRunning", true).toBool());
     }
 
     // File > New Window: another window over the same store, with its own
-    // selection, list and search, as the reference app's multiple windows have.
-    std::function<void()> openWindow;
-    openWindow = [&engine, &store, &app, &openWindow]() {
+    // selection, list and search, as the reference app's multiple windows have. The open
+    // windows' lists are remembered, so a relaunch brings them back; closing
+    // a window forgets it.
+    QList<QPointer<Backend>> extraBackends;
+    bool quitting = false;
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &app, [&quitting] { quitting = true; });
+    auto saveWindows = [&extraBackends, &store, &offscreen] {
+        if (offscreen)
+            return;
+        QStringList keys;
+        for (const auto &b : extraBackends)
+            if (b)
+                keys << b->sourceKey();
+        store.setSetting("windows.extra", keys.join('\n'));
+    };
+    std::function<void(const QString &)> openWindow;
+    openWindow = [&](const QString &sourceKey) {
         auto *extra = new Backend(&store, &app);
+        if (!sourceKey.isEmpty())
+            extra->selectSource(sourceKey);
         auto *context = new QQmlContext(engine.rootContext(), extra);
         context->setContextProperty("backend", extra);
         context->setContextProperty("startHidden", false);
@@ -541,16 +592,31 @@ int main(int argc, char *argv[]) {
             delete extra;
             return;
         }
+        extraBackends.append(extra);
+        saveWindows();
+        QObject::connect(extra, &Backend::viewChanged, extra, saveWindows);
         // Closing the window releases its backend.
-        QObject::connect(qobject_cast<QQuickWindow *>(window), &QQuickWindow::visibleChanged, extra, [window, extra](bool shown) {
+        QObject::connect(qobject_cast<QQuickWindow *>(window), &QQuickWindow::visibleChanged, extra,
+                         [window, extra, &extraBackends, &quitting, saveWindows](bool shown) {
             if (!shown) {
+                if (!quitting) {
+                    extraBackends.removeAll(extra);
+                    saveWindows();
+                }
                 window->deleteLater();
                 extra->deleteLater();
             }
         });
-        QObject::connect(extra, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
+        QObject::connect(extra, &Backend::newWindowRequested, &app, [&openWindow] { openWindow({}); });
     };
-    QObject::connect(&backend, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
+    QObject::connect(&backend, &Backend::newWindowRequested, &app, [&openWindow] { openWindow({}); });
+    if (opened && !offscreen && !cli.isSet(quickOption) && !cli.isSet(daemonOption)) {
+        const QStringList remembered = store.setting("windows.extra").toString().split('\n', Qt::SkipEmptyParts);
+        QTimer::singleShot(0, &app, [&openWindow, remembered] {
+            for (const auto &key : remembered)
+                openWindow(key);
+        });
+    }
 
     // On Hyprland, fit the main window into a free third when the workspace
     // is laid out with floating windows (see hyprland.h). Each time it
