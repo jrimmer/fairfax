@@ -121,7 +121,9 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     if (a.sound)
         hints.insert("sound-name", "alarm-clock-elapsed");
     call << QStringLiteral("Precrime") << uint(0) << QStringLiteral("precrime") << t.title << body
-         << QStringList{"default", "Open", "complete", "Complete", "snooze", "Snooze 15 Minutes"} << hints << int(0);
+         << QStringList{"default", "Open", "complete", "Complete", "snooze", "Snooze 15 Minutes", "snooze-hour", "Snooze 1 Hour",
+                        "snooze-evening", "This Evening", "snooze-morning", "Tomorrow Morning"}
+         << hints << int(0);
     const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
     if (reply.isValid())
         m_notifications.insert(reply.value(), a.id);
@@ -175,6 +177,16 @@ void AlarmService::onAction(uint id, const QString &key) {
         emit completeTask(taskId);
     else if (key == "snooze")
         snooze(alarmId, 15);
+    else if (key == "snooze-hour")
+        snooze(alarmId, 60);
+    else if (key == "snooze-evening" || key == "snooze-morning") {
+        // the reference app's presets: this evening at 7 PM, tomorrow morning at 9 AM.
+        const QDateTime now = QDateTime::currentDateTime();
+        QDateTime at = key == "snooze-evening" ? QDateTime(now.date(), QTime(19, 0)) : QDateTime(now.date().addDays(1), QTime(9, 0));
+        if (at <= now)
+            at = at.addDays(1);
+        snooze(alarmId, int(now.secsTo(at) / 60));
+    }
     else
         emit openTask(taskId);
 }

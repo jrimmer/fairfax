@@ -30,6 +30,18 @@ Menu {
         MenuItem { text: "To Project"; onTriggered: backend.convertSelection(1) }
         MenuItem { text: "To Checklist"; onTriggered: backend.convertSelection(2) }
     }
+    Menu {
+        title: root.row.type === 2 ? "Sort Checklist" : "Sort Project"
+        enabled: root.row.type === 1 || root.row.type === 2
+        Repeater {
+            model: [[8, "Manually"], [0, "Due Date"], [1, "Start Date"], [2, "Priority"], [4, "Title"], [5, "Creation"], [7, "Duration"], [11, "Status"]]
+            MenuItem {
+                required property var modelData
+                text: modelData[1]
+                onTriggered: backend.setProjectSort(root.row.taskId, modelData[0], true)
+            }
+        }
+    }
     MenuItem {
         text: "Open in List"
         visible: !backend.sourceKey.startsWith("list:")

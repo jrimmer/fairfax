@@ -3,6 +3,9 @@
 
 #include "backend.h"
 
+#include <QFile>
+#include <QFileInfo>
+
 namespace {
 
 struct Seeder {
@@ -182,5 +185,22 @@ void Backend::seedDemo() {
     }
 
     m_store->commit();
+
+    // A calendar for the day bar: three events today.
+    const QString ics = QFileInfo(m_store->path()).absolutePath() + "/demo-calendar.ics";
+    QFile file(ics);
+    if (file.open(QIODevice::WriteOnly)) {
+        const QString day = QDate::currentDate().toString("yyyyMMdd");
+        auto event = [&](const char *uid, const char *title, const char *start, const char *end) {
+            return QStringLiteral("BEGIN:VEVENT\r\nUID:%1\r\nSUMMARY:%2\r\nDTSTART:%3T%4\r\nDTEND:%3T%5\r\nEND:VEVENT\r\n")
+                .arg(uid, title, day, start, end);
+        };
+        file.write(("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Precrime//Demo//EN\r\n" +
+                    event("standup", "Team stand-up", "093000", "100000") + event("jeremy", "Call with Jeremy", "110000", "114500") +
+                    event("lunch", "Lunch with Ana", "123000", "133000") + event("review", "Design review", "150000", "160000") +
+                    "END:VCALENDAR\r\n").toUtf8());
+        file.close();
+        m_store->setSetting("calendar.sources", ics);
+    }
     rebuild();
 }

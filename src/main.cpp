@@ -201,8 +201,10 @@ int main(int argc, char *argv[]) {
     QObject::connect(&externalChanges, &QTimer::timeout, &store, [&store] { store.reloadIfChangedElsewhere(); });
     externalChanges.start(1500);
     if (opened) {
-        if (cli.isSet(demoOption))
+        if (cli.isSet(demoOption)) {
             backend.seedDemo();
+            calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
+        }
         backend.ensureDefaults();
         if (cli.isSet(sourceOption))
             backend.selectSource(cli.value(sourceOption));
