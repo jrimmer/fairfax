@@ -1,5 +1,5 @@
 pkgname=precrime
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc='A keyboard-first task manager for Omarchy, modelled on the reference app'
 arch=('x86_64' 'aarch64')
@@ -22,6 +22,12 @@ package() {
   # `pc` is the terminal shorthand: pc <task> adds one, pc lists Today.
   ln -s precrime "$pkgdir/usr/bin/pc"
   install -Dm755 scripts/precrime-omarchy-setup "$pkgdir/usr/lib/precrime/precrime-omarchy-setup"
+  # Shell completions for precrime and pc.
+  install -Dm644 completions/precrime.bash "$pkgdir/usr/share/bash-completion/completions/precrime"
+  ln -s precrime "$pkgdir/usr/share/bash-completion/completions/pc"
+  install -Dm644 completions/_precrime "$pkgdir/usr/share/zsh/site-functions/_precrime"
+  install -Dm644 completions/precrime.fish "$pkgdir/usr/share/fish/vendor_completions.d/precrime.fish"
+  install -Dm644 completions/pc.fish "$pkgdir/usr/share/fish/vendor_completions.d/pc.fish"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 "$startdir/precrime.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/precrime.svg"
   install -Dm644 "$startdir/precrime.desktop" "$pkgdir/usr/share/applications/precrime.desktop"

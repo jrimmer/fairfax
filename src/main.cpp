@@ -87,6 +87,28 @@ int runHeadless(int argc, char *argv[]) {
         err << "precrime: can't open the database: " << error << Qt::endl;
         return 1;
     }
+    if (args.value(1) == "--complete") {
+        // Values for shell completion: list names, open tasks ("id<TAB>title"),
+        // or ctl commands. Kept quiet and fast; errors print nothing.
+        const QString kind = args.value(2);
+        if (kind == "lists") {
+            for (const auto &l : store.lists())
+                if (!l.deleted && !l.archived && l.kind != ListKind::Smart)
+                    out << l.name << '\n';
+        } else if (kind == "tasks") {
+            for (const auto &t : store.tasks())
+                if (!t.deleted && !t.completed && !t.title.isEmpty())
+                    out << t.id << '\t' << t.title.left(60) << '\n';
+        } else if (kind == "done") {
+            for (const auto &t : store.tasks())
+                if (!t.deleted && t.completed && !t.title.isEmpty() && t.completedAt.daysTo(QDateTime::currentDateTime()) < 14)
+                    out << t.id << '\t' << t.title.left(60) << '\n';
+        } else if (kind == "ctl") {
+            for (const auto &name : Automation::commandNames())
+                out << name << '\n';
+        }
+        return 0;
+    }
     const bool shorthand = args.value(0).section('/', -1) == "pc";
     if (shorthand)
         return Cli::pc(store, args.mid(1), out, err);
@@ -148,13 +170,13 @@ int main(int argc, char *argv[]) {
         const QString self = QString::fromLocal8Bit(argv[0]).section('/', -1);
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
         if (self == "pc" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" ||
-            first == "add" || first == "setup")
+            first == "add" || first == "setup" || first == "--complete")
             return runHeadless(argc, argv);
     }
 
     QGuiApplication app(argc, argv);
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.2.0");
+    app.setApplicationVersion("0.2.1");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.

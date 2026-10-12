@@ -114,8 +114,9 @@ cat >"$module" <<LUA
 -- Quick Entry from anywhere: press it again to save and start the next task.
 o.bind("$key", "Precrime quick entry", "precrime --quick")
 
--- Quick Entry and Settings float, centred, like the reference app's panels.
-o.window({ class = "^precrime\$", title = "^Precrime Quick Entry\$" }, { float = true, center = true, size = { 620, 340 } })
+-- Quick Entry and Settings float, centred, like the reference app's panels. Quick Entry
+-- sizes itself to its contents.
+o.window({ class = "^precrime\$", title = "^Precrime Quick Entry\$" }, { float = true, center = true })
 o.window({ class = "^precrime\$", title = "^Precrime Settings\$" }, { float = true, center = true, size = { 760, 580 } })
 
 -- Keep Precrime running in the background after sign-in, so alarms arrive

@@ -63,6 +63,9 @@ pc done 347                           # complete by number
 pc help
 ```
 
+Tab completion for `precrime` and `pc` comes with the package for bash, zsh and fish: `pc ls <Tab>`
+offers your lists and `pc done <Tab>` your open tasks.
+
 ## How it works
 
 - **Focus lists.** *All*, *Today*, *Starred*, *Scheduled* and *Done* gather tasks from every list.

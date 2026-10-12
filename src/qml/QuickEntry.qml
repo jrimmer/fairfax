@@ -17,6 +17,7 @@ Window {
     width: 600
     height: body.implicitHeight + 28
     minimumWidth: 420
+    minimumHeight: 240
     color: theme.raised
     flags: Qt.Window | Qt.WindowStaysOnTopHint
 
@@ -82,11 +83,12 @@ Window {
     Shortcut { sequence: "Ctrl+Return"; onActivated: root.save(true) }
     Shortcut { sequence: "Shift+Return"; onActivated: root.save(false) }
 
+    // The layout fills whatever size the compositor gives the window; the
+    // notes area takes up any extra height, so the buttons stay at the bottom.
     ColumnLayout {
         id: body
-        x: 14
-        y: 14
-        width: parent.width - 28
+        anchors.fill: parent
+        anchors.margins: 14
         spacing: 10
 
         RowLayout {
@@ -187,6 +189,8 @@ Window {
 
         Rectangle {
             Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 60
             implicitHeight: 80
             radius: 8
             color: theme.notes
