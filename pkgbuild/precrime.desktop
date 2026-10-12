@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Precrime
+GenericName=Task Manager
+Comment=A keyboard-first task manager, modelled on the reference app
+Exec=precrime
+Icon=precrime
+Terminal=false
+Categories=Office;ProjectManagement;Utility;
+Keywords=todo;tasks;gtd;taskapp;
+StartupWMClass=precrime
