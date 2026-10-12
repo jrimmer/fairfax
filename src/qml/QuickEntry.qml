@@ -91,6 +91,9 @@ Window {
 
     // ---------------------------------------------------------------- helpers
 
+    // Tag matching ignores case and accents, so "cafe" finds "Café".
+    function fold(s) { return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() }
+
     function blankRule() {
         return { frequency: 0, interval: 1, from: 0, weekdays: 0, monthOrdinal: 0, monthWeekday: 1, endType: 0, endCount: 1, endDate: "" }
     }
@@ -883,7 +886,7 @@ Window {
                             onTextEdited: {
                                 if (text.endsWith(",")) { accept(text.slice(0, -1)); return }
                                 const q = text.toLowerCase()
-                                matches = q ? backend.tagNames.filter(n => n.toLowerCase().startsWith(q) && !root.tags.includes(n)).slice(0, 6) : []
+                                matches = q ? backend.tagNames.filter(n => root.fold(n).startsWith(root.fold(q)) && !root.tags.includes(n)).slice(0, 6) : []
                                 if (matches.length) tagPopup.open(); else tagPopup.close()
                             }
                             Keys.onReturnPressed: (e) => {

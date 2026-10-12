@@ -10,6 +10,8 @@ Flow {
     property int taskId: 0
     property var tags: []
     property var matches: []
+    // Tag matching ignores case and accents, so "cafe" finds "Café".
+    function fold(s) { return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() }
     spacing: 5
 
     Icon { name: "tag"; size: 15; color: theme.faint; height: 22 }
@@ -51,7 +53,7 @@ Flow {
         onTextEdited: {
             if (text.endsWith(",")) { accept(text.slice(0, -1)); return }
             const q = text.toLowerCase()
-            root.matches = q ? backend.tagNames.filter(n => n.toLowerCase().startsWith(q)).slice(0, 6) : []
+            root.matches = q ? backend.tagNames.filter(n => root.fold(n).startsWith(root.fold(q))).slice(0, 6) : []
             if (root.matches.length) popup.open(); else popup.close()
         }
         Keys.onReturnPressed: accept(root.matches.length && popup.visible ? root.matches[0] : text)
