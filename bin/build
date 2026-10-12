@@ -6,6 +6,6 @@ mkdir -p "$ROOT/build"
 cd "$ROOT/build"
 
 qmake6 "$ROOT/precrime.pro"
-make -j"$(nproc)"
+make -j"${PRECRIME_JOBS:-$(nproc)}"
 
 echo "Built $ROOT/build/precrime"

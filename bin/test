@@ -6,5 +6,5 @@ mkdir -p "$ROOT/build/tests"
 cd "$ROOT/build/tests"
 
 qmake6 "$ROOT/tests/precrime_tests.pro"
-make -j"$(nproc)"
+make -j"${PRECRIME_JOBS:-$(nproc)}"
 QT_QPA_PLATFORM=offscreen ./precrime_tests
