@@ -18,6 +18,10 @@ Item {
     readonly property real lineHeight: Math.round(backend.fontSize * [2.05, 2.5, 2.8][backend.density])
     readonly property bool showNotes: !!r.notesPreview && (backend.showNotesPreview || backend.density === 2)
 
+    // "Show overdue in red": off, overdue tasks use the ordinary colours.
+    readonly property color overdueColor: backend.overdueInRed ? theme.overdue : theme.muted
+    readonly property color overdueTitle: backend.overdueInRed ? theme.overdue : theme.foreground
+
     readonly property real indent: (r.depth || 0) * 28
     readonly property bool hasCrumb: !!r.breadcrumb
     height: lineHeight + (hasCrumb ? backend.fontSize + 2 : 0) + (showNotes ? backend.fontSize + 2 : 0)
@@ -77,7 +81,7 @@ Item {
             radius: 9
             color: root.r.completed ? theme.muted : "transparent"
             border.width: 1.3
-            border.color: root.r.overdue ? theme.overdue : theme.faint
+            border.color: root.r.overdue && backend.overdueInRed ? theme.overdue : theme.faint
             Icon { anchors.centerIn: parent; visible: root.r.completed; name: "check"; size: 12; stroke: 2.4; color: theme.background }
         }
         Icon {
@@ -85,7 +89,7 @@ Item {
             visible: root.r.type !== 2 && root.r.repeating
             name: root.r.completed ? "done" : "repeat"
             size: 19
-            color: root.r.overdue ? theme.overdue : theme.muted
+            color: root.r.overdue ? root.overdueColor : theme.muted
         }
         Rectangle {
             anchors.fill: parent
@@ -129,7 +133,7 @@ Item {
         font.strikeout: root.r.completed
         color: !root.r.title ? theme.faint
              : root.r.completed ? theme.muted
-             : root.r.overdue ? theme.overdue : theme.foreground
+             : root.r.overdue ? root.overdueTitle : theme.foreground
     }
 
     Text {
@@ -186,7 +190,8 @@ Item {
         }
 
         Repeater {
-            model: root.width > 760 || root.revealNames ? (root.r.tags || []).slice(0, 3) : []
+            // "Always show tag names": off, tags are an icon until Alt is held.
+            model: (root.width > 760 && backend.showTagNames) || root.revealNames ? (root.r.tags || []).slice(0, 3) : []
             Rectangle {
                 required property string modelData
                 anchors.verticalCenter: parent.verticalCenter
@@ -198,7 +203,7 @@ Item {
             }
         }
         Icon {
-            visible: root.width <= 760 && (root.r.tags || []).length > 0
+            visible: !((root.width > 760 && backend.showTagNames) || root.revealNames) && (root.r.tags || []).length > 0
             anchors.verticalCenter: parent.verticalCenter
             name: "tag"; size: 14; color: theme.faint
         }
@@ -253,7 +258,7 @@ Item {
                 text: root.r.dueText || ""
                 font.pixelSize: root.r.startText ? backend.fontSize - 3 : backend.fontSize - 2
                 color: root.r.completed ? theme.faint
-                     : root.r.dueTone === "overdue" ? theme.overdue
+                     : root.r.dueTone === "overdue" ? root.overdueColor
                      : root.r.dueTone === "today" ? theme.today : theme.muted
             }
         }

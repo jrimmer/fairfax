@@ -64,6 +64,8 @@ bool Store::open(const QString &path, QString *error) {
     return true;
 }
 
+int Store::schemaVersion() { return SchemaVersion; }
+
 bool Store::migrate(QString *error) {
     QSqlQuery q(m_db);
     q.exec("PRAGMA user_version");

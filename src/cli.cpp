@@ -27,14 +27,7 @@ QString paint(const QString &text, const char *code) {
     return colour() ? QStringLiteral("\x1b[%1m%2\x1b[0m").arg(code, text) : text;
 }
 
-ScheduleSettings settingsOf(const Store &store) {
-    ScheduleSettings s;
-    s.todayIncludesOverdue = store.setting("today.overdue", true).toBool();
-    s.todayIncludesStarred = store.setting("today.starred", false).toBool();
-    s.todayIncludesStillWorking = store.setting("today.stillWorking", true).toBool();
-    s.overdueUsesDueTime = store.setting("tasks.overdueUsesTime", false).toBool();
-    return s;
-}
+ScheduleSettings settingsOf(const Store &store) { return ScheduleSettings::fromStore(store); }
 
 // One line per task: number, title, then date, list and markers.
 QString line(const Store &store, const Task &t, const QDateTime &now, const ScheduleSettings &s) {

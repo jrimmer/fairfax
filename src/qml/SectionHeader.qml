@@ -23,7 +23,7 @@ Item {
         anchors.bottomMargin: 8
         visible: !root.renaming
         text: (root.r.title || "").toUpperCase()
-        color: root.r.tone === "overdue" ? theme.overdue
+        color: root.r.tone === "overdue" ? (backend.overdueInRed ? theme.overdue : theme.foreground)
              : root.r.tone === "list" ? theme.listColor(root.r.color)
              : root.r.tone === "progress" ? theme.today : theme.foreground
         font.pixelSize: backend.fontSize - 1
@@ -54,7 +54,7 @@ Item {
         anchors.rightMargin: root.margin
         anchors.baseline: title.baseline
         text: root.r.count || ""
-        color: root.r.tone === "overdue" ? theme.overdue : theme.faint
+        color: root.r.tone === "overdue" && backend.overdueInRed ? theme.overdue : theme.faint
         font.pixelSize: backend.fontSize - 2
     }
     readonly property bool isListSection: (root.r.sectionId || 0) > 0

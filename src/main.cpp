@@ -36,6 +36,7 @@
 #include "alarms.h"
 #include "automation.h"
 #include "calendar.h"
+#include "diagnostics.h"
 #include "cli.h"
 #include "exchange.h"
 #include "hyprland.h"
@@ -166,17 +167,17 @@ int runHeadless(int argc, char *argv[]) {
     if (mode == "add")
         return Cli::add(store, args.mid(2), out, err);
     if (mode == "--waybar") {
-        // A Waybar custom module: overdue and due-today counts, like the reference app's
-        // Dock badge.
-        ScheduleSettings settings;
-        settings.todayIncludesOverdue = store.setting("today.overdue", true).toBool();
-        settings.todayIncludesStarred = store.setting("today.starred", false).toBool();
-        settings.todayIncludesStillWorking = store.setting("today.stillWorking", true).toBool();
+        // A Waybar custom module: the count the "Badge shows" setting picks
+        // (overdue, due today or both), like the reference app's Dock badge.
+        const ScheduleSettings settings = ScheduleSettings::fromStore(store);
         const ViewBuilder views(store, QDateTime::currentDateTime(), settings);
         const auto today = views.countsForFocus(Source::Today);
-        const QString text = today.overdue ? QStringLiteral("%1 | %2").arg(today.overdue).arg(today.undone)
-                                           : QString::number(today.undone);
-        const QJsonObject json{{"text", today.undone ? text : QString()},
+        const QString metric = store.setting("alerts.badge", "both").toString();
+        const int count = views.badgeCount(metric);
+        const int dueToday = settings.todayIncludesOverdue ? today.undone - today.overdue : today.undone;
+        const QString text = metric == "both" && today.overdue ? QStringLiteral("%1 | %2").arg(today.overdue).arg(dueToday)
+                                                               : QString::number(count);
+        const QJsonObject json{{"text", count ? text : QString()},
                                {"tooltip", QStringLiteral("%1 overdue, %2 in Today").arg(today.overdue).arg(today.undone)},
                                {"class", today.overdue ? "overdue" : today.undone ? "due" : "clear"}};
         out << QJsonDocument(json).toJson(QJsonDocument::Compact) << Qt::endl;
@@ -227,6 +228,7 @@ int main(int argc, char *argv[]) {
     // QApplication rather than QGuiApplication only for the tray icon's
     // menu, which Qt builds with widgets; the window itself is all QML.
     QApplication app(argc, argv);
+    Diagnostics::install();
     app.setApplicationName("precrime");
     app.setApplicationVersion("0.4.0");
 

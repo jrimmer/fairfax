@@ -43,6 +43,12 @@ class Backend : public QObject {
     Q_PROPERTY(int contentWidth READ contentWidth NOTIFY settingsChanged)
     Q_PROPERTY(bool showNotesPreview READ showNotesPreview NOTIFY settingsChanged)
     Q_PROPERTY(bool showListNames READ showListNames NOTIFY settingsChanged)
+    Q_PROPERTY(bool overdueInRed READ overdueInRed NOTIFY settingsChanged)
+    Q_PROPERTY(bool showTagNames READ showTagNames NOTIFY settingsChanged)
+    Q_PROPERTY(bool quickLookEnabled READ quickLookEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(bool monthDividers READ monthDividers NOTIFY settingsChanged)
+    // 0 for Sunday to 6 for Saturday, as in Qt Quick's Locale.
+    Q_PROPERTY(int firstDayOfWeek READ firstDayOfWeek NOTIFY settingsChanged)
     Q_PROPERTY(bool focusOn READ focusOn NOTIFY viewChanged)
     Q_PROPERTY(QStringList focusConditions READ focusConditions NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsSmart READ sourceIsSmart NOTIFY viewChanged)
@@ -80,6 +86,11 @@ public:
     int contentWidth() const { return m_store->setting("appearance.contentWidth", 980).toInt(); }
     bool showNotesPreview() const { return m_store->setting("appearance.notesPreview", false).toBool(); }
     bool showListNames() const { return m_store->setting("appearance.listNames", false).toBool(); }
+    bool overdueInRed() const { return m_store->setting("appearance.overdueRed", true).toBool(); }
+    bool showTagNames() const { return m_store->setting("appearance.tagNames", true).toBool(); }
+    bool quickLookEnabled() const { return m_store->setting("tasks.quickLook", true).toBool(); }
+    bool monthDividers() const { return m_store->setting("appearance.monthDividers", true).toBool(); }
+    int firstDayOfWeek() const { return Schedule::resolveWeekStart(m_store->setting("general.weekStart", 0).toInt()) % 7; }
 
     QString sourceKey() const { return m_source.key(); }
     QString sourceTitle() const;
@@ -322,6 +333,12 @@ public:
     Q_INVOKABLE bool saveBackupCopy(const QString &path, const QString &destination);
     Q_INVOKABLE bool deleteBackup(const QString &path);
     Q_INVOKABLE QString backupFolder() const;
+
+    // Diagnostics pane: versions, paths, counts and the latest warnings as
+    // text to read or copy for a bug report. `extra` is appended as is (the
+    // sync providers' statuses, which only the window knows).
+    Q_INVOKABLE QString diagnosticsReport(const QString &extra = {}) const;
+    Q_INVOKABLE void copyDiagnostics(const QString &extra = {});
 
     // Import and export (paths come from the portal file picker).
     Q_INVOKABLE void exportTo(const QString &path, const QString &format, bool selectionOnly = false);

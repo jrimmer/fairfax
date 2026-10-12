@@ -22,11 +22,17 @@ Window {
 
     property int pane: 0
     property string copySource
-    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation"]
+    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"]
 
     function value(key, fallback) {
         const v = backend.setting(key).value
         return v === undefined || v === null || v === "" ? fallback : v
+    }
+    // Every half hour of the day, in minutes after midnight, for time pickers.
+    readonly property var timeSteps: Array.from({ length: 48 }, (_, i) => i * 30)
+    function timeLabel(minutes) {
+        const m = minutes % 60
+        return ((Math.floor(minutes / 60) % 12) || 12) + ":" + (m < 10 ? "0" : "") + m + " " + (minutes < 720 ? "AM" : "PM")
     }
     function bool(key, fallback) {
         const v = value(key, fallback)
@@ -175,6 +181,18 @@ Window {
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
                     Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Precrime takes the free one. With tiled windows Hyprland places it as usual." }
                     Toggle { key: "general.trayIcon"; fallback: true; label: "Show Precrime in the bar's tray"; note: "Its menu lists today's tasks, with New Task, Find, Sync and Quit." }
+                    RowLayout {
+                        Label { text: "Week starts on"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            // 0 follows the system locale; 1 to 7 are Qt's Monday to Sunday.
+                            readonly property var days: [0, 1, 7, 6]
+                            model: ["Automatic (" + Qt.locale().dayName(Qt.locale().firstDayOfWeek, Locale.LongFormat) + ")", "Monday", "Sunday", "Saturday"]
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            currentIndex: Math.max(0, days.indexOf(Number(root.value("general.weekStart", 0))))
+                            onActivated: (i) => backend.setSetting("general.weekStart", days[i])
+                        }
+                    }
+                    Hint { Layout.topMargin: 0; text: "Used by this-week searches and Focus Filter, the mini calendar, date pickers and weekly repeats. Precrime is English only; month and day names are English and dates are laid out for the system locale (" + Qt.locale().name + ")." }
                     Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
                     Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }
                     Hint { text: "On Omarchy, run  precrime setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Precrime section in the Super+Space menu, and starts Precrime at sign-in so alarms arrive. Undo with  precrime setup omarchy --remove." }
@@ -228,9 +246,13 @@ Window {
                             onActivated: (i) => backend.setSetting("appearance.calendarStyle", styles[i])
                         }
                     }
+                    Toggle { key: "appearance.monthDividers"; fallback: true; label: "Show month dividers in the mini calendar" }
                     Toggle { key: "appearance.friendlyDates"; fallback: true; label: "Use friendly dates (Today, Tomorrow, In 28 days)" }
                     Toggle { key: "appearance.notesPreview"; fallback: false; label: "Show notes under tasks" }
                     Toggle { key: "appearance.listNames"; fallback: false; label: "Always show list names"; note: "Otherwise hold Alt in the task list to reveal list and tag names." }
+                    Toggle { key: "appearance.tagNames"; fallback: true; label: "Always show tag names"; note: "Off shows a tag icon instead; hold Alt to reveal the names. Narrow windows always show the icon." }
+                    Toggle { key: "appearance.overdueRed"; fallback: true; label: "Show overdue tasks in red" }
+                    Toggle { key: "appearance.headingDurations"; fallback: true; label: "Show durations in headings"; note: "The time still to do under each heading, such as 2h 45m." }
                     Hint { text: "Colours follow your Omarchy theme, light or dark, and change with it." }
                 }
 
@@ -257,6 +279,7 @@ Window {
                             onActivated: (i) => backend.setSetting("tasks.completedWindow", minutes[i])
                         }
                     }
+                    Toggle { key: "tasks.completedRuleSubtasks"; fallback: true; label: "Apply the completed rule to sub-tasks"; note: "Off keeps completed project sub-tasks in view, whatever the setting above says." }
                     RowLayout {
                         Label { text: "Default list"; Layout.preferredWidth: 220 }
                         ComboBox {
@@ -279,8 +302,42 @@ Window {
                             onActivated: (i) => backend.setSetting("tasks.defaultDueOffset", days[i])
                         }
                     }
+                    // Quick Entry only, or everywhere but Quick Entry: never both.
+                    CheckBox {
+                        enabled: Number(root.value("tasks.defaultDueOffset", -1)) >= 0
+                        text: "Only use the default due date in Quick Entry"
+                        checked: root.bool("tasks.defaultDueQuickEntryOnly", false)
+                        onToggled: {
+                            backend.setSetting("tasks.defaultDueQuickEntryOnly", checked)
+                            if (checked) backend.setSetting("tasks.defaultDueNotQuickEntry", false)
+                        }
+                    }
+                    CheckBox {
+                        enabled: Number(root.value("tasks.defaultDueOffset", -1)) >= 0
+                        text: "Do not use the default due date in Quick Entry"
+                        checked: root.bool("tasks.defaultDueNotQuickEntry", false)
+                        onToggled: {
+                            backend.setSetting("tasks.defaultDueNotQuickEntry", checked)
+                            if (checked) backend.setSetting("tasks.defaultDueQuickEntryOnly", false)
+                        }
+                    }
                     Toggle { key: "tasks.todayDue"; fallback: true; label: "Use today's date in the Today list" }
-                    Toggle { key: "tasks.useDefaultDueTime"; fallback: false; label: "Give new due dates the default due time (Alerts pane)" }
+                    RowLayout {
+                        CheckBox {
+                            id: useDueTime
+                            text: "Default due time"
+                            checked: root.bool("tasks.useDefaultDueTime", false)
+                            onToggled: backend.setSetting("tasks.useDefaultDueTime", checked)
+                        }
+                        ComboBox {
+                            enabled: useDueTime.checked
+                            model: root.timeSteps.map(m => root.timeLabel(m))
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            currentIndex: Math.max(0, root.timeSteps.indexOf(Number(root.value("tasks.defaultDueTime", 540))))
+                            onActivated: (i) => backend.setSetting("tasks.defaultDueTime", root.timeSteps[i])
+                        }
+                    }
+                    Hint { Layout.topMargin: 0; text: "The time a task gets the first time you give it a due date without choosing one. Leave it off to keep dates without a clock time." }
                     RowLayout {
                         Label { text: "Auto-delete completed tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
@@ -302,6 +359,7 @@ Window {
                             onEditingFinished: backend.setSetting("tasks.dueTimeChips", text.trim())
                         }
                     }
+                    Toggle { key: "tasks.quickLook"; fallback: true; label: "Enable Quick Look for tasks"; note: "Space on a task opens a zoomed-in view of it." }
                 }
 
                 // Today & Lists
@@ -311,8 +369,11 @@ Window {
                     Toggle { key: "today.overdue"; fallback: true; label: "Include overdue items in Today" }
                     Toggle { key: "today.starred"; fallback: false; label: "Include starred items in Today" }
                     Toggle { key: "today.stillWorking"; fallback: true; label: "Include 'Still Working On' tasks in Today"; note: "Tasks whose start date has passed stay in Today until done." }
+                    Toggle { key: "lists.startedVisible"; fallback: true; label: "Keep started tasks visible in All and lists"; note: "Off hides a task whose start date has passed unless it is due today or overdue. Today has its own setting above." }
+                    Toggle { key: "focus.subtasksSeparately"; fallback: true; label: "Always list matched sub-tasks separately"; note: "In Focus and Smart Lists. Off hides a project's sub-tasks when the project is in the list too." }
                     Toggle { key: "sort.groupedDates"; fallback: false; label: "Sorting by due date uses grouped dates"; note: "Today, Tomorrow, Next 7 Days and Future instead of one heading per day." }
                     Toggle { key: "sort.starredAboveHigh"; fallback: false; label: "Sort starred items above high priority" }
+                    Toggle { key: "sort.listOrder"; fallback: true; label: "Sorting by list uses your list order"; note: "Off sorts the sections A to Z by list name." }
                     RowLayout {
                         Label { text: "Counts on lists"; Layout.preferredWidth: 260 }
                         ComboBox {
@@ -332,8 +393,9 @@ Window {
                     RowLayout {
                         Label { text: "Alerts on date-only tasks fire at"; Layout.preferredWidth: 260 }
                         ComboBox {
-                            readonly property var minutes: [360, 420, 480, 540, 600, 720]
-                            model: ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "12:00 PM"]
+                            readonly property var minutes: root.timeSteps
+                            model: minutes.map(m => root.timeLabel(m))
+                            implicitContentWidthPolicy: ComboBox.WidestText
                             currentIndex: Math.max(0, minutes.indexOf(Number(root.value("tasks.defaultDueTime", 540))))
                             onActivated: (i) => backend.setSetting("tasks.defaultDueTime", minutes[i])
                         }
@@ -348,6 +410,18 @@ Window {
                         }
                     }
                     Hint { text: "Only alerts set to Message with Sound repeat; a plain Message is shown once." }
+
+                    RowLayout {
+                        Label { text: "Badge shows"; Layout.preferredWidth: 260 }
+                        ComboBox {
+                            readonly property var metrics: ["both", "overdue", "today", "none"]
+                            model: ["Overdue + Today", "Overdue", "Today", "None"]
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            currentIndex: Math.max(0, metrics.indexOf(String(root.value("alerts.badge", "both"))))
+                            onActivated: (i) => backend.setSetting("alerts.badge", metrics[i])
+                        }
+                    }
+                    Hint { Layout.topMargin: 0; text: "The number on the tray icon and in the Waybar module (precrime --waybar). Today counts tasks due today, not overdue ones." }
 
                     Label { text: "Default Reminders"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
@@ -593,6 +667,39 @@ Window {
                     Hint {
                         Layout.topMargin: 0
                         text: "Let Claude work with your tasks: add Precrime as an MCP server. In Claude Code run:\n  claude mcp add precrime -- precrime mcp\n\nScripts can use the same commands from a terminal:\n  precrime ctl help\n  precrime ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like precrime://x-callback-url/add?task=Buy%20milk open in the app.\n\nWaybar: add a custom module that runs  precrime --waybar  every 60 seconds to show overdue and due-today counts."
+                    }
+                }
+
+                // Diagnostics
+                ColumnLayout {
+                    id: diag
+                    visible: root.pane === 10
+                    Layout.fillWidth: true
+                    // Rebuilt each time the pane opens, so the log is current.
+                    property string report: ""
+                    readonly property string syncStatus: [
+                        "Git sync: " + (gitSync ? gitSync.status : "off"),
+                        "Todoist: " + (todoist ? todoist.status : "off"),
+                        "Folder sync: " + (folderSync ? folderSync.status : "off"),
+                        "WebDAV sync: " + (webDavSync ? webDavSync.status : "off")
+                    ].join("\n")
+                    onVisibleChanged: if (visible) report = backend.diagnosticsReport(syncStatus)
+                    Hint { Layout.topMargin: 0; text: "What to include in a bug report. Nothing here leaves your machine unless you copy it." }
+                    Frame {
+                        Layout.fillWidth: true
+                        Text {
+                            width: parent.width
+                            text: diag.report
+                            color: theme.foreground
+                            font.family: theme.monoFont
+                            font.pixelSize: backend.fontSize - 2
+                            wrapMode: Text.WrapAnywhere
+                            textFormat: Text.PlainText
+                        }
+                    }
+                    RowLayout {
+                        Button { text: "Copy Diagnostics"; onClicked: backend.copyDiagnostics(diag.syncStatus) }
+                        Button { text: "Refresh"; flat: true; onClicked: diag.report = backend.diagnosticsReport(diag.syncStatus) }
                     }
                 }
 

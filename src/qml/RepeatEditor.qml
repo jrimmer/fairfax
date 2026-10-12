@@ -270,7 +270,7 @@ Popup {
                 model: 7
                 Pill {
                     required property int index
-                    readonly property int day: (index + Qt.locale().firstDayOfWeek + 6) % 7  // Sunday-based locale index to Monday-based bit.
+                    readonly property int day: (index + backend.firstDayOfWeek + 6) % 7  // Sunday-based locale index to Monday-based bit.
                     minWidth: 34
                     label: root.weekdayNames[day][0]
                     on: ((root.rule.weekdays || 0) >> day) & 1

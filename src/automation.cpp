@@ -317,15 +317,7 @@ struct Automation::Impl {
 
     QDateTime now() const { return a.m_now.isValid() ? a.m_now : QDateTime::currentDateTime(); }
 
-    ScheduleSettings settings() const {
-        ScheduleSettings c;
-        c.todayIncludesOverdue = s.setting("today.overdue", true).toBool();
-        c.todayIncludesStarred = s.setting("today.starred", false).toBool();
-        c.todayIncludesStillWorking = s.setting("today.stillWorking", true).toBool();
-        c.overdueUsesDueTime = s.setting("tasks.overdueUsesTime", false).toBool();
-        c.friendlyDates = s.setting("appearance.friendlyDates", true).toBool();
-        return c;
-    }
+    ScheduleSettings settings() const { return ScheduleSettings::fromStore(s); }
 
     ViewBuilder &views() {
         if (!m_views)

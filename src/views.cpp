@@ -153,8 +153,8 @@ bool ViewBuilder::matchesFocusCondition(const Task &t, const QString &c, const Q
     if (c == "today") return Schedule::isDueToday(t, now);
     if (c == "tomorrow") return t.dueDate == today.addDays(1);
     if (c == "thisweek") {
-        const QDate monday = today.addDays(1 - today.dayOfWeek());
-        return t.dueDate.isValid() && t.dueDate >= monday && t.dueDate <= monday.addDays(6);
+        const QDate first = Schedule::weekStartOf(today, s.weekStart);
+        return t.dueDate.isValid() && t.dueDate >= first && t.dueDate <= first.addDays(6);
     }
     if (c == "next3") return dueWithin(3);
     if (c == "next7") return dueWithin(7);
@@ -266,6 +266,10 @@ bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewO
     const bool scheduledView = source.kind == Source::Scheduled || source.kind == Source::Done;
     if (!scheduledView && !o.showScheduled && Schedule::isScheduled(t, m_now) && !t.completed)
         return false;
+    // "Hide started tasks unless due today" covers All and the lists; Today
+    // has its own "Still Working On" setting.
+    if ((source.kind == Source::All || source.kind == Source::List) && Schedule::startedHidden(t, m_now, m_settings))
+        return false;
     if (!o.tagFilter.isEmpty()) {
         bool any = false;
         for (auto id : t.tagIds)
@@ -310,11 +314,22 @@ bool ViewBuilder::completedVisible(const Task &t, const Source &source, const Vi
     return t.completedAt.isValid() && t.completedAt.secsTo(m_now) <= qint64(o.completedWindowMinutes) * 60;
 }
 
-void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
-    const auto lists = orderedLists();
-    QHash<qint64, int> listRank;
+QHash<qint64, int> ViewBuilder::listRanks(bool listOrder) const {
+    auto lists = orderedLists();
+    if (!listOrder) {
+        std::stable_sort(lists.begin(), lists.end(), [](const TaskList &a, const TaskList &b) {
+            const int byName = QString::localeAwareCompare(a.name, b.name);
+            return byName != 0 ? byName < 0 : a.id < b.id;
+        });
+    }
+    QHash<qint64, int> rank;
     for (int i = 0; i < lists.size(); ++i)
-        listRank.insert(lists.at(i).id, i);
+        rank.insert(lists.at(i).id, i);
+    return rank;
+}
+
+void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort, bool listOrder) const {
+    const QHash<qint64, int> listRank = listRanks(listOrder);
     auto dueKey = [](const Task &t) {
         const QDateTime k = Schedule::dueSortKey(t);
         return k.isValid() ? k.toSecsSinceEpoch() : RankLast;
@@ -376,10 +391,7 @@ void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort) const {
 
 QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort,
                                          const ViewOptions &options) const {
-    const auto lists = orderedLists();
-    QHash<qint64, int> listRank;
-    for (int i = 0; i < lists.size(); ++i)
-        listRank.insert(lists.at(i).id, i);
+    const QHash<qint64, int> listRank = listRanks(options.listOrder);
 
     auto place = [&](const Task &t) -> Placement {
         if (!sort.separated || source.kind == Source::Project) {
@@ -508,7 +520,7 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
 
     for (auto &s : sections) {
         QVector<Task> sectionItems = itemsOf.value(s.key);
-        sortItems(sectionItems, sort);
+        sortItems(sectionItems, sort, options.listOrder);
         for (const auto &t : sectionItems) {
             TaskRow row;
             row.taskId = t.id;
@@ -524,6 +536,10 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
             }
         }
     }
+    // A list sorted by duration already names the duration in each heading.
+    if (sort.field == SortField::Duration && sort.separated && source.kind != Source::Project)
+        for (auto &s : sections)
+            s.durationTotal = 0;
     return sections;
 }
 
@@ -599,6 +615,15 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         items.append(t);
     }
 
+    if (flat && !o.subtasksSeparately) {
+        QSet<qint64> present;
+        for (const auto &t : items)
+            present.insert(t.id);
+        items.erase(std::remove_if(items.begin(), items.end(),
+                                   [&](const Task &t) { return t.parentId && present.contains(t.parentId); }),
+                    items.end());
+    }
+
     QVector<Section> sections = sectionize(items, source, sort, o);
     if (sort.field == SortField::Section && sort.separated && source.kind == Source::List) {
         for (const auto &sec : m_store.sectionsOf(source.id)) {
@@ -644,7 +669,7 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
                     if (inherit && (!inheritedRule.matches(c, queryContext(o)) || !inSmartRange(c, o.inheritedRange)))
                         continue;
                     // Completed checklist items stay with their checklist.
-                    if (t.type == TaskType::Project && !completedVisible(c, source, o, policy))
+                    if (t.type == TaskType::Project && o.completedRuleSubtasks && !completedVisible(c, source, o, policy))
                         continue;
                     nested.append(TaskRow{c.id, 1, false, 0});
                 }
@@ -659,12 +684,25 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
     return sections;
 }
 
+int ViewBuilder::badgeCount(const QString &metric) const {
+    if (metric == "none")
+        return 0;
+    const ListCounts today = countsForFocus(Source::Today);
+    // Today's own count includes what is overdue when Today shows it.
+    const int dueToday = m_settings.todayIncludesOverdue ? today.undone - today.overdue : today.undone;
+    if (metric == "overdue")
+        return today.overdue;
+    if (metric == "today")
+        return dueToday;
+    return today.overdue + dueToday;
+}
+
 ListCounts ViewBuilder::countsForList(qint64 listId) const {
     ListCounts c;
     for (const auto &t : m_store.tasks()) {
         if (t.listId != listId || t.parentId || t.completed || t.deleted || isPaused(t))
             continue;
-        if (Schedule::isScheduled(t, m_now))
+        if (Schedule::isScheduled(t, m_now) || Schedule::startedHidden(t, m_now, m_settings))
             continue;
         ++c.undone;
         if (Schedule::isOverdue(t, m_now, m_settings))
@@ -685,6 +723,8 @@ ListCounts ViewBuilder::countsForFocus(int kind) const {
         if (t.parentId && m_store.task(t.parentId).type != TaskType::Project)
             continue;
         if (kind != Source::Scheduled && Schedule::isScheduled(t, m_now))
+            continue;
+        if (kind == Source::All && Schedule::startedHidden(t, m_now, m_settings))
             continue;
         if (!matchesFocus(t, kind))
             continue;

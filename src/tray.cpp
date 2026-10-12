@@ -4,6 +4,8 @@
 #include <QCoreApplication>
 #include <QIcon>
 #include <QMenu>
+#include <QPainter>
+#include <QPixmap>
 #include <QSystemTrayIcon>
 
 #include "backend.h"
@@ -15,13 +17,30 @@ namespace {
 
 constexpr int MaxTasks = 12;
 
-ScheduleSettings settingsOf(const Store &store) {
-    ScheduleSettings s;
-    s.todayIncludesOverdue = store.setting("today.overdue", true).toBool();
-    s.todayIncludesStarred = store.setting("today.starred", false).toBool();
-    s.todayIncludesStillWorking = store.setting("today.stillWorking", true).toBool();
-    s.overdueUsesDueTime = store.setting("tasks.overdueUsesTime", false).toBool();
-    return s;
+ScheduleSettings settingsOf(const Store &store) { return ScheduleSettings::fromStore(store); }
+
+// The app icon with a red count in the corner, as the reference app badges its Dock icon;
+// no badge for zero.
+QIcon badgeIcon(int count) {
+    const QIcon base = QIcon::fromTheme("precrime", QIcon(":/icon.svg"));
+    if (count <= 0)
+        return base;
+    QPixmap pixmap = base.pixmap(64, 64);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QString text = count > 99 ? QStringLiteral("99+") : QString::number(count);
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPixelSize(text.size() > 2 ? 24 : 30);
+    painter.setFont(font);
+    const int width = qMax(34, painter.fontMetrics().horizontalAdvance(text) + 14);
+    const QRect badge(pixmap.width() - width, pixmap.height() - 34, width, 34);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0xE5, 0x48, 0x4D));
+    painter.drawRoundedRect(badge, 17, 17);
+    painter.setPen(Qt::white);
+    painter.drawText(badge, Qt::AlignCenter, text);
+    return QIcon(pixmap);
 }
 
 }  // namespace
@@ -123,6 +142,9 @@ void Tray::rebuild() {
     m_menu->addSeparator();
     m_menu->addAction("Quit Precrime", qApp, &QCoreApplication::quit);
 
+    // The "Badge shows" setting picks the number drawn on the icon.
+    const int badge = views.badgeCount(m_store->setting("alerts.badge", "both").toString());
+    m_icon->setIcon(badgeIcon(badge));
     QString tip = QStringLiteral("Precrime — %1 today").arg(counts.undone);
     if (counts.overdue)
         tip += QStringLiteral(", %1 overdue").arg(counts.overdue);

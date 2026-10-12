@@ -9,15 +9,34 @@
 
 #include "model.h"
 
+class Store;
+
 struct ScheduleSettings {
     bool todayIncludesOverdue = true;
     bool todayIncludesStarred = false;
     bool todayIncludesStillWorking = true;
     bool overdueUsesDueTime = false;
     bool friendlyDates = true;
+    // "Include 'Still Working On' tasks" for All and lists: off hides a task
+    // whose start date has passed unless it is due today or overdue.
+    bool hideStartedTasks = false;
+    int weekStart = 1;  // Qt::DayOfWeek the week begins on; Monday unless the setting says otherwise.
+
+    // Reads every one of these from the settings table, so the app, the tray,
+    // the CLI and the waybar module agree.
+    static ScheduleSettings fromStore(const Store &store);
 };
 
 namespace Schedule {
+
+// The first day of the week for "general.weekStart": 0 follows the system
+// locale, 1 to 7 is a fixed Qt::DayOfWeek.
+int resolveWeekStart(int setting);
+// The first day of the week containing `date`.
+QDate weekStartOf(const QDate &date, int weekStart);
+
+// Started tasks that "hide unless due today" keeps out of All and lists.
+bool startedHidden(const Task &task, const QDateTime &now, const ScheduleSettings &settings);
 
 // A date-only deadline counts as the end of its day.
 QDateTime dueMoment(const Task &task);

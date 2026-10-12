@@ -23,6 +23,7 @@ public:
 
     bool open(const QString &path, QString *error = nullptr);
     QString path() const { return m_path; }
+    static int schemaVersion();
 
     const QHash<qint64, Task> &tasks() const { return m_tasks; }
     const QHash<qint64, TaskList> &lists() const { return m_lists; }

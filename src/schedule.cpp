@@ -2,6 +2,8 @@
 
 #include <QLocale>
 
+#include "store.h"
+
 namespace {
 
 const QLocale English(QLocale::English, QLocale::UnitedKingdom);
@@ -21,7 +23,35 @@ QString span(qint64 seconds) {
 
 }  // namespace
 
+ScheduleSettings ScheduleSettings::fromStore(const Store &store) {
+    ScheduleSettings s;
+    s.todayIncludesOverdue = store.setting("today.overdue", true).toBool();
+    s.todayIncludesStarred = store.setting("today.starred", false).toBool();
+    s.todayIncludesStillWorking = store.setting("today.stillWorking", true).toBool();
+    s.overdueUsesDueTime = store.setting("tasks.overdueUsesTime", false).toBool();
+    s.friendlyDates = store.setting("appearance.friendlyDates", true).toBool();
+    s.hideStartedTasks = !store.setting("lists.startedVisible", true).toBool();
+    s.weekStart = Schedule::resolveWeekStart(store.setting("general.weekStart", 0).toInt());
+    return s;
+}
+
 namespace Schedule {
+
+int resolveWeekStart(int setting) {
+    if (setting >= 1 && setting <= 7)
+        return setting;
+    return int(QLocale::system().firstDayOfWeek());
+}
+
+QDate weekStartOf(const QDate &date, int weekStart) {
+    return date.addDays(-((date.dayOfWeek() - weekStart + 7) % 7));
+}
+
+bool startedHidden(const Task &t, const QDateTime &now, const ScheduleSettings &s) {
+    if (!s.hideStartedTasks || t.completed || t.parentId || !t.startDate.isValid() || t.startDate >= now.date())
+        return false;
+    return !isDueToday(t, now) && !isOverdue(t, now, s);
+}
 
 QDateTime dueMoment(const Task &t) {
     if (!t.dueDate.isValid())

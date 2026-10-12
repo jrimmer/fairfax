@@ -19,6 +19,7 @@
 
 #include "dateparse.h"
 #include "alarms.h"
+#include "diagnostics.h"
 #include "automation.h"
 #include "exchange.h"
 #include "query.h"
@@ -105,15 +106,7 @@ Backend::Backend(Store *store, QObject *parent)
 
 // ---------------------------------------------------------------- settings
 
-ScheduleSettings Backend::scheduleSettings() const {
-    ScheduleSettings s;
-    s.todayIncludesOverdue = m_store->setting("today.overdue", true).toBool();
-    s.todayIncludesStarred = m_store->setting("today.starred", false).toBool();
-    s.todayIncludesStillWorking = m_store->setting("today.stillWorking", true).toBool();
-    s.overdueUsesDueTime = m_store->setting("tasks.overdueUsesTime", false).toBool();
-    s.friendlyDates = m_store->setting("appearance.friendlyDates", true).toBool();
-    return s;
-}
+ScheduleSettings Backend::scheduleSettings() const { return ScheduleSettings::fromStore(*m_store); }
 
 SortSpec Backend::sortSpec() const {
     SortSpec spec;
@@ -3098,6 +3091,56 @@ QString Backend::backupFolder() const {
     return QFileInfo(m_store->path()).absolutePath() + "/backups";
 }
 
+QString Backend::diagnosticsReport(const QString &extra) const {
+    int open = 0, done = 0, scheduled = 0, subtasks = 0;
+    const QDateTime now = QDateTime::currentDateTime();
+    for (const auto &t : m_store->tasks()) {
+        if (t.deleted)
+            continue;
+        if (t.parentId)
+            ++subtasks;
+        else if (t.completed)
+            ++done;
+        else
+            ++open;
+        if (!t.completed && Schedule::isScheduled(t, now))
+            ++scheduled;
+    }
+    int lists = 0;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted)
+            ++lists;
+    int tags = 0;
+    for (const auto &t : m_store->tags())
+        if (!t.deleted)
+            ++tags;
+    const QFileInfo db(m_store->path());
+    QStringList out;
+    out << QStringLiteral("Precrime %1").arg(QCoreApplication::applicationVersion())
+        << QStringLiteral("Qt %1 (built with %2)").arg(QString::fromLatin1(qVersion()), QStringLiteral(QT_VERSION_STR))
+        << QStringLiteral("System: %1, %2").arg(QSysInfo::prettyProductName(), QSysInfo::currentCpuArchitecture())
+        << QStringLiteral("Locale: %1; week starts on %2")
+               .arg(QLocale::system().name(), QLocale::system().dayName(Schedule::resolveWeekStart(m_store->setting("general.weekStart", 0).toInt())))
+        << QStringLiteral("Database: %1 (%2 KB)").arg(m_store->path()).arg((db.size() + 512) / 1024)
+        << QStringLiteral("Schema version: %1").arg(Store::schemaVersion())
+        << QStringLiteral("Tasks: %1 open, %2 completed, %3 sub-tasks, %4 scheduled").arg(open).arg(done).arg(subtasks).arg(scheduled)
+        << QStringLiteral("Lists: %1, tags: %2, alerts: %3").arg(lists).arg(tags).arg(m_store->alarms().size());
+    if (!extra.trimmed().isEmpty())
+        out << QString() << extra.trimmed();
+    out << QString() << QStringLiteral("Recent warnings and errors:");
+    const QStringList log = Diagnostics::recent();
+    if (log.isEmpty())
+        out << QStringLiteral("  none since Precrime started");
+    for (const auto &line : log.mid(qMax<qsizetype>(0, log.size() - 30)))
+        out << "  " + line;
+    return out.join('\n');
+}
+
+void Backend::copyDiagnostics(const QString &extra) {
+    QGuiApplication::clipboard()->setText(diagnosticsReport(extra));
+    setStatus("Copied diagnostics");
+}
+
 void Backend::completeAfterAutoDelete() {
     // "Auto-delete completed tasks": completed tasks older than N days are
     // removed for good (soft-deleted, so sync carries the deletion).
@@ -3826,6 +3869,10 @@ void Backend::rebuildTasks(const ViewBuilder &views) {
     m_options.focusConditions = focusOn() ? focusConditions() : QStringList();
     m_options.groupedDates = m_store->setting("sort.groupedDates", false).toBool();
     m_options.starredAboveHigh = m_store->setting("sort.starredAboveHigh", false).toBool();
+    m_options.listOrder = m_store->setting("sort.listOrder", true).toBool();
+    m_options.subtasksSeparately = m_store->setting("focus.subtasksSeparately", true).toBool();
+    m_options.completedRuleSubtasks = m_store->setting("tasks.completedRuleSubtasks", true).toBool();
+    const bool showDurations = m_store->setting("appearance.headingDurations", true).toBool();
     // With the scope set to all lists, a search looks everywhere.
     const Source viewed = (m_searchAll && !m_options.search.isEmpty()) ? Source{Source::All, 0} : m_source;
     m_options.inheritSearch = m_source.kind == Source::Project && m_store->setting("search.inheritInProject", false).toBool();
@@ -3843,7 +3890,8 @@ void Backend::rebuildTasks(const ViewBuilder &views) {
     for (const auto &section : sections) {
         rows.append({{"key", "s:" + section.key}, {"kind", "section"}, {"sectionKey", section.key},
                      {"title", section.title}, {"tone", section.tone}, {"color", section.color},
-                     {"count", section.openCount}, {"durationTotal", Schedule::durationTotal(section.durationTotal)},
+                     {"count", section.openCount},
+                     {"durationTotal", showDurations ? Schedule::durationTotal(section.durationTotal) : QString()},
                      {"collapsed", section.collapsed}, {"isFirst", first},
                      {"sectionId", section.key.startsWith("sec:") ? section.key.mid(4).toLongLong() : -1}});
         first = false;

@@ -102,6 +102,14 @@ offers your lists and `pc done <Tab>` your open tasks.
 - **List options.** Right-click a list for Exclude/Include Completed and Delete all Tasks;
   Settings → Today & Lists chooses the counts on lists and whether a project view inherits
   the search it was opened from. Lists also sort by Note and Location.
+- **More settings.** Settings → General sets the first day of the week (used by this-week
+  searches, the mini calendar, date pickers and weekly repeats). Appearance has month
+  dividers, always-show tag names, overdue in red and durations in headings; Tasks has the
+  default due time, "only / not in Quick Entry" for the default due date, applying the
+  completed rule to sub-tasks and turning Quick Look off; Today & Lists has started-task
+  visibility, matched sub-tasks listed separately and sorting by list in list order or A to Z.
+  Settings → Diagnostics shows versions, database path, schema, task counts and recent
+  warnings, with Copy Diagnostics for bug reports.
 - **Focus Filter.** The sun in the sort bar narrows any list to tasks that are overdue,
   due today, this week, high priority, starred and so on, each list remembering its own.
 - **Repeats.** Completing a repeating task keeps a done copy and moves it to the next
@@ -239,6 +247,9 @@ Dock badge) goes in `~/.config/waybar/config.jsonc`:
 ```jsonc
 "custom/precrime": { "exec": "precrime --waybar", "return-type": "json", "interval": 60, "on-click": "precrime" }
 ```
+
+Settings → Alerts → Badge shows picks what it, and the number on the tray icon, counts:
+Overdue + Today, Overdue, Today or None.
 
 ## Development
 

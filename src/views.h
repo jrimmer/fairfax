@@ -43,6 +43,13 @@ struct ViewOptions {
     QSet<QString> collapsedSections;
     bool groupedDates = false;      // Today / Tomorrow / Next 7 Days / Future instead of one heading per day.
     bool starredAboveHigh = false;  // A Starred section above High when sorting by priority.
+    // Sorting by list follows the sidebar order; off sorts A to Z by name.
+    bool listOrder = true;
+    // Focus and Smart Lists list project children as rows of their own even
+    // when the project is there too; off drops them under their project.
+    bool subtasksSeparately = true;
+    // The completed-tasks rule also hides completed sub-tasks of a project.
+    bool completedRuleSubtasks = true;
     // "Inherit Search in Project View": a project's children also have to
     // match the search that was active when it was opened, and the rule and
     // range of the Smart List it was opened from (both may be empty).
@@ -92,6 +99,10 @@ public:
     ListCounts countsForList(qint64 listId) const;
     ListCounts countsForFocus(int kind) const;
 
+    // What the badge on the bar and in the tray counts: "overdue", "today"
+    // (due today, not overdue), "both" or "none".
+    int badgeCount(const QString &metric) const;
+
     bool isPaused(const Task &task) const;
     bool isSmartList(qint64 listId) const;
     bool inSmartRange(const Task &task, const QString &range) const;
@@ -119,7 +130,8 @@ private:
     bool completedVisible(const Task &task, const Source &source, const ViewOptions &options, int policy = 0) const;
     QVector<Section> sectionize(const QVector<Task> &items, const Source &source, const SortSpec &sort,
                                 const ViewOptions &options) const;
-    void sortItems(QVector<Task> &items, const SortSpec &sort) const;
+    void sortItems(QVector<Task> &items, const SortSpec &sort, bool listOrder = true) const;
+    QHash<qint64, int> listRanks(bool listOrder) const;
 
     const Store &m_store;
     QDateTime m_now;

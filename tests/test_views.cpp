@@ -759,6 +759,98 @@ private slots:
         // Focus lists keep hiding them.
         QVERIFY(!titles(build(Source{Source::All}, {}, byStart)).contains("later"));
     }
+
+    // ---- settings that change what the views show ----
+
+    void subtasksListedSeparatelyOrUnderTheirProject() {
+        const auto l = addList("L");
+        const auto proj = addTask(l, "proj", [](Task &t) { t.type = TaskType::Project; t.dueDate = Today; });
+        addTask(l, "child", [&](Task &t) { t.parentId = proj; t.dueDate = Today; });
+        QCOMPARE(titles(build(Source{Source::Today})).size(), 2);
+        ViewOptions o;
+        o.subtasksSeparately = false;
+        QCOMPARE(titles(build(Source{Source::Today}, o)), QStringList{"proj"});
+        // A child whose project is not in the list still shows.
+        const auto other = addTask(l, "away", [](Task &t) { t.type = TaskType::Project; });
+        addTask(l, "kid", [&](Task &t) { t.parentId = other; t.dueDate = Today; });
+        QCOMPARE(sorted(titles(build(Source{Source::Today}, o))), (QStringList{"kid", "proj"}));
+    }
+
+    void sortByListFollowsListOrderOrName() {
+        const auto zed = addList("Zed");
+        const auto alpha = addList("Alpha");
+        addTask(zed, "in zed");
+        addTask(alpha, "in alpha");
+        SortSpec byList;
+        byList.field = SortField::List;
+        QCOMPARE(titles(build(Source{Source::All}, {}, byList)), (QStringList{"in zed", "in alpha"}));
+        ViewOptions o;
+        o.listOrder = false;
+        QCOMPARE(titles(build(Source{Source::All}, o, byList)), (QStringList{"in alpha", "in zed"}));
+    }
+
+    void completedRuleAppliesToProjectChildrenOnlyWhenAsked() {
+        const auto l = addList("L");
+        const auto proj = addTask(l, "proj", [](Task &t) { t.type = TaskType::Project; });
+        addTask(l, "old done", [&](Task &t) {
+            t.parentId = proj; t.completed = true; t.completedAt = Now.addDays(-10);
+        });
+        QCOMPARE(titles(build(list(l))), QStringList{"proj"});
+        ViewOptions o;
+        o.completedRuleSubtasks = false;
+        QCOMPARE(titles(build(list(l), o)), (QStringList{"proj", "old done"}));
+    }
+
+    void startedTasksHiddenUnlessDueTodayWhenAsked() {
+        const auto l = addList("L");
+        addTask(l, "started", [](Task &t) { t.startDate = day(-3); t.dueDate = day(5); });
+        addTask(l, "started due today", [](Task &t) { t.startDate = day(-3); t.dueDate = Today; });
+        addTask(l, "starts today", [](Task &t) { t.startDate = Today; });
+        QCOMPARE(titles(build(Source{Source::All})).size(), 3);
+        m_settings.hideStartedTasks = true;
+        QCOMPARE(sorted(titles(build(Source{Source::All}))), (QStringList{"started due today", "starts today"}));
+        QCOMPARE(sorted(titles(build(list(l)))), (QStringList{"started due today", "starts today"}));
+        // The sidebar count agrees with the list.
+        QCOMPARE(ViewBuilder(*m_store, Now, m_settings).countsForList(l).undone, 2);
+    }
+
+    void durationHeadingsSkipTotalsWhenSortedByDuration() {
+        const auto l = addList("L");
+        addTask(l, "a", [](Task &t) { t.dueDate = Today; t.duration = 90; });
+        addTask(l, "b", [](Task &t) { t.dueDate = Today; t.duration = 30; });
+        auto sections = build(Source{Source::All});
+        QCOMPARE(sections.at(0).durationTotal, 120);
+        SortSpec byDuration;
+        byDuration.field = SortField::Duration;
+        sections = build(Source{Source::All}, {}, byDuration);
+        for (const auto &s : sections)
+            QCOMPARE(s.durationTotal, 0);
+    }
+
+    void thisWeekFollowsTheWeekStart() {
+        const auto l = addList("L");
+        const auto sunday = addTask(l, "sunday", [](Task &t) { t.dueDate = QDate(2026, 7, 12); });
+        Task t = m_store->task(sunday);
+        m_settings.weekStart = Qt::Monday;
+        QVERIFY(!ViewBuilder::matchesFocusCondition(t, "thisweek", Now, m_settings));
+        m_settings.weekStart = Qt::Sunday;
+        QVERIFY(ViewBuilder::matchesFocusCondition(t, "thisweek", Now, m_settings));
+        QCOMPARE(Schedule::weekStartOf(Today, Qt::Saturday), QDate(2026, 7, 11));
+        m_store->setSetting("general.weekStart", int(Qt::Sunday));
+        QCOMPARE(ScheduleSettings::fromStore(*m_store).weekStart, int(Qt::Sunday));
+    }
+
+    void badgeCountsByMetric() {
+        const auto l = addList("L");
+        addTask(l, "late", [](Task &t) { t.dueDate = day(-2); });
+        addTask(l, "now1", [](Task &t) { t.dueDate = Today; });
+        addTask(l, "now2", [](Task &t) { t.dueDate = Today; });
+        const ViewBuilder views(*m_store, Now, m_settings);
+        QCOMPARE(views.badgeCount("overdue"), 1);
+        QCOMPARE(views.badgeCount("today"), 2);
+        QCOMPARE(views.badgeCount("both"), 3);
+        QCOMPARE(views.badgeCount("none"), 0);
+    }
 };
 
 REGISTER_TEST(ViewsTest)

@@ -327,7 +327,7 @@ Item {
                         width: 4 + 10 * modelData.count / rail.most
                         height: 3
                         radius: 1.5
-                        color: modelData.tone === "overdue" ? theme.overdue : theme.faint
+                        color: modelData.tone === "overdue" && backend.overdueInRed ? theme.overdue : theme.faint
                         MouseArea {
                             anchors.fill: parent
                             anchors.margins: -4
@@ -366,7 +366,7 @@ Item {
             return done()
         }
         if (k === Qt.Key_Escape) { backend.clearSelection(); return done() }
-        if (k === Qt.Key_Space) { root.quickLook(); return done() }
+        if (k === Qt.Key_Space) { if (backend.quickLookEnabled) root.quickLook(); return done() }
         if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && !ctrl)) { backend.deleteSelection(); return done() }
         if (k === Qt.Key_Alt) { root.altHeld = true; return }
         if (ctrl && k === Qt.Key_A) { backend.selectAll(); return done() }

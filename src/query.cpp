@@ -140,8 +140,6 @@ bool nameMatches(const QString &pattern, const QString &name) {
     return QRegularExpression(QStringLiteral("^") + rx + QStringLiteral("$")).match(name).hasMatch();
 }
 
-QDate weekStart(const QDate &d) { return d.addDays(-(d.dayOfWeek() - 1)); }
-
 struct Tok {
     enum K { Word, Quoted, LP, RP, Comma, Or, And, Not } k = Word;
     QString s;
@@ -436,7 +434,7 @@ const QHash<QString, Predicate> &typePresets() {
         using C = const QueryContext &;
         auto action = [](int a) { return [a](T t, C) { return t.actionType == a; }; };
         auto day = [](C c) { return c.now.date(); };
-        auto week = [](C c, QDate &a, QDate &b) { a = weekStart(c.now.date()); b = a.addDays(6); };
+        auto week = [](C c, QDate &a, QDate &b) { a = Schedule::weekStartOf(c.now.date(), c.settings.weekStart); b = a.addDays(6); };
 
         add({"alltasks"}, [](T, C) { return true; });
         add({"task"}, [](T t, C) { return t.type == TaskType::Task && t.parentId == 0; });

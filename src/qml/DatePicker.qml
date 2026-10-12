@@ -14,7 +14,7 @@ Popup {
     signal picked(string iso)
     signal noTime()
 
-    readonly property int firstDay: Qt.locale().firstDayOfWeek  // 0 = Sunday, as in Date.getDay().
+    readonly property int firstDay: backend.firstDayOfWeek  // 0 = Sunday, as in Date.getDay().
     property date cursor: new Date()                            // The day the keyboard is on.
     property int shownYear: cursor.getFullYear()
     property int shownMonth: cursor.getMonth()

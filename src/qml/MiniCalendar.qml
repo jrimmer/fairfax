@@ -13,7 +13,7 @@ ColumnLayout {
     property date shown: new Date()
     readonly property int year: shown.getFullYear()
     readonly property int month: shown.getMonth()
-    readonly property int firstDay: Qt.locale().firstDayOfWeek  // 0 = Sunday.
+    readonly property int firstDay: backend.firstDayOfWeek  // 0 = Sunday; the "Week starts" setting.
     // the reference app's Busy Days styles: a heat-map tint, dots under the date, or none,
     // which skips the counting entirely.
     readonly property string style: String(backend.setting("appearance.calendarStyle").value || "heat")
@@ -119,6 +119,22 @@ ColumnLayout {
                     anchors.fill: parent
                     visible: root.shadeWeekends && (cell.day.getDay() === 0 || cell.day.getDay() === 6)
                     color: Qt.alpha(theme.foreground, theme.dark ? 0.05 : 0.045)
+                }
+                // "Show month dividers": a line wherever the next cell to the
+                // right or below belongs to another month.
+                Rectangle {
+                    visible: backend.monthDividers && index % 7 < 6 && cell.day.getMonth() !== new Date(root.year, root.month, 2 + cell.index - cell.lead).getMonth()
+                    anchors.right: parent.right
+                    width: 1
+                    height: parent.height
+                    color: Qt.alpha(theme.foreground, 0.28)
+                }
+                Rectangle {
+                    visible: backend.monthDividers && index < 35 && cell.day.getMonth() !== new Date(root.year, root.month, 8 + cell.index - cell.lead).getMonth()
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 1
+                    color: Qt.alpha(theme.foreground, 0.28)
                 }
                 Rectangle {
                     anchors.centerIn: parent
