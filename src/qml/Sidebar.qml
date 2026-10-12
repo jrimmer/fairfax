@@ -9,6 +9,8 @@ Rectangle {
 
     signal hideRequested()
     signal settingsRequested()
+    signal newSmartListRequested()
+    signal editSmartListRequested()
 
     color: theme.sidebar
     property int renamingListId: 0
@@ -238,6 +240,7 @@ Rectangle {
                     id: addMenu
                     MenuItem { text: "New List"; onTriggered: { backend.newList(); root.renameSelected() } }
                     MenuItem { text: "New List Group"; onTriggered: root.renamingGroupId = backend.newGroup() }
+                    MenuItem { text: "New Smart List…"; onTriggered: root.newSmartListRequested() }
                 }
             }
         }
@@ -610,6 +613,7 @@ Rectangle {
             ListMenu { id: listMenu; listId: item.row.listId || 0; onRename: root.renamingListId = item.row.listId }
             Menu {
                 id: smartMenu
+                MenuItem { text: "Edit Search…"; onTriggered: { backend.selectSource(item.row.sourceKey); root.editSmartListRequested() } }
                 MenuItem { text: "Rename…"; onTriggered: root.renamingListId = item.row.listId }
                 MenuItem { text: "Delete Smart List"; onTriggered: backend.deleteList(item.row.listId) }
             }

@@ -49,6 +49,10 @@ ApplicationWindow {
             visible: win.sidebarVisible
             onHideRequested: win.sidebarShown = false
             onSettingsRequested: { settings.show(); settings.raise() }
+            // A new smart list starts as a search over everything in the
+            // search builder, saved from there.
+            onNewSmartListRequested: { backend.selectSource("all"); pane.openSearchBuilder() }
+            onEditSmartListRequested: pane.editSmartQuery()
         }
 
         Rectangle { Layout.fillHeight: true; implicitWidth: 1; color: theme.divider; visible: sidebar.visible }

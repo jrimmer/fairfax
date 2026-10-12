@@ -20,6 +20,7 @@ Item {
 
     function focusList() { list.forceActiveFocus() }
     function openSearchBuilder() { searchBuilder.openAt(search) }
+    function editSmartQuery() { Qt.callLater(() => { smartQuery.forceActiveFocus(); smartQuery.selectAll() }) }
     function focusSearch() { search.expanded = true; search.field.forceActiveFocus() }
     function toggleProjectView() {
         if (backend.sourceKey.startsWith("project:")) {
