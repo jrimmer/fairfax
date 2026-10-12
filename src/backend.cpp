@@ -1471,7 +1471,9 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         {"selected", m_selected.contains(t.id)},
         {"current", m_cursor == t.id},
         {"editing", m_editing == t.id},
-        {"dimmed", views.isPaused(t) || Schedule::isScheduled(t, now)},
+        // Hidden-by-default tasks shown on request read as dimmed, except in
+        // Scheduled, where being scheduled is the point.
+        {"dimmed", views.isPaused(t) || (Schedule::isScheduled(t, now) && m_source.kind != Source::Scheduled)},
         {"progress", childCount ? (childCount - childOpen) * 100 / childCount : 0},
     };
 }

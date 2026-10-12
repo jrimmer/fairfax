@@ -79,7 +79,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
-            visible: root.height > 520
+            visible: root.height > 660
         }
 
         // Footer: new list or group.
