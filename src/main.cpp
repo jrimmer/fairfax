@@ -11,6 +11,10 @@
 #include <QFileInfo>
 #include <QIcon>
 #include <QProcess>
+#include <QThread>
+#include <csignal>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlApplicationEngine>
@@ -176,7 +180,7 @@ int main(int argc, char *argv[]) {
 
     QGuiApplication app(argc, argv);
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.2.2");
+    app.setApplicationVersion("0.2.3");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
@@ -215,7 +219,45 @@ int main(int argc, char *argv[]) {
     if (!offscreen) {
         QLocalSocket probe;
         probe.connectToServer(socketName);
+        // After an update the running instance is still the old build (it
+        // stays resident for alarms). If it reports another version, ask it
+        // to quit and carry on as the new instance.
         if (probe.waitForConnected(300)) {
+            // The peer's pid, read from the kernel now, while connected: an
+            // old build closes the connection when it doesn't understand us.
+            pid_t peer = 0;
+            ucred cred{};
+            socklen_t len = sizeof(cred);
+            if (getsockopt(int(probe.socketDescriptor()), SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0)
+                peer = cred.pid;
+            probe.write("version\n");
+            QString running;
+            if (probe.waitForReadyRead(500))
+                running = QString::fromUtf8(probe.readAll()).trimmed();
+            if (running != app.applicationVersion()) {
+                QLocalSocket quit;
+                quit.connectToServer(socketName);
+                if (quit.waitForConnected(300)) {
+                    quit.write("quit\n");
+                    quit.waitForBytesWritten(300);
+                }
+                auto stillRunning = [&] { return peer > 0 && ::kill(peer, 0) == 0; };
+                for (int i = 0; i < 15 && stillRunning(); ++i)
+                    QThread::msleep(100);
+                // Only ever stop a process that really is Precrime.
+                if (stillRunning() && QFileInfo(QStringLiteral("/proc/%1/exe").arg(peer)).symLinkTarget().contains("precrime")) {
+                    ::kill(peer, SIGTERM);
+                    for (int i = 0; i < 20 && stillRunning(); ++i)
+                        QThread::msleep(100);
+                }
+                probe.abort();
+            } else {
+                probe.abort();
+                probe.connectToServer(socketName);
+                probe.waitForConnected(300);
+            }
+        }
+        if (probe.state() == QLocalSocket::ConnectedState) {
             if (cli.isSet(daemonOption))
                 return 0;
             if (openUrl.startsWith("precrime:"))
@@ -330,6 +372,18 @@ int main(int argc, char *argv[]) {
             while (QLocalSocket *client = server.nextPendingConnection()) {
                 QObject::connect(client, &QLocalSocket::readyRead, client, [client, &backend, handleUrl] {
                     const QByteArray request = client->readAll().trimmed();
+                    if (request == "version") {
+                        client->write(QCoreApplication::applicationVersion().toUtf8() + "\n");
+                        client->flush();
+                        client->waitForBytesWritten(200);
+                        client->disconnectFromServer();
+                        return;
+                    }
+                    if (request == "quit") {
+                        client->disconnectFromServer();
+                        QCoreApplication::quit();
+                        return;
+                    }
                     if (request == "quick")
                         backend.requestQuickEntry();
                     else if (request.startsWith("url "))
