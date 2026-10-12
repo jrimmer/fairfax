@@ -670,10 +670,11 @@ LeafFactory timeFactory(TimeField field, QStringList *errors) {
 // ----------------------------------------------------------------- parse
 
 struct Segment {
-    enum Kind { Text, Type, Tags, TagGroups, Locations, Lists, Groups, Modified, Created, Completed, DateFilter } kind = Text;
+    enum Kind { Text, Type, Tags, TagGroups, Locations, Lists, Groups, Modified, Created, Completed, DateFilter, Group } kind = Text;
     bool negated = false;  // For "!modified:" and friends.
     bool orMarked = false;
     QString value;
+    NodePtr node;          // A Group's already parsed contents.
 };
 
 NodePtr buildSegment(const Segment &seg, QStringList *errors) {
@@ -696,6 +697,8 @@ NodePtr buildSegment(const Segment &seg, QStringList *errors) {
     case Segment::Modified: o.commaIsOr = o.mergeWords = true; f = timeFactory(TimeField::Modified, errors); break;
     case Segment::Created: o.commaIsOr = o.mergeWords = true; f = timeFactory(TimeField::Created, errors); break;
     case Segment::Completed: o.commaIsOr = o.mergeWords = true; f = timeFactory(TimeField::Completed, errors); break;
+    case Segment::Group:
+        return seg.negated ? makeNot(seg.node) : seg.node;
     case Segment::DateFilter:
         return leaf([](const Task &t, const QueryContext &c) {
             if (!c.rangeFrom.isValid() && !c.rangeTo.isValid()) return true;
@@ -719,12 +722,61 @@ bool stripTrailingOr(QString &s) {
     return true;
 }
 
+const QRegularExpression &keywordPattern() {
+    static const QRegularExpression keyword(
+        QStringLiteral(R"((?<!\S)(?:type:|tags:|locations:|lists:|groups:|taggroups:|!?(?:modified:|created:|completed:)|!?\{group:\d+\}|\{datefilter\}))"),
+        QRegularExpression::CaseInsensitiveOption);
+    return keyword;
+}
+
+// Parenthesised groups that open with a keyword filter, such as
+// "(tags: a OR tags: b)", combine whole filters, which the flat keyword
+// segments cannot. They are lifted out as `{group:N}` placeholders (keeping a
+// leading "!") with their contents in `inners`. Parentheses inside a filter's
+// own value, "type: (hiprio OR starred)", are left alone.
+QString liftGroups(const QString &text, QStringList &inners) {
+    static const QRegularExpression opensWithKeyword(
+        QStringLiteral(R"(^\s*!?(?:type:|tags:|locations:|lists:|groups:|taggroups:|modified:|created:|completed:|\{datefilter\}|\{group:))"),
+        QRegularExpression::CaseInsensitiveOption);
+    QString out;
+    bool quoted = false;
+    for (int i = 0; i < text.size(); ++i) {
+        const QChar c = text.at(i);
+        if (c == '"') quoted = !quoted;
+        if (c != '(' || quoted) {
+            out += c;
+            continue;
+        }
+        int depth = 0, close = -1;
+        bool q = false;
+        for (int j = i; j < text.size(); ++j) {
+            const QChar d = text.at(j);
+            if (d == '"') q = !q;
+            else if (!q && d == '(') ++depth;
+            else if (!q && d == ')' && --depth == 0) { close = j; break; }
+        }
+        if (close < 0) {
+            out += c;
+            continue;
+        }
+        const QString inner = text.mid(i + 1, close - i - 1);
+        if (!opensWithKeyword.match(inner).hasMatch()) {
+            out += c;
+            continue;
+        }
+        const bool negated = out.endsWith('!');
+        if (negated) out.chop(1);
+        out += QStringLiteral(" %1{group:%2} ").arg(negated ? "!" : "").arg(inners.size());
+        inners << inner;
+        i = close;
+    }
+    return out;
+}
+
 }  // namespace
 
-Query Query::parse(const QString &text, QString *error) {
-    static const QRegularExpression keyword(
-        QStringLiteral(R"((?<!\S)(?:type:|tags:|locations:|lists:|groups:|taggroups:|!?(?:modified:|created:|completed:)|\{datefilter\}))"),
-        QRegularExpression::CaseInsensitiveOption);
+Query Query::parse(const QString &input, QString *error) {
+    const QRegularExpression &keyword = keywordPattern();
 
     // A negated value (!donetoday) does not ask for completed tasks.
     static const QRegularExpression doneTypes(QStringLiteral(R"((?<![!\w])done(?:today|yesterday|thisweek)\b)"),
@@ -732,6 +784,14 @@ Query Query::parse(const QString &text, QString *error) {
 
     QStringList errors;
     std::vector<Segment> segs;
+    QStringList inners;
+    const QString text = liftGroups(input, inners);
+    std::vector<Query> subQueries;
+    for (const QString &inner : inners) {
+        QString subError;
+        subQueries.push_back(Query::parse(inner, &subError));
+        if (!subError.isEmpty()) errors << subError;
+    }
 
     struct Hit { int start, end; QString word; };
     std::vector<Hit> hits;
@@ -741,6 +801,7 @@ Query Query::parse(const QString &text, QString *error) {
         hits.push_back({int(m.capturedStart()), int(m.capturedEnd()), m.captured().toLower()});
     }
 
+    bool namesCompleted = false, replacesScope = false;
     bool nextOr = false;
     {
         QString pre = text.left(hits.empty() ? text.size() : hits.front().start);
@@ -760,6 +821,25 @@ Query Query::parse(const QString &text, QString *error) {
         s.value = value;
         QString w = hits[i].word;
         if (w.startsWith('!')) { s.negated = true; w.remove(0, 1); }
+        if (w.startsWith("{group:")) {
+            s.kind = Segment::Group;
+            const Query &sub = subQueries.at(w.mid(7, w.size() - 8).toInt());
+            s.node = std::const_pointer_cast<Node>(sub.m_root);
+            if (!s.node) continue;
+            // Anything after the group up to the next keyword is plain text.
+            if (!value.trimmed().isEmpty()) {
+                Segment extra;
+                extra.value = value;
+                s.value.clear();
+                segs.push_back(s);
+                segs.push_back(extra);
+            } else {
+                segs.push_back(s);
+            }
+            namesCompleted = namesCompleted || sub.m_namesCompleted;
+            replacesScope = replacesScope || sub.m_replacesScope;
+            continue;
+        }
         if (w == "type:") s.kind = Segment::Type;
         else if (w == "tags:") s.kind = Segment::Tags;
         else if (w == "taggroups:") s.kind = Segment::TagGroups;
@@ -803,6 +883,8 @@ Query Query::parse(const QString &text, QString *error) {
     if (error) *error = errors.join(QStringLiteral("; "));
     Query q;
     q.m_root = root;
+    q.m_namesCompleted = namesCompleted;
+    q.m_replacesScope = replacesScope;
     for (const Segment &s : segs) {
         const bool done = s.kind == Segment::Completed && !s.negated;
         const bool doneType = s.kind == Segment::Type && !s.negated &&

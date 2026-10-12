@@ -375,6 +375,8 @@ Item {
         if (ctrl && k === Qt.Key_V) { backend.pasteTasks(); return done() }
         if (ctrl && k === Qt.Key_T) { backend.setStartInDays(0); return done() }
         if (ctrl && k === Qt.Key_S) { backend.setStarred(0); return done() }
+        // Ctrl+Shift+[ takes the time off the due date.
+        if (ctrl && shift && (k === Qt.Key_BraceLeft || k === Qt.Key_BracketLeft)) { backend.setSelectionDueTime(-1); return done() }
         if (ctrl) return
 
         switch (k) {

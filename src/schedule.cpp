@@ -169,6 +169,10 @@ QString dueHint(const Task &t, const QDateTime &now, const ScheduleSettings &s) 
         return days > 0 ? QStringLiteral("Overdue by %1 day%2").arg(days).arg(days == 1 ? "" : "s")
                         : QStringLiteral("Overdue");
     }
+    // The deadline can pass while the day rule does not yet call the task
+    // overdue (a due time earlier today): it has ended.
+    if (now >= dueMoment(t))
+        return QStringLiteral("Ended");
     if (start.isValid())
         return span(now.secsTo(dueMoment(t))) + QStringLiteral(" remaining");
     return QStringLiteral("Due in ") + span(qMax<qint64>(60, now.secsTo(dueMoment(t))));

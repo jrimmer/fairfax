@@ -542,6 +542,10 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
     ViewOptions o = options;
     if (smart && smartList.includeScheduled)
         o.showScheduled = true;
+    // Sorting one of your own lists by Start Date shows its scheduled tasks,
+    // in the order they start.
+    if (!smart && sort.field == SortField::StartDate && (source.kind == Source::List || source.kind == Source::Project))
+        o.showScheduled = true;
     // Completed tasks: a query that asks for them shows them all; otherwise
     // the list's own Include/Exclude Completed switch decides.
     int policy = 0;

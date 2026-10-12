@@ -292,6 +292,16 @@ Window {
                     }
                     Toggle { key: "tasks.autoDeleteDelaySubtasks"; fallback: false; label: "Delay sub-tasks by 3 weeks" }
                     Toggle { key: "tasks.returnCreates"; fallback: false; label: "Hit Return to create a new task, Ctrl+Return to edit" }
+                    Toggle { key: "quickopen.selectInPlace"; fallback: true; label: "Quick Open selects a task in place when the view shows it"; note: "Otherwise it always switches to the task's own list." }
+                    RowLayout {
+                        Label { text: "Due time shortcuts"; Layout.preferredWidth: 220 }
+                        TextField {
+                            Layout.fillWidth: true
+                            placeholderText: "9am, 12pm, 3pm, 6pm"
+                            text: root.value("tasks.dueTimeChips", "")
+                            onEditingFinished: backend.setSetting("tasks.dueTimeChips", text.trim())
+                        }
+                    }
                 }
 
                 // Today & Lists

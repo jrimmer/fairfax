@@ -1,5 +1,7 @@
 #include "nlparse.h"
 
+#include "dateparse.h"
+
 #include <QRegularExpression>
 #include <algorithm>
 #include <vector>
@@ -470,6 +472,12 @@ private:
             end = i + 1;
             return true;
         }
+        if (a == QLatin1String("quarterly")) {
+            r.frequency = Repeat::Monthly;
+            r.interval = 3;
+            end = i + 1;
+            return true;
+        }
         if (a != QLatin1String("every"))
             return false;
         int j = i + 1;
@@ -501,6 +509,10 @@ private:
             r.weekdays = (1 << 5) | (1 << 6);
         } else if (b == QLatin1String("week") || b == QLatin1String("weeks")) {
             r.frequency = Repeat::Weekly;
+        } else if (b == QLatin1String("quarter") || b == QLatin1String("quarters")) {
+            // A quarter is three months.
+            r.frequency = Repeat::Monthly;
+            r.interval = interval * 3;
         } else if (b == QLatin1String("year") || b == QLatin1String("years")) {
             r.frequency = Repeat::Yearly;
         } else if (b == QLatin1String("month") || b == QLatin1String("months")) {
@@ -605,6 +617,18 @@ private:
         }
         if (a == QLatin1String("tomorrow"))
             return done(m_today.addDays(1), i);
+        if (a == QLatin1String("eom"))
+            return done(QDate(m_today.year(), m_today.month(), m_today.daysInMonth()), i);
+        if (a == QLatin1String("eoy"))
+            return done(QDate(m_today.year(), 12, 31), i);
+        if (a == QLatin1String("end") && w(i + 1) == QLatin1String("of")) {
+            // "end of month" / "end of the year".
+            const int k = w(i + 2) == QLatin1String("the") ? i + 3 : i + 2;
+            if (w(k) == QLatin1String("month"))
+                return done(QDate(m_today.year(), m_today.month(), m_today.daysInMonth()), k);
+            if (w(k) == QLatin1String("year"))
+                return done(QDate(m_today.year(), 12, 31), k);
+        }
         if (a == QLatin1String("day") && w(i + 1) == QLatin1String("after") && w(i + 2) == QLatin1String("tomorrow"))
             return done(m_today.addDays(2), i + 2);
         if (a == QLatin1String("the") && w(i + 1) == QLatin1String("day") && w(i + 2) == QLatin1String("after") &&
@@ -642,11 +666,12 @@ private:
             return h;
         }
 
-        // m/d and m/d/y.
+        // m/d and m/d/y, or d/m and d/m/y where the locale writes the day first.
         static const QRegularExpression slashed(QStringLiteral("^(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}|\\d{2}))?$"));
         if (const auto m = slashed.match(a); m.hasMatch()) {
-            const int month = m.captured(1).toInt();
-            const int day = m.captured(2).toInt();
+            const bool dayFirst = DateParse::numericDayFirst();
+            const int month = m.captured(dayFirst ? 2 : 1).toInt();
+            const int day = m.captured(dayFirst ? 1 : 2).toInt();
             if (!m.captured(3).isEmpty()) {
                 int year = m.captured(3).toInt();
                 if (year < 100)
@@ -694,6 +719,21 @@ private:
         } else if (afterOn) {
             day = dayAt(i, true, true);
             ordinalAt = i;
+        }
+        // A lone ordinal ("Pay rent 15th") names the next such day of the
+        // month, but only where it ends the phrase, so "3rd floor" and
+        // "5th Avenue" stay in the title.
+        if (!day && !afterOn) {
+            if (const int bare = dayAt(i, true, true)) {
+                const QString next = w(i + 1);
+                const QString core = i + 1 < m_tokens.size() ? m_tokens[i + 1].core : QString();
+                const bool ends = next.isEmpty() || next == QLatin1String("at") || next == QLatin1String("every") ||
+                                  (!core.isEmpty() && QStringLiteral("#@![*").contains(core.at(0)));
+                if (ends) {
+                    day = bare;
+                    ordinalAt = i;
+                }
+            }
         }
         if (day) {
             if (w(ordinalAt + 1) == QLatin1String("of") && monthAt(ordinalAt + 2))

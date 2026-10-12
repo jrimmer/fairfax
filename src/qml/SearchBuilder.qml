@@ -16,6 +16,9 @@ Popup {
     property var names: ({ tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} })
     property var dates: ({ modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } })
     property int pickerTab: 0
+    // Parenthesised groups of whole filters, "(tags: a OR tags: b)": each has
+    // its own text and how it joins the rest (and / or / not).
+    property var groups: []
     property string query: ""
     property bool loading: false              // Suppresses rebuilds while state is being set.
     property bool editingPreview: false
@@ -157,7 +160,47 @@ Popup {
             const v = dates[d.key]
             if (v.n > 0) parts.push(d.key + ": " + v.n + v.unit)
         }
+        for (const g of groups) {
+            const inner = g.text.trim()
+            if (!inner) continue
+            const group = (g.join === "not" ? "!" : "") + "(" + inner + ")"
+            parts.push(g.join === "or" && parts.length ? "OR " + group : group)
+        }
         return parts.join(" ")
+    }
+
+    function setGroup(i, change) {
+        const c = groups.slice()
+        c[i] = Object.assign({}, c[i], change)
+        groups = c
+    }
+    function addGroup() { groups = groups.concat([{ text: "", join: "and" }]) }
+    function removeGroup(i) { const c = groups.slice(); c.splice(i, 1); groups = c }
+
+    // Lifts parenthesised groups that open with a keyword (as the query
+    // language does) out of `src`; returns the rest and the groups found.
+    function liftGroups(src) {
+        const found = []
+        let rest = ""
+        const kw = /^\s*!?(type:|tags:|taggroups:|locations:|lists:|groups:|modified:|created:|completed:)/i
+        let i = 0
+        while (i < src.length) {
+            if (src[i] !== "(") { rest += src[i++]; continue }
+            let depth = 0, close = -1
+            for (let j = i; j < src.length; ++j) {
+                if (src[j] === "(") ++depth
+                else if (src[j] === ")" && --depth === 0) { close = j; break }
+            }
+            const inner = close < 0 ? "" : src.slice(i + 1, close)
+            if (close < 0 || !kw.test(inner)) { rest += src[i++]; continue }
+            let join = "and"
+            if (rest.endsWith("!")) { join = "not"; rest = rest.slice(0, -1) }
+            const orTail = /(^|\s)or\s*$/i
+            if (join === "and" && orTail.test(rest)) { join = "or"; rest = rest.replace(orTail, "") }
+            found.push({ text: inner.trim(), join: join })
+            i = close + 1
+        }
+        return { rest: rest, groups: found }
     }
 
     function rebuild() {
@@ -171,6 +214,7 @@ Popup {
     onTypeModeChanged: rebuild()
     onNamesChanged: rebuild()
     onDatesChanged: rebuild()
+    onGroupsChanged: rebuild()
 
     function cycled(map, key, toExclude) {
         const c = Object.assign({}, map)
@@ -201,6 +245,7 @@ Popup {
         typeMode = "or"
         names = { tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} }
         dates = { modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } }
+        groups = []
         loading = false
     }
 
@@ -263,6 +308,8 @@ Popup {
         const st = { types: {}, typeMode: "or", names: { tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} },
                      dates: { modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } } }
         const extras = []
+        const lifted = liftGroups(text || "")
+        text = lifted.rest
         let haveTypes = false
         const re = /(^|\s)(type:|tags:|taggroups:|locations:|lists:|groups:|modified:|created:|completed:)/gi
         const hits = []
@@ -323,6 +370,7 @@ Popup {
         typeMode = st.typeMode
         names = st.names
         dates = st.dates
+        groups = lifted.groups
         loading = false
         rebuild()
         freeInput.text = freeText
@@ -604,6 +652,68 @@ Popup {
                     }
                 }
 
+                Heading { text: "GROUPS"; Layout.topMargin: 6 }
+                Text {
+                    Layout.fillWidth: true
+                    text: "A group combines whole filters, such as tags: home OR type: starred, inside parentheses."
+                    color: theme.faint
+                    font.pixelSize: backend.fontSize - 3
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.groups
+                    RowLayout {
+                        required property var modelData
+                        required property int index
+                        Layout.fillWidth: true
+                        spacing: 6
+                        Segment { label: "And"; active: modelData.join === "and"; onClicked: root.setGroup(index, { join: "and" }) }
+                        Segment { label: "Or"; active: modelData.join === "or"; onClicked: root.setGroup(index, { join: "or" }) }
+                        Segment { label: "Not"; active: modelData.join === "not"; onClicked: root.setGroup(index, { join: "not" }) }
+                        TextField {
+                            id: groupField
+                            objectName: "groupField"
+                            Layout.fillWidth: true
+                            font.pixelSize: backend.fontSize
+                            color: theme.foreground
+                            text: modelData.text
+                            placeholderText: "tags: home OR type: starred"
+                            placeholderTextColor: theme.faint
+                            background: Rectangle { radius: 8; color: theme.background; border.color: groupField.activeFocus ? theme.accent : theme.divider }
+                            onTextEdited: root.setGroup(index, { text: text })
+                            Keys.onReturnPressed: root.doSearch()
+                        }
+                        Segment { label: "\u00d7"; onClicked: root.removeGroup(index) }
+                    }
+                }
+                RowLayout {
+                    Segment { objectName: "addGroup"; label: "Add group"; onClicked: root.addGroup() }
+                }
+
+                Heading { text: "SEARCH SCOPE"; Layout.topMargin: 6 }
+                RowLayout {
+                    spacing: 6
+                    Text { Layout.preferredWidth: 72; text: "Search in"; color: theme.foreground; font.pixelSize: backend.fontSize }
+                    Segment { objectName: "scopeThis"; label: "This list"; active: !backend.searchAllLists; onClicked: backend.setSearchAllLists(false) }
+                    Segment { objectName: "scopeAll"; label: "All lists"; active: backend.searchAllLists; onClicked: backend.setSearchAllLists(true) }
+                }
+                RowLayout {
+                    spacing: 6
+                    Text { Layout.preferredWidth: 72; text: "Scheduled"; color: theme.foreground; font.pixelSize: backend.fontSize }
+                    Segment {
+                        objectName: "searchScheduledHide"
+                        label: "Hide"
+                        active: root.editingListId ? !root.includeScheduled : !backend.showScheduled
+                        onClicked: { if (root.editingListId) root.includeScheduled = false; else backend.showScheduled = false }
+                    }
+                    Segment {
+                        objectName: "searchScheduledInclude"
+                        label: "Include"
+                        active: root.editingListId ? root.includeScheduled : backend.showScheduled
+                        onClicked: { if (root.editingListId) root.includeScheduled = true; else backend.showScheduled = true }
+                    }
+                }
+
                 Heading { text: "WITHIN THE LAST"; Layout.topMargin: 6 }
                 Repeater {
                     model: root.dateRows
@@ -720,15 +830,9 @@ Popup {
                     Segment { objectName: "completedInclude"; label: "Include"; active: root.completedMode === 1; onClicked: root.completedMode = 1 }
                     Segment { objectName: "completedExclude"; label: "Exclude"; active: root.completedMode === 2; onClicked: root.completedMode = 2 }
                 }
-                RowLayout {
-                    spacing: 6
-                    Text { Layout.preferredWidth: 72; text: "Scheduled"; color: theme.foreground; font.pixelSize: backend.fontSize }
-                    Segment { objectName: "scheduledHide"; label: "Hide"; active: !root.includeScheduled; onClicked: root.includeScheduled = false }
-                    Segment { objectName: "scheduledInclude"; label: "Include"; active: root.includeScheduled; onClicked: root.includeScheduled = true }
-                }
                 Text {
                     Layout.fillWidth: true
-                    text: "These apply to the Smart List you save or update; a plain search ignores them."
+                    text: "The due date range and Completed switch apply to the Smart List you save or update; a plain search ignores them."
                     color: theme.faint
                     font.pixelSize: backend.fontSize - 3
                     wrapMode: Text.Wrap

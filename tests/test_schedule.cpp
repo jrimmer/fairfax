@@ -423,6 +423,13 @@ private slots:
         QCOMPARE(Schedule::dueHint(t, Now, defaults()), QString("Completed yesterday"));
         QVERIFY(Schedule::dueHint(task(), Now, defaults()).isEmpty());
     }
+
+    void dueHintEndedAfterDueTime() {
+        // Due 9:00 today with a 1h window: ended, though not overdue by the day rule.
+        const Task t = task({}, -1, Today, 9 * H, 60);
+        QCOMPARE(Schedule::dueHint(t, Now, defaults()), QString("Ended"));
+        QCOMPARE(Schedule::dueHint(task({}, -1, Today, 9 * H), Now, defaults()), QString("Ended"));
+    }
 };
 
 REGISTER_TEST(ScheduleTest)

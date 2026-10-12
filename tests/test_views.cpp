@@ -746,6 +746,19 @@ private slots:
             seen << m_store->task(r.taskId).title;
         QCOMPARE(seen, (QStringList{"P", "noted", "plain"}));
     }
+
+    void sortingByStartDateRevealsScheduled() {
+        const auto l = addList("L");
+        addTask(l, "visible");
+        addTask(l, "later", [](Task &t) { t.startDate = day(5); });
+        QCOMPARE(titles(build(list(l))), QStringList{"visible"});
+        SortSpec byStart;
+        byStart.field = SortField::StartDate;
+        const auto shown = titles(build(list(l), {}, byStart));
+        QCOMPARE(sorted(shown), (QStringList{"later", "visible"}));
+        // Focus lists keep hiding them.
+        QVERIFY(!titles(build(Source{Source::All}, {}, byStart)).contains("later"));
+    }
 };
 
 REGISTER_TEST(ViewsTest)

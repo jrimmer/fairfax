@@ -753,6 +753,21 @@ private slots:
         QVERIFY(!Query::parse("tags: x milk").replacesScope());
         QVERIFY(!Query::parse("milk").namesCompleted());
     }
+
+    void keywordGroupsCombineFilters() {
+        EXPECT("(tags: work OR type: starred) lists: Office", "Book flights", "Prepare slides", "Review budget", "Write report");
+        EXPECT("tags: home OR (lists: Office type: starred)", "Buy milk", "Plumber visit", "Review budget");
+        QString error;
+        titles("(tags: urgent OR tags: nothing)", &error);
+        QVERIFY(error.isEmpty());
+        // A group that opens with a plain word is ordinary text grouping.
+        QCOMPARE(titles("(milk OR plumber)"), titles("milk OR plumber"));
+    }
+
+    void negatedGroupExcludes() {
+        EXPECT("lists: Errands !(tags: home)", "Call Mum", "Naïve résumé", "Shopping");
+        QVERIFY(Query::parse("(completed: 7d)").namesCompleted());
+    }
 };
 
 REGISTER_TEST(QueryTest)

@@ -4,6 +4,8 @@
 // ("tom mor", "in 3w 3pm", "18d", "w19", "9p45", "eod") and drop down a short
 // list of suggestions as you type; this produces that list.
 
+#include <optional>
+
 #include <QDate>
 #include <QDateTime>
 #include <QList>
@@ -18,6 +20,14 @@ struct DateSuggestion {
 };
 
 namespace DateParse {
+
+// Whether a numeric date such as "9/5" reads day first (5 September) rather
+// than month first. Follows the system locale's short date format unless
+// forced; locales that cannot say (C/POSIX) read month first.
+bool numericDayFirst();
+
+// Forces the order for tests and for a future setting; nullopt follows the locale.
+void setNumericDayFirst(std::optional<bool> dayFirst);
 
 // Suggestions for `text`, best first, at most `limit`. `now` is passed in so
 // tests are deterministic. Empty or unrecognised input gives an empty list.

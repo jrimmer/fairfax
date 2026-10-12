@@ -93,7 +93,12 @@ offers your lists and `pc done <Tab>` your open tasks.
   (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) also sets a due-date range
   (between two dates, in the next N days to years, or no due date) and whether the list
   includes completed or scheduled tasks. `lists:`, `groups:` and `completed:` search every
-  list, and `completed:` or `type: donetoday` find finished tasks.
+  list, and `completed:` or `type: donetoday` find finished tasks. Parentheses can group
+  whole filters, `tags: home OR (lists: Work type: starred)`, and Search Options has a
+  group row, a This list / All lists scope, an Include Scheduled switch and a Sounds like
+  switch that is remembered. The Find, Jump, Tag Search and Quick Open bars have an
+  Exact words switch (Alt+E), remembered per bar; Defer also takes an offset such as
+  `+3d`, `+1w` or `-2d` for the whole selection.
 - **List options.** Right-click a list for Exclude/Include Completed and Delete all Tasks;
   Settings → Today & Lists chooses the counts on lists and whether a project view inherits
   the search it was opened from. Lists also sort by Note and Location.
@@ -146,6 +151,7 @@ list has focus. Press `?` in the app for the full list.
 | `e` / `x` | Due time… / Duration… |
 | `]` `[` and `.` `,` | Due date / start date ±1 day (Shift: a week) |
 | `Alt+[` / `Alt+,` | Remove the due / start date |
+| `Ctrl+Shift+[` | Remove the due time |
 | `0`–`3`, `=` / `-` | Priority none…high, raise / lower |
 | `s` / `Ctrl+S` | Star / unstar |
 | `l` / `Alt+L` | Tag… / Untag… (choose which tags to remove) |

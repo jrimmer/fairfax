@@ -30,6 +30,8 @@ struct TimeWord {
 const TimeWord kTimeWords[] = {{"morning", 9 * 60}, {"afternoon", 14 * 60}, {"evening", 19 * 60},
                                {"night", 21 * 60},  {"noon", 12 * 60},      {"midnight", 0}};
 
+std::optional<bool> g_dayFirstOverride;
+
 constexpr int kMaxLookaheadMonths = 14;
 constexpr int kMaxLookaheadYears = 8;
 
@@ -183,6 +185,10 @@ QList<Candidate> keywordReadings(const QString &s, const Context &ctx) {
         addDay(out, today.addDays((5 - today.dayOfWeek() + 7) % 7));
     if (matches("eom"))
         addDay(out, QDate(today.year(), today.month(), today.daysInMonth()));
+    if (matches("eoy"))
+        addDay(out, QDate(today.year(), 12, 31));
+    if (s.size() >= 3 && matches("tonight"))
+        out.append({today, 21 * 60, true});
     if (matches("now"))
         out.append({today, ctx.nowMinutes, true});
 
@@ -347,8 +353,10 @@ QList<Candidate> exactDateReadings(const QString &s, const Context &ctx) {
     if (const auto m = iso.match(s); m.hasMatch()) {
         addDay(out, QDate(m.captured(1).toInt(), m.captured(2).toInt(), m.captured(3).toInt()));
     } else if (const auto m2 = us.match(s); m2.hasMatch()) {
-        int month = m2.captured(1).toInt();
-        int day = m2.captured(2).toInt();
+        const bool dayFirst = DateParse::numericDayFirst();
+        int month = m2.captured(dayFirst ? 2 : 1).toInt();
+        int day = m2.captured(dayFirst ? 1 : 2).toInt();
+        // An impossible month means the other order was meant.
         if (month > 12 && day <= 12)
             std::swap(month, day);
         const int year = m2.captured(3).isEmpty() ? 0 : m2.captured(3).toInt();
@@ -409,6 +417,23 @@ DateSuggestion makeSuggestion(const QDate &date, int minutes, const QDate &today
 }  // namespace
 
 namespace DateParse {
+
+bool numericDayFirst() {
+    if (g_dayFirstOverride)
+        return *g_dayFirstOverride;
+    const QLocale locale = QLocale::system();
+    if (locale.language() == QLocale::C)
+        return false;
+    // The first of d/M in the short format decides ("dd/MM/yyyy" vs "M/d/yy").
+    const QString format = locale.dateFormat(QLocale::ShortFormat);
+    const int d = format.indexOf(QLatin1Char('d'));
+    const int m = format.indexOf(QLatin1Char('M'));
+    return d >= 0 && m >= 0 && d < m;
+}
+
+void setNumericDayFirst(std::optional<bool> dayFirst) {
+    g_dayFirstOverride = dayFirst;
+}
 
 QList<DateSuggestion> suggest(const QString &text, const QDateTime &now, int limit) {
     QList<DateSuggestion> out;

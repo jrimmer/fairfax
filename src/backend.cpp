@@ -65,6 +65,7 @@ Backend::Backend(Store *store, QObject *parent)
     for (const auto &id : m_store->setting("ui.expandedLists").toString().split(',', Qt::SkipEmptyParts))
         m_expandedLists.insert(id.toLongLong());
     m_options.completedWindowMinutes = m_store->setting("tasks.completedWindow", 24 * 60).toInt();
+    m_options.soundex = m_store->setting("search.soundex", false).toBool();
     // Quick Entry once read its own list key, which Settings never wrote.
     // There is one default list now; an old choice carries over to it.
     if (const qint64 old = m_store->setting("tasks.quickEntryList", 0).toLongLong(); old > 0) {
@@ -246,8 +247,19 @@ QString Backend::selectionSummary() const {
     int minutes = 0;
     for (auto id : m_selected) {
         const Task t = m_store->task(id);
-        if (!t.completed)
-            minutes += t.duration;
+        // A selected parent and its sub-tasks must not count twice: as in
+        // the section totals, open sub-tasks with durations stand in for the
+        // parent's own, and are then skipped when they are selected too.
+        bool underSelected = false;
+        for (qint64 p = t.parentId; p && !underSelected; p = m_store->task(p).parentId)
+            underSelected = m_selected.contains(p);
+        if (t.completed || underSelected)
+            continue;
+        int childMinutes = 0;
+        for (const auto &c : m_store->tasks())
+            if (c.parentId == id && !c.deleted && !c.completed)
+                childMinutes += c.duration;
+        minutes += childMinutes > 0 ? childMinutes : t.duration;
     }
     QString text = QStringLiteral("%1 tasks selected").arg(m_selected.size());
     if (minutes > 0)
@@ -710,7 +722,13 @@ void Backend::completeTask(Task t, bool done, const QDateTime &now) {
                 copy.seriesUid = t.uid;
             m_store->putTask(copy);
             next->seriesUid = copy.seriesUid;
+            next->notes = Recurrences::carryOverNotes(t.notes);
             m_store->putTask(*next);
+            // A project or checklist starts the next occurrence fresh: the
+            // completed copy keeps the children as they were checked, and
+            // the live ones are reset.
+            if (t.type != TaskType::Task)
+                archiveChildren(t.id, copy.id);
             return;
         }
     }
@@ -723,6 +741,37 @@ void Backend::completeTask(Task t, bool done, const QDateTime &now) {
         for (const auto &c : views.children(t.id))
             if (!c.completed)
                 completeTask(c, true, now);
+    }
+}
+
+void Backend::archiveChildren(qint64 parentId, qint64 copyId) {
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    for (Task c : views.children(parentId)) {
+        Task kept = c;
+        kept.id = m_store->nextId("tasks");
+        kept.uid.clear();
+        kept.parentId = copyId;
+        kept.recurrence = {};
+        m_store->putTask(kept);
+        archiveChildren(c.id, kept.id);
+        if (c.completed) {
+            c.completed = false;
+            c.completedAt = {};
+            m_store->putTask(c);
+        }
+    }
+}
+
+void Backend::reopenChildren(const Task &project) {
+    if (project.type != TaskType::Project)
+        return;
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    for (auto c : views.children(project.id)) {
+        if (c.completed) {
+            c.completed = false;
+            c.completedAt = {};
+            m_store->putTask(c);
+        }
     }
 }
 
@@ -782,7 +831,56 @@ void Backend::nudgeDue(int days) {
     editTasks("Change Due Date", targetIds(), [&](Task &t) {
         if (t.parentId && m_store->task(t.parentId).type == TaskType::Checklist) return;
         t.dueDate = t.dueDate.isValid() ? t.dueDate.addDays(days) : today.addDays(days > 0 ? days - 1 : days + 1);
+        reopenChildren(t);
     });
+}
+
+bool Backend::deferBy(const QString &text) {
+    static const QRegularExpression pattern(QStringLiteral("^\\s*([+-]?)\\s*(\\d{1,4})\\s*(d|w|m|y)[a-z]*\\s*$"),
+                                            QRegularExpression::CaseInsensitiveOption);
+    const auto m = pattern.match(text);
+    if (!m.hasMatch())
+        return false;
+    // A bare number is a delay, so only an explicit minus moves a date back.
+    const int n = m.captured(2).toInt() * (m.captured(1) == QLatin1String("-") ? -1 : 1);
+    const QChar unit = m.captured(3).at(0).toLower();
+    const QDate today = QDate::currentDate();
+    const auto shifted = [&](const QDate &from) {
+        return unit == QLatin1Char('d')   ? from.addDays(n)
+               : unit == QLatin1Char('w') ? from.addDays(7 * n)
+               : unit == QLatin1Char('m') ? from.addMonths(n)
+                                          : from.addYears(n);
+    };
+    const auto ids = targetIds();
+    for (auto i : ids)
+        m_options.keepVisible.insert(i);
+    editTasks("Change Due Date", ids, [&](Task &t) {
+        if (t.parentId && m_store->task(t.parentId).type == TaskType::Checklist)
+            return;
+        t.dueDate = shifted(t.dueDate.isValid() ? t.dueDate : today);
+        reopenChildren(t);
+    });
+    return true;
+}
+
+QVariantList Backend::dueTimeChips() const {
+    QVariantList chips;
+    const QString text = m_store->setting("tasks.dueTimeChips", QString()).toString();
+    const QDateTime now = QDateTime::currentDateTime();
+    for (const QString &part : text.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+        const int minutes = DateParse::parseTime(part.trimmed(), now);
+        if (minutes < 0 || chips.size() >= 6)
+            continue;
+        const QString label = minutes % 60 == 0 ? Schedule::formatTime(minutes).remove(QStringLiteral(":00"))
+                                                : Schedule::formatTime(minutes);
+        chips.append(QVariantMap{{"label", label}, {"minutes", minutes}});
+    }
+    if (chips.isEmpty()) {
+        for (int minutes : {9 * 60, 12 * 60, 15 * 60, 18 * 60})
+            chips.append(QVariantMap{{"label", Schedule::formatTime(minutes).remove(QStringLiteral(":00"))},
+                                     {"minutes", minutes}});
+    }
+    return chips;
 }
 
 void Backend::nudgeStart(int days) {
@@ -790,6 +888,7 @@ void Backend::nudgeStart(int days) {
     editTasks("Change Start Date", targetIds(), [&](Task &t) {
         if (t.parentId && m_store->task(t.parentId).type == TaskType::Checklist) return;
         t.startDate = t.startDate.isValid() ? t.startDate.addDays(days) : today.addDays(days > 0 ? days - 1 : days + 1);
+        reopenChildren(t);
     });
 }
 
@@ -800,25 +899,31 @@ void Backend::setDueInDays(int days) {
     editTasks("Change Due Date", targetIds(), [&](Task &t) {
         t.dueDate = due;
         AlarmTimes::applyDefaultReminder(*m_store, t);
+        reopenChildren(t);
     });
 }
 
 void Backend::setStartInDays(int days) {
     const QDate start = QDate::currentDate().addDays(days);
-    editTasks("Change Start Date", targetIds(), [&](Task &t) { t.startDate = start; });
+    editTasks("Change Start Date", targetIds(), [&](Task &t) {
+        t.startDate = start;
+        reopenChildren(t);
+    });
 }
 
 void Backend::clearDue() {
-    editTasks("Remove Due Date", targetIds(), [](Task &t) {
+    editTasks("Remove Due Date", targetIds(), [this](Task &t) {
         t.dueDate = {};
         t.dueTime = -1;
+        reopenChildren(t);
     });
 }
 
 void Backend::clearStart() {
-    editTasks("Remove Start Date", targetIds(), [](Task &t) {
+    editTasks("Remove Start Date", targetIds(), [this](Task &t) {
         t.startDate = {};
         t.startTime = -1;
+        reopenChildren(t);
     });
 }
 
@@ -1336,16 +1441,7 @@ void Backend::setDue(qint64 id, const QString &iso, int minutes) {
     if (date.isValid())
         AlarmTimes::applyDefaultReminder(*m_store, t);
     // Rescheduling a project sets its finished children back to active.
-    if (t.type == TaskType::Project) {
-        ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
-        for (auto c : views.children(t.id)) {
-            if (c.completed) {
-                c.completed = false;
-                c.completedAt = {};
-                m_store->putTask(c);
-            }
-        }
-    }
+    reopenChildren(t);
     m_store->commit();
     m_options.keepVisible.insert(id);
 }
@@ -1362,6 +1458,7 @@ void Backend::setStart(qint64 id, const QString &iso, int minutes) {
     else if (minutes != -2)
         t.startTime = minutes;
     m_store->putTask(t);
+    reopenChildren(t);
     m_store->commit();
     m_options.keepVisible.insert(id);
 }
@@ -1734,11 +1831,37 @@ QVariantMap Backend::taskInfo(qint64 id) const {
     };
 }
 
-QVariantList Backend::findTasks(const QString &text, int limit) const {
+bool Backend::textMatches(const QString &haystack, const QString &needle, bool exact) const {
+    const QString q = needle.trimmed();
+    if (q.isEmpty())
+        return true;
+    if (!exact)
+        return haystack.contains(q, Qt::CaseInsensitive);
+    // Whole words: "log" finds "Log in" but not "Catalog".
+    const QRegularExpression words(QStringLiteral("(?<![\\p{L}\\p{N}])") + QRegularExpression::escape(q) +
+                                       QStringLiteral("(?![\\p{L}\\p{N}])"),
+                                   QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+    return words.match(haystack).hasMatch();
+}
+
+void Backend::openTask(qint64 taskId) {
+    if (m_store->setting("quickopen.selectInPlace", true).toBool()) {
+        for (const auto &row : m_tasks.rows()) {
+            if (row.value("kind") == "task" && row.value("taskId").toLongLong() == taskId) {
+                selectTask(taskId);
+                emit revealTask(taskId);
+                return;
+            }
+        }
+    }
+    revealInList(taskId);
+}
+
+QVariantList Backend::findTasks(const QString &text, int limit, bool exact) const {
     // Quick Open: title matches across every list, prefix matches first.
     QVector<Task> hits;
     for (const auto &t : m_store->tasks())
-        if (!t.deleted && !t.title.isEmpty() && t.title.contains(text, Qt::CaseInsensitive) && m_store->lists().contains(t.listId)
+        if (!t.deleted && !t.title.isEmpty() && textMatches(t.title, text, exact) && m_store->lists().contains(t.listId)
             && !m_store->list(t.listId).deleted)
             hits.append(t);
     std::sort(hits.begin(), hits.end(), [&](const Task &a, const Task &b) {
@@ -1785,9 +1908,8 @@ void Backend::revealInList(qint64 taskId) {
     emit revealTask(taskId);
 }
 
-QVariantList Backend::jumpTargets(const QString &text) const {
-    const QString q = text.trimmed();
-    auto matches = [&](const QString &title) { return q.isEmpty() || title.contains(q, Qt::CaseInsensitive); };
+QVariantList Backend::jumpTargets(const QString &text, bool exact) const {
+    auto matches = [&](const QString &title) { return textMatches(title, text, exact); };
     QVariantList result;
     static const char *focusTitles[] = {"All", "Today", "Starred", "Scheduled", "Done"};
     ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
@@ -1822,7 +1944,7 @@ QVariantList Backend::jumpTargets(const QString &text) const {
     return result;
 }
 
-QVariantList Backend::findInView(const QString &text, int limit) const {
+QVariantList Backend::findInView(const QString &text, int limit, bool exact) const {
     // Every task the view holds, including those folded away inside collapsed
     // projects.
     const QString q = text.trimmed();
@@ -1833,7 +1955,7 @@ QVariantList Backend::findInView(const QString &text, int limit) const {
         if (seen.contains(t.id) || result.size() >= limit)
             return;
         seen.insert(t.id);
-        if (!q.isEmpty() && !t.title.contains(q, Qt::CaseInsensitive))
+        if (!textMatches(t.title, q, exact))
             return;
         const TaskList l = m_store->list(t.listId);
         result.append(QVariantMap{{"id", t.id}, {"title", t.title}, {"listName", t.parentId ? m_store->task(t.parentId).title : l.name},
@@ -2840,10 +2962,16 @@ QString Backend::licenseText() const {
 QString Backend::shareableLink(qint64 taskId) const { return Automation::shareableLink(m_store->task(taskId)); }
 
 void Backend::toggleSearchScope() {
-    m_searchAll = !m_searchAll;
+    setSearchAllLists(!m_searchAll);
+    setStatus(m_searchAll ? "Searching all lists" : "Searching this list");
+}
+
+void Backend::setSearchAllLists(bool all) {
+    if (m_searchAll == all)
+        return;
+    m_searchAll = all;
     rebuild();
     emit viewChanged();
-    setStatus(m_searchAll ? "Searching all lists" : "Searching this list");
 }
 
 // ----------------------------------------------------- focus & smart lists
@@ -2899,6 +3027,7 @@ QString Backend::smartRangeText() const {
 
 void Backend::setSoundex(bool on) {
     m_options.soundex = on;
+    m_store->setSetting("search.soundex", on);
     rebuild();
     emit viewChanged();
 }

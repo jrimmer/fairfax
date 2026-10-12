@@ -13,6 +13,10 @@ Popup {
     property string kind
     property var items: []
     property int highlighted: 0
+    // The exact-match switch of the Find, Jump, Tag Search and Quick Open bars;
+    // each bar remembers its own.
+    property bool exact: false
+    readonly property bool hasExact: ["find", "jump", "tagsearch", "open"].includes(kind)
 
     parent: Overlay.overlay
     x: (parent.width - width) / 2
@@ -35,7 +39,7 @@ Popup {
         case "defer": case "schedule":
             return [{ label: "Today", days: 0 }, { label: "Tomorrow", days: 1 }, { label: "2 Days", days: 2 }, { label: "Week", days: 7 }, { label: "None", days: -1 }]
         case "time":
-            return [{ label: "9 AM", minutes: 540 }, { label: "12 PM", minutes: 720 }, { label: "3 PM", minutes: 900 }, { label: "6 PM", minutes: 1080 }, { label: "None", minutes: -1 }]
+            return backend.dueTimeChips().concat([{ label: "None", minutes: -1 }])
         case "duration":
             return [{ label: "30 mins", minutes: 30 }, { label: "1 hour", minutes: 60 }, { label: "2 hours", minutes: 120 }, { label: "None", minutes: 0 }]
         case "repeat":
@@ -46,6 +50,7 @@ Popup {
 
     function openFor(k) {
         kind = k
+        exact = backend.setting("bar.exact." + k).value === "true"
         input.text = ""
         refresh()
         open()
@@ -68,10 +73,15 @@ Popup {
 
     function refresh() {
         const q = input.text.trim().toLowerCase()
-        const like = (s) => !q || s.toLowerCase().indexOf(q) >= 0
+        const like = (s) => backend.textMatches(s, q, hasExact && exact)
         let list = []
         switch (kind) {
         case "defer": case "schedule": case "time":
+            // A typed offset such as +3d or -1w moves the due dates instead.
+            if (kind === "defer" && /^[+-]\s*\d+\s*[dwmy]/i.test(q)) {
+                list = [{ label: "Move due dates by " + input.text.trim(), offset: input.text.trim() }]
+                break
+            }
             list = q ? backend.dateSuggestions(input.text).map(s => ({ label: s.label, date: s.date, minutes: s.minutes })) : []
             if (kind === "time") list = list.filter(s => s.minutes >= 0)
             break
@@ -85,11 +95,11 @@ Popup {
             break
         case "jump":
             // Lists in collapsed groups count; the panel only hides them.
-            list = backend.jumpTargets(input.text)
+            list = backend.jumpTargets(input.text, exact)
             break
         case "find":
             // Tasks folded away inside collapsed projects count too.
-            list = backend.findInView(input.text, 12).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id }))
+            list = backend.findInView(input.text, 12, exact).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id }))
             break
         case "untag": {
             list = backend.selectionTags().filter(t => like(t.name)).map(t => ({ label: t.name, sub: t.count > 1 ? t.count + " tasks" : "", id: t.id }))
@@ -106,7 +116,7 @@ Popup {
                     const r = backend.sidebar.get(i)
                     if (r.sourceKey && like(r.title)) list.push({ label: r.title, sub: "List", color: r.kind === "focus" ? -1 : r.color, key: r.sourceKey })
                 }
-                list = list.slice(0, 4).concat(backend.findTasks(input.text, 10).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id, task: true })))
+                list = list.slice(0, 4).concat(backend.findTasks(input.text, 10, exact).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id, task: true })))
             } else {
                 // Nothing typed yet: where you have been lately.
                 list = backend.recentItems(8)
@@ -115,6 +125,13 @@ Popup {
         }
         items = list.slice(0, 12)
         highlighted = 0
+    }
+
+    function toggleExact() {
+        exact = !exact
+        backend.setSetting("bar.exact." + kind, exact)
+        refresh()
+        input.forceActiveFocus()
     }
 
     function acceptChip(i) {
@@ -135,7 +152,10 @@ Popup {
         if (kind === "tag") { backend.tagSelection(it ? it.label : input.text, replace); close(); return }
         if (!it) return
         switch (kind) {
-        case "defer": backend.deferTo(it.date, it.minutes >= 0 ? it.minutes : -2); break
+        case "defer":
+            if (it.offset) backend.deferBy(it.offset)
+            else backend.deferTo(it.date, it.minutes >= 0 ? it.minutes : -2)
+            break
         case "schedule": backend.scheduleTo(it.date, it.minutes >= 0 ? it.minutes : -2); break
         case "time": backend.setSelectionDueTime(it.minutes); break
         case "duration": backend.setSelectionDuration(it.minutes); break
@@ -150,7 +170,7 @@ Popup {
             }
             break
         }
-        case "open": if (it.task) backend.revealInList(it.id); else backend.selectSource(it.key); break
+        case "open": if (it.task) backend.openTask(it.id); else backend.selectSource(it.key); break
         }
         close()
     }
@@ -158,14 +178,34 @@ Popup {
     contentItem: ColumnLayout {
         spacing: 0
 
-        Text {
+        RowLayout {
+            Layout.fillWidth: true
             Layout.leftMargin: 16
+            Layout.rightMargin: 10
             Layout.topMargin: 12
-            text: root.titles[root.kind] || ""
-            color: theme.muted
-            font.pixelSize: backend.fontSize - 2
-            font.weight: Font.Bold
-            font.letterSpacing: 0.5
+            Text {
+                Layout.fillWidth: true
+                text: root.titles[root.kind] || ""
+                color: theme.muted
+                font.pixelSize: backend.fontSize - 2
+                font.weight: Font.Bold
+                font.letterSpacing: 0.5
+            }
+            Rectangle {
+                visible: root.hasExact
+                implicitWidth: exactText.implicitWidth + 16
+                implicitHeight: 20
+                radius: 10
+                color: root.exact ? theme.accent : (exactMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07))
+                Text {
+                    id: exactText
+                    anchors.centerIn: parent
+                    text: "Exact words  ⌥E"
+                    color: root.exact ? theme.background : theme.muted
+                    font.pixelSize: backend.fontSize - 3
+                }
+                MouseArea { id: exactMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.toggleExact() }
+            }
         }
 
         TextField {
@@ -176,7 +216,7 @@ Popup {
             font.pixelSize: backend.fontSize + 2
             color: theme.foreground
             placeholderTextColor: theme.faint
-            placeholderText: ({ defer: "Type a date: tom 3pm, fri, in 2w, 18d", schedule: "Start on…", time: "Type a time: 9a, 14:30, 742",
+            placeholderText: ({ defer: "Type a date (tom 3pm, fri, in 2w) or an offset (+3d, +1w, -2d)", schedule: "Start on…", time: "Type a time: 9a, 14:30, 742",
                                 duration: "45m, 2h, 1d", tag: "Tag name (Shift+Return replaces existing tags)", move: "List name",
                                 jump: "List or project", find: "Task title", untag: "Tag to remove", tagsearch: "Tag", open: "Find any task or list",
                                 repeat: "" })[root.kind] || ""
@@ -188,7 +228,10 @@ Popup {
             Keys.onEnterPressed: (e) => root.accept(root.highlighted, e.modifiers & Qt.ShiftModifier)
             Keys.onEscapePressed: root.close()
             Keys.onPressed: (e) => {
-                if ((e.modifiers & Qt.AltModifier) && e.key >= Qt.Key_0 && e.key <= Qt.Key_9) {
+                if ((e.modifiers & Qt.AltModifier) && e.key === Qt.Key_E && root.hasExact) {
+                    root.toggleExact()
+                    e.accepted = true
+                } else if ((e.modifiers & Qt.AltModifier) && e.key >= Qt.Key_0 && e.key <= Qt.Key_9) {
                     const n = e.key - Qt.Key_0
                     root.acceptChip(n === 0 ? root.chips.length - 1 : n - 1)
                     e.accepted = true

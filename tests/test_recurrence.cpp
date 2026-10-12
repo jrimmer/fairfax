@@ -256,6 +256,13 @@ private slots:
         r.endDate = QDate(2026, 12, 31);
         QCOMPARE(Recurrences::describe(r), QString("Weekly · until 31 Dec 2026"));
     }
+
+    void carryOverNotesDropsStampLines() {
+        QCOMPARE(Recurrences::carryOverNotes("Call the bank\n2026-07-15 10:30\nAsk about fees"),
+                 QString("Call the bank\nAsk about fees"));
+        QCOMPARE(Recurrences::carryOverNotes("Plan\n[15 Jul 2026, 10:30 AM]\n\nRoom 12"), QString("Plan\n\nRoom 12"));
+        QCOMPARE(Recurrences::carryOverNotes("Just words"), QString("Just words"));
+    }
 };
 
 REGISTER_TEST(RecurrenceTest)

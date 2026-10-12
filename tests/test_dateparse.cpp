@@ -30,6 +30,7 @@ void check(const QString &text, const QDate &date, int minutes) {
 class DateParseTest : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase() { DateParse::setNumericDayFirst(false); }
     void emptyAndGarbage() {
         QVERIFY(sug("").isEmpty());
         QVERIFY(sug("   ").isEmpty());
@@ -239,6 +240,22 @@ private slots:
 
     void bestIsFirstSuggestion() {
         QCOMPARE(best("t"), sug("t").first());
+    }
+
+    // ---- numeric order ----
+
+    void numericOrderFollowsOverride() {
+        DateParse::setNumericDayFirst(true);
+        check("9/5", QDate(2027, 5, 9), -1);  // 9 May has passed this year.
+        check("25/12", QDate(2026, 12, 25), -1);
+        DateParse::setNumericDayFirst(false);
+        check("9/5", QDate(2026, 9, 5), -1);
+        DateParse::setNumericDayFirst(std::nullopt);
+    }
+
+    void yearEndWords() {
+        check("eoy", QDate(2026, 12, 31), -1);
+        check("tonight", QDate(2026, 7, 15), 21 * 60);
     }
 };
 

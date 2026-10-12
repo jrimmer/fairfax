@@ -1,6 +1,7 @@
 #include "recurrence.h"
 
 #include <QLocale>
+#include <QRegularExpression>
 #include <QStringList>
 
 namespace {
@@ -132,6 +133,29 @@ std::optional<Task> advance(const Task &task, const QDate &completedOn) {
             return std::nullopt;
     }
     return result;
+}
+
+QString carryOverNotes(const QString &notes) {
+    // The stamp formats Insert Time Stamp offers: ISO dates, "12 Oct 2026",
+    // "Mon, 12 Oct", and clock times, alone or together on a line, optionally
+    // in brackets.
+    static const QRegularExpression stamp(QStringLiteral(
+        "^\\s*[\\[(]?\\s*"
+        "(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\\s+)?"
+        "(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.]\\d{1,2}[/.]\\d{2,4}|\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?(?:\\s+\\d{4})?|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?\\s+\\d{1,2}(?:,\\s*\\d{4})?)?"
+        "[,T\\s]*(?:\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:[AaPp][Mm])?)?"
+        "\\s*[\\])]?\\s*$"));
+    QStringList kept;
+    bool changed = false;
+    for (const QString &line : notes.split(QLatin1Char('\n'))) {
+        // A blank line is not a stamp, and must not be dropped by the pattern.
+        if (!line.trimmed().isEmpty() && stamp.match(line).hasMatch()) {
+            changed = true;
+            continue;
+        }
+        kept << line;
+    }
+    return changed ? kept.join(QLatin1Char('\n')).trimmed() : notes;
 }
 
 QString describe(const Recurrence &rule) {

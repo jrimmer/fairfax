@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include "dateparse.h"
 #include "nlparse.h"
 #include "testregistry.h"
 
@@ -28,6 +29,7 @@ QStringList spanTexts(const QString &text, const ParsedEntry &e) {
 class NlParseTest : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase() { DateParse::setNumericDayFirst(false); }
     void plainTitleUntouched() {
         const auto e = parse(QStringLiteral("Buy some bread"));
         QCOMPARE(e.title, QStringLiteral("Buy some bread"));
@@ -934,6 +936,69 @@ private slots:
         const auto e = parse(QStringLiteral("Do it ! !!! [10m] [20m]"));
         QCOMPARE(e.priority, 1);
         QCOMPARE(e.duration, 10);
+    }
+
+    // ---- Locale order, quarters, end-of-period words, bare ordinals ----
+
+    void slashDateDayFirst() {
+        DateParse::setNumericDayFirst(true);
+        auto e = parse(QStringLiteral("File the claim 9/5"));
+        DateParse::setNumericDayFirst(false);
+        QCOMPARE(e.dueDate, QDate(2027, 5, 9));
+    }
+
+    void quarterlyRepeats() {
+        auto e = parse(QStringLiteral("Pay estimated tax quarterly"));
+        QCOMPARE(e.title, QStringLiteral("Pay estimated tax"));
+        QCOMPARE(e.recurrence.frequency, int(Repeat::Monthly));
+        QCOMPARE(e.recurrence.interval, 3);
+        e = parse(QStringLiteral("Review goals every quarter"));
+        QCOMPARE(e.recurrence.frequency, int(Repeat::Monthly));
+        QCOMPARE(e.recurrence.interval, 3);
+        e = parse(QStringLiteral("Review goals every other quarter"));
+        QCOMPARE(e.recurrence.interval, 6);
+    }
+
+    void endOfPeriods() {
+        auto e = parse(QStringLiteral("Close the books eom"));
+        QCOMPARE(e.title, QStringLiteral("Close the books"));
+        QCOMPARE(e.dueDate, QDate(2026, 7, 31));
+        e = parse(QStringLiteral("Annual review eoy"));
+        QCOMPARE(e.dueDate, QDate(2026, 12, 31));
+        e = parse(QStringLiteral("Annual review by end of year"));
+        QCOMPARE(e.title, QStringLiteral("Annual review"));
+        QCOMPARE(e.dueDate, QDate(2026, 12, 31));
+        e = parse(QStringLiteral("Invoices end of the month"));
+        QCOMPARE(e.dueDate, QDate(2026, 7, 31));
+    }
+
+    void tonightKeepsEveningTime() {
+        const auto e = parse(QStringLiteral("Call mum tonight"));
+        QCOMPARE(e.title, QStringLiteral("Call mum"));
+        QCOMPARE(e.dueDate, QDate(2026, 7, 15));
+        QCOMPARE(e.dueTime, mins(21));
+    }
+
+    void bareOrdinalIsNextSuchDay() {
+        auto e = parse(QStringLiteral("Pay rent 15th"));
+        QCOMPARE(e.title, QStringLiteral("Pay rent"));
+        QCOMPARE(e.dueDate, QDate(2026, 7, 15));
+        e = parse(QStringLiteral("Pay rent 3rd"));
+        QCOMPARE(e.dueDate, QDate(2026, 8, 3));
+        // Mid-sentence ordinals are ordinary words.
+        e = parse(QStringLiteral("Visit 3rd floor"));
+        QCOMPARE(e.title, QStringLiteral("Visit 3rd floor"));
+        QVERIFY(!parse(QStringLiteral("Lunch at 5th Avenue deli")).dueDate.isValid());
+    }
+
+    void locationLongestNameWins() {
+        const QStringList places{"Home", "Home Depot"};
+        auto e = parse(QStringLiteral("Buy screws @Home Depot"), {}, places);
+        QCOMPARE(e.location, QStringLiteral("Home Depot"));
+        QCOMPARE(e.title, QStringLiteral("Buy screws"));
+        e = parse(QStringLiteral("Buy screws @Home soon"), {}, places);
+        QCOMPARE(e.location, QStringLiteral("Home"));
+        QCOMPARE(e.title, QStringLiteral("Buy screws soon"));
     }
 };
 

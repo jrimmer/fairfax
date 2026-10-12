@@ -22,6 +22,10 @@ QDate next(const Recurrence &rule, const QDate &anchor);
 // The returned task is not completed and has occurrencesDone incremented.
 std::optional<Task> advance(const Task &task, const QDate &completedOn);
 
+// A repeating task's notes as the next occurrence gets them: lines that are
+// only a date or time stamp (from Insert Time Stamp) are dropped.
+QString carryOverNotes(const QString &notes);
+
 // A short summary for the editor and Quick Look, such as "Daily",
 // "Every 2 weeks on Mon, Wed", "Monthly on the last Fri", "Yearly · after completion".
 QString describe(const Recurrence &rule);

@@ -167,6 +167,13 @@ public:
     Q_INVOKABLE void bumpPriority(int delta);
     Q_INVOKABLE void setStarred(int state, qint64 id = 0);  // 1 star, 0 unstar, -1 toggle.
     Q_INVOKABLE void nudgeDue(int days);
+    // Moves the selection's due dates by a typed offset such as "+3d", "+1w",
+    // "-2d", "+1m" or "+1y" (undated tasks count from today). False when the
+    // text is not an offset.
+    Q_INVOKABLE bool deferBy(const QString &offset);
+    // The quick time choices of the Due Time menu and bar, from the "Due Time
+    // Shortcuts" setting: a list of {label, minutes}.
+    Q_INVOKABLE QVariantList dueTimeChips() const;
     Q_INVOKABLE void nudgeStart(int days);
     Q_INVOKABLE void setDueInDays(int days);
     Q_INVOKABLE void setStartInDays(int days);
@@ -240,13 +247,19 @@ public:
     // and its tasks. Kept in a setting, on this machine only.
     Q_INVOKABLE void setListSyncExcluded(qint64 id, bool excluded);
     Q_INVOKABLE QVariantMap taskInfo(qint64 id) const;
-    Q_INVOKABLE QVariantList findTasks(const QString &text, int limit = 12) const;
+    Q_INVOKABLE QVariantList findTasks(const QString &text, int limit = 12, bool exact = false) const;
     Q_INVOKABLE void revealInList(qint64 taskId);
     // The jump, find and quick-open bars. Jump lists every list, including
     // those in collapsed groups; find looks inside collapsed projects too;
     // Quick Open starts from what was visited lately.
-    Q_INVOKABLE QVariantList jumpTargets(const QString &text) const;
-    Q_INVOKABLE QVariantList findInView(const QString &text, int limit = 12) const;
+    // Whether `haystack` matches `needle` in the jump and find bars: loosely
+    // (a case-insensitive substring) or, with `exact`, as whole words.
+    Q_INVOKABLE bool textMatches(const QString &haystack, const QString &needle, bool exact = false) const;
+    Q_INVOKABLE QVariantList jumpTargets(const QString &text, bool exact = false) const;
+    Q_INVOKABLE QVariantList findInView(const QString &text, int limit = 12, bool exact = false) const;
+    // Quick Open on a task: selected where it stands when the current view
+    // shows it (and the option is on), otherwise revealed in its own list.
+    Q_INVOKABLE void openTask(qint64 taskId);
     Q_INVOKABLE void revealHere(qint64 taskId);
     Q_INVOKABLE QVariantList recentItems(int limit = 8) const;
 
@@ -407,6 +420,7 @@ public:
 
     // Search everywhere rather than in the current list (the reference app's scope toggle).
     Q_INVOKABLE void toggleSearchScope();
+    Q_INVOKABLE void setSearchAllLists(bool all);
 
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
@@ -441,6 +455,11 @@ private:
     QVector<qint64> targetIds(qint64 id = 0) const;
     void editTasks(const QString &label, const QVector<qint64> &ids, const std::function<void(Task &)> &edit);
     void completeTask(Task task, bool done, const QDateTime &now);
+    // Copies a repeating project's children (as they stand) under its completed
+    // copy and resets the live ones, then the same for their own children.
+    void archiveChildren(qint64 parentId, qint64 copyId);
+    // Rescheduling a project sets its completed children back to active.
+    void reopenChildren(const Task &project);
     void deleteTree(qint64 id);
     qint64 duplicateTree(const Task &task, qint64 parentId, qint64 listId);
     void collectTree(const Task &task, QVector<Task> &into) const;

@@ -686,6 +686,160 @@ private slots:
         f.backend->setSetting("lists.counts", 0);
         QCOMPARE(counts("all"), (QPair<int, int>{0, 0}));
     }
+
+    // ---- repeating projects, rescheduling, durations, offsets ----
+
+    void repeatingProjectResetsChildrenAndArchivesCheckedOnes() {
+        Fixture f;
+        const qint64 proj = f.addTask("Weekly review", TaskType::Project);
+        f.backend->selectTask(proj);
+        f.backend->setDueInDays(0);
+        f.backend->setRepeatPreset(proj, 2);  // Weekly.
+        auto addChild = [&](const QString &title, bool done) {
+            Task c;
+            c.id = f.store.nextId("tasks");
+            c.listId = f.store.task(proj).listId;
+            c.parentId = proj;
+            c.title = title;
+            c.completed = done;
+            if (done) c.completedAt = QDateTime::currentDateTime().addDays(-1);
+            f.store.begin("child");
+            f.store.putTask(c);
+            f.store.commit();
+        };
+        addChild("Inbox zero", true);
+        addChild("Plan week", false);
+        f.backend->toggleComplete(proj);
+
+        QVERIFY(!f.store.task(proj).completed);
+        QCOMPARE(f.store.task(proj).dueDate, QDate::currentDate().addDays(7));
+        qint64 copy = 0;
+        for (const auto &t : f.store.tasks())
+            if (t.id != proj && t.type == TaskType::Project && t.completed) copy = t.id;
+        QVERIFY(copy);
+        int live = 0, kept = 0, keptDone = 0;
+        for (const auto &t : f.store.tasks()) {
+            if (t.deleted || t.parentId == 0) continue;
+            if (t.parentId == proj) { ++live; QVERIFY(!t.completed && !t.completedAt.isValid()); }
+            if (t.parentId == copy) { ++kept; keptDone += t.completed; }
+        }
+        QCOMPARE(live, 2);
+        QCOMPARE(kept, 2);
+        QCOMPARE(keptDone, 1);  // The copy keeps the children as they were checked.
+    }
+
+    void repeatingTaskCarriesNotesWithoutStamps() {
+        Fixture f;
+        const qint64 id = f.addTask("Backup");
+        f.backend->selectTask(id);
+        f.backend->setDueInDays(0);
+        f.backend->setRepeatPreset(id, 1);
+        Task t = f.store.task(id);
+        t.notes = "Check disks\n2026-07-15 10:30\nRotate drive";
+        f.store.begin("notes");
+        f.store.putTask(t);
+        f.store.commit();
+        f.backend->toggleComplete(id);
+        QCOMPARE(f.store.task(id).notes, QString("Check disks\nRotate drive"));
+    }
+
+    void rescheduleStartResetsCompletedProjectChildren() {
+        Fixture f;
+        const qint64 proj = f.addTask("Trip", TaskType::Project);
+        Task c;
+        c.id = f.store.nextId("tasks");
+        c.listId = f.store.task(proj).listId;
+        c.parentId = proj;
+        c.title = "Pack";
+        c.completed = true;
+        c.completedAt = QDateTime::currentDateTime();
+        f.store.begin("child");
+        f.store.putTask(c);
+        f.store.commit();
+        f.backend->setStart(proj, QDate::currentDate().addDays(3).toString(Qt::ISODate), -2);
+        QVERIFY(!f.store.task(c.id).completed);
+        c.completed = true;
+        f.store.begin("child");
+        f.store.putTask(c);
+        f.store.commit();
+        f.backend->selectTask(proj);
+        f.backend->clearStart();
+        QVERIFY(!f.store.task(c.id).completed);
+    }
+
+    void selectionDurationDoesNotDoubleCount() {
+        Fixture f;
+        const qint64 proj = f.addTask("Project", TaskType::Project);
+        auto child = [&](const QString &title, int minutes) {
+            Task c;
+            c.id = f.store.nextId("tasks");
+            c.listId = f.store.task(proj).listId;
+            c.parentId = proj;
+            c.title = title;
+            c.duration = minutes;
+            f.store.begin("child");
+            f.store.putTask(c);
+            f.store.commit();
+            return c.id;
+        };
+        const qint64 a = child("A", 30), b = child("B", 30);
+        const qint64 other = f.addTask("Solo");
+        Task solo = f.store.task(other);
+        solo.duration = 60;
+        f.store.begin("d");
+        f.store.putTask(solo);
+        f.store.commit();
+        f.backend->selectTask(proj);
+        f.backend->selectTask(a, 2);
+        f.backend->selectTask(b, 2);
+        f.backend->selectTask(other, 2);
+        // Parent stands in for its children (60 min), plus the solo task.
+        QVERIFY2(f.backend->selectionSummary().contains("2h"), qPrintable(f.backend->selectionSummary()));
+    }
+
+    void deferByOffsetMovesDueDates() {
+        Fixture f;
+        const qint64 id = f.addTask("Report");
+        f.backend->selectTask(id);
+        f.backend->setDueInDays(0);
+        QVERIFY(f.backend->deferBy("+3d"));
+        QCOMPARE(f.store.task(id).dueDate, QDate::currentDate().addDays(3));
+        QVERIFY(f.backend->deferBy("+1w"));
+        QCOMPARE(f.store.task(id).dueDate, QDate::currentDate().addDays(10));
+        QVERIFY(f.backend->deferBy("-2d"));
+        QCOMPARE(f.store.task(id).dueDate, QDate::currentDate().addDays(8));
+        QVERIFY(!f.backend->deferBy("soon"));
+        QCOMPARE(f.store.task(id).dueDate, QDate::currentDate().addDays(8));
+    }
+
+    void dueTimeChipsReadSetting() {
+        Fixture f;
+        QCOMPARE(f.backend->dueTimeChips().size(), 4);
+        f.backend->setSetting("tasks.dueTimeChips", "8am, 5:30pm, nonsense");
+        const auto chips = f.backend->dueTimeChips();
+        QCOMPARE(chips.size(), 2);
+        QCOMPARE(chips.at(0).toMap().value("minutes").toInt(), 8 * 60);
+        QCOMPARE(chips.at(1).toMap().value("minutes").toInt(), 17 * 60 + 30);
+    }
+
+    void soundexSettingPersists() {
+        Fixture f;
+        QVERIFY(!f.backend->soundex());
+        f.backend->setSoundex(true);
+        Backend again(&f.store);
+        QVERIFY(again.soundex());
+    }
+
+    void exactMatchMeansWholeWords() {
+        Fixture f;
+        QVERIFY(f.backend->textMatches("Catalog update", "log"));
+        QVERIFY(!f.backend->textMatches("Catalog update", "log", true));
+        QVERIFY(f.backend->textMatches("Log in to bank", "log", true));
+        f.addTask("Catalog update");
+        f.addTask("Log in to bank");
+        QCOMPARE(f.backend->findTasks("log", 10, false).size(), 2);
+        QCOMPARE(f.backend->findTasks("log", 10, true).size(), 1);
+    }
 };
 
 REGISTER_TEST(BackendTest)

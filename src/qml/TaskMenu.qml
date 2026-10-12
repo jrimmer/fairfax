@@ -46,7 +46,7 @@ Menu {
             }
         }
         MenuSeparator {}
-        MenuItem { text: "Pick Date…"; onTriggered: root.pickDate("defer") }
+        MenuItem { text: "Pick Date or Offset (+3d)…"; onTriggered: root.pickDate("defer") }
         MenuItem { text: "No Due Date"; onTriggered: backend.clearDue() }
     }
     Menu {
@@ -64,13 +64,17 @@ Menu {
         MenuItem { text: "No Start Date"; onTriggered: backend.clearStart() }
     }
     Menu {
+        id: timeMenu
         title: "Due Time"
+        // The Due Time Shortcuts setting, read again each time the menu opens.
+        property var chips: backend.dueTimeChips()
+        onAboutToShow: chips = backend.dueTimeChips()
         Repeater {
-            model: [["9 AM", 540], ["12 PM", 720], ["3 PM", 900], ["6 PM", 1080]]
+            model: timeMenu.chips
             MenuItem {
                 required property var modelData
-                text: modelData[0]
-                onTriggered: backend.setSelectionDueTime(modelData[1])
+                text: modelData.label
+                onTriggered: backend.setSelectionDueTime(modelData.minutes)
             }
         }
         MenuSeparator {}
