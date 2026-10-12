@@ -44,7 +44,11 @@ Hyprland's part lives in `~/.config/hypr/precrime.lua`, loaded by one line in
 
 ## Quick Entry and the terminal
 
-Type a task the way you'd say it, and Precrime picks out the details:
+Quick Entry is one line to type plus a row of labelled pills (list, due, start, repeat,
+alert, duration, tags, place, priority, star, attach) that always show what the task will
+get. Click a pill, or Tab to it, and its choices open in one row underneath: pick with the
+mouse, the arrow keys or a digit, and Escape closes the row. Type a task the way you'd say
+it, and Precrime picks out the details and fills the pills:
 `Call Sam tomorrow at 3pm #family !! every Monday [30m] /work/`. Dates, start dates
 (`starting Friday`), ranges (`from Monday until Friday`), repeats, `alert 30m`,
 `[durations]`, `!`/`!!`/`!!!` priority, `*` star, `#tags`, `/list/` and `@ Place` all work,
@@ -96,6 +100,8 @@ offers your lists and `pc done <Tab>` your open tasks.
 - **Arrange freely.** Drag lists and groups to reorder them, drag tasks onto lists, Today,
   Starred, Done, projects, tags, locations or calendar days, and between rows. Archived
   lists wait under *Archived* in the sidebar.
+- **Tray.** Precrime sits in the bar's tray while it runs in the background; its menu is a
+  quick view of today, with New Task, Find, Sync and Quit.
 - **Undo.** Every change is undoable with Ctrl+Z.
 
 ## Keyboard

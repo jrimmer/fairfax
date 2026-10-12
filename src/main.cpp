@@ -72,6 +72,11 @@ protected:
         if (!window || window != QGuiApplication::focusWindow())
             return false;
         if (window->title() == "Precrime Settings" || window->title() == "Precrime Quick Entry") {
+            // A window can keep Escape for itself (Quick Entry with an option
+            // row open closes the row first).
+            const QVariant own = window->property("escapeCloses");
+            if (own.isValid() && !own.toBool())
+                return false;
             // A popup inside (a menu, a date picker) gets Escape first.
             if (auto *quick = qobject_cast<QQuickWindow *>(window); quick && quick->activeFocusItem() &&
                 QString(quick->activeFocusItem()->metaObject()->className()).contains("Popup"))
@@ -219,7 +224,7 @@ int main(int argc, char *argv[]) {
     // menu, which Qt builds with widgets; the window itself is all QML.
     QApplication app(argc, argv);
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.2.4");
+    app.setApplicationVersion("0.3.0");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
