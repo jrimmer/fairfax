@@ -251,7 +251,7 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     Diagnostics::install();
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.4.0");
+    app.setApplicationVersion("0.5.0");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
