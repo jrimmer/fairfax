@@ -395,16 +395,33 @@ void Backend::setDayFilter(const QString &iso) {
     emit viewChanged();
 }
 
+void Backend::setDayRange(const QString &fromIso, const QString &toIso) {
+    QDate from = isoDate(fromIso), to = isoDate(toIso);
+    if (!from.isValid() || !to.isValid())
+        return setDayFilter(fromIso);
+    if (to < from)
+        std::swap(from, to);
+    m_options.dayFilterFrom = from;
+    m_options.dayFilterTo = to;
+    rebuild();
+    emit viewChanged();
+}
+
+QString Backend::dayFilterTo() const {
+    return m_options.dayFilterTo.isValid() ? m_options.dayFilterTo.toString(Qt::ISODate) : QString();
+}
+
 QVariantList Backend::monthDays(int year, int month) const {
-    // Busy-day counts for the mini calendar: tasks starting or due each day,
-    // plus the next occurrences of repeating tasks within the month.
+    // Busy-day counts for the mini calendar. Each task counts once, on its
+    // due day or, failing that, its start day, as in the reference app; repeating tasks
+    // also mark their next occurrences within the month.
     const QDate first(year, month, 1);
     QHash<QDate, int> counts;
     for (const auto &t : m_store->tasks()) {
         if (t.deleted || t.completed)
             continue;
         if (t.dueDate.isValid()) counts[t.dueDate]++;
-        if (t.startDate.isValid() && t.startDate != t.dueDate) counts[t.startDate]++;
+        else if (t.startDate.isValid()) counts[t.startDate]++;
         if (t.recurrence.isSet() && t.dueDate.isValid()) {
             QDate d = t.dueDate;
             for (int guard = 0; guard < 62; ++guard) {

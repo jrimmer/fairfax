@@ -97,6 +97,10 @@ offers your lists and `pc done <Tab>` your open tasks.
   files), and notes with live Markdown, clickable links and `@{Task}` links to other tasks.
 - **Calendar day bar.** Add an iCalendar address in Settings → Calendar and today's events
   appear above Today; drag a task onto the bar to block out time for it.
+- **Mini calendar.** Busy days as a heat map, dots or nothing (the ⌄ beside the calendar
+  button under the lists, which also shows or hides it and can shade weekends). Click a day
+  to filter to it, drag across days for a range, ⌥-click to add a task due that day, scroll
+  to page through months, and drop tasks on a day to defer them.
 - **Arrange freely.** Drag lists and groups to reorder them, drag tasks onto lists, Today,
   Starred, Done, projects, tags, locations or calendar days, and between rows. Archived
   lists wait under *Archived* in the sidebar.

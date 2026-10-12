@@ -19,6 +19,7 @@ Rectangle {
     property int dragListId: 0
     property int dragGroupId: 0
     property int deleteGroupId: 0
+    readonly property bool calendarShown: backend.setting("appearance.showCalendar").value !== false
     property string deleteGroupName
 
     Connections {
@@ -103,10 +104,10 @@ Rectangle {
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Precrime"
-                color: theme.muted
-                font.pixelSize: backend.fontSize - 1
-                font.weight: Font.DemiBold
-                font.letterSpacing: 0.4
+                color: theme.foreground
+                font.pixelSize: backend.fontSize + 4
+                font.weight: Font.Bold
+                font.letterSpacing: 0.3
             }
             IconButton {
                 anchors.right: parent.right
@@ -199,7 +200,11 @@ Rectangle {
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
-            visible: root.height > 660
+            Layout.bottomMargin: 4
+            // Shown or hidden from the footer; it also appears while tasks are
+            // dragged, so there is always a date to drop them on.
+            readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
+            visible: root.height > 560 && (root.calendarShown || (!!proxy && proxy.visible))
         }
 
         // Footer: new list or group, and settings.
@@ -241,6 +246,64 @@ Rectangle {
                     MenuItem { text: "New List"; onTriggered: { backend.newList(); root.renameSelected() } }
                     MenuItem { text: "New List Group"; onTriggered: root.renamingGroupId = backend.newGroup() }
                     MenuItem { text: "New Smart List…"; onTriggered: root.newSmartListRequested() }
+                }
+            }
+            // Show or hide the mini calendar, and beside it its display style.
+            Row {
+                id: calendarControls
+                x: 40
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 0
+                IconButton {
+                    icon: "calendar"
+                    tip: root.calendarShown ? "Hide Calendar" : "Show Calendar"
+                    checked: root.calendarShown
+                    onClicked: backend.setSetting("appearance.showCalendar", !root.calendarShown)
+                }
+                IconButton {
+                    id: styleButton
+                    icon: "chevronDown"
+                    size: 11
+                    width: 18
+                    tip: "Calendar Display Style"
+                    checked: styleMenu.opened
+                    onClicked: styleMenu.popup(styleButton, 0, -styleMenu.implicitHeight - 4)
+                    Menu {
+                        id: styleMenu
+                        popupType: Popup.Window
+                        readonly property string style: String(backend.setting("appearance.calendarStyle").value || "heat")
+                        // Picking a style also shows a hidden calendar.
+                        function pick(key) {
+                            backend.setSetting("appearance.calendarStyle", key)
+                            backend.setSetting("appearance.showCalendar", true)
+                        }
+                        MenuItem {
+                            text: "Shade Weekends"
+                            checkable: true
+                            checked: backend.setting("appearance.calendarWeekends").value === true
+                            onTriggered: backend.setSetting("appearance.calendarWeekends", checked)
+                        }
+                        MenuSeparator {}
+                        MenuItem { text: "Display style:"; enabled: false }
+                        MenuItem {
+                            text: "None"
+                            checkable: true
+                            checked: styleMenu.style === "none"
+                            onTriggered: styleMenu.pick("none")
+                        }
+                        MenuItem {
+                            text: "Dots"
+                            checkable: true
+                            checked: styleMenu.style === "dots"
+                            onTriggered: styleMenu.pick("dots")
+                        }
+                        MenuItem {
+                            text: "Heat Map"
+                            checkable: true
+                            checked: styleMenu.style === "heat"
+                            onTriggered: styleMenu.pick("heat")
+                        }
+                    }
                 }
             }
         }

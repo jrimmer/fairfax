@@ -3,7 +3,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // The month calendar under the Lists panel. Busy days are tinted as a heat
-// map; clicking a day filters the task list to it, and clicking again clears.
+// map or dotted; clicking a day filters the task list to it (again clears),
+// dragging across days filters to the range, Alt-click adds a task due that
+// day, and the wheel pages through months.
 ColumnLayout {
     id: root
     spacing: 2
@@ -12,16 +14,38 @@ ColumnLayout {
     readonly property int year: shown.getFullYear()
     readonly property int month: shown.getMonth()
     readonly property int firstDay: Qt.locale().firstDayOfWeek  // 0 = Sunday.
-    property var counts: backend.monthDays(year, month + 1)
-    // the reference app's Busy Days styles: a heat-map tint, dots under the date, or none.
+    // the reference app's Busy Days styles: a heat-map tint, dots under the date, or none,
+    // which skips the counting entirely.
     readonly property string style: String(backend.setting("appearance.calendarStyle").value || "heat")
-    readonly property int peak: Math.max(1, ...counts)
+    readonly property bool shadeWeekends: backend.setting("appearance.calendarWeekends").value === true
+    property var counts: style === "none" ? [] : backend.monthDays(year, month + 1)
+    readonly property bool showingToday: year === new Date().getFullYear() && month === new Date().getMonth()
+
+    // A drag across days, as indexes into the 42-cell grid.
+    property int dragFrom: -1
+    property int dragTo: -1
 
     Connections {
         target: backend
-        function onDataChanged() { root.counts = backend.monthDays(root.year, root.month + 1) }
+        function onDataChanged() { if (root.style !== "none") root.counts = backend.monthDays(root.year, root.month + 1) }
+    }
+    WheelHandler {
+        property real pending: 0
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: (e) => {
+            pending += e.angleDelta.y
+            if (Math.abs(pending) >= 120) {
+                root.shown = new Date(root.year, root.month + (pending > 0 ? -1 : 1), 1)
+                pending = 0
+            }
+        }
     }
 
+    // The date in grid cell `index`, which starts on the week containing the 1st.
+    function isoAt(index) {
+        const lead = (new Date(year, month, 1).getDay() - firstDay + 7) % 7
+        return iso(new Date(year, month, 1 + index - lead))
+    }
     function iso(d) {
         return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
     }
@@ -38,11 +62,24 @@ ColumnLayout {
             font.weight: Font.DemiBold
             MouseArea { anchors.fill: parent; onClicked: root.shown = new Date() }
         }
+        // Back to today, only once today's month is out of view.
+        Text {
+            visible: !root.showingToday
+            text: "Today"
+            color: theme.today
+            font.pixelSize: 10
+            font.weight: Font.DemiBold
+            MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: root.shown = new Date() }
+        }
         IconButton { icon: "chevronRight"; size: 12; onClicked: root.shown = new Date(root.year, root.month + 1, 1) }
     }
 
+    Item {
+    Layout.fillWidth: true
+    implicitHeight: grid.implicitHeight
     Grid {
-        Layout.fillWidth: true
+        id: grid
+        width: parent.width
         columns: 7
         readonly property real cell: width / 7
 
@@ -50,8 +87,10 @@ ColumnLayout {
             model: 7
             Text {
                 required property int index
+                readonly property int weekday: (index + root.firstDay) % 7
                 width: parent.cell
                 horizontalAlignment: Text.AlignHCenter
+                Rectangle { anchors.fill: parent; z: -1; visible: root.shadeWeekends && (parent.weekday === 0 || parent.weekday === 6); color: Qt.alpha(theme.foreground, theme.dark ? 0.05 : 0.045) }
                 text: Qt.locale("en_GB").dayName((index + root.firstDay) % 7, Locale.ShortFormat).toUpperCase()
                 color: theme.faint
                 font.pixelSize: 9
@@ -71,15 +110,23 @@ ColumnLayout {
                 readonly property bool inMonth: day.getMonth() === root.month
                 readonly property bool isToday: root.iso(day) === backend.today
                 readonly property int busy: inMonth ? (root.counts[day.getDate() - 1] || 0) : 0
-                readonly property bool filtered: backend.dayFilter === root.iso(day)
+                readonly property string dayIso: root.iso(day)
+                readonly property bool dragged: root.dragFrom >= 0 && index >= Math.min(root.dragFrom, root.dragTo) && index <= Math.max(root.dragFrom, root.dragTo)
+                readonly property bool filtered: dragged || (root.dragFrom < 0 && backend.dayFilter !== ""
+                                                             && dayIso >= backend.dayFilter && dayIso <= (backend.dayFilterTo || backend.dayFilter))
 
+                Rectangle {
+                    anchors.fill: parent
+                    visible: root.shadeWeekends && (cell.day.getDay() === 0 || cell.day.getDay() === 6)
+                    color: Qt.alpha(theme.foreground, theme.dark ? 0.05 : 0.045)
+                }
                 Rectangle {
                     anchors.centerIn: parent
                     width: 20
                     height: 20
                     radius: 10
-                    // Ten steps of tint, deepening with the number of tasks that day.
-                    color: cell.busy && root.style === "heat" ? Qt.alpha(theme.accent, 0.03 + 0.024 * Math.ceil(10 * cell.busy / root.peak)) : "transparent"
+                    // Ten steps of tint: one task is the lightest, ten or more the deepest.
+                    color: cell.busy && root.style === "heat" ? Qt.alpha(theme.accent, 0.04 + 0.026 * Math.min(10, cell.busy)) : "transparent"
                     border.width: cell.filtered ? 1.5 : 0
                     border.color: theme.accent
                 }
@@ -108,7 +155,6 @@ ColumnLayout {
                     font.bold: cell.isToday
                     color: cell.isToday ? theme.today : cell.inMonth ? theme.foreground : theme.faint
                 }
-                MouseArea { anchors.fill: parent; onClicked: backend.setDayFilter(root.iso(cell.day)) }
                 // Dropping tasks on a day defers them to it.
                 DropArea {
                     id: dayDrop
@@ -122,5 +168,36 @@ ColumnLayout {
                 Rectangle { anchors.centerIn: parent; width: 22; height: 22; radius: 11; color: "transparent"; border.width: 2; border.color: theme.accent; visible: dayDrop.containsDrag }
             }
         }
+    }
+    // One mouse area over the whole grid so a press can drag across days.
+    MouseArea {
+        anchors.fill: grid
+        function cellAt(x, y) {
+            const c = grid.childAt(x, y)
+            return c && c.dayIso !== undefined ? c : null
+        }
+        onPressed: (mouse) => {
+            const c = cellAt(mouse.x, mouse.y)
+            if (!c || (mouse.modifiers & Qt.AltModifier)) return
+            root.dragFrom = root.dragTo = c.index
+        }
+        onPositionChanged: (mouse) => {
+            const c = cellAt(mouse.x, mouse.y)
+            if (c && root.dragFrom >= 0) root.dragTo = c.index
+        }
+        onReleased: (mouse) => {
+            const c = cellAt(mouse.x, mouse.y)
+            if (c && (mouse.modifiers & Qt.AltModifier)) {
+                backend.newTask()
+                backend.setDue(backend.editingTaskId, c.dayIso)
+            } else if (root.dragFrom >= 0 && root.dragFrom !== root.dragTo) {
+                backend.setDayRange(root.isoAt(root.dragFrom), root.isoAt(root.dragTo))
+            } else if (c) {
+                backend.setDayFilter(c.dayIso)
+            }
+            root.dragFrom = root.dragTo = -1
+        }
+        onCanceled: root.dragFrom = root.dragTo = -1
+    }
     }
 }

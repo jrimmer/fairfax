@@ -186,6 +186,36 @@ private slots:
         QCOMPARE(f.store.task(id).sectionId, sec);
     }
 
+    void calendarCountsEachTaskOnceAndFiltersRanges() {
+        Fixture f;
+        f.backend->selectSource("list:" + QString::number(f.firstList()));
+        f.backend->newTask();
+        const qint64 id = f.backend->editingTaskId();
+        f.backend->setTitle(id, "Span");
+        f.backend->endEdit();
+        const QDate first(2031, 3, 1);
+        Task t = f.store.task(id);
+        t.startDate = first.addDays(2);
+        t.dueDate = first.addDays(5);
+        f.store.begin("test");
+        f.store.putTask(t);
+        f.store.commit();
+        const QVariantList days = f.backend->monthDays(2031, 3);
+        QCOMPARE(days.at(2).toInt(), 0);  // Its start day doesn't count too.
+        QCOMPARE(days.at(5).toInt(), 1);
+        t.startDate = {};  // A future start would hide it as scheduled.
+        f.store.begin("test");
+        f.store.putTask(t);
+        f.store.commit();
+        f.backend->setDayRange("2031-03-10", "2031-03-04");  // Dragged backwards.
+        QCOMPARE(f.backend->dayFilter(), QString("2031-03-04"));
+        QCOMPARE(f.backend->dayFilterTo(), QString("2031-03-10"));
+        bool listed = false;
+        for (const auto &row : f.backend->tasks()->rows())
+            listed = listed || row.value("taskId").toLongLong() == id;
+        QVERIFY(listed);
+    }
+
     void panesAreFilledAtStartup() {
         // A backend opened on an existing database shows it immediately,
         // without waiting for a change.

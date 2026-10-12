@@ -50,6 +50,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString smartRangeText READ smartRangeText NOTIFY viewChanged)
     Q_PROPERTY(QVariantList tagFilter READ tagFilter NOTIFY viewChanged)
     Q_PROPERTY(QString dayFilter READ dayFilter NOTIFY viewChanged)
+    Q_PROPERTY(QString dayFilterTo READ dayFilterTo NOTIFY viewChanged)
     Q_PROPERTY(QString selectionSummary READ selectionSummary NOTIFY selectionChanged)
     Q_PROPERTY(int selectionCount READ selectionCount NOTIFY selectionChanged)
     Q_PROPERTY(qint64 currentTaskId READ currentTaskId NOTIFY selectionChanged)
@@ -103,6 +104,7 @@ public:
     QString smartRangeText() const;
     QVariantList tagFilter() const;
     QString dayFilter() const;
+    QString dayFilterTo() const;
     QString selectionSummary() const;
     int selectionCount() const { return m_selected.size(); }
     qint64 currentTaskId() const { return m_cursor; }
@@ -139,6 +141,8 @@ public:
     Q_INVOKABLE void toggleTagFilter(qint64 tagId);
     Q_INVOKABLE void clearTagFilter();
     Q_INVOKABLE void setDayFilter(const QString &isoDate);
+    // Filters to a span of days, as dragged across the mini calendar.
+    Q_INVOKABLE void setDayRange(const QString &fromIso, const QString &toIso);
     Q_INVOKABLE QVariantList monthDays(int year, int month) const;
 
     // Selection and editing.
