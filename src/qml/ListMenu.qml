@@ -42,6 +42,13 @@ Menu {
         onTriggered: backend.setListFlag(root.listId, "done", !root.info.showInDone)
     }
     MenuSeparator {}
+    MenuItem {
+        text: "Mute Alerts"
+        checkable: true
+        checked: !!root.info.muteAlerts
+        onTriggered: backend.setListFlag(root.listId, "muteAlerts", !root.info.muteAlerts)
+    }
+    MenuSeparator {}
     MenuItem { text: "Archive"; onTriggered: backend.setListFlag(root.listId, "archived", true) }
     MenuItem { text: "Delete List…"; onTriggered: confirm.open() }
 

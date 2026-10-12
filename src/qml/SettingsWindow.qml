@@ -312,9 +312,47 @@ Window {
                             onActivated: (i) => backend.setSetting("tasks.defaultDueTime", minutes[i])
                         }
                     }
-                    Toggle { key: "alerts.respectExclusions"; fallback: false; label: "Silence alerts from lists excluded from Today" }
-                    Toggle { key: "alerts.nag"; fallback: false; label: "Nag: repeat an alert every 5 minutes until it's handled" }
-                    Hint { text: "Alerts appear as notifications with Complete and Snooze. Precrime has to be running to deliver them." }
+                    RowLayout {
+                        Label { text: "Sound alerts repeat until dismissed"; Layout.preferredWidth: 260 }
+                        ComboBox {
+                            readonly property var minutes: [0, 2, 5, 10]
+                            model: ["Never", "Every 2 mins", "Every 5 mins", "Every 10 mins"]
+                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("alerts.nagMinutes", 0))))
+                            onActivated: (i) => backend.setSetting("alerts.nagMinutes", minutes[i])
+                        }
+                    }
+                    Hint { text: "Only alerts set to Message with Sound repeat; a plain Message is shown once." }
+
+                    Label { text: "Default Reminders"; font.bold: true; Layout.topMargin: 12 }
+                    RowLayout {
+                        Label { text: "Remind me of tasks with a due time"; Layout.preferredWidth: 260 }
+                        ComboBox {
+                            readonly property var offsets: [-1, 0, 5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880]
+                            model: ["None", "At due time", "5 minutes before", "10 minutes before", "15 minutes before", "30 minutes before",
+                                    "1 hour before", "2 hours before", "6 hours before", "12 hours before", "1 day before", "2 days before"]
+                            currentIndex: Math.max(0, offsets.indexOf(Number(root.value("alerts.defaultTimed", -1))))
+                            onActivated: (i) => backend.setSetting("alerts.defaultTimed", offsets[i])
+                        }
+                    }
+                    RowLayout {
+                        Label { text: "Remind me of tasks with a due date"; Layout.preferredWidth: 260 }
+                        ComboBox {
+                            readonly property var days: [-1, 0, 1, 2]
+                            model: ["None", "On the day", "1 day before", "2 days before"]
+                            currentIndex: Math.max(0, days.indexOf(Number(root.value("alerts.defaultDateOnly", -1))))
+                            onActivated: (i) => backend.setSetting("alerts.defaultDateOnly", days[i])
+                        }
+                        Label { text: "at" }
+                        ComboBox {
+                            id: reminderTime
+                            readonly property var minutes: [360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260]
+                            model: minutes.map(m => ((m / 60) % 12 || 12) + ":00 " + (m < 720 ? "AM" : "PM"))
+                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("alerts.defaultDateOnlyTime", root.value("tasks.defaultDueTime", 540)))))
+                            onActivated: (i) => backend.setSetting("alerts.defaultDateOnlyTime", minutes[i])
+                        }
+                    }
+                    Hint { text: "Added whenever a task gets a due date and has no alerts yet. You can still edit or remove alerts on any task." }
+                    Hint { text: "Silence a single list from its right-click menu (Mute Alerts). Alerts appear as notifications with Complete and Snooze; Precrime has to be running to deliver them." }
                 }
 
                 // Sync

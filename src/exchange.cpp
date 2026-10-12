@@ -966,6 +966,8 @@ bool exportIcs(const Store &store, const QString &path, const QList<qint64> &tas
             line("DESCRIPTION:" + escapeText(t.title));
             if (a.kind == Alarm::Absolute && a.at.isValid())
                 line("TRIGGER;VALUE=DATE-TIME:" + icsUtc(a.at));
+            else if (a.kind == Alarm::DaysBefore)  // Counted back from midnight of the date.
+                line("TRIGGER:" + triggerText(a.offset * 24 * 60 - (a.at.time().hour() * 60 + a.at.time().minute())));
             else
                 line("TRIGGER:" + triggerText(a.offset));
             line("END:VALARM");

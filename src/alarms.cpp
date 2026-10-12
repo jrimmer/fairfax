@@ -19,6 +19,10 @@ constexpr auto Interface = "org.freedesktop.Notifications";
 
 }  // namespace
 
+QDateTime AlarmTimes::clockTime(int minutes) {
+    return QDateTime(QDate(2000, 1, 1), QTime(0, 0).addSecs(qint64(minutes) * 60));
+}
+
 QDateTime AlarmTimes::fireTime(const Alarm &a, const Task &t, int defaultDueMinutes) {
     if (a.deleted || t.deleted || t.completed)
         return {};
@@ -26,36 +30,104 @@ QDateTime AlarmTimes::fireTime(const Alarm &a, const Task &t, int defaultDueMinu
         return a.snoozedUntil;
     if (a.kind == Alarm::Absolute)
         return a.at;
-    if (!t.dueDate.isValid())
+    // Alerts count from the due date, or from the start date when that is all
+    // the task has.
+    QDate date = t.dueDate;
+    int minutes = t.dueTime;
+    if (!date.isValid()) {
+        date = t.startDate;
+        minutes = t.startTime;
+    }
+    if (!date.isValid())
         return {};
-    const int minutes = t.dueTime >= 0 ? t.dueTime : defaultDueMinutes;
-    return QDateTime(t.dueDate, QTime(0, 0)).addSecs(qint64(minutes - a.offset) * 60);
+    if (a.kind == Alarm::DaysBefore)
+        return QDateTime(date.addDays(-a.offset), a.at.time());
+    if (minutes < 0)
+        minutes = defaultDueMinutes;
+    return QDateTime(date, QTime(0, 0)).addSecs(qint64(minutes - a.offset) * 60);
+}
+
+AlarmTimes::DefaultReminders AlarmTimes::DefaultReminders::load(const Store &store) {
+    DefaultReminders d;
+    d.timedOffset = store.setting("alerts.defaultTimed", -1).toInt();
+    d.dateOnlyDays = store.setting("alerts.defaultDateOnly", -1).toInt();
+    d.dateOnlyMinutes = store.setting("alerts.defaultDateOnlyTime", store.setting("tasks.defaultDueTime", 9 * 60)).toInt();
+    return d;
+}
+
+std::optional<Alarm> AlarmTimes::DefaultReminders::alarmFor(const Task &task) const {
+    Alarm a;
+    if (!task.dueDate.isValid() || task.completed || task.deleted)
+        return std::nullopt;
+    if (task.dueTime >= 0 && timedOffset >= 0) {
+        a.offset = timedOffset;
+    } else if (task.dueTime < 0 && dateOnlyDays >= 0) {
+        a.kind = Alarm::DaysBefore;
+        a.offset = dateOnlyDays;
+        a.at = clockTime(dateOnlyMinutes);
+    } else {
+        return std::nullopt;
+    }
+    a.taskId = task.id;
+    return a;
+}
+
+void AlarmTimes::applyDefaultReminder(Store &store, const Task &task) {
+    auto alarm = DefaultReminders::load(store).alarmFor(task);
+    if (!alarm || !store.alarmsFor(task.id).isEmpty())
+        return;
+    Alarm a = *alarm;
+    // Checklist items carry no alerts of their own.
+    if (task.parentId && store.task(task.parentId).type == TaskType::Checklist)
+        return;
+    a.id = store.nextId("alarms");
+    store.putAlarm(a);
+}
+
+QDateTime AlarmTimes::snoozeTarget(const QString &key, const QDateTime &now, int morningMinutes) {
+    if (key == "snooze5")
+        return now.addSecs(5 * 60);
+    if (key == "snooze")
+        return now.addSecs(15 * 60);
+    if (key == "snooze-hour")
+        return now.addSecs(60 * 60);
+    if (key == "snooze-evening") {
+        QDateTime at(now.date(), QTime(19, 0));
+        return at <= now ? at.addDays(1) : at;
+    }
+    if (key == "snooze-morning")
+        return QDateTime(now.date().addDays(1), QTime(0, 0).addSecs(qint64(morningMinutes < 0 ? 9 * 60 : morningMinutes) * 60));
+    return {};
 }
 
 AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_store(store) {
     m_timer.setSingleShot(true);
     connect(&m_timer, &QTimer::timeout, this, &AlarmService::check);
     connect(m_store, &Store::changed, this, &AlarmService::schedule);
+    connect(m_store, &Store::changed, this, &AlarmService::closeStale);
 #if defined(Q_OS_LINUX)
     m_connected = QDBusConnection::sessionBus().connect(Service, Path, Interface, "ActionInvoked", this,
                                                         SLOT(onAction(uint, QString)));
     QDBusConnection::sessionBus().connect(Service, Path, Interface, "NotificationClosed", this,
                                           SLOT(onClosed(uint, uint)));
 #endif
-    // Nagging, like the reference app's: an unanswered alert comes back every five minutes
-    // until it's completed, snoozed or dismissed.
+    // Sounding alerts can come back until they're handled, like the reference app's
+    // "Sound alerts repeat until dismissed".
+    if (!m_store->setting("alerts.nagMinutes").isValid())
+        m_store->setSetting("alerts.nagMinutes", m_store->setting("alerts.nag", false).toBool() ? 5 : 0);  // The old on/off switch.
     m_nagTimer.setInterval(30 * 1000);
     connect(&m_nagTimer, &QTimer::timeout, this, [this] {
         const QDateTime now = QDateTime::currentDateTime();
+        const int minutes = nagMinutes();
         for (auto it = m_nagging.begin(); it != m_nagging.end();) {
             const Alarm a = m_store->alarms().value(it.key());
             const Task t = m_store->task(a.taskId);
-            if (!a.id || a.deleted || t.completed || t.deleted) {
+            if (!minutes || !a.id || a.deleted || !a.sound || t.completed || t.deleted) {
                 it = m_nagging.erase(it);
                 continue;
             }
             if (it.value() <= now) {
-                it.value() = now.addSecs(5 * 60);
+                it.value() = now.addSecs(qint64(minutes) * 60);
                 notify(a, t, now);
             }
             ++it;
@@ -70,8 +142,9 @@ QVector<Alarm> AlarmService::due(const QDateTime &now) const {
     const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
     QVector<Alarm> result;
     for (const auto &a : m_store->alarms()) {
-        const QDateTime moment = AlarmTimes::fireTime(a, m_store->task(a.taskId), defaultDue);
-        if (moment.isValid() && moment <= now && a.firedFor != moment)
+        const Task t = m_store->task(a.taskId);
+        const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
+        if (moment.isValid() && moment <= now && a.firedFor != moment && !m_store->list(t.listId).muteAlerts)
             result.append(a);
     }
     return result;
@@ -82,14 +155,12 @@ void AlarmService::check() {
     const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
     for (const auto &a : due(now)) {
         const Task t = m_store->task(a.taskId);
-        const TaskList list = m_store->list(t.listId);
         const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
-        // Muted lists keep their alarms quiet, and very old misses aren't
-        // worth a notification: they are just marked as handled.
-        if (list.showInToday || !m_store->setting("alerts.respectExclusions", false).toBool()) {
-            if (moment.secsTo(now) < 24 * 3600)
-                notify(a, t, moment);
-        }
+        // Very old misses aren't worth a notification: they are just marked
+        // as handled. (due() leaves out the alarms of muted lists, which
+        // therefore go off if the list is unmuted in time.)
+        if (moment.secsTo(now) < 24 * 3600)
+            notify(a, t, moment);
         markFired(a, moment);
     }
     schedule();
@@ -100,8 +171,9 @@ void AlarmService::schedule() {
     const QDateTime now = QDateTime::currentDateTime();
     QDateTime next;
     for (const auto &a : m_store->alarms()) {
-        const QDateTime moment = AlarmTimes::fireTime(a, m_store->task(a.taskId), defaultDue);
-        if (!moment.isValid() || a.firedFor == moment)
+        const Task t = m_store->task(a.taskId);
+        const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
+        if (!moment.isValid() || a.firedFor == moment || m_store->list(t.listId).muteAlerts)
             continue;
         if (!next.isValid() || moment < next)
             next = moment;
@@ -129,17 +201,25 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
                       {"desktop-entry", "precrime"}};
     if (a.sound)
         hints.insert("sound-name", "alarm-clock-elapsed");
-    call << QStringLiteral("Precrime") << uint(0) << QStringLiteral("precrime") << t.title << body
-         << QStringList{"default", "Open", "complete", "Complete", "snooze", "Snooze 15 Minutes", "snooze-hour", "Snooze 1 Hour",
-                        "snooze-evening", "This Evening", "snooze-morning", "Tomorrow Morning"}
-         << hints << int(0);
+    // the reference app's snooze menu: the two date-based rows show the time they land on,
+    // and "This evening" is left out when 7 PM is less than 30 minutes away.
+    const QDateTime now = QDateTime::currentDateTime();
+    QStringList actions{"default", "Open", "complete", "Complete", "snooze5", "Snooze 5 Minutes", "snooze", "Snooze 15 Minutes",
+                        "snooze-hour", "Snooze 1 Hour"};
+    const QDateTime evening(now.date(), QTime(19, 0));
+    if (now.secsTo(evening) >= 30 * 60)
+        actions << "snooze-evening" << "This Evening (" + Schedule::formatTime(19 * 60) + ")";
+    const QDateTime morning = AlarmTimes::snoozeTarget("snooze-morning", now, morningMinutes());
+    actions << "snooze-morning" << "Tomorrow Morning (" + Schedule::formatTime(morning.time().hour() * 60 + morning.time().minute()) + ")";
+    call << QStringLiteral("Precrime") << uint(0) << QStringLiteral("precrime") << t.title << body << actions << hints << int(0);
     const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
     if (reply.isValid())
         m_notifications.insert(reply.value(), a.id);
     else
         qWarning("precrime: couldn't show a notification: %s", qPrintable(reply.error().message()));
-    if (m_store->setting("alerts.nag", false).toBool() && !m_nagging.contains(a.id))
-        m_nagging.insert(a.id, QDateTime::currentDateTime().addSecs(5 * 60));
+    // Only sounding alerts nag; a plain message is shown once.
+    if (a.sound && nagMinutes() && !m_nagging.contains(a.id))
+        m_nagging.insert(a.id, now.addSecs(qint64(nagMinutes()) * 60));
 
     // Notification daemons rarely play sounds themselves.
     if (a.sound) {
@@ -161,20 +241,55 @@ void AlarmService::markFired(const Alarm &a, const QDateTime &moment) {
     m_store->commit();
 }
 
-void AlarmService::snooze(qint64 alarmId, int minutes) {
+void AlarmService::snooze(qint64 alarmId, const QDateTime &until) {
     Alarm a = m_store->alarms().value(alarmId);
     if (!a.id)
         return;
-    a.snoozedUntil = QDateTime::currentDateTime().addSecs(qint64(minutes) * 60);
+    a.snoozedUntil = until;
     m_store->begin("Snooze", false);
     m_store->putAlarm(a);
     m_store->commit();
+}
+
+int AlarmService::nagMinutes() const {
+    return m_store->setting("alerts.nagMinutes", 0).toInt();
+}
+
+int AlarmService::morningMinutes() const {
+    // "Tomorrow morning" follows the Default Due Time when that is in use and
+    // is a morning hour.
+    const int minutes = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    return m_store->setting("tasks.useDefaultDueTime", false).toBool() && minutes < 12 * 60 ? minutes : -1;
+}
+
+void AlarmService::closeStale() {
+    // A notification goes away once its task is completed, deleted or
+    // re-dated (the alarm then has a different moment to fire at).
+    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    for (auto it = m_notifications.begin(); it != m_notifications.end();) {
+        const Alarm a = m_store->alarms().value(it.value());
+        const Task t = m_store->task(a.taskId);
+        const bool stale = !a.id || AlarmTimes::fireTime(a, t, defaultDue) != a.firedFor;
+        if (!stale) {
+            ++it;
+            continue;
+        }
+        m_nagging.remove(it.value());
+#if defined(Q_OS_LINUX)
+        QDBusMessage close = QDBusMessage::createMethodCall(Service, Path, Interface, "CloseNotification");
+        close << it.key();
+        QDBusConnection::sessionBus().asyncCall(close);
+#endif
+        it = m_notifications.erase(it);
+    }
 }
 
 void AlarmService::onClosed(uint id, uint reason) {
     // Reason 2 is "dismissed by the user", which ends nagging for that alarm.
     if (reason == 2 && m_notifications.contains(id))
         m_nagging.remove(m_notifications.take(id));
+    else
+        m_notifications.remove(id);
 }
 
 void AlarmService::onAction(uint id, const QString &key) {
@@ -185,18 +300,8 @@ void AlarmService::onAction(uint id, const QString &key) {
     const qint64 taskId = m_store->alarms().value(alarmId).taskId;
     if (key == "complete")
         emit completeTask(taskId);
-    else if (key == "snooze")
-        snooze(alarmId, 15);
-    else if (key == "snooze-hour")
-        snooze(alarmId, 60);
-    else if (key == "snooze-evening" || key == "snooze-morning") {
-        // the reference app's presets: this evening at 7 PM, tomorrow morning at 9 AM.
-        const QDateTime now = QDateTime::currentDateTime();
-        QDateTime at = key == "snooze-evening" ? QDateTime(now.date(), QTime(19, 0)) : QDateTime(now.date().addDays(1), QTime(9, 0));
-        if (at <= now)
-            at = at.addDays(1);
-        snooze(alarmId, int(now.secsTo(at) / 60));
-    }
+    else if (key.startsWith("snooze"))
+        snooze(alarmId, AlarmTimes::snoozeTarget(key, QDateTime::currentDateTime(), morningMinutes()));
     else
         emit openTask(taskId);
 }

@@ -15,6 +15,7 @@
 #include <algorithm>
 
 #include "dateparse.h"
+#include "alarms.h"
 #include "automation.h"
 #include "exchange.h"
 #include "query.h"
@@ -518,6 +519,12 @@ void Backend::endEdit() {
         if (m_cursor == id)
             m_cursor = 0;
         m_store->discard("tasks", id);
+    } else if (id == m_newTask && m_store->task(id).dueDate.isValid()) {
+        // A new task that inherited a due date (from Today, say) gets the
+        // default reminder once it has a title.
+        m_store->begin("Default Reminder", false);
+        AlarmTimes::applyDefaultReminder(*m_store, m_store->task(id));
+        m_store->commit();
     }
     m_newTask = 0;
     rebuild();
@@ -727,7 +734,10 @@ void Backend::setDueInDays(int days) {
     const QDate due = QDate::currentDate().addDays(days);
     for (auto i : targetIds())
         m_options.keepVisible.insert(i);
-    editTasks("Change Due Date", targetIds(), [&](Task &t) { t.dueDate = due; });
+    editTasks("Change Due Date", targetIds(), [&](Task &t) {
+        t.dueDate = due;
+        AlarmTimes::applyDefaultReminder(*m_store, t);
+    });
 }
 
 void Backend::setStartInDays(int days) {
@@ -1128,6 +1138,8 @@ void Backend::setDue(qint64 id, const QString &iso, int minutes) {
     else if (!hadDue && m_store->setting("tasks.useDefaultDueTime", false).toBool())
         t.dueTime = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();  // "Default due time".
     m_store->putTask(t);
+    if (date.isValid())
+        AlarmTimes::applyDefaultReminder(*m_store, t);
     // Rescheduling a project sets its finished children back to active.
     if (t.type == TaskType::Project) {
         ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
@@ -1201,6 +1213,8 @@ bool Backend::setTimeFromText(qint64 id, bool due, const QString &text) {
         t.startTime = minutes;
     }
     m_store->putTask(t);
+    if (due && t.dueDate.isValid())
+        AlarmTimes::applyDefaultReminder(*m_store, t);
     m_store->commit();
     return true;
 }
@@ -1418,6 +1432,7 @@ void Backend::setListFlag(qint64 id, const QString &flag, bool on) {
     else if (flag == "today") l.showInToday = on;
     else if (flag == "done") l.showInDone = on;
     else if (flag == "archived") l.archived = on;
+    else if (flag == "muteAlerts") l.muteAlerts = on;
     m_store->begin("Change List");
     m_store->putList(l);
     m_store->commit();
@@ -1445,7 +1460,8 @@ void Backend::deleteList(qint64 id) {
 QVariantMap Backend::listInfo(qint64 id) const {
     const TaskList l = m_store->list(id);
     return {{"id", l.id}, {"name", l.name}, {"color", l.color}, {"showInAll", l.showInAll},
-            {"showInToday", l.showInToday}, {"showInDone", l.showInDone}, {"archived", l.archived}};
+            {"showInToday", l.showInToday}, {"showInDone", l.showInDone}, {"archived", l.archived},
+            {"muteAlerts", l.muteAlerts}};
 }
 
 QVariantMap Backend::taskInfo(qint64 id) const {
@@ -2074,6 +2090,7 @@ void Backend::pasteTasks() {
         if (m_store->setting("nl.editor", true).toBool())
             applyParsed(t, NaturalLanguage::parse(line, QDateTime::currentDateTime(), listNames(), locationNames()));
         m_store->putTask(t);
+        AlarmTimes::applyDefaultReminder(*m_store, t);
         created.append(t.id);
     }
     m_store->commit();
@@ -2244,6 +2261,41 @@ void Backend::addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minute
     a.kind = Alarm::Absolute;
     a.at = QDateTime(day, QTime(0, 0).addSecs(minutes * 60));
     m_store->begin("Add Alert");
+    m_store->putAlarm(a);
+    m_store->commit();
+}
+
+void Backend::addDaysBeforeAlarm(qint64 taskId, int days, int minutes) {
+    // "N days before at HH:MM", counted from the due date (or the start date).
+    Task t = m_store->task(taskId);
+    if (!t.id || days < 0 || days > 365 || minutes < 0 || minutes >= 24 * 60)
+        return;
+    if (m_store->alarmsFor(taskId).size() >= 10) {
+        setStatus("A task can have at most 10 alerts.");
+        return;
+    }
+    Alarm a;
+    a.id = m_store->nextId("alarms");
+    a.taskId = taskId;
+    a.kind = Alarm::DaysBefore;
+    a.offset = days;
+    a.at = AlarmTimes::clockTime(minutes);
+    m_store->begin("Add Alert");
+    m_store->putAlarm(a);
+    if (!t.dueDate.isValid() && !t.startDate.isValid()) {
+        t.dueDate = QDate::currentDate();  // An alert needs a date to count from.
+        m_store->putTask(t);
+    }
+    m_store->commit();
+}
+
+void Backend::setAlarmSound(qint64 alarmId, bool sound) {
+    // the reference app's per-alert style: "Message with Sound" or just "Message".
+    Alarm a = m_store->alarms().value(alarmId);
+    if (!a.id || a.sound == sound)
+        return;
+    a.sound = sound;
+    m_store->begin("Change Alert");
     m_store->putAlarm(a);
     m_store->commit();
 }
@@ -2712,6 +2764,7 @@ qint64 Backend::quickAddFields(const QVariantMap &f) {
             t.dueDate = QDate::currentDate();  // An alert counts from a deadline.
     }
     m_store->putTask(t);
+    AlarmTimes::applyDefaultReminder(*m_store, t);
     m_store->commit();
     const QVariantList files = f.value("files").toList();
     if (!files.isEmpty())
@@ -2742,6 +2795,7 @@ qint64 Backend::quickAdd(const QString &text, const QString &notes, int type, qi
     if (!t.dueDate.isValid() && offset >= 0 && !m_store->setting("tasks.defaultDueNotQuickEntry", false).toBool())
         t.dueDate = offset == 30 ? QDate::currentDate().addMonths(1) : QDate::currentDate().addDays(offset);
     m_store->putTask(t);
+    AlarmTimes::applyDefaultReminder(*m_store, t);
     m_store->commit();
     m_options.keepVisible.insert(t.id);
     setStatus("Added “" + t.title + "” to " + m_store->list(t.listId).name);
@@ -3090,11 +3144,15 @@ void Backend::rebuildEditor() {
                      QString label;
                      if (a.kind == Alarm::Absolute)
                          label = Schedule::friendlyDateTime(a.at.date(), a.at.time().hour() * 60 + a.at.time().minute(), today, false);
+                     else if (a.kind == Alarm::DaysBefore)
+                         label = (a.offset == 0 ? QStringLiteral("On the day") : a.offset == 1 ? QStringLiteral("Day before")
+                                                                               : QStringLiteral("%1 days before").arg(a.offset)) +
+                                 " at " + Schedule::formatTime(a.at.time().hour() * 60 + a.at.time().minute());
                      else if (a.offset == 0)
                          label = "At due time";
                      else
                          label = Schedule::durationBadge(a.offset) + " before";
-                     items.append(QVariantMap{{"id", a.id}, {"label", label}, {"absolute", a.kind == Alarm::Absolute}});
+                     items.append(QVariantMap{{"id", a.id}, {"label", label}, {"absolute", a.kind == Alarm::Absolute}, {"sound", a.sound}});
                  }
                  return items;
              }()},

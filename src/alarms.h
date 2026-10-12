@@ -10,6 +10,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QVector>
+#include <optional>
 
 #include "model.h"
 
@@ -19,9 +20,35 @@ namespace AlarmTimes {
 
 // When an alarm goes off: an absolute alarm at its time; a relative one the
 // offset before the due moment, where a date-only deadline counts from the
-// default due time. A snooze overrides both. Invalid when there is nothing
-// to fire (no due date, completed task).
+// default due time; a "days before" one at its time of day that many days
+// before the date. A task with only a start date counts from that instead.
+// A snooze overrides all of them. Invalid when there is nothing to fire (no
+// date, completed task).
 QDateTime fireTime(const Alarm &alarm, const Task &task, int defaultDueMinutes);
+
+// Where a "days before at HH:MM" alarm keeps its time of day.
+QDateTime clockTime(int minutes);
+
+// Settings > Alerts > Default Reminders: an alert added whenever a task
+// gets a due date and has none yet.
+struct DefaultReminders {
+    int timedOffset = -1;      // Minutes before the due time, or -1 for none.
+    int dateOnlyDays = -1;     // Days before a date-only due date, or -1 for none.
+    int dateOnlyMinutes = 540; // The time of day for that alert.
+
+    static DefaultReminders load(const Store &store);
+    // The alert to add for `task` (without an id), if one applies.
+    std::optional<Alarm> alarmFor(const Task &task) const;
+};
+
+// Adds the default reminder to `task` unless it already has alerts. Call it
+// inside the transaction that sets the due date, after the task is saved.
+void applyDefaultReminder(Store &store, const Task &task);
+
+// When a snooze action ("snooze5", "snooze-evening", ...) lands. A negative
+// `morningMinutes` means no Default Due Time is in use (9:00 AM). Invalid for
+// an unknown key.
+QDateTime snoozeTarget(const QString &key, const QDateTime &now, int morningMinutes);
 
 }  // namespace AlarmTimes
 
@@ -46,7 +73,10 @@ private:
     void schedule();
     void notify(const Alarm &alarm, const Task &task, const QDateTime &moment);
     void markFired(const Alarm &alarm, const QDateTime &moment);
-    void snooze(qint64 alarmId, int minutes);
+    void snooze(qint64 alarmId, const QDateTime &until);
+    void closeStale();
+    int nagMinutes() const;
+    int morningMinutes() const;
 
 private slots:
     void onAction(uint id, const QString &key);

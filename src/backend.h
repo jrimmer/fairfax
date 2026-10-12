@@ -335,6 +335,8 @@ public:
 
     // Alerts beyond the presets.
     Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);
+    Q_INVOKABLE void addDaysBeforeAlarm(qint64 taskId, int days, int minutes);
+    Q_INVOKABLE void setAlarmSound(qint64 alarmId, bool sound);
     Q_INVOKABLE void removeAlarm(qint64 alarmId);
 
     // Search everywhere rather than in the current list (the reference app's scope toggle).

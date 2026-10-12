@@ -178,16 +178,17 @@ struct Tag {
 };
 
 // An alert on a task, after the reference app's alarms: relative to the due moment (an
-// offset in minutes before it) or at a fixed date and time.
+// offset in minutes before it), a number of days before the due date at a
+// time of day, or at a fixed date and time.
 struct Alarm {
-    enum Kind { Relative = 0, Absolute = 1 };
+    enum Kind { Relative = 0, Absolute = 1, DaysBefore = 2 };
 
     qint64 id = 0;
     QString uid;
     qint64 taskId = 0;
     int kind = Relative;
-    int offset = 0;           // Minutes before the due moment, for relative alarms.
-    QDateTime at;             // For absolute alarms.
+    int offset = 0;           // Minutes before the due moment (Relative), or whole days before the date (DaysBefore).
+    QDateTime at;             // The moment for Absolute alarms; only the time of day counts for DaysBefore.
     bool sound = true;        // "Message with Sound" rather than "Message".
     QDateTime snoozedUntil;   // A snoozed alarm fires again at this moment.
     QDateTime firedFor;       // The fire moment it last went off for, so a moved due date re-arms it.

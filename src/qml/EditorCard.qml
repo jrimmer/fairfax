@@ -221,6 +221,7 @@ Item {
                                 }
                             }
                             MenuSeparator {}
+                            MenuItem { text: "Days Before at a Time…"; onTriggered: daysBeforeAlarm.open() }
                             MenuItem { text: "At a Date and Time…"; onTriggered: absoluteAlarm.open() }
                             MenuItem { text: "Remove All Alerts"; enabled: (root.e.alarms || []).length > 0; onTriggered: backend.clearAlarms(root.e.id) }
                         }
@@ -466,8 +467,13 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 x: 8
                                 spacing: 5
-                                Icon { name: "alarm"; size: 12; color: theme.priorityMedium }
-                                Text { id: alarmLabel; text: modelData.label; color: theme.priorityMedium; font.pixelSize: backend.fontSize - 2 }
+                                Icon { name: "alarm"; size: 12; color: theme.priorityMedium; opacity: modelData.sound ? 1 : 0.5 }
+                                Text { id: alarmLabel; text: modelData.label + (modelData.sound ? "" : " (message)"); color: theme.priorityMedium; font.pixelSize: backend.fontSize - 2 }
+                            }
+                            // Clicking the chip chooses its style, as in the reference app's alert rows.
+                            MouseArea {
+                                anchors.fill: parent; anchors.rightMargin: 22
+                                onClicked: { alarmStyleMenu.alarmId = modelData.id; alarmStyleMenu.sound = modelData.sound; alarmStyleMenu.popup() }
                             }
                             Icon {
                                 anchors.right: parent.right; anchors.rightMargin: 7; anchors.verticalCenter: parent.verticalCenter
@@ -545,6 +551,33 @@ Item {
     }
 
     RepeatEditor { id: repeatEditor; taskId: root.e.id }
+
+    Menu {
+        id: alarmStyleMenu
+        property int alarmId: 0
+        property bool sound: true
+        MenuItem { text: "Message with Sound"; checkable: true; checked: alarmStyleMenu.sound; onTriggered: backend.setAlarmSound(alarmStyleMenu.alarmId, true) }
+        MenuItem { text: "Message"; checkable: true; checked: !alarmStyleMenu.sound; onTriggered: backend.setAlarmSound(alarmStyleMenu.alarmId, false) }
+    }
+
+    Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
+        id: daysBeforeAlarm
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: "Alert days before at a time"
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        property int minutes: 540
+        Row {
+            spacing: 8
+            SpinBox { id: daysBox; from: 0; to: 365; value: 1; editable: true }
+            Label { text: daysBox.value === 1 ? "day before at" : "days before at"; anchors.verticalCenter: parent.verticalCenter }
+            DateField { timeOnly: true; value: "9:00 AM"; placeholderText: "Time"; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].minutes >= 0) { daysBeforeAlarm.minutes = s[0].minutes; value = s[0].label } } }
+        }
+        onAccepted: backend.addDaysBeforeAlarm(root.e.id, daysBox.value, minutes)
+    }
 
     Dialog {
 

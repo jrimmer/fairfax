@@ -1,4 +1,5 @@
 #include "automation.h"
+#include "alarms.h"
 
 #include <QHash>
 #include <QJsonArray>
@@ -950,6 +951,7 @@ struct Automation::Impl {
             alarm.offset = offset;
             s.putAlarm(alarm);
         }
+        AlarmTimes::applyDefaultReminder(s, t);
         QList<qint64> childIds;
         for (const auto &title : subtasks) {
             Task c;
