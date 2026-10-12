@@ -35,5 +35,7 @@
         <file>qml/TaskPane.qml</file>
         <file>qml/TaskRow.qml</file>
         <file>qml/UtilityPanel.qml</file>
+        <file alias="LICENSE">../LICENSE</file>
+        <file alias="icon.svg">../pkgbuild/precrime.svg</file>
     </qresource>
 </RCC>

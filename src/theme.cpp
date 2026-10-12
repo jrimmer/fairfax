@@ -28,6 +28,24 @@ const QHash<QString, QColor> &fallbackColors() {
     return colors;
 }
 
+// The built-in light palette, after the reference app's light look, for forcing Light on a
+// dark Omarchy theme.
+const QHash<QString, QColor> &lightColors() {
+    static const QHash<QString, QColor> colors{
+        {"selection", QColor("#DCE6F2")},  {"muted", QColor("#7B848C")},
+        {"background", QColor("#FFFFFF")}, {"dark_background", QColor("#EEF0F2")},
+        {"lighter_background", QColor("#F3F4F6")}, {"foreground", QColor("#1E2328")},
+        {"red", QColor("#C2453B")},        {"yellow", QColor("#D9A21B")},
+        {"orange", QColor("#E8892B")},     {"green", QColor("#3E9A4A")},
+        {"cyan", QColor("#2A9DB0")},       {"blue", QColor("#2F7FD8")},
+        {"magenta", QColor("#7A62C7")},    {"brown", QColor("#9A7656")},
+        {"bright_red", QColor("#D9665C")}, {"bright_yellow", QColor("#E8B83A")},
+        {"bright_green", QColor("#5DB36A")}, {"bright_cyan", QColor("#4CB4C6")},
+        {"bright_blue", QColor("#5C9BE2")}, {"bright_magenta", QColor("#9682D6")},
+    };
+    return colors;
+}
+
 // The list palette walks the theme's hues in the order the reference app's own palette
 // does: blue first, then purple, green, red, orange and the rest.
 const QStringList PaletteKeys{"blue", "magenta", "green", "red", "orange", "cyan", "yellow", "brown",
@@ -70,8 +88,22 @@ QHash<QString, QColor> Theme::readColors(const QString &path, bool *dark) {
 }
 
 QColor Theme::color(const QString &name) const {
+    // A forced scheme that differs from the theme uses the built-in palette
+    // for that scheme, keeping only the theme's accent.
+    if (dark() != m_dark && name != "accent") {
+        const auto &palette = dark() ? fallbackColors() : lightColors();
+        return palette.value(name, fallbackColors().value(name, QColor("#888888")));
+    }
     const auto it = m_colors.constFind(name);
     return it != m_colors.cend() ? *it : fallbackColors().value(name, QColor("#888888"));
+}
+
+void Theme::setScheme(const QString &scheme) {
+    const QString next = scheme == "dark" || scheme == "light" ? scheme : QStringLiteral("system");
+    if (next == m_scheme)
+        return;
+    m_scheme = next;
+    emit changed();
 }
 
 // Black or white, whichever reads on the accent (WCAG relative luminance).
@@ -90,31 +122,31 @@ QColor Theme::mix(const QColor &a, const QColor &b, double t) const {
 // the reference app's sidebar is a shade off the content area; dark themes go darker, light
 // themes a touch grayer.
 QColor Theme::sidebar() const {
-    if (m_colors.contains("dark_background"))
+    if (dark() != m_dark || m_colors.contains("dark_background"))
         return color("dark_background");
-    return mix(background(), m_dark ? QColor(Qt::black) : QColor("#808080"), m_dark ? 0.25 : 0.12);
+    return mix(background(), dark() ? QColor(Qt::black) : QColor("#808080"), dark() ? 0.25 : 0.12);
 }
 
 // The editor card and Quick Entry panel sit just above the background.
 QColor Theme::surface() const {
-    if (m_colors.contains("lighter_background"))
+    if (dark() != m_dark || m_colors.contains("lighter_background"))
         return mix(background(), color("lighter_background"), 0.6);
     return mix(background(), foreground(), 0.05);
 }
 
 QColor Theme::raised() const {
-    if (m_colors.contains("lighter_background"))
+    if (dark() != m_dark || m_colors.contains("lighter_background"))
         return color("lighter_background");
     return mix(background(), foreground(), 0.10);
 }
 
 QColor Theme::faint() const { return mix(background(), muted(), 0.55); }
-QColor Theme::divider() const { return mix(background(), foreground(), m_dark ? 0.09 : 0.11); }
+QColor Theme::divider() const { return mix(background(), foreground(), dark() ? 0.09 : 0.11); }
 
 // the reference app's notes area is a pale cream; here it is the background warmed toward
 // the theme's yellow.
-QColor Theme::notes() const { return mix(surface(), color("yellow"), m_dark ? 0.05 : 0.10); }
-QColor Theme::tagBubble() const { return mix(background(), color("blue"), m_dark ? 0.16 : 0.13); }
+QColor Theme::notes() const { return mix(surface(), color("yellow"), dark() ? 0.05 : 0.10); }
+QColor Theme::tagBubble() const { return mix(background(), color("blue"), dark() ? 0.16 : 0.13); }
 
 QStringList Theme::listPalette() const {
     QStringList names;

@@ -76,6 +76,54 @@ Window {
             Layout.fillHeight: true
             Layout.preferredWidth: 180
             color: theme.sidebar
+
+            // About, in the corner: what this is, which version, whose, and
+            // under what licence.
+            Column {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 14
+                spacing: 3
+                Row {
+                    spacing: 8
+                    Image { source: "qrc:/icon.svg"; width: 28; height: 28; sourceSize: Qt.size(56, 56); anchors.verticalCenter: parent.verticalCenter }
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        Text { text: "Precrime"; color: theme.foreground; font.pixelSize: backend.fontSize; font.bold: true }
+                        Text { text: "Version " + Qt.application.version; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
+                    }
+                }
+                Text {
+                    topPadding: 4
+                    text: "github.com/jrimmer/precrime"
+                    color: theme.today
+                    font.pixelSize: backend.fontSize - 3
+                    font.underline: linkMouse.containsMouse
+                    MouseArea {
+                        id: linkMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Qt.openUrlExternally("https://github.com/jrimmer/precrime")
+                    }
+                }
+                Text { text: "© 2026 Jason Rimmer"; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
+                Text {
+                    text: "MIT License"
+                    color: theme.today
+                    font.pixelSize: backend.fontSize - 3
+                    font.underline: licenseMouse.containsMouse
+                    MouseArea {
+                        id: licenseMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: licenseDialog.open()
+                    }
+                }
+            }
+
             Column {
                 anchors.fill: parent
                 anchors.topMargin: 14
@@ -131,6 +179,23 @@ Window {
                 ColumnLayout {
                     visible: root.pane === 1
                     Layout.fillWidth: true
+                    RowLayout {
+                        Label { text: "Appearance"; Layout.preferredWidth: 160 }
+                        // System follows the Omarchy theme; Dark and Light force one.
+                        Repeater {
+                            model: [["system", "System"], ["dark", "Dark"], ["light", "Light"]]
+                            Button {
+                                required property var modelData
+                                text: modelData[1]
+                                checkable: true
+                                autoExclusive: true
+                                checked: theme.scheme === modelData[0]
+                                highlighted: checked
+                                flat: !checked
+                                onClicked: backend.setSetting("appearance.scheme", modelData[0])
+                            }
+                        }
+                    }
                     RowLayout {
                         Label { text: "Text size"; Layout.preferredWidth: 160 }
                         Slider { from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }

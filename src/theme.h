@@ -15,6 +15,10 @@
 class Theme : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool dark READ dark NOTIFY changed)
+    // "system" follows the Omarchy theme; "dark" or "light" force a scheme,
+    // using a built-in palette (with the theme's accent) when the theme is
+    // the other kind.
+    Q_PROPERTY(QString scheme READ scheme WRITE setScheme NOTIFY changed)
     Q_PROPERTY(QColor accent READ accent NOTIFY changed)
     Q_PROPERTY(QColor accentForeground READ accentForeground NOTIFY changed)
     Q_PROPERTY(QColor background READ background NOTIFY changed)
@@ -41,7 +45,9 @@ class Theme : public QObject {
 public:
     explicit Theme(const QString &currentDirectory = {}, QObject *parent = nullptr);
 
-    bool dark() const { return m_dark; }
+    bool dark() const { return m_scheme == "dark" ? true : m_scheme == "light" ? false : m_dark; }
+    QString scheme() const { return m_scheme; }
+    void setScheme(const QString &scheme);
     QColor accent() const { return color("accent"); }
     QColor accentForeground() const;
     QColor background() const { return color("background"); }
@@ -79,7 +85,8 @@ private:
 
     QString m_directory;
     QHash<QString, QColor> m_colors;
-    bool m_dark = true;
+    bool m_dark = true;  // What the Omarchy theme itself is.
+    QString m_scheme = "system";
     QFileSystemWatcher m_watcher;
     QTimer m_debounce;
 };

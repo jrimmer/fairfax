@@ -6,6 +6,7 @@
 #include <QMimeDatabase>
 #include <QProcess>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QLocale>
@@ -2229,6 +2230,11 @@ void Backend::removeAlarm(qint64 alarmId) {
     m_store->commit();
 }
 
+QString Backend::licenseText() const {
+    QFile file(":/LICENSE");
+    return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+}
+
 QString Backend::shareableLink(qint64 taskId) const { return Automation::shareableLink(m_store->task(taskId)); }
 
 void Backend::toggleSearchScope() {
@@ -2533,7 +2539,38 @@ QVariantMap Backend::previewEntry(const QString &text) const {
     QVariantList spans;
     for (const auto &span : p.spans)
         spans.append(QVariantMap{{"start", span.start}, {"length", span.length}, {"kind", span.kind}});
-    return {{"title", p.title}, {"chips", chips}, {"spans", spans}};
+    qint64 listId = 0;
+    for (const auto &l : m_store->lists())
+        if (!p.list.isEmpty() && !l.deleted && l.kind != ListKind::Smart && l.name.compare(p.list, Qt::CaseInsensitive) == 0)
+            listId = l.id;
+    qint64 locationId = 0;
+    for (const auto &l : m_store->locations())
+        if (!p.location.isEmpty() && !l.deleted && l.name.compare(p.location, Qt::CaseInsensitive) == 0)
+            locationId = l.id;
+    QVariantList alerts;
+    for (int offset : p.alertOffsets)
+        alerts.append(offset);
+    QDate dueDate = p.dueDate;
+    if (!dueDate.isValid() && p.dueTime >= 0)
+        dueDate = QDate::currentDate();
+    if (p.recurrence.isSet() && !dueDate.isValid() && !p.startDate.isValid())
+        dueDate = Recurrences::next(p.recurrence, QDate::currentDate().addDays(-1));
+    const QVariantMap fields{
+        {"title", p.title},
+        {"dueIso", dueDate.isValid() ? dueDate.toString(Qt::ISODate) : QString()},
+        {"dueMinutes", p.dueTime},
+        {"startIso", p.startDate.isValid() ? p.startDate.toString(Qt::ISODate) : QString()},
+        {"startMinutes", p.startTime},
+        {"recurrence", recurrenceToMap(p.recurrence)},
+        {"alerts", alerts},
+        {"duration", p.duration},
+        {"tags", p.tags},
+        {"listId", listId},
+        {"locationId", locationId},
+        {"priority", qMax(0, p.priority)},
+        {"starred", p.starred},
+    };
+    return {{"title", p.title}, {"chips", chips}, {"spans", spans}, {"fields", fields}};
 }
 
 void Backend::applyParsed(Task &t, const ParsedEntry &p) {
@@ -2593,6 +2630,67 @@ void Backend::applyParsed(Task &t, const ParsedEntry &p) {
             }
         }
     }
+}
+
+QVariantMap Backend::quickEntryDefaults() const {
+    QString due;
+    const int offset = m_store->setting("tasks.defaultDueOffset", -1).toInt();
+    if (offset >= 0 && !m_store->setting("tasks.defaultDueNotQuickEntry", false).toBool())
+        due = (offset == 30 ? QDate::currentDate().addMonths(1) : QDate::currentDate().addDays(offset)).toString(Qt::ISODate);
+    return {{"listId", quickEntryListId()}, {"dueIso", due}};
+}
+
+qint64 Backend::quickAddFields(const QVariantMap &f) {
+    const QString title = f.value("title").toString().trimmed();
+    if (title.isEmpty())
+        return 0;
+    Task t;
+    t.id = m_store->nextId("tasks");
+    t.type = qBound(0, f.value("type").toInt(), 2);
+    const qint64 listId = f.value("listId").toLongLong();
+    t.listId = listId && m_store->lists().contains(listId) && m_store->list(listId).kind != ListKind::Smart ? listId
+                                                                                                          : quickEntryListId();
+    if (!t.listId) {
+        setStatus("Create a list first: there is nowhere to put the task.");
+        return 0;
+    }
+    t.title = title.left(1000);
+    t.notes = f.value("notes").toString();
+    t.order = nextOrder(t.listId, 0);
+    t.dueDate = QDate::fromString(f.value("dueIso").toString(), Qt::ISODate);
+    t.dueTime = t.dueDate.isValid() ? f.value("dueMinutes", -1).toInt() : -1;
+    t.startDate = QDate::fromString(f.value("startIso").toString(), Qt::ISODate);
+    t.startTime = t.startDate.isValid() ? f.value("startMinutes", -1).toInt() : -1;
+    if (f.contains("recurrence"))
+        t.recurrence = recurrenceFromMap(f.value("recurrence").toMap());
+    if (t.recurrence.isSet() && !t.dueDate.isValid() && !t.startDate.isValid())
+        t.dueDate = Recurrences::next(t.recurrence, QDate::currentDate().addDays(-1));
+    t.duration = qMax(0, f.value("duration").toInt());
+    t.priority = qBound(0, f.value("priority").toInt(), 3);
+    t.starred = f.value("starred").toBool();
+    m_store->begin("Quick Entry");
+    for (const auto &name : f.value("tags").toStringList())
+        if (const qint64 id = tagIdForName(name, true); id && !t.tagIds.contains(id))
+            t.tagIds.append(id);
+    if (const qint64 place = f.value("locationId").toLongLong(); place && m_store->locations().contains(place))
+        t.locationIds.append(place);
+    for (const auto &v : f.value("alerts").toList()) {
+        Alarm a;
+        a.id = m_store->nextId("alarms");
+        a.taskId = t.id;
+        a.offset = v.toInt();
+        m_store->putAlarm(a);
+        if (!t.dueDate.isValid())
+            t.dueDate = QDate::currentDate();  // An alert counts from a deadline.
+    }
+    m_store->putTask(t);
+    m_store->commit();
+    const QVariantList files = f.value("files").toList();
+    if (!files.isEmpty())
+        dropFiles(t.id, files);
+    m_options.keepVisible.insert(t.id);
+    setStatus("Added “" + t.title + "” to " + m_store->list(t.listId).name);
+    return t.id;
 }
 
 qint64 Backend::quickAdd(const QString &text, const QString &notes, int type, qint64 listId) {

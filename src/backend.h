@@ -231,6 +231,15 @@ public:
     // Quick Entry and natural-language input.
     Q_INVOKABLE QVariantMap previewEntry(const QString &text) const;
     Q_INVOKABLE qint64 quickAdd(const QString &text, const QString &notes, int type, qint64 listId);
+    // The redesigned Quick Entry: the window keeps its own field values
+    // (seeded from previewEntry().fields as you type, then adjusted with its
+    // pills) and saves them exactly, without parsing the title again.
+    // Keys: title, notes, type, listId, dueIso, dueMinutes, startIso,
+    // startMinutes, recurrence (map, as setRecurrence), alerts (minutes
+    // before), duration, tags (names), locationId, priority, starred, files.
+    Q_INVOKABLE qint64 quickAddFields(const QVariantMap &fields);
+    // Where Quick Entry starts: its list and the default due date, if any.
+    Q_INVOKABLE QVariantMap quickEntryDefaults() const;
     Q_INVOKABLE qint64 quickEntryListId() const;
     Q_INVOKABLE QVariantMap setting(const QString &key) const;
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
@@ -238,6 +247,7 @@ public:
     void requestQuickEntryWith(const QString &text) { emit quickEntryTextRequested(text); }
     QList<qint64> selectedIds() const { return QList<qint64>(m_selected.cbegin(), m_selected.cend()); }
     Q_INVOKABLE QString shareableLink(qint64 taskId) const;
+    Q_INVOKABLE QString licenseText() const;
 
     // Backups: automatic every 24 or 48 hours, keeping the newest N, plus
     // Backup Now and restore. A restore first backs up what it replaces.

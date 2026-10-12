@@ -10,6 +10,7 @@
 #include <QGuiApplication>
 #include <QFileInfo>
 #include <QIcon>
+#include <QKeyEvent>
 #include <QProcess>
 #include <QThread>
 #include <csignal>
@@ -45,6 +46,38 @@
 #include "todoist.h"
 
 namespace {
+
+// Settings and Quick Entry close on Escape (or Ctrl+W) whatever control has
+// focus inside them. QML shortcuts proved unreliable for this under Hyprland,
+// where a focused field or checkbox could swallow the key first; an
+// application-level filter sees it before anything else does.
+class CloseKeys : public QObject {
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        if (event->type() != QEvent::KeyPress)
+            return false;
+        auto *key = static_cast<QKeyEvent *>(event);
+        const bool close = key->key() == Qt::Key_Escape ||
+                           (key->key() == Qt::Key_W && key->modifiers() == Qt::ControlModifier);
+        if (!close)
+            return false;
+        auto *window = qobject_cast<QWindow *>(watched);
+        if (!window || window != QGuiApplication::focusWindow())
+            return false;
+        if (window->title() == "Precrime Settings" || window->title() == "Precrime Quick Entry") {
+            // A popup inside (a menu, a date picker) gets Escape first.
+            if (auto *quick = qobject_cast<QQuickWindow *>(window); quick && quick->activeFocusItem() &&
+                QString(quick->activeFocusItem()->metaObject()->className()).contains("Popup"))
+                return false;
+            window->close();
+            return true;
+        }
+        return false;
+    }
+};
 
 QString databasePath(const QStringList &args) {
     const int i = args.indexOf("--db");
@@ -180,7 +213,7 @@ int main(int argc, char *argv[]) {
 
     QGuiApplication app(argc, argv);
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.2.3");
+    app.setApplicationVersion("0.2.4");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
@@ -199,13 +232,14 @@ int main(int argc, char *argv[]) {
     QCommandLineOption editOption("edit", "Open the editor on this task id (for screenshots).", "id");
     QCommandLineOption themeOption("theme-dir", "Read the theme from this directory instead of Omarchy's.", "dir");
     QCommandLineOption quickOption("quick", "Open Quick Entry (bind this to a key in Hyprland).");
+    QCommandLineOption schemeOption("scheme", "Force system, dark or light (for screenshots).", "scheme");
     QCommandLineOption openOption("open", "Open Quick Open, to find any task or list.");
     QCommandLineOption settingsOption("settings", "Open Settings.");
     QCommandLineOption selfTestOption("selftest", "Drive the window with scripted keys and report QML errors (use with --demo).");
     QCommandLineOption quickTextOption("quick-text", "Type this into Quick Entry (for screenshots).", "text");
     QCommandLineOption daemonOption("background", "Start without a window, to deliver alarms (for exec-once).");
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
-                    daemonOption, quickTextOption, selfTestOption, openOption, settingsOption});
+                    daemonOption, quickTextOption, selfTestOption, openOption, settingsOption, schemeOption});
     cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
@@ -274,6 +308,8 @@ int main(int argc, char *argv[]) {
     }
 
     QQuickStyle::setStyle("Material");
+    CloseKeys closeKeys;
+    app.installEventFilter(&closeKeys);
 
     QTemporaryDir demoDir;
     QString dbPath = cli.value(dbOption);
@@ -287,7 +323,12 @@ int main(int argc, char *argv[]) {
     const bool opened = store.open(dbPath, &error);
 
     Theme theme(cli.value(themeOption));
+    theme.setScheme(store.setting("appearance.scheme", "system").toString());
     Backend backend(&store);
+    QObject::connect(&backend, &Backend::settingsChanged, &theme,
+                     [&] { theme.setScheme(store.setting("appearance.scheme", "system").toString()); });
+    if (cli.isSet(schemeOption))
+        theme.setScheme(cli.value(schemeOption));
     NotesHighlighter::registerType();
 
     Sounds sounds;
