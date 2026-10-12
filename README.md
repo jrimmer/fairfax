@@ -308,9 +308,16 @@ Overdue + Today, Overdue, Today or None.
 ```sh
 bin/build    # qmake6 + make into build/precrime
 bin/test     # builds and runs the Qt Test suite offscreen
+bin/e2e      # builds and runs the end-to-end UI tests offscreen (see below)
 build/precrime --demo --screenshot shot.png   # render offscreen to a PNG
 QT_QPA_PLATFORM=offscreen build/precrime --demo --selftest   # drive the UI with scripted keys; fails on any QML error
 ```
+
+`bin/e2e` boots the real window on a temporary database and drives it the way a user does
+(mouse clicks, double-clicks, typing, shortcuts), then checks the store or the screen. Each
+scenario in `tests/e2e/` quotes the the reference app manual page it comes from, and a layout check fails when
+any visible item sticks out of its dialog, popup or window. Pass Qt Test arguments through
+(`bin/e2e doubleClickOpensEditorWithTitle`); `PRECRIME_E2E=1 bin/test` runs it after the unit tests.
 
 `src/` holds the C++ (store, scheduling rules, view building, the `backend` QObject) and
 `src/qml/` the interface. `docs/analysis.md` records how the reference app behaves and the roadmap.

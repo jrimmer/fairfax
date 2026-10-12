@@ -1,0 +1,12 @@
+#!/bin/sh
+# Builds and runs the end-to-end UI tests: the real QML window, driven by
+# synthetic mouse and keyboard events, offscreen.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+mkdir -p "$ROOT/build/e2e"
+cd "$ROOT/build/e2e"
+
+qmake6 "$ROOT/tests/e2e/precrime_e2e.pro"
+make -j"${PRECRIME_JOBS:-$(nproc)}"
+QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 ./precrime_e2e "$@"

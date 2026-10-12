@@ -94,6 +94,7 @@ Rectangle {
 
     EditListDialog {
         id: editListDialog
+        objectName: "editListDialog"
     }
     Connections {
         target: editListDialog
@@ -222,6 +223,7 @@ Rectangle {
         }
 
         MiniCalendar {
+            objectName: "miniCalendar"
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
@@ -313,12 +315,14 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 0
                 IconButton {
+                    objectName: "calendarToggle"
                     icon: "calendar"
                     tip: root.calendarShown ? "Hide Calendar" : "Show Calendar"
                     onClicked: backend.setSetting("appearance.showCalendar", !root.calendarShown)
                 }
                 IconButton {
                     id: styleButton
+                    objectName: "calendarStyle"
                     icon: "chevronDown"
                     size: 11
                     width: 18
@@ -527,6 +531,7 @@ Rectangle {
         id: listRow
         Item {
             id: item
+            objectName: "sidebarRow:" + (row.sourceKey || "")
             height: row.kind === "project" ? 28 : 32
             property var row: parent ? parent.model : ({})
             property int rowIndex: parent ? parent.index : 0

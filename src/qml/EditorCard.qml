@@ -11,6 +11,7 @@ import "Icons.js" as Icons
 Item {
     id: root
 
+    objectName: "editorCard"
     property real margin: 40
     signal done()
 
@@ -143,6 +144,7 @@ Item {
                     }
                     Plain.TextField {
                         id: titleField
+                        objectName: "editorTitle"
                         Layout.fillWidth: true
                         // While a new task's title is typed, recognised dates,
                         // tags and the rest are drawn as capsules, as in Quick Entry.
@@ -343,7 +345,7 @@ Item {
                         }
                         RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
                         RibbonButton { id: locationButton; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; menu: locationMenu }
-                        RibbonButton { id: repeatButton; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
+                        RibbonButton { id: repeatButton; objectName: "editorRepeat"; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
                         RibbonButton { id: alarmButton; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
                         RibbonButton { id: durationButton; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; menu: durationMenu }
 
@@ -704,7 +706,7 @@ Item {
         onAccepted: backend.setAction(root.e.id, kind, actionValue.text)
     }
 
-    RepeatEditor { id: repeatEditor; taskId: root.e.id }
+    RepeatEditor { id: repeatEditor; objectName: "repeatEditor"; taskId: root.e.id }
 
     Menu {
         id: alarmStyleMenu

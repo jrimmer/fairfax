@@ -37,6 +37,7 @@
 #include <functional>
 
 #include "alarms.h"
+#include "appsetup.h"
 #include "automation.h"
 #include "calendar.h"
 #include "diagnostics.h"
@@ -375,29 +376,13 @@ int main(int argc, char *argv[]) {
     QString error;
     const bool opened = store.open(dbPath, &error);
 
-    Theme theme(cli.value(themeOption));
-    theme.setScheme(store.setting("appearance.scheme", "system").toString());
-    Backend backend(&store);
-    QObject::connect(&backend, &Backend::settingsChanged, &theme,
-                     [&] { theme.setScheme(store.setting("appearance.scheme", "system").toString()); });
+    AppServices services(store, cli.value(themeOption));
+    Theme &theme = services.theme;
+    Backend &backend = services.backend;
+    Sounds &sounds = services.sounds;
+    CalendarFeed &calendar = services.calendar;
     if (cli.isSet(schemeOption))
         theme.setScheme(cli.value(schemeOption));
-    NotesHighlighter::registerType();
-
-    Sounds sounds;
-    sounds.setEnabled(store.setting("general.sounds", true).toBool());
-    QObject::connect(&backend, &Backend::settingsChanged, &sounds, [&] { sounds.setEnabled(store.setting("general.sounds", true).toBool()); });
-    QObject::connect(&backend, &Backend::taskCompleted, &sounds, [&sounds](bool done) { if (done) sounds.complete(); else sounds.uncomplete(); });
-
-    CalendarFeed calendar;
-    calendar.setPalette(theme.listPalette());
-    // Per-source switches and colours, and the addresses that mark a declined
-    // invitation as mine, all set before the sources so the first load is right.
-    calendar.setDisabledSources(store.setting("calendar.disabled").toString().split('\n', Qt::SkipEmptyParts));
-    calendar.setSourceColors(QJsonDocument::fromJson(store.setting("calendar.colors").toString().toUtf8()).object().toVariantMap());
-    calendar.setMyEmails(store.setting("calendar.emails").toString());
-    calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
-    QObject::connect(&theme, &Theme::changed, &calendar, [&] { calendar.setPalette(theme.listPalette()); });
 
     // The same command set scripts and Claude use, wired to this window.
     Automation automation(store);
@@ -439,47 +424,10 @@ int main(int argc, char *argv[]) {
             backend.selectSource(cli.value(sourceOption));
     }
 
-    FilePicker filePicker;
-    // Git sync works on a working copy beside the database; demo and
-    // screenshot runs leave it alone.
-    std::unique_ptr<GitSync> gitSync;
-    if (opened && !offscreen) {
-        gitSync = std::make_unique<GitSync>(&store);
-        QObject::connect(&app, &QCoreApplication::aboutToQuit, gitSync.get(), [&gitSync, &store] {
-            // One last push so edits made just before quitting reach the remote.
-            if (gitSync->configured() && SyncTree::autoSyncEnabled(store))
-                gitSync->syncBlocking(8000);
-        });
-    }
+    services.startSync(opened, offscreen);
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("filePicker", &filePicker);
-    engine.rootContext()->setContextProperty("gitSync", gitSync.get());
+    SyncHub &syncHub = services.syncHub;
     std::unique_ptr<Tray> tray;
-    std::unique_ptr<TodoistSync> todoist;
-    if (opened && !offscreen) {
-        todoist = std::make_unique<TodoistSync>(&store);
-        if (todoist->connected())
-            QTimer::singleShot(3000, todoist.get(), &TodoistSync::syncNow);
-    }
-    engine.rootContext()->setContextProperty("todoist", todoist.get());
-    std::unique_ptr<FolderSync> folderSync;
-    std::unique_ptr<WebDavSync> webDavSync;
-    if (opened && !offscreen) {
-        folderSync = std::make_unique<FolderSync>(&store);
-        webDavSync = std::make_unique<WebDavSync>(&store);
-        if (SyncTree::autoSyncEnabled(store)) {
-            QTimer::singleShot(4000, folderSync.get(), &TreeProvider::syncNow);
-            QTimer::singleShot(5000, webDavSync.get(), &TreeProvider::syncNow);
-        }
-    }
-    engine.rootContext()->setContextProperty("folderSync", folderSync.get());
-    engine.rootContext()->setContextProperty("webDavSync", webDavSync.get());
-    SyncHub syncHub;
-    syncHub.add(gitSync.get(), "Git");
-    syncHub.add(todoist.get(), "Todoist");
-    syncHub.add(folderSync.get(), "Folder");
-    syncHub.add(webDavSync.get(), "WebDAV");
-    engine.rootContext()->setContextProperty("syncHub", &syncHub);
     if (opened && !offscreen) {
         tray = std::make_unique<Tray>(&store, &backend);
         tray->canSync = [&] { return syncHub.active(); };
@@ -487,12 +435,8 @@ int main(int argc, char *argv[]) {
         QObject::connect(&backend, &Backend::settingsChanged, tray.get(),
                          [&] { tray->setVisible(store.setting("general.trayIcon", true).toBool()); });
     }
-    engine.rootContext()->setContextProperty("calendar", &calendar);
-    engine.rootContext()->setContextProperty("sounds", &sounds);
-    engine.rootContext()->setContextProperty("theme", &theme);
-    engine.rootContext()->setContextProperty("backend", &backend);
-    engine.rootContext()->setContextProperty("storeError", opened ? QString() : dbPath + ": " + error);
-    engine.rootContext()->setContextProperty("startHidden", cli.isSet(quickOption) || cli.isSet(daemonOption));
+    services.install(engine, opened ? QString() : dbPath + ": " + error,
+                     cli.isSet(quickOption) || cli.isSet(daemonOption));
     engine.load(QUrl("qrc:/qml/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

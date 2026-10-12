@@ -112,6 +112,7 @@ ColumnLayout {
             model: 42
             Item {
                 id: cell
+                objectName: "calDay:" + dayIso
                 required property int index
                 width: parent.cell
                 height: 21
@@ -126,6 +127,7 @@ ColumnLayout {
                                                              && dayIso >= backend.dayFilter && dayIso <= (backend.dayFilterTo || backend.dayFilter))
 
                 Rectangle {
+                    objectName: "calWeekendShade"
                     anchors.fill: parent
                     visible: root.shadeWeekends && (cell.day.getDay() === 0 || cell.day.getDay() === 6)
                     color: Qt.alpha(theme.foreground, theme.dark ? 0.05 : 0.045)
@@ -159,6 +161,7 @@ ColumnLayout {
                 // Dots: one per task, up to three; red on past days, whose open
                 // tasks are overdue.
                 Row {
+                    objectName: "calDots"
                     visible: root.style === "dots" && cell.busy > 0
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.bottom

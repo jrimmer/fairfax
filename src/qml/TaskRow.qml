@@ -8,6 +8,7 @@ import "Icons.js" as Icons
 Item {
     id: root
 
+    objectName: "taskRow:" + (r.taskId || 0)
     property var row
     // The last real row, so bindings stay valid while the delegate is torn
     // down and its model entry is already gone.
@@ -70,6 +71,7 @@ Item {
     // checklist's square badge with its open-item count.
     Item {
         id: check
+        objectName: "taskCheck:" + (root.r.taskId || 0)
         x: root.margin + root.indent
         y: (root.lineHeight - height) / 2
         width: 18

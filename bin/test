@@ -8,3 +8,8 @@ cd "$ROOT/build/tests"
 qmake6 "$ROOT/tests/precrime_tests.pro"
 make -j"${PRECRIME_JOBS:-$(nproc)}"
 QT_QPA_PLATFORM=offscreen ./precrime_tests
+
+# The UI tests need a second full build, so they run here only on request.
+if [ -n "${PRECRIME_E2E:-}" ]; then
+    "$ROOT/bin/e2e"
+fi

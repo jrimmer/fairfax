@@ -121,6 +121,7 @@ Item {
                 onClicked: root.toggleProjectView()
             }
             Text {
+                objectName: "paneTitle"
                 text: backend.sourceTitle
                 color: backend.sourceKey.startsWith("project:") ? theme.muted : theme.foreground
                 font.pixelSize: backend.fontSize + 9
@@ -227,6 +228,7 @@ Item {
 
         ListView {
             id: list
+            objectName: "taskList"
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -352,7 +354,7 @@ Item {
         }
     }
 
-    SearchBuilder { id: searchBuilder; onClosed: Qt.callLater(root.focusList) }
+    SearchBuilder { id: searchBuilder; objectName: "searchBuilder"; onClosed: Qt.callLater(root.focusList) }
 
     Confetti { id: confetti; anchors.fill: parent; enabled: (backend.settingsRevision, backend.settingFlag("general.celebrate", true)) }
     Connections {

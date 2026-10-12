@@ -112,7 +112,7 @@ ApplicationWindow {
         onAccepted: { settings.pane = 2; settings.show(); settings.raise() }
         onClosed: win.focusList()
     }
-    ExportDialog { id: exportDialog; owner: "main" }
+    ExportDialog { id: exportDialog; objectName: "exportDialog"; owner: "main" }
 
     // Files picked for a task's attachments.
     Connections {

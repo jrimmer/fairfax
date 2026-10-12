@@ -731,6 +731,7 @@ Window {
                     }
                     RibbonButton {
                         id: repeatButton
+                        objectName: "quickRepeat"
                         icon: "repeat"; active: !!root.recurrence.frequency; tint: theme.duration
                         tip: root.repeatTip()
                         menu: repeatMenu
@@ -801,6 +802,7 @@ Window {
                     Seg {
                         required property string modelData
                         required property int index
+                        objectName: "quickUnit:" + modelData
                         text: modelData
                         on: root.customMode === "repeat" ? root.recurrence.frequency === index + 1 || (root.recurrence.frequency === 5 && index === 1) : root.durationUnit === index
                         onClicked: {
@@ -820,6 +822,7 @@ Window {
                     model: root.customMode === "repeat" && root.recurrence.frequency === 2 ? 7 : 0
                     Seg {
                         required property int index
+                        objectName: "quickWeekday:" + index
                         text: root.weekdayNames[index].charAt(0)
                         implicitWidth: 24
                         on: (root.recurrence.weekdays >> index) & 1

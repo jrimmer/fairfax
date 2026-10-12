@@ -30,6 +30,7 @@ Item {
     }
     TextInput {
         id: input
+        objectName: "searchField"
         visible: root.expanded
         anchors.left: parent.left
         anchors.leftMargin: 30
