@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 6;
+constexpr int SchemaVersion = 7;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -209,6 +209,15 @@ bool Store::migrate(QString *error) {
             %1))").arg(SyncColumns),
     };
 
+    // Version 7 adds per-list completed/scheduled/alert switches and list
+    // group colours.
+    const QStringList version7{
+        QStringLiteral("ALTER TABLE lists ADD COLUMN completed_mode INTEGER NOT NULL DEFAULT 0"),
+        QStringLiteral("ALTER TABLE lists ADD COLUMN include_scheduled INTEGER NOT NULL DEFAULT 0"),
+        QStringLiteral("ALTER TABLE lists ADD COLUMN mute_alerts INTEGER NOT NULL DEFAULT 0"),
+        QStringLiteral("ALTER TABLE list_groups ADD COLUMN color INTEGER NOT NULL DEFAULT -1"),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -222,6 +231,8 @@ bool Store::migrate(QString *error) {
         steps += version5;
     if (version < 6)
         steps += version6;
+    if (version < 7)
+        steps += version7;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();

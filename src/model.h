@@ -105,6 +105,7 @@ struct ListGroup {
     QString name;
     double order = 0;
     bool collapsed = false;
+    int color = -1;           // Palette index its lists take on ("Color grouped lists"); -1 for none.
     QDateTime modified;
     bool deleted = false;
 
@@ -136,6 +137,12 @@ struct TaskList {
     // "next:N:unit" with unit d/w/m/y ("In the next 3 days"),
     // "fixed:yyyy-MM-dd:yyyy-MM-dd", or "nodue".
     QString smartRange;
+    // Whether completed tasks show here: the list default, always, or never.
+    // Normal lists default to showing them (subject to the completed-window
+    // setting); Smart Lists default to hiding them, as in the reference app.
+    int completedMode = 0;    // 0 default, 1 include, 2 exclude.
+    bool includeScheduled = false;  // Smart Lists: also match scheduled tasks.
+    bool muteAlerts = false;  // Alerts for this list's tasks stay silent.
     QDateTime modified;
     bool deleted = false;
 

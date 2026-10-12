@@ -113,7 +113,7 @@ Task Task::fromMap(const QVariantMap &m) {
 
 QVariantMap ListGroup::toMap() const {
     return {{"id", id}, {"uid", uid}, {"name", name}, {"sort_order", order},
-            {"collapsed", collapsed}, {"modified", stampValue(modified)}, {"deleted", deleted}};
+            {"collapsed", collapsed}, {"color", color}, {"modified", stampValue(modified)}, {"deleted", deleted}};
 }
 
 ListGroup ListGroup::fromMap(const QVariantMap &m) {
@@ -123,6 +123,7 @@ ListGroup ListGroup::fromMap(const QVariantMap &m) {
     g.name = m.value("name").toString();
     g.order = m.value("sort_order").toDouble();
     g.collapsed = m.value("collapsed").toBool();
+    g.color = m.value("color", -1).toInt();
     g.modified = stampFrom(m.value("modified"));
     g.deleted = m.value("deleted").toBool();
     return g;
@@ -146,6 +147,9 @@ QVariantMap TaskList::toMap() const {
         {"archived", archived},
         {"smart_query", smartQuery},
         {"smart_range", smartRange},
+        {"completed_mode", completedMode},
+        {"include_scheduled", includeScheduled},
+        {"mute_alerts", muteAlerts},
         {"modified", stampValue(modified)},
         {"deleted", deleted},
     };
@@ -169,6 +173,9 @@ TaskList TaskList::fromMap(const QVariantMap &m) {
     l.archived = m.value("archived").toBool();
     l.smartQuery = m.value("smart_query").toString();
     l.smartRange = m.value("smart_range").toString();
+    l.completedMode = m.value("completed_mode").toInt();
+    l.includeScheduled = m.value("include_scheduled").toBool();
+    l.muteAlerts = m.value("mute_alerts").toBool();
     l.modified = stampFrom(m.value("modified"));
     l.deleted = m.value("deleted").toBool();
     return l;
