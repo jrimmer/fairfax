@@ -18,7 +18,7 @@ Item {
     // Natural-language reading of a new task's title, which the "Stop
     // detecting" chip turns off for this edit only.
     property bool detecting: true
-    readonly property bool canDetect: !!e.isNew && backend.setting("nl.editor").value !== "false"
+    readonly property bool canDetect: !!e.isNew && (backend.settingsRevision, backend.settingFlag("nl.editor", true))
     readonly property var chipColors: ({
         due: theme.today, start: theme.start, repeat: theme.duration, alert: theme.priorityMedium,
         duration: theme.duration, priority: theme.priorityHigh, star: theme.star, tag: theme.muted,
@@ -47,8 +47,18 @@ Item {
         }
     }
 
-    Component.onCompleted: {
+    // The task whose title is in the field, so a late-arriving editor update
+    // for a different task refills it rather than leaving it blank.
+    property var loadedId: 0
+    function loadTitle() {
+        if (loadedId === e.id) return
+        loadedId = e.id
         titleField.text = e.title || ""
+    }
+    onEChanged: loadTitle()
+
+    Component.onCompleted: {
+        loadTitle()
         titleField.forceActiveFocus()
         if (e.isNew) titleField.selectAll()
         const pending = backend.takePendingField()
@@ -158,7 +168,11 @@ Item {
                         placeholderTextColor: theme.faint
                         selectByMouse: true
                         background: Item {}
-                        function commit() { if (text !== (root.e.title || "")) backend.setTitle(root.e.id, text) }
+                        // An existing task never loses its name to an empty field.
+                        function commit() {
+                            if (text === (root.e.title || "") || (text.trim() === "" && !root.e.isNew)) return
+                            backend.setTitle(root.e.id, text)
+                        }
                         onEditingFinished: commit()
                         Keys.onReturnPressed: root.finish()
                         Keys.onEscapePressed: root.finish()

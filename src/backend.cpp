@@ -3735,8 +3735,16 @@ QStringList Backend::listNames() const {
 
 QVariantMap Backend::setting(const QString &key) const { return {{"value", m_store->setting(key)}}; }
 
+bool Backend::settingFlag(const QString &key, bool fallback) const {
+    const QVariant v = m_store->setting(key);
+    if (!v.isValid() || v.isNull() || v.toString().isEmpty())
+        return fallback;
+    return v.toBool();  // QVariant reads the strings "false" and "0" as false.
+}
+
 void Backend::setSetting(const QString &key, const QVariant &value) {
     m_store->setSetting(key, value);
+    ++m_settingsRevision;
     m_options.completedWindowMinutes = m_store->setting("tasks.completedWindow", 24 * 60).toInt();
     rebuild();
     emit settingsChanged();
@@ -4021,11 +4029,13 @@ void Backend::rebuild() {
         m_editing = 0;
 
     const ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    // The editor's data goes first: the task rows create the editor card,
+    // which reads it as it is built.
+    rebuildEditor();
     rebuildSidebar(views);
     rebuildTasks(views);
     rebuildTags(views);
     rebuildPlaces(views);
-    rebuildEditor();
 }
 
 void Backend::rebuildSidebar(const ViewBuilder &views) {

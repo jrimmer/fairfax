@@ -40,6 +40,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool searchAllLists READ searchAllLists NOTIFY viewChanged)
     Q_PROPERTY(RowModel *places READ places CONSTANT)
     Q_PROPERTY(int density READ density NOTIFY settingsChanged)
+    Q_PROPERTY(int settingsRevision READ settingsRevision NOTIFY settingsChanged)
     Q_PROPERTY(int contentWidth READ contentWidth NOTIFY settingsChanged)
     Q_PROPERTY(bool showNotesPreview READ showNotesPreview NOTIFY settingsChanged)
     Q_PROPERTY(bool showListNames READ showListNames NOTIFY settingsChanged)
@@ -344,6 +345,12 @@ public:
     // it can become the task's URL action. Keys: title, notes, url.
     Q_INVOKABLE QVariantMap splitPaste(const QString &text) const;
     Q_INVOKABLE QVariantMap setting(const QString &key) const;
+    // A setting read as a switch: stored settings come back as text after a
+    // restart, so "false" must read as false. Bindings that use it should
+    // also read settingsRevision, which changes with every setting, so they
+    // re-evaluate when a setting changes.
+    Q_INVOKABLE bool settingFlag(const QString &key, bool fallback) const;
+    int settingsRevision() const { return m_settingsRevision; }
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
     Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
     void requestQuickEntryWith(const QString &text) { emit quickEntryTextRequested(text); }
@@ -564,6 +571,7 @@ private:
     qint64 m_anchor = 0;
     qint64 m_editing = 0;
     qint64 m_newTask = 0;
+    int m_settingsRevision = 0;
     qint64 m_noDetectTask = 0;
     bool m_hasHidden = false;
     QVariantMap m_editor;

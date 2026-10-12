@@ -50,7 +50,7 @@ Popup {
 
     function openFor(k) {
         kind = k
-        exact = backend.setting("bar.exact." + k).value === "true"
+        exact = backend.settingFlag("bar.exact." + k, false)
         input.text = ""
         refresh()
         open()

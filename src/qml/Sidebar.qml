@@ -20,7 +20,7 @@ Rectangle {
     property int dragListId: 0
     property int dragGroupId: 0
     property int deleteGroupId: 0
-    readonly property bool calendarShown: backend.setting("appearance.showCalendar").value !== false
+    readonly property bool calendarShown: (backend.settingsRevision, backend.settingFlag("appearance.showCalendar", true))
     property string deleteGroupName
     // Re-read when settings change: the Hide Lists privacy option.
     property bool hasHidden: backend.hasHiddenLists()
@@ -315,7 +315,6 @@ Rectangle {
                 IconButton {
                     icon: "calendar"
                     tip: root.calendarShown ? "Hide Calendar" : "Show Calendar"
-                    checked: root.calendarShown
                     onClicked: backend.setSetting("appearance.showCalendar", !root.calendarShown)
                 }
                 IconButton {
@@ -329,7 +328,7 @@ Rectangle {
                     Menu {
                         id: styleMenu
                         popupType: Popup.Window
-                        readonly property string style: String(backend.setting("appearance.calendarStyle").value || "heat")
+                        readonly property string style: (backend.settingsRevision, String(backend.setting("appearance.calendarStyle").value || "heat"))
                         // Picking a style also shows a hidden calendar.
                         function pick(key) {
                             backend.setSetting("appearance.calendarStyle", key)
@@ -338,8 +337,8 @@ Rectangle {
                         MenuItem {
                             text: "Shade Weekends"
                             checkable: true
-                            checked: backend.setting("appearance.calendarWeekends").value === true
-                            onTriggered: backend.setSetting("appearance.calendarWeekends", checked)
+                            checked: (backend.settingsRevision, backend.settingFlag("appearance.calendarWeekends", false))
+                            onTriggered: backend.setSetting("appearance.calendarWeekends", !backend.settingFlag("appearance.calendarWeekends", false))
                         }
                         MenuSeparator {}
                         MenuItem { text: "Display style:"; enabled: false }

@@ -222,7 +222,7 @@ Item {
             Layout.rightMargin: root.contentMargin
             Layout.bottomMargin: 6
             visible: !!calendar && calendar.sources.length > 0 && backend.search === ""
-                     && (backend.sourceKey === "today" || (backend.setting("calendar.inLists").value === "true" && !backend.sourceIsSmart && !backend.sourceKey.startsWith("project:")))
+                     && (backend.sourceKey === "today" || ((backend.settingsRevision, backend.settingFlag("calendar.inLists", false)) && !backend.sourceIsSmart && !backend.sourceKey.startsWith("project:")))
         }
 
         ListView {
@@ -354,7 +354,7 @@ Item {
 
     SearchBuilder { id: searchBuilder; onClosed: Qt.callLater(root.focusList) }
 
-    Confetti { id: confetti; anchors.fill: parent; enabled: backend.setting("general.celebrate").value !== "false" }
+    Confetti { id: confetti; anchors.fill: parent; enabled: (backend.settingsRevision, backend.settingFlag("general.celebrate", true)) }
     Connections {
         target: backend
         function onCelebrate() { if (confetti.enabled) confetti.burst(root.width / 2, root.height / 3) }
@@ -371,7 +371,7 @@ Item {
         if (k === Qt.Key_Up) { backend.moveCursor(-1, shift); return done() }
         if (k === Qt.Key_Return || k === Qt.Key_Enter) {
             // the reference app's option: Return creates a new task and Ctrl+Return edits.
-            const returnCreates = backend.setting("tasks.returnCreates").value === "true"
+            const returnCreates = backend.settingFlag("tasks.returnCreates", false)
             if (returnCreates !== !!ctrl) backend.newTask(0); else backend.beginEdit()
             return done()
         }

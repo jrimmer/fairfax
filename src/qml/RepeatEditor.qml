@@ -32,6 +32,8 @@ Popup {
     parent: Overlay.overlay
     padding: 14
     width: 380
+    // The popup grows when a weekly or monthly shape adds rows; margins keep Qt pushing it back inside the window.
+    margins: 8
     focus: true
     modal: false
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside

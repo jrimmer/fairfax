@@ -83,10 +83,10 @@ Item {
 
     // Expanded or collapsed is remembered between sessions. The backend is
     // absent or minimal in tests, so every call is guarded.
-    readonly property bool canPersist: !!backend && typeof backend.setting === "function" && typeof backend.setSetting === "function"
+    readonly property bool canPersist: !!backend && typeof backend.settingFlag === "function" && typeof backend.setSetting === "function"
     property bool restored: false
     Component.onCompleted: {
-        if (canPersist) expanded = backend.setting("calendar.expanded").value === "true"
+        if (canPersist) expanded = backend.settingFlag("calendar.expanded", false)
         restored = true
     }
     onExpandedChanged: {

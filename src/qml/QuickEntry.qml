@@ -66,7 +66,7 @@ Window {
         && !startField.dirty && !dueField.dirty && !startTimeField.dirty && !dueTimeField.dirty
     // A pasted link stays whole: no dates are read out of it.
     readonly property bool bareUrl: /^(https?|ftp):\/\/\S+$/i.test(title_.text.trim())
-    readonly property bool detect: backend.setting("nl.quickEntry").value !== "false" && !bareUrl
+    readonly property bool detect: (backend.settingsRevision, backend.settingFlag("nl.quickEntry", true)) && !bareUrl
 
     readonly property var kindColors: ({
         date: theme.today, due: theme.today, start: theme.start, time: theme.today, repeat: theme.duration,
@@ -308,7 +308,7 @@ Window {
         applyParsed()
         // Like the reference app, the clipboard's text lands in the notes, ready to keep or clear.
         notes.text = ""
-        if (backend.setting("quickEntry.clipboard").value !== "false") {
+        if (backend.settingFlag("quickEntry.clipboard", true)) {
             clip.text = ""
             clip.paste()
             notes.text = clip.text.trim().length < 2000 ? clip.text.trim() : ""
@@ -755,14 +755,23 @@ Window {
         Rectangle {
             Layout.fillWidth: true
             visible: root.customMode !== ""
-            implicitHeight: 38
+            implicitHeight: customColumn.implicitHeight + 12
             color: theme.mix(theme.raised, theme.foreground, 0.04)
-            RowLayout {
-                anchors.fill: parent
+            // Two lines so it fits the panel: the interval and unit with Done,
+            // then the weekdays for a weekly repeat.
+            ColumnLayout {
+                id: customColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
                 spacing: 6
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
                 Text {
+                    id: everyLabel
                     visible: root.customMode === "repeat"
                     text: "Every"
                     color: theme.muted
@@ -800,7 +809,13 @@ Window {
                         }
                     }
                 }
-                Item { implicitWidth: 6 }
+                Item { Layout.fillWidth: true }
+                Seg { text: "Done"; on: true; onClicked: root.applyCustom() }
+            }
+            RowLayout {
+                visible: root.customMode === "repeat" && root.recurrence.frequency === 2
+                spacing: 6
+                Text { text: "On"; color: theme.muted; font.pixelSize: backend.fontSize - 1; Layout.preferredWidth: everyLabel.implicitWidth }
                 Repeater {
                     model: root.customMode === "repeat" && root.recurrence.frequency === 2 ? 7 : 0
                     Seg {
@@ -811,8 +826,7 @@ Window {
                         onClicked: root.setRule({ weekdays: (root.recurrence.weekdays ^ (1 << index)) || (1 << index) })
                     }
                 }
-                Item { Layout.fillWidth: true }
-                Seg { text: "Done"; on: true; onClicked: root.applyCustom() }
+            }
             }
         }
 

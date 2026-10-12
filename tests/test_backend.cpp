@@ -465,6 +465,20 @@ private slots:
         QVERIFY(hasList);
     }
 
+    void settingFlagsReadStoredTextAndBumpTheRevision() {
+        Fixture f;
+        QVERIFY(f.backend->settingFlag("appearance.showCalendar", true));
+        const int before = f.backend->settingsRevision();
+        f.backend->setSetting("appearance.showCalendar", false);
+        QVERIFY(!f.backend->settingFlag("appearance.showCalendar", true));
+        QVERIFY(f.backend->settingsRevision() > before);
+        // After a restart settings come back as text.
+        f.store.setSetting("appearance.calendarWeekends", "false");
+        QVERIFY(!f.backend->settingFlag("appearance.calendarWeekends", true));
+        f.store.setSetting("appearance.calendarWeekends", "true");
+        QVERIFY(f.backend->settingFlag("appearance.calendarWeekends", false));
+    }
+
     void panesAreFilledAtStartup() {
         // A backend opened on an existing database shows it immediately,
         // without waiting for a change.
