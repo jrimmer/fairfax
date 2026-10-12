@@ -53,7 +53,12 @@ it, and Precrime picks out the details and fills the pills:
 (`starting Friday`), ranges (`from Monday until Friday`), repeats, `alert 30m`,
 `[durations]`, `!`/`!!`/`!!!` priority, `*` star, `#tags`, `/list/` and `@ Place` all work,
 and `"quotes"` keep words literal. The same parsing applies to a new task's title in the
-main window. In Quick Entry, Return saves, Shift+Return saves and starts another (so does
+main window, which shows what it found as capsules, with a "Stop detecting" chip to turn
+it off for that task. Pasting several lines into Quick Entry keeps the first as the title
+and moves the rest into the notes; a pasted link becomes the title and a URL action.
+The new-task list comes from Settings → Tasks → Default list (a list, the first list, or
+the one you used last), and "Always use the default list" sends tasks added from the main
+window there instead of to the list being viewed. In Quick Entry, Return saves, Shift+Return saves and starts another (so does
 pressing the key again), and Ctrl+Return saves and opens the task.
 
 From any terminal, `pc` (short for `precrime`) does the same:
@@ -95,13 +100,17 @@ offers your lists and `pc done <Tab>` your open tasks.
   completion), sub-tasks you add with Return, alerts (presets, N days before at a time, or a
   date and time; each Message or Message with Sound; click an alert chip to change it),
   locations, a picture and audio notes (record with the mic button, or drop
-  files), and notes with live Markdown, clickable links and `@{Task}` links to other tasks.
+  files), and notes with live Markdown, clickable links and `@{Task}` links to other tasks (type `@{`
+  for a picker of tasks, Return inserts the link).
 - **Alerts.** Settings → Alerts has Default Reminders (an automatic alert for tasks with a due
   time, and for date-only tasks, added when a due date is set and the task has none), a repeat
   interval for sound alerts (Never, 2, 5 or 10 minutes), and right-click a list → Mute Alerts.
   Alerts count from the start date when a task has no due date. Notifications offer Snooze for
   5 minutes, 15 minutes, 1 hour, this evening or tomorrow morning (the Default Due Time when
   set), and close themselves when the task is completed, deleted or re-dated.
+- **Export.** Ctrl+Shift+E opens the export panel (choose lists, All / Not Done / Done, CSV or
+  .ics); the task right-click menu has Add to Calendar (opens the task as an event in your
+  calendar app), Save as Event (.ics)… and Export Selection….
 - **Calendar day bar.** Add an iCalendar address in Settings → Calendar and today's events
   appear above Today; drag a task onto the bar to block out time for it.
 - **Mini calendar.** Busy days as a heat map, dots or nothing (the ⌄ beside the calendar

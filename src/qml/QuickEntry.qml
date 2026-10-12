@@ -64,7 +64,9 @@ Window {
         || repeatMenu.visible || alarmMenu.visible || durationMenu.visible || attachMenu.visible
     readonly property bool escapeCloses: customMode === "" && !anyMenuOpen && !tagPopup.visible
         && !startField.dirty && !dueField.dirty && !startTimeField.dirty && !dueTimeField.dirty
-    readonly property bool detect: backend.setting("nl.quickEntry").value !== "false"
+    // A pasted link stays whole: no dates are read out of it.
+    readonly property bool bareUrl: /^(https?|ftp):\/\/\S+$/i.test(title_.text.trim())
+    readonly property bool detect: backend.setting("nl.quickEntry").value !== "false" && !bareUrl
 
     readonly property var kindColors: ({
         date: theme.today, due: theme.today, start: theme.start, time: theme.today, repeat: theme.duration,
@@ -630,6 +632,22 @@ Window {
                     verticalAlignment: TextInput.AlignVCenter
                     selectByMouse: true
                     onTextChanged: root.applyParsed()
+                    // Multi-line text keeps its first line as the title and moves
+                    // the rest into the notes.
+                    Keys.onPressed: (e) => {
+                        if (!e.matches(StandardKey.Paste)) return
+                        clip.text = ""
+                        clip.paste()
+                        if (clip.text.trim().indexOf("\n") < 0) return
+                        const parts = backend.splitPaste(clip.text)
+                        remove(selectionStart, selectionEnd)
+                        insert(cursorPosition, parts.title)
+                        if (parts.notes) {
+                            notes.text = notes.text ? notes.text + "\n" + parts.notes : parts.notes
+                            root.notesOpen = true
+                        }
+                        e.accepted = true
+                    }
                     Keys.onReturnPressed: (e) => root.submit(e.modifiers)
                     Keys.onEnterPressed: (e) => root.submit(e.modifiers)
                     Keys.onEscapePressed: { if (root.customMode !== "") root.closeCustom(); else root.hide() }

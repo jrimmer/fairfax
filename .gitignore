@@ -4,3 +4,4 @@
 *.pkg.tar.*
 # Research material from the the reference app teardown; never ship or commit it.
 /reference/
+.claude/

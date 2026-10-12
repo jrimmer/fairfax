@@ -257,12 +257,15 @@ Window {
                     RowLayout {
                         Label { text: "Default list"; Layout.preferredWidth: 220 }
                         ComboBox {
-                            model: [{ name: "First list", id: 0 }].concat(backend.listChoices)
+                            // 0 is the first list and -1 the list used last.
+                            model: [{ name: "First list", id: 0 }, { name: "Last used", id: -1 }].concat(backend.listChoices)
                             textRole: "name"
+                            enabled: !backend.inboxEnabled()
                             currentIndex: Math.max(0, model.findIndex(l => l.id === Number(root.value("tasks.defaultList", 0))))
                             onActivated: (i) => backend.setSetting("tasks.defaultList", model[i].id)
                         }
                     }
+                    Toggle { key: "tasks.alwaysDefaultList"; fallback: false; label: "Always use the default list for new tasks"; note: "Otherwise a task added from the main window goes to the list you are viewing." }
                     Toggle { key: "tasks.overdueUsesTime"; fallback: false; label: "Due time taken into account when marking a task overdue" }
                     RowLayout {
                         Label { text: "Default due date for new tasks"; Layout.preferredWidth: 220 }
@@ -455,8 +458,9 @@ Window {
                     Layout.fillWidth: true
                     Label { text: "Export"; font.bold: true }
                     RowLayout {
-                        Button { text: "CSV…"; onClicked: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
-                        Button { text: "iCalendar (.ics)…"; onClicked: filePicker.save("Export tasks as iCalendar", "Precrime.ics", "export-ics") }
+                        Button { text: "Choose Lists…"; onClicked: exportDialog.show() }
+                        Button { text: "Everything as CSV…"; flat: true; onClicked: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
+                        Button { text: "Everything as .ics…"; flat: true; onClicked: filePicker.save("Export tasks as iCalendar", "Precrime.ics", "export-ics") }
                     }
                     Label { text: "Import"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
@@ -538,6 +542,8 @@ Window {
         standardButtons: Dialog.Cancel | Dialog.Ok
         onAccepted: backend.restoreBackup(path)
     }
+
+    ExportDialog { id: exportDialog; owner: "settings" }
 
     component Toggle: ColumnLayout {
         property string key

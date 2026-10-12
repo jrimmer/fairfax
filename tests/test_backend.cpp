@@ -102,7 +102,8 @@ private slots:
         f.backend->nudgeDue(7);  // `}`: a week later.
         QCOMPARE(f.store.task(id).dueDate, QDate::currentDate().addDays(7));
         f.backend->clearDue();
-        QVERIFY(!f.store.task(id).dueDate.isValid());
+        // Today's own due date stays; "tomorrow" was not read.
+        QVERIFY(f.store.task(id).dueDate != QDate::currentDate().addDays(1));
         f.backend->setPriority(3);
         f.backend->bumpPriority(1);
         QCOMPARE(f.store.task(id).priority, 3);
@@ -241,6 +242,143 @@ private slots:
             hasTask = hasTask || row.value("title") == "Already here";
         QVERIFY(hasList);
         QVERIFY(hasTask);
+    }
+
+    void defaultListSettingDrivesQuickEntry() {
+        Fixture f;
+        QList<qint64> ids;
+        for (const auto &l : f.store.lists())
+            if (!l.deleted) ids << l.id;
+        std::sort(ids.begin(), ids.end());
+        QVERIFY(ids.size() >= 2);
+        f.backend->setSetting("tasks.defaultList", ids.last());
+        QCOMPARE(f.backend->quickEntryListId(), ids.last());
+        f.backend->setSetting("tasks.defaultList", 0);
+        QCOMPARE(f.backend->quickEntryListId(), ids.first());
+    }
+
+    void oldQuickEntryListKeyMigrates() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        {
+            Backend seed(&store);
+            seed.ensureDefaults();
+        }
+        qint64 second = 0;
+        for (const auto &l : store.lists())
+            second = qMax(second, l.id);
+        store.setSetting("tasks.quickEntryList", second);
+        Backend backend(&store);
+        QCOMPARE(store.setting("tasks.defaultList", 0).toLongLong(), second);
+        QCOMPARE(backend.quickEntryListId(), second);
+    }
+
+    void lastUsedListFollowsQuickAdd() {
+        Fixture f;
+        QList<qint64> ids;
+        for (const auto &l : f.store.lists())
+            if (!l.deleted) ids << l.id;
+        std::sort(ids.begin(), ids.end());
+        f.backend->setSetting("tasks.defaultList", -1);
+        f.backend->quickAdd("first", {}, 0, ids.last());
+        QCOMPARE(f.backend->quickEntryListId(), ids.last());
+        f.backend->quickAdd("second", {}, 0, ids.first());
+        QCOMPARE(f.backend->quickEntryListId(), ids.first());
+    }
+
+    void alwaysUseDefaultListIgnoresViewedList() {
+        Fixture f;
+        QList<qint64> ids;
+        for (const auto &l : f.store.lists())
+            if (!l.deleted) ids << l.id;
+        std::sort(ids.begin(), ids.end());
+        f.backend->setSetting("tasks.defaultList", ids.first());
+        f.backend->selectSource("list:" + QString::number(ids.last()));
+        f.backend->newTask();
+        QCOMPARE(f.only().listId, ids.last());
+        f.backend->endEdit();
+
+        f.backend->setSetting("tasks.alwaysDefaultList", true);
+        f.backend->newTask();
+        f.backend->setTitle(f.backend->editingTaskId(), "Elsewhere");
+        QCOMPARE(f.store.task(f.backend->editingTaskId()).listId, ids.first());
+    }
+
+    void pastedTextSplitsIntoTitleAndNotes() {
+        Fixture f;
+        QVariantMap p = f.backend->splitPaste("\n  Buy milk \nfrom the shop\n\nand eggs\n");
+        QCOMPARE(p.value("title").toString(), QString("Buy milk"));
+        QCOMPARE(p.value("notes").toString(), QString("from the shop\n\nand eggs"));
+        QVERIFY(p.value("url").toString().isEmpty());
+
+        p = f.backend->splitPaste("https://example.com/a?b=1\nsome context");
+        QCOMPARE(p.value("title").toString(), QString("https://example.com/a?b=1"));
+        QCOMPARE(p.value("url").toString(), QString("https://example.com/a?b=1"));
+        QCOMPARE(p.value("notes").toString(), QString("some context"));
+
+        QVERIFY(f.backend->splitPaste(" \n ").value("title").toString().isEmpty());
+    }
+
+    void bareUrlTitleGetsUrlAction() {
+        Fixture f;
+        const qint64 id = f.backend->quickAddFields({{"title", "https://example.com/page"}});
+        QCOMPARE(f.store.task(id).actionType, int(ActionType::Url));
+        QCOMPARE(f.store.task(id).actionValue, QString("https://example.com/page"));
+
+        const qint64 plain = f.backend->quickAddFields({{"title", "see https://example.com"}});
+        QCOMPARE(f.store.task(plain).actionType, int(ActionType::None));
+
+        const qint64 call = f.backend->quickAddFields({{"title", "Ring Sam"}, {"actionType", ActionType::Call}, {"actionValue", "555"}});
+        QCOMPARE(f.store.task(call).actionType, int(ActionType::Call));
+    }
+
+    void stopDetectingKeepsTheTitleWhole() {
+        Fixture f;
+        f.backend->newTask();
+        const qint64 id = f.backend->editingTaskId();
+        f.backend->setDetecting(id, false);
+        f.backend->setTitle(id, "Call mum tomorrow");
+        f.backend->endEdit();
+        QCOMPARE(f.store.task(id).title, QString("Call mum tomorrow"));
+        // Today's own due date stays; "tomorrow" was not read.
+        QVERIFY(f.store.task(id).dueDate != QDate::currentDate().addDays(1));
+    }
+
+    void exportListsHonoursScopeAndNeedsLists() {
+        Fixture f;
+        const qint64 list = f.firstList();
+        const qint64 a = f.backend->quickAdd("Open", {}, 0, list);
+        const qint64 b = f.backend->quickAdd("Closed", {}, 0, list);
+        Task t = f.store.task(b);
+        t.completed = true;
+        f.store.begin("done");
+        f.store.putTask(t);
+        f.store.commit();
+        Q_UNUSED(a);
+        const QString path = f.dir.filePath("out.csv");
+        QCOMPARE(f.backend->exportLists(path, "csv", {list}, 1), 1);
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QString csv = QString::fromUtf8(file.readAll());
+        QVERIFY(csv.contains("Open"));
+        QVERIFY(!csv.contains("Closed"));
+        file.close();
+        QCOMPARE(f.backend->exportLists(f.dir.filePath("none.csv"), "csv", {}, 0), 0);
+        QVERIFY(!QFile::exists(f.dir.filePath("none.csv")));
+    }
+
+    void addToCalendarWritesEventFile() {
+        Fixture f;
+        const qint64 id = f.backend->quickAddFields({{"title", "Standup"}, {"dueIso", "2026-11-02"}, {"dueMinutes", 9 * 60}});
+        const QString path = f.dir.filePath("event.ics");
+        QVERIFY(f.backend->addToCalendar(id, path));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("DTSTART:20261102T090000"));
+        const qint64 undated = f.backend->quickAddFields({{"title", "Someday"}});
+        QVERIFY(!f.backend->addToCalendar(undated, f.dir.filePath("none.ics")));
+        QVERIFY(!QFile::exists(f.dir.filePath("none.ics")));
     }
 };
 

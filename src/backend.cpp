@@ -44,6 +44,16 @@ QString focusKey(int kind) { return Source{kind, 0}.key(); }
 
 }  // namespace
 
+namespace {
+
+// A whole string that is one web address, such as a pasted link.
+bool isBareUrl(const QString &text) {
+    static const QRegularExpression re(R"(^(https?|ftp)://\S+$)", QRegularExpression::CaseInsensitiveOption);
+    return re.match(text.trimmed()).hasMatch();
+}
+
+}  // namespace
+
 Backend::Backend(Store *store, QObject *parent)
     : QObject(parent), m_store(store), m_sidebar(SidebarRoles), m_tasks(TaskRoles), m_tags(TagRoles), m_places(PlaceRoles) {
     m_source = Source::fromKey(m_store->setting("ui.source", "today").toString());
@@ -52,6 +62,13 @@ Backend::Backend(Store *store, QObject *parent)
     for (const auto &id : m_store->setting("ui.expandedLists").toString().split(',', Qt::SkipEmptyParts))
         m_expandedLists.insert(id.toLongLong());
     m_options.completedWindowMinutes = m_store->setting("tasks.completedWindow", 24 * 60).toInt();
+    // Quick Entry once read its own list key, which Settings never wrote.
+    // There is one default list now; an old choice carries over to it.
+    if (const qint64 old = m_store->setting("tasks.quickEntryList", 0).toLongLong(); old > 0) {
+        if (m_store->setting("tasks.defaultList", 0).toLongLong() == 0)
+            m_store->setSetting("tasks.defaultList", old);
+        m_store->setSetting("tasks.quickEntryList", 0);
+    }
 
     connect(m_store, &Store::changed, this, [this] {
         rebuild();
@@ -556,12 +573,21 @@ void Backend::editTasks(const QString &label, const QVector<qint64> &ids, const 
 // ------------------------------------------------------------ task actions
 
 qint64 Backend::defaultListId() const {
-    const qint64 preferred = m_store->setting("tasks.defaultList", 0).toLongLong();
+    // 0 is the first list; -1 is "Last used", the list a task was most
+    // recently added to.
+    qint64 preferred = m_store->setting("tasks.defaultList", 0).toLongLong();
+    if (preferred < 0)
+        preferred = m_store->setting("tasks.lastList", 0).toLongLong();
     if (preferred && m_store->lists().contains(preferred) && !m_store->list(preferred).deleted)
         return preferred;
     ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
     const auto lists = views.orderedLists();
     return lists.isEmpty() ? 0 : lists.first().id;
+}
+
+void Backend::rememberList(qint64 listId) {
+    if (listId && m_store->setting("tasks.lastList", 0).toLongLong() != listId)
+        m_store->setSetting("tasks.lastList", listId);
 }
 
 double Backend::nextOrder(qint64 listId, qint64 parentId) const {
@@ -585,6 +611,9 @@ void Backend::newTask(int type, bool subtask) {
         t.parentId = parent.id;
         t.listId = parent.listId;
         t.type = TaskType::Task;
+    } else if (m_source.kind == Source::List && m_store->setting("tasks.alwaysDefaultList", false).toBool()) {
+        // "Always Use Default List": new tasks ignore the list being viewed.
+        t.listId = defaultListId();
     } else if (m_source.kind == Source::List) {
         t.listId = m_source.id;
         // In a sectioned list a new task joins the section you're in.
@@ -612,6 +641,7 @@ void Backend::newTask(int type, bool subtask) {
             t.dueDate = offset == 30 ? QDate::currentDate().addMonths(1) : QDate::currentDate().addDays(offset);
     }
     t.order = nextOrder(t.listId, t.parentId);
+    rememberList(t.listId);
     m_store->begin(type == TaskType::Project ? "New Project" : type == TaskType::Checklist ? "New Checklist" : "New Task");
     m_store->putTask(t);
     m_store->commit();
@@ -1100,7 +1130,7 @@ void Backend::setTitle(qint64 id, const QString &title) {
         t.notes = title.mid(1000) + (t.notes.isEmpty() ? "" : "\n" + t.notes);
     // A new task's title is read for dates, tags, repeats and the rest, which
     // then come out of the title, as the reference app's natural-language input does.
-    if (id == m_newTask && m_store->setting("nl.editor", true).toBool())
+    if (id == m_newTask && id != m_noDetectTask && m_store->setting("nl.editor", true).toBool())
         applyParsed(t, NaturalLanguage::parse(head, QDateTime::currentDateTime(), listNames(), locationNames()));
     m_store->putTask(t);
     m_store->commit();
@@ -1510,6 +1540,8 @@ QVariantList Backend::findTasks(const QString &text, int limit) const {
             && !m_store->list(t.listId).deleted)
             hits.append(t);
     std::sort(hits.begin(), hits.end(), [&](const Task &a, const Task &b) {
+        // With no text yet (the task-link picker) the most recent come first.
+        if (text.isEmpty() && a.modified != b.modified) return a.modified > b.modified;
         const bool pa = a.title.startsWith(text, Qt::CaseInsensitive), pb = b.title.startsWith(text, Qt::CaseInsensitive);
         if (pa != pb) return pa;
         if (a.completed != b.completed) return !a.completed;
@@ -2503,13 +2535,68 @@ bool Backend::restoreBackup(const QString &path) {
 
 void Backend::exportTo(const QString &path, const QString &format, bool selectionOnly) {
     QList<qint64> ids;
-    if (selectionOnly)
+    if (selectionOnly) {
         for (auto id : m_selected)
             ids.append(id);
+        // An empty list means "everything" to the exporters, so an empty
+        // selection must not reach them.
+        if (ids.isEmpty()) {
+            setStatus("Select some tasks to export");
+            return;
+        }
+    }
     QString error;
     const bool ok = format == "ics" ? Exchange::exportIcs(*m_store, path, ids, &error)
                                     : Exchange::exportCsv(*m_store, path, ids, &error);
     setStatus(ok ? "Exported to " + QFileInfo(path).fileName() : "Export failed: " + error);
+}
+
+int Backend::exportLists(const QString &path, const QString &format, const QVariantList &listIds, int scope) {
+    QSet<qint64> lists;
+    for (const auto &v : listIds)
+        lists.insert(v.toLongLong());
+    const QList<qint64> ids = Exchange::selectTasks(*m_store, lists, static_cast<Exchange::Scope>(qBound(0, scope, 2)));
+    if (ids.isEmpty()) {
+        setStatus("Nothing to export");
+        return 0;
+    }
+    QString error;
+    const bool ok = format == "ics" ? Exchange::exportIcs(*m_store, path, ids, &error)
+                                    : Exchange::exportCsv(*m_store, path, ids, &error);
+    setStatus(ok ? QStringLiteral("Exported %1 tasks to %2").arg(ids.size()).arg(QFileInfo(path).fileName())
+                 : "Export failed: " + error);
+    return ok ? ids.size() : 0;
+}
+
+bool Backend::addToCalendar(qint64 taskId, const QString &path) {
+    const Task t = m_store->task(taskId);
+    if (!t.id)
+        return false;
+    const QByteArray ics = Exchange::eventIcs(*m_store, t);
+    if (ics.isEmpty()) {
+        setStatus("Give the task a due or start date first");
+        return false;
+    }
+    // The desktop handler needs a file to open; a stable name per task keeps
+    // repeats from piling up in the temp folder.
+    const QString target = !path.isEmpty() ? path
+        : QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath(QStringLiteral("precrime-event-%1.ics").arg(t.id));
+    QFile file(target);
+    if (!file.open(QIODevice::WriteOnly) || file.write(ics) != ics.size()) {
+        setStatus("Could not write the event: " + file.errorString());
+        return false;
+    }
+    file.close();
+    if (!path.isEmpty()) {
+        setStatus("Saved the event to " + QFileInfo(path).fileName());
+        return true;
+    }
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(target))) {
+        setStatus("No calendar app handles .ics files; use Save as Event instead");
+        return false;
+    }
+    setStatus("Opened “" + t.title + "” in your calendar");
+    return true;
 }
 
 void Backend::importFrom(const QString &path, const QString &format) {
@@ -2583,10 +2670,14 @@ qint64 Backend::quickEntryListId() const {
     for (const auto &l : m_store->lists())
         if (!l.deleted && l.kind == ListKind::Inbox)
             return l.id;
-    const qint64 chosen = m_store->setting("tasks.quickEntryList", 0).toLongLong();
-    if (chosen && m_store->lists().contains(chosen) && !m_store->list(chosen).deleted)
-        return chosen;
     return defaultListId();
+}
+
+void Backend::setDetecting(qint64 taskId, bool on) {
+    if (on && m_noDetectTask == taskId)
+        m_noDetectTask = 0;
+    else if (!on)
+        m_noDetectTask = taskId;
 }
 
 QVariantMap Backend::previewEntry(const QString &text) const {
@@ -2748,6 +2839,14 @@ qint64 Backend::quickAddFields(const QVariantMap &f) {
     t.duration = qMax(0, f.value("duration").toInt());
     t.priority = qBound(0, f.value("priority").toInt(), 3);
     t.starred = f.value("starred").toBool();
+    t.actionType = qBound(0, f.value("actionType").toInt(), int(ActionType::Google));
+    t.actionValue = t.actionType == ActionType::None ? QString() : f.value("actionValue").toString().trimmed();
+    if (t.actionValue.isEmpty())
+        t.actionType = ActionType::None;
+    if (t.actionType == ActionType::None && isBareUrl(t.title)) {
+        t.actionType = ActionType::Url;
+        t.actionValue = t.title;
+    }
     m_store->begin("Quick Entry");
     for (const auto &name : f.value("tags").toStringList())
         if (const qint64 id = tagIdForName(name, true); id && !t.tagIds.contains(id))
@@ -2770,8 +2869,22 @@ qint64 Backend::quickAddFields(const QVariantMap &f) {
     if (!files.isEmpty())
         dropFiles(t.id, files);
     m_options.keepVisible.insert(t.id);
+    rememberList(t.listId);
     setStatus("Added “" + t.title + "” to " + m_store->list(t.listId).name);
     return t.id;
+}
+
+QVariantMap Backend::splitPaste(const QString &text) const {
+    QStringList lines = text.split('\n');
+    for (auto &l : lines)
+        l = l.trimmed();
+    while (!lines.isEmpty() && lines.first().isEmpty())
+        lines.removeFirst();
+    if (lines.isEmpty())
+        return {{"title", QString()}, {"notes", QString()}, {"url", QString()}};
+    const QString title = lines.takeFirst();
+    // Like the reference app, the title keeps its first line and the rest moves to the notes.
+    return {{"title", title}, {"notes", lines.join('\n').trimmed()}, {"url", isBareUrl(title) ? title : QString()}};
 }
 
 qint64 Backend::quickAdd(const QString &text, const QString &notes, int type, qint64 listId) {
@@ -2794,10 +2907,15 @@ qint64 Backend::quickAdd(const QString &text, const QString &notes, int type, qi
     const int offset = m_store->setting("tasks.defaultDueOffset", -1).toInt();
     if (!t.dueDate.isValid() && offset >= 0 && !m_store->setting("tasks.defaultDueNotQuickEntry", false).toBool())
         t.dueDate = offset == 30 ? QDate::currentDate().addMonths(1) : QDate::currentDate().addDays(offset);
+    if (t.actionType == ActionType::None && isBareUrl(text.trimmed())) {
+        t.actionType = ActionType::Url;
+        t.actionValue = text.trimmed();
+    }
     m_store->putTask(t);
     AlarmTimes::applyDefaultReminder(*m_store, t);
     m_store->commit();
     m_options.keepVisible.insert(t.id);
+    rememberList(t.listId);
     setStatus("Added “" + t.title + "” to " + m_store->list(t.listId).name);
     return t.id;
 }

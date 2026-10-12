@@ -15,6 +15,15 @@ Item {
     signal done()
 
     readonly property var e: backend.editor
+    // Natural-language reading of a new task's title, which the "Stop
+    // detecting" chip turns off for this edit only.
+    property bool detecting: true
+    readonly property bool canDetect: !!e.isNew && backend.setting("nl.editor").value !== "false"
+    readonly property var chipColors: ({
+        due: theme.today, start: theme.start, repeat: theme.duration, alert: theme.priorityMedium,
+        duration: theme.duration, priority: theme.priorityHigh, star: theme.star, tag: theme.muted,
+        list: theme.accent, location: theme.start
+    })
     readonly property color listColor: theme.listColor(e.listColor || 0)
     height: column.implicitHeight + 12
 
@@ -104,8 +113,8 @@ Item {
                         Layout.fillWidth: true
                         // While a new task's title is typed, recognised dates,
                         // tags and the rest are drawn as capsules, as in Quick Entry.
-                        property var spans: root.e.isNew && backend.setting("nl.editor").value !== "false" && text.trim()
-                                            ? backend.previewEntry(text).spans : []
+                        readonly property var preview: root.canDetect && root.detecting && text.trim() ? backend.previewEntry(text) : null
+                        property var spans: preview ? preview.spans : []
                         Repeater {
                             model: titleField.spans
                             Rectangle {
@@ -141,6 +150,52 @@ Item {
                         MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: backend.setStarred(root.e.starred ? 0 : 1, root.e.id) }
                     }
                     PriorityPicker { value: root.e.priority || 0; onPicked: (p) => backend.setPriority(p, root.e.id) }
+                }
+
+                // What was recognised in a new task's title, with the switch to
+                // stop reading it.
+                Flow {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 38
+                    Layout.rightMargin: 10
+                    Layout.bottomMargin: visible ? 6 : 0
+                    spacing: 6
+                    visible: root.canDetect && titleField.text.trim() !== ""
+                    Repeater {
+                        model: titleField.preview ? titleField.preview.chips : []
+                        Rectangle {
+                            required property var modelData
+                            height: 22
+                            width: chipLabel.implicitWidth + 16
+                            radius: 6
+                            color: Qt.alpha(root.chipColors[modelData.kind] || theme.accent, 0.22)
+                            Text { id: chipLabel; anchors.centerIn: parent; text: parent.modelData.label; color: theme.foreground; font.pixelSize: backend.fontSize - 2 }
+                        }
+                    }
+                    Rectangle {
+                        height: 22
+                        width: stopLabel.implicitWidth + 16
+                        radius: 11
+                        color: "transparent"
+                        border.width: 1
+                        border.color: theme.faint
+                        Text {
+                            id: stopLabel
+                            anchors.centerIn: parent
+                            text: root.detecting ? "Stop detecting" : "Detect dates and details"
+                            color: theme.muted
+                            font.pixelSize: backend.fontSize - 2
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.detecting = !root.detecting
+                                backend.setDetecting(root.e.id, root.detecting)
+                                titleField.forceActiveFocus()
+                            }
+                        }
+                    }
                 }
 
                 // The list ribbon.

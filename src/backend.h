@@ -234,17 +234,26 @@ public:
 
     // Quick Entry and natural-language input.
     Q_INVOKABLE QVariantMap previewEntry(const QString &text) const;
+    // Turns natural-language reading of a new task's title off or on for
+    // that task (the editor's "Stop detecting" chip).
+    Q_INVOKABLE void setDetecting(qint64 taskId, bool on);
     Q_INVOKABLE qint64 quickAdd(const QString &text, const QString &notes, int type, qint64 listId);
     // The redesigned Quick Entry: the window keeps its own field values
     // (seeded from previewEntry().fields as you type, then adjusted with its
     // pills) and saves them exactly, without parsing the title again.
     // Keys: title, notes, type, listId, dueIso, dueMinutes, startIso,
     // startMinutes, recurrence (map, as setRecurrence), alerts (minutes
-    // before), duration, tags (names), locationId, priority, starred, files.
+    // before), duration, tags (names), locationId, priority, starred, files,
+    // actionType and actionValue. A title that is a bare URL gets a URL
+    // action pointing at it unless an action is given.
     Q_INVOKABLE qint64 quickAddFields(const QVariantMap &fields);
     // Where Quick Entry starts: its list and the default due date, if any.
     Q_INVOKABLE QVariantMap quickEntryDefaults() const;
     Q_INVOKABLE qint64 quickEntryListId() const;
+    // Splits pasted text for the Quick Entry title: the first non-empty line
+    // is the title, the rest goes to the notes, and a bare URL is flagged so
+    // it can become the task's URL action. Keys: title, notes, url.
+    Q_INVOKABLE QVariantMap splitPaste(const QString &text) const;
     Q_INVOKABLE QVariantMap setting(const QString &key) const;
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
     Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
@@ -263,6 +272,12 @@ public:
     // Import and export (paths come from the portal file picker).
     Q_INVOKABLE void exportTo(const QString &path, const QString &format, bool selectionOnly = false);
     Q_INVOKABLE void importFrom(const QString &path, const QString &format);
+    // The export chooser: `listIds` are the lists to include and `scope` is
+    // 0 all, 1 not done, 2 done. Returns how many tasks were written.
+    Q_INVOKABLE int exportLists(const QString &path, const QString &format, const QVariantList &listIds, int scope);
+    // Add to Calendar: a one-event .ics for the task, opened with the desktop
+    // calendar handler, or saved to `path` when one is given.
+    Q_INVOKABLE bool addToCalendar(qint64 taskId, const QString &path = {});
 
     // The GTD Inbox: a real list that Quick Entry fills by default.
     Q_INVOKABLE void setInboxEnabled(bool on);
@@ -377,6 +392,7 @@ private:
     void deleteTree(qint64 id);
     qint64 duplicateTree(const Task &task, qint64 parentId, qint64 listId);
     qint64 defaultListId() const;
+    void rememberList(qint64 listId);
     qint64 tagIdForName(const QString &name, bool create);
     double nextOrder(qint64 listId, qint64 parentId) const;
     void setStatus(const QString &message);
@@ -415,6 +431,7 @@ private:
     qint64 m_anchor = 0;
     qint64 m_editing = 0;
     qint64 m_newTask = 0;
+    qint64 m_noDetectTask = 0;
     bool m_hasHidden = false;
     QVariantMap m_editor;
     QString m_status;
