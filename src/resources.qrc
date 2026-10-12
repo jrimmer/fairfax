@@ -8,6 +8,7 @@
         <file>qml/DayBar.qml</file>
         <file>qml/DragProxy.qml</file>
         <file>qml/EditorCard.qml</file>
+        <file>qml/ExportDialog.qml</file>
         <file>qml/FocusButton.qml</file>
         <file>qml/IconButton.qml</file>
         <file>qml/Icon.qml</file>

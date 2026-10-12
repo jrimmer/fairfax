@@ -85,6 +85,7 @@ ApplicationWindow {
     CommandPopup { id: command; onClosed: win.focusList() }
     QuickEntry { id: quickEntry }
     SettingsWindow { id: settings }
+    ExportDialog { id: exportDialog; owner: "main" }
 
     // Files picked for a task's attachments.
     Connections {
@@ -92,6 +93,10 @@ ApplicationWindow {
         function onPicked(path, purpose) {
             if (purpose.startsWith("attach:"))
                 backend.dropFiles(Number(purpose.slice(7)), [path])
+            else if (purpose.startsWith("event:"))
+                backend.addToCalendar(Number(purpose.slice(6)), path)
+            else if (purpose === "export-selection")
+                backend.exportTo(path, path.endsWith(".ics") ? "ics" : "csv", true)
         }
     }
 
@@ -214,6 +219,6 @@ ApplicationWindow {
     }
     AppShortcut { sequence: "Ctrl+Shift+Alt+F"; onActivated: pane.openSearchBuilder() }
     AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
-    AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
+    AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: exportDialog.show() }
     AppShortcut { sequence: "Ctrl+'"; onActivated: if (!backend.editingTaskId) backend.beginEdit() }
 }

@@ -73,4 +73,8 @@ Menu {
     MenuItem { text: "Duplicate"; onTriggered: backend.duplicateSelection() }
     MenuSeparator {}
     MenuItem { text: "Delete"; onTriggered: backend.deleteSelection() }
+    MenuSeparator {}
+    MenuItem { text: "Add to Calendar"; onTriggered: backend.addToCalendar(root.row.taskId) }
+    MenuItem { text: "Save as Event (.ics)…"; onTriggered: filePicker.save("Save the task as a calendar event", "Event.ics", "event:" + root.row.taskId) }
+    MenuItem { text: "Export Selection…"; onTriggered: filePicker.save("Export the selected tasks", "Precrime.csv", "export-selection") }
 }

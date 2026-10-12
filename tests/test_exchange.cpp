@@ -457,6 +457,56 @@ private slots:
         QVERIFY(r.error.contains("tasks") || r.error.contains("calendars"));
         QVERIFY(!s->canUndo());
     }
+
+    void selectTasksByListAndScope() {
+        auto s = freshStore();
+        const qint64 a = addList(*s, "A"), b = addList(*s, "B");
+        Task open;
+        open.title = "open";
+        open.listId = a;
+        Task done = open;
+        done.title = "done";
+        done.completed = true;
+        Task other = open;
+        other.title = "elsewhere";
+        other.listId = b;
+        const qint64 openId = addTask(*s, open), doneId = addTask(*s, done), otherId = addTask(*s, other);
+        QCOMPARE(Exchange::selectTasks(*s, {a}, Exchange::Scope::All), (QList<qint64>{openId, doneId}));
+        QCOMPARE(Exchange::selectTasks(*s, {a}, Exchange::Scope::NotDone), (QList<qint64>{openId}));
+        QCOMPARE(Exchange::selectTasks(*s, {a, b}, Exchange::Scope::Done), (QList<qint64>{doneId}));
+        QCOMPARE(Exchange::selectTasks(*s, {b}, Exchange::Scope::All), (QList<qint64>{otherId}));
+        QVERIFY(Exchange::selectTasks(*s, {}, Exchange::Scope::All).isEmpty());
+    }
+
+    void eventIcsTimedAndAllDay() {
+        auto s = freshStore();
+        const qint64 list = addList(*s, "A");
+        Task t;
+        t.title = "Dentist, 3rd floor";
+        t.notes = "Bring forms";
+        t.listId = list;
+        t.dueDate = QDate(2026, 10, 14);
+        t.dueTime = 23 * 60 + 30;
+        t.duration = 45;
+        t.id = addTask(*s, t);
+        const QString timed = QString::fromUtf8(Exchange::eventIcs(*s, t));
+        QVERIFY(timed.contains("BEGIN:VEVENT"));
+        QVERIFY(!timed.contains("VTODO"));
+        QVERIFY(timed.contains("SUMMARY:Dentist\\, 3rd floor"));
+        QVERIFY(timed.contains("DTSTART:20261014T233000"));
+        QVERIFY(timed.contains("DTEND:20261015T001500"));  // 45 minutes, across midnight.
+        QVERIFY(timed.contains("DESCRIPTION:Bring forms"));
+
+        t.dueTime = -1;
+        const QString allDay = QString::fromUtf8(Exchange::eventIcs(*s, t));
+        QVERIFY(allDay.contains("DTSTART;VALUE=DATE:20261014"));
+        QVERIFY(allDay.contains("DTEND;VALUE=DATE:20261015"));
+
+        t.dueDate = QDate();
+        QVERIFY(Exchange::eventIcs(*s, t).isEmpty());
+        t.startDate = QDate(2026, 10, 20);
+        QVERIFY(QString::fromUtf8(Exchange::eventIcs(*s, t)).contains("DTSTART;VALUE=DATE:20261020"));
+    }
 };
 
 REGISTER_TEST(ExchangeTest)

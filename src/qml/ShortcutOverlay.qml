@@ -38,7 +38,7 @@ Popup {
             ["Ctrl+F", "Search"], ["Ctrl+Shift+O", "Quick Open"], ["Ctrl+K", "Show scheduled"], ["Ctrl+U", "Show paused"],
             ["Ctrl+Shift+K", "Show scheduled & paused"], ["Ctrl+O", "Hide completed"], ["Ctrl+Alt+J", "Project view"],
             ["Ctrl+Alt+← →", "Lists / Tags panels"], ["Ctrl+= / Ctrl+-", "Text size"], ["Ctrl+C / Ctrl+V", "Copy / paste tasks"], ["Shift+F5", "Previous task"], ["Ctrl+Alt+F", "Search scope"], ["Ctrl+Alt+W", "New window"], ["Ctrl+S", "Sync now"], ["Ctrl+,", "Settings"],
-            ["Ctrl+Shift+2", "Quick Entry"], ["Ctrl+Shift+E", "Export CSV"], ["Ctrl+Q", "Quit"] ] },
+            ["Ctrl+Shift+2", "Quick Entry"], ["Ctrl+Shift+E", "Export tasks"], ["Ctrl+Q", "Quit"] ] },
     ]
 
     contentItem: Flickable {

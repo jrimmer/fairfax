@@ -5,10 +5,13 @@
 // RELATED-TO), and import of a the reference app database or .taskdb backup so moving from
 // the Mac keeps lists, groups, tags, dates, repeats and alerts.
 
+#include <QByteArray>
 #include <QList>
+#include <QSet>
 #include <QString>
 
 class Store;
+struct Task;
 
 struct ImportResult {
     int lists = 0;
@@ -20,6 +23,20 @@ struct ImportResult {
 };
 
 namespace Exchange {
+
+// Which tasks an export includes, as in the reference app's "Tasks to export:" popup.
+enum class Scope { All, NotDone, Done };
+
+// The non-deleted tasks in `listIds` that match `scope`, in id order. Unlike
+// the exporters' own "empty means everything", an empty list set selects
+// nothing: the reference app writes no file when no list is ticked.
+QList<qint64> selectTasks(const Store &store, const QSet<qint64> &listIds, Scope scope);
+
+// A one-event VCALENDAR for a task, so it can be handed to a calendar app.
+// The event runs from the due date and time (else the start) for the task's
+// duration, an hour by default; with no time it is an all-day event. Empty
+// when the task has no date at all.
+QByteArray eventIcs(const Store &store, const Task &task);
 
 // Writes `taskIds` (all non-deleted tasks when empty) as CSV with a header
 // row: Title, List, Type, Parent, Notes, Priority, Starred, Start, Due,

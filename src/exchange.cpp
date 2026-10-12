@@ -978,6 +978,70 @@ bool exportIcs(const Store &store, const QString &path, const QList<qint64> &tas
     return writeFile(path, out, error);
 }
 
+QList<qint64> selectTasks(const Store &store, const QSet<qint64> &listIds, Scope scope) {
+    QList<qint64> ids;
+    for (const Task &t : store.tasks()) {
+        if (t.deleted || !listIds.contains(t.listId))
+            continue;
+        if ((scope == Scope::NotDone && t.completed) || (scope == Scope::Done && !t.completed))
+            continue;
+        ids << t.id;
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+QByteArray eventIcs(const Store &store, const Task &t) {
+    const bool useDue = t.dueDate.isValid();
+    const QDate date = useDue ? t.dueDate : t.startDate;
+    if (!date.isValid())
+        return {};
+    const int minutes = useDue ? t.dueTime : t.startTime;
+    QByteArray out;
+    auto line = [&](const QString &l) { appendFolded(out, l); };
+    line("BEGIN:VCALENDAR");
+    line("VERSION:2.0");
+    line("PRODID:-//Precrime//EN");
+    line("CALSCALE:GREGORIAN");
+    line("METHOD:PUBLISH");
+    line("BEGIN:VEVENT");
+    line("UID:event-" + (t.uid.isEmpty() ? QUuid::createUuid().toString(QUuid::WithoutBraces) : t.uid));
+    line("DTSTAMP:" + icsUtc(QDateTime::currentDateTime()));
+    line("SUMMARY:" + escapeText(t.title));
+    if (minutes >= 0) {
+        const int length = t.duration > 0 ? t.duration : 60;
+        const QDateTime end = QDateTime(date, QTime(minutes / 60, minutes % 60)).addSecs(length * 60);
+        line("DTSTART:" + icsLocal(date, minutes));
+        line("DTEND:" + icsLocal(end.date(), end.time().hour() * 60 + end.time().minute()));
+    } else {
+        // An all-day event's end date is exclusive.
+        line("DTSTART;VALUE=DATE:" + icsDate(date));
+        line("DTEND;VALUE=DATE:" + icsDate(date.addDays(1)));
+    }
+    QStringList body;
+    if (!t.notes.isEmpty())
+        body << t.notes;
+    if (t.actionType == ActionType::Url && !t.actionValue.isEmpty())
+        body << t.actionValue;
+    if (!body.isEmpty())
+        line("DESCRIPTION:" + escapeText(body.join("\n\n")));
+    if (t.recurrence.isSet())
+        line("RRULE:" + rruleText(t.recurrence));
+    // Alerts count back from a moment, so an all-day event has none to offer.
+    for (const Alarm &a : store.alarmsFor(t.id)) {
+        if (minutes < 0 || a.deleted || a.kind == Alarm::Absolute)
+            continue;
+        line("BEGIN:VALARM");
+        line("ACTION:DISPLAY");
+        line("DESCRIPTION:" + escapeText(t.title));
+        line("TRIGGER:" + triggerText(a.offset));
+        line("END:VALARM");
+    }
+    line("END:VEVENT");
+    line("END:VCALENDAR");
+    return out;
+}
+
 ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId) {
     ImportResult result;
     QFile file(path);
