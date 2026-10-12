@@ -6,6 +6,10 @@
 RowModel::RowModel(const QStringList &roles, QObject *parent) : QAbstractListModel(parent), m_roles(roles) {
     if (!m_roles.contains("key"))
         m_roles.prepend("key");
+    // "row" hands QML the whole row as a plain object. Unlike the per-role
+    // properties of a delegate's model object, it survives the delegate's
+    // teardown, so bindings never see a destroyed model entry.
+    m_roles.append("row");
 }
 
 int RowModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : m_rows.size(); }
@@ -16,6 +20,8 @@ QVariant RowModel::data(const QModelIndex &index, int role) const {
     const int r = role - Qt::UserRole - 1;
     if (r < 0 || r >= m_roles.size())
         return {};
+    if (r == m_roles.size() - 1)
+        return m_rows.at(index.row());
     return m_rows.at(index.row()).value(m_roles.at(r));
 }
 

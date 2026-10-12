@@ -26,6 +26,7 @@
 #include "automation.h"
 #include "calendar.h"
 #include "markdown.h"
+#include "selftest.h"
 #include "sounds.h"
 #include "views.h"
 #include "backend.h"
@@ -33,6 +34,7 @@
 #include "gitsync.h"
 #include "store.h"
 #include "theme.h"
+#include "todoist.h"
 
 namespace {
 
@@ -120,10 +122,11 @@ int main(int argc, char *argv[]) {
     QCommandLineOption editOption("edit", "Open the editor on this task id (for screenshots).", "id");
     QCommandLineOption themeOption("theme-dir", "Read the theme from this directory instead of Omarchy's.", "dir");
     QCommandLineOption quickOption("quick", "Open Quick Entry (bind this to a key in Hyprland).");
+    QCommandLineOption selfTestOption("selftest", "Drive the window with scripted keys and report QML errors (use with --demo).");
     QCommandLineOption quickTextOption("quick-text", "Type this into Quick Entry (for screenshots).", "text");
     QCommandLineOption daemonOption("background", "Start without a window, to deliver alarms (for exec-once).");
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
-                    daemonOption, quickTextOption});
+                    daemonOption, quickTextOption, selfTestOption});
     cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
@@ -220,6 +223,13 @@ int main(int argc, char *argv[]) {
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("filePicker", &filePicker);
     engine.rootContext()->setContextProperty("gitSync", gitSync.get());
+    std::unique_ptr<TodoistSync> todoist;
+    if (opened && !offscreen) {
+        todoist = std::make_unique<TodoistSync>(&store);
+        if (todoist->connected())
+            QTimer::singleShot(3000, todoist.get(), &TodoistSync::syncNow);
+    }
+    engine.rootContext()->setContextProperty("todoist", todoist.get());
     engine.rootContext()->setContextProperty("calendar", &calendar);
     engine.rootContext()->setContextProperty("sounds", &sounds);
     engine.rootContext()->setContextProperty("theme", &theme);
@@ -294,6 +304,9 @@ int main(int argc, char *argv[]) {
         QObject::connect(extra, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
     };
     QObject::connect(&backend, &Backend::newWindowRequested, &app, [&openWindow] { openWindow(); });
+
+    if (cli.isSet(selfTestOption) && window)
+        SelfTest::run(window, &backend);
 
     if (cli.isSet(editOption))
         backend.beginEdit(cli.value(editOption).toLongLong());

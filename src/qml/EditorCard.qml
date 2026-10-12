@@ -525,6 +525,8 @@ Item {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: actionDialog
         property int kind: 1
         parent: Overlay.overlay
@@ -545,6 +547,8 @@ Item {
     RepeatEditor { id: repeatEditor; taskId: root.e.id }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: absoluteAlarm
         parent: Overlay.overlay
         anchors.centerIn: parent
@@ -562,6 +566,8 @@ Item {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: newLocation
         parent: Overlay.overlay
         anchors.centerIn: parent

@@ -7,19 +7,23 @@ Item {
     id: root
 
     property var row
+    // The last real row, so bindings stay valid while the delegate is torn
+    // down and its model entry is already gone.
+    property var r: row || ({})
+    onRowChanged: if (row) r = row
     property real margin: 40
 
-    height: row.isFirst ? 34 : 50
+    height: r.isFirst ? 34 : 50
 
     Text {
         id: title
         x: root.margin
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 8
-        text: (root.row.title || "").toUpperCase()
-        color: root.row.tone === "overdue" ? theme.overdue
-             : root.row.tone === "list" ? theme.listColor(root.row.color)
-             : root.row.tone === "progress" ? theme.today : theme.foreground
+        text: (root.r.title || "").toUpperCase()
+        color: root.r.tone === "overdue" ? theme.overdue
+             : root.r.tone === "list" ? theme.listColor(root.r.color)
+             : root.r.tone === "progress" ? theme.today : theme.foreground
         font.pixelSize: backend.fontSize - 1
         font.weight: Font.Bold
         font.letterSpacing: 0.6
@@ -28,17 +32,17 @@ Item {
         anchors.left: title.right
         anchors.leftMargin: 10
         anchors.baseline: title.baseline
-        visible: !!root.row.durationTotal
-        text: root.row.durationTotal || ""
+        visible: !!root.r.durationTotal
+        text: root.r.durationTotal || ""
         color: theme.duration
         font.pixelSize: backend.fontSize - 2
     }
     Icon {
         anchors.left: title.right
-        anchors.leftMargin: root.row.durationTotal ? 60 : 8
+        anchors.leftMargin: root.r.durationTotal ? 60 : 8
         anchors.verticalCenter: title.verticalCenter
-        visible: root.row.collapsed || hover.containsMouse
-        name: root.row.collapsed ? "chevronRight" : "chevronDown"
+        visible: root.r.collapsed || hover.containsMouse
+        name: root.r.collapsed ? "chevronRight" : "chevronDown"
         size: 10
         stroke: 2
         color: theme.faint
@@ -47,14 +51,14 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: root.margin
         anchors.baseline: title.baseline
-        text: root.row.count || ""
-        color: root.row.tone === "overdue" ? theme.overdue : theme.faint
+        text: root.r.count || ""
+        color: root.r.tone === "overdue" ? theme.overdue : theme.faint
         font.pixelSize: backend.fontSize - 2
     }
     MouseArea {
         id: hover
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: (m) => backend.toggleSection(root.row.sectionKey, m.modifiers & Qt.ControlModifier)
+        onClicked: (m) => backend.toggleSection(root.r.sectionKey, m.modifiers & Qt.ControlModifier)
     }
 }

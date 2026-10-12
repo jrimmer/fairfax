@@ -466,6 +466,8 @@ Rectangle {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: nameDialog
         parent: Overlay.overlay
         anchors.centerIn: parent
@@ -489,6 +491,8 @@ Rectangle {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirm
         parent: Overlay.overlay
         anchors.centerIn: parent
@@ -509,6 +513,8 @@ Rectangle {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: locDialog
         parent: Overlay.overlay
         anchors.centerIn: parent

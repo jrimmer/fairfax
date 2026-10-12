@@ -9,21 +9,25 @@ Item {
     id: root
 
     property var row
+    // The last real row, so bindings stay valid while the delegate is torn
+    // down and its model entry is already gone.
+    property var r: row || ({})
+    onRowChanged: if (row) r = row
     property real margin: 40
     property bool revealNames: false  // Alt held: show list names, like the reference app.
     readonly property real lineHeight: Math.round(backend.fontSize * [2.05, 2.5, 2.8][backend.density])
-    readonly property bool showNotes: !!row.notesPreview && (backend.showNotesPreview || backend.density === 2)
+    readonly property bool showNotes: !!r.notesPreview && (backend.showNotesPreview || backend.density === 2)
 
-    readonly property real indent: (row.depth || 0) * 28
-    readonly property bool hasCrumb: !!row.breadcrumb
+    readonly property real indent: (r.depth || 0) * 28
+    readonly property bool hasCrumb: !!r.breadcrumb
     height: lineHeight + (hasCrumb ? backend.fontSize + 2 : 0) + (showNotes ? backend.fontSize + 2 : 0)
-    opacity: row.dimmed ? 0.55 : 1
+    opacity: r.dimmed ? 0.55 : 1
 
     // The list's colour runs down the pane's leading edge, row by row.
     Rectangle {
         width: 4
         height: parent.height
-        color: theme.listColor(root.row.listColor || 0)
+        color: theme.listColor(root.r.listColor || 0)
         opacity: 0.9
     }
 
@@ -33,7 +37,7 @@ Item {
         height: parent.height - 2
         y: 1
         radius: 6
-        color: root.row.selected ? theme.selection
+        color: root.r.selected ? theme.selection
              : mouse.containsMouse ? theme.mix(theme.background, theme.foreground, 0.035) : "transparent"
     }
 
@@ -43,19 +47,19 @@ Item {
         anchors.bottom: parent.bottom
         height: 1
         color: theme.divider
-        visible: !root.row.selected
+        visible: !root.r.selected
     }
 
     // Disclosure for projects and checklists.
     Icon {
-        visible: root.row.hasChildren && (root.row.depth || 0) === 0
+        visible: root.r.hasChildren && (root.r.depth || 0) === 0
         x: root.margin + root.indent - 20
         y: (root.lineHeight - height) / 2
-        name: root.row.collapsed ? "chevronRight" : "chevronDown"
+        name: root.r.collapsed ? "chevronRight" : "chevronDown"
         size: 11
         stroke: 2
         color: theme.muted
-        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: backend.toggleCollapsed(root.row.taskId) }
+        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: backend.toggleCollapsed(root.r.taskId) }
     }
 
     // Checkbox: a circle, a repeat arrow for repeating tasks, or the
@@ -69,41 +73,41 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            visible: root.row.type !== 2 && !root.row.repeating
+            visible: root.r.type !== 2 && !root.r.repeating
             radius: 9
-            color: root.row.completed ? theme.muted : "transparent"
+            color: root.r.completed ? theme.muted : "transparent"
             border.width: 1.3
-            border.color: root.row.overdue ? theme.overdue : theme.faint
-            Icon { anchors.centerIn: parent; visible: root.row.completed; name: "check"; size: 12; stroke: 2.4; color: theme.background }
+            border.color: root.r.overdue ? theme.overdue : theme.faint
+            Icon { anchors.centerIn: parent; visible: root.r.completed; name: "check"; size: 12; stroke: 2.4; color: theme.background }
         }
         Icon {
             anchors.centerIn: parent
-            visible: root.row.type !== 2 && root.row.repeating
-            name: root.row.completed ? "done" : "repeat"
+            visible: root.r.type !== 2 && root.r.repeating
+            name: root.r.completed ? "done" : "repeat"
             size: 19
-            color: root.row.overdue ? theme.overdue : theme.muted
+            color: root.r.overdue ? theme.overdue : theme.muted
         }
         Rectangle {
             anchors.fill: parent
-            visible: root.row.type === 2
+            visible: root.r.type === 2
             radius: 4
-            color: root.row.completed ? theme.muted : "transparent"
+            color: root.r.completed ? theme.muted : "transparent"
             border.width: 1.3
             border.color: theme.today
             Text {
                 anchors.centerIn: parent
-                text: root.row.completed ? "✓" : (root.row.childOpen || "")
-                color: root.row.completed ? theme.background : theme.today
+                text: root.r.completed ? "✓" : (root.r.childOpen || "")
+                color: root.r.completed ? theme.background : theme.today
                 font.pixelSize: 10
                 font.bold: true
             }
         }
-        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: backend.toggleComplete(root.row.taskId) }
+        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: backend.toggleComplete(root.r.taskId) }
     }
 
     Item {
         id: projectGlyph
-        visible: root.row.type === 1
+        visible: root.r.type === 1
         anchors.left: check.right
         anchors.leftMargin: 8
         y: (root.lineHeight - height) / 2
@@ -119,13 +123,13 @@ Item {
         anchors.right: details.left
         anchors.rightMargin: 12
         y: (root.lineHeight - height) / 2
-        text: root.row.title || "New Task"
+        text: root.r.title || "New Task"
         elide: Text.ElideRight
         font.pixelSize: backend.fontSize
-        font.strikeout: root.row.completed
-        color: !root.row.title ? theme.faint
-             : root.row.completed ? theme.muted
-             : root.row.overdue ? theme.overdue : theme.foreground
+        font.strikeout: root.r.completed
+        color: !root.r.title ? theme.faint
+             : root.r.completed ? theme.muted
+             : root.r.overdue ? theme.overdue : theme.foreground
     }
 
     Text {
@@ -135,7 +139,7 @@ Item {
         anchors.right: title.right
         anchors.top: root.hasCrumb ? crumb.bottom : title.bottom
         anchors.topMargin: 1
-        text: root.row.notesPreview || ""
+        text: root.r.notesPreview || ""
         elide: Text.ElideRight
         color: theme.muted
         font.pixelSize: backend.fontSize - 2
@@ -150,7 +154,7 @@ Item {
         spacing: 5
         Icon { name: "breadcrumb"; size: 11; color: theme.faint; anchors.verticalCenter: parent.verticalCenter }
         Icon { name: "project"; size: 11; color: theme.muted; anchors.verticalCenter: parent.verticalCenter }
-        Text { text: root.row.breadcrumb || ""; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
+        Text { text: root.r.breadcrumb || ""; color: theme.muted; font.pixelSize: backend.fontSize - 2 }
     }
 
     Row {
@@ -165,24 +169,24 @@ Item {
         Text {
             visible: (root.revealNames || backend.showListNames) && backend.sourceIsFocus
             anchors.verticalCenter: parent.verticalCenter
-            text: root.row.listName || ""
-            color: theme.listColor(root.row.listColor || 0)
+            text: root.r.listName || ""
+            color: theme.listColor(root.r.listColor || 0)
             font.pixelSize: backend.fontSize - 3
             font.weight: Font.DemiBold
         }
         // Project progress pill.
         Rectangle {
-            visible: root.row.type === 1 && root.row.childCount > 0
+            visible: root.r.type === 1 && root.r.childCount > 0
             anchors.verticalCenter: parent.verticalCenter
             width: pct.implicitWidth + 12
             height: pct.implicitHeight + 4
             radius: height / 2
             color: Qt.alpha(theme.start, 0.18)
-            Text { id: pct; anchors.centerIn: parent; text: (root.row.progress || 0) + "%"; color: theme.start; font.pixelSize: backend.fontSize - 3; font.bold: true }
+            Text { id: pct; anchors.centerIn: parent; text: (root.r.progress || 0) + "%"; color: theme.start; font.pixelSize: backend.fontSize - 3; font.bold: true }
         }
 
         Repeater {
-            model: root.width > 760 || root.revealNames ? (root.row.tags || []).slice(0, 3) : []
+            model: root.width > 760 || root.revealNames ? (root.r.tags || []).slice(0, 3) : []
             Rectangle {
                 required property string modelData
                 anchors.verticalCenter: parent.verticalCenter
@@ -194,63 +198,63 @@ Item {
             }
         }
         Icon {
-            visible: root.width <= 760 && (root.row.tags || []).length > 0
+            visible: root.width <= 760 && (root.r.tags || []).length > 0
             anchors.verticalCenter: parent.verticalCenter
             name: "tag"; size: 14; color: theme.faint
         }
         Icon {
-            visible: !!root.row.hasLocation
+            visible: !!root.r.hasLocation
             anchors.verticalCenter: parent.verticalCenter
             name: "pin"
             size: 14
             color: theme.faint
         }
         Icon {
-            visible: !!root.row.hasAttachment
+            visible: !!root.r.hasAttachment
             anchors.verticalCenter: parent.verticalCenter
             name: "attach"
             size: 14
             color: theme.faint
         }
         Icon {
-            visible: !!root.row.hasAlarm
+            visible: !!root.r.hasAlarm
             anchors.verticalCenter: parent.verticalCenter
             name: "alarm"
             size: 14
             color: theme.faint
         }
         Icon {
-            visible: (root.row.actionType || 0) > 0
+            visible: (root.r.actionType || 0) > 0
             anchors.verticalCenter: parent.verticalCenter
-            name: Icons.actionIcons[root.row.actionType || 0]
+            name: Icons.actionIcons[root.r.actionType || 0]
             size: 14
             color: theme.today
         }
         Row {
-            visible: !!root.row.durationText
+            visible: !!root.r.durationText
             anchors.verticalCenter: parent.verticalCenter
             spacing: 3
             Icon { name: "clock"; size: 13; color: theme.duration; anchors.verticalCenter: parent.verticalCenter }
-            Text { text: root.row.durationText || ""; color: theme.duration; font.pixelSize: backend.fontSize - 2 }
+            Text { text: root.r.durationText || ""; color: theme.duration; font.pixelSize: backend.fontSize - 2 }
         }
         Column {
-            visible: !!root.row.dueText || !!root.row.startText
+            visible: !!root.r.dueText || !!root.r.startText
             anchors.verticalCenter: parent.verticalCenter
             Text {
-                visible: !!root.row.startText
+                visible: !!root.r.startText
                 anchors.right: parent.right
-                text: root.row.startText || ""
+                text: root.r.startText || ""
                 color: theme.start
-                font.pixelSize: root.row.dueText ? backend.fontSize - 3 : backend.fontSize - 2
+                font.pixelSize: root.r.dueText ? backend.fontSize - 3 : backend.fontSize - 2
             }
             Text {
-                visible: !!root.row.dueText
+                visible: !!root.r.dueText
                 anchors.right: parent.right
-                text: root.row.dueText || ""
-                font.pixelSize: root.row.startText ? backend.fontSize - 3 : backend.fontSize - 2
-                color: root.row.completed ? theme.faint
-                     : root.row.dueTone === "overdue" ? theme.overdue
-                     : root.row.dueTone === "today" ? theme.today : theme.muted
+                text: root.r.dueText || ""
+                font.pixelSize: root.r.startText ? backend.fontSize - 3 : backend.fontSize - 2
+                color: root.r.completed ? theme.faint
+                     : root.r.dueTone === "overdue" ? theme.overdue
+                     : root.r.dueTone === "today" ? theme.today : theme.muted
             }
         }
         // Priority bars and star; clicking opens the priority menu.
@@ -261,7 +265,7 @@ Item {
             Column {
                 anchors.centerIn: parent
                 spacing: 2.5
-                visible: (root.row.priority || 0) > 0 && !root.row.starred
+                visible: (root.r.priority || 0) > 0 && !root.r.starred
                 Repeater {
                     model: 3
                     Rectangle {
@@ -269,14 +273,14 @@ Item {
                         width: 13
                         height: 2
                         radius: 1
-                        color: root.row.priority === 3 ? theme.priorityHigh : root.row.priority === 2 ? theme.priorityMedium : theme.priorityLow
-                        opacity: root.row.priority === 1 && index > 0 ? 0.25 : root.row.priority === 2 && index > 1 ? 0.25 : 1
+                        color: root.r.priority === 3 ? theme.priorityHigh : root.r.priority === 2 ? theme.priorityMedium : theme.priorityLow
+                        opacity: root.r.priority === 1 && index > 0 ? 0.25 : root.r.priority === 2 && index > 1 ? 0.25 : 1
                     }
                 }
             }
             Icon {
                 anchors.centerIn: parent
-                visible: !!root.row.starred
+                visible: !!root.r.starred
                 name: "starred"
                 size: 15
                 filled: true
@@ -284,18 +288,18 @@ Item {
             }
             Rectangle {
                 anchors.centerIn: parent
-                visible: !root.row.starred && !root.row.priority && mouse.containsMouse
+                visible: !root.r.starred && !root.r.priority && mouse.containsMouse
                 width: 13; height: 2; radius: 1; color: theme.faint
             }
             MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: priorityMenu.popup() }
             Menu {
                 id: priorityMenu
-                MenuItem { text: "None"; onTriggered: backend.setPriority(0, root.row.taskId) }
-                MenuItem { text: "High"; onTriggered: backend.setPriority(3, root.row.taskId) }
-                MenuItem { text: "Medium"; onTriggered: backend.setPriority(2, root.row.taskId) }
-                MenuItem { text: "Low"; onTriggered: backend.setPriority(1, root.row.taskId) }
+                MenuItem { text: "None"; onTriggered: backend.setPriority(0, root.r.taskId) }
+                MenuItem { text: "High"; onTriggered: backend.setPriority(3, root.r.taskId) }
+                MenuItem { text: "Medium"; onTriggered: backend.setPriority(2, root.r.taskId) }
+                MenuItem { text: "Low"; onTriggered: backend.setPriority(1, root.r.taskId) }
                 MenuSeparator {}
-                MenuItem { text: root.row.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.row.starred ? 0 : 1, root.row.taskId) }
+                MenuItem { text: root.r.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.r.starred ? 0 : 1, root.r.taskId) }
             }
         }
     }
@@ -307,13 +311,13 @@ Item {
     DropArea {
         anchors.fill: parent
         keys: ["precrime-tag"]
-        onDropped: (drop) => backend.tagTask(root.row.taskId, Number(drop.getDataAsString("text/x-precrime-tag")))
+        onDropped: (drop) => backend.tagTask(root.r.taskId, Number(drop.getDataAsString("text/x-precrime-tag")))
         Rectangle { anchors.fill: parent; color: "transparent"; border.color: theme.accent; border.width: 2; radius: 6; visible: parent.containsDrag }
     }
     DropArea {
         anchors.fill: parent
         keys: ["text/uri-list"]
-        onDropped: (drop) => { if (drop.hasUrls) { backend.dropFiles(root.row.taskId, drop.urls); drop.accept() } }
+        onDropped: (drop) => { if (drop.hasUrls) { backend.dropFiles(root.r.taskId, drop.urls); drop.accept() } }
         Rectangle { anchors.fill: parent; color: "transparent"; border.color: theme.accent; border.width: 2; radius: 6; visible: parent.containsDrag }
     }
 
@@ -321,7 +325,7 @@ Item {
     DropArea {
         anchors.fill: parent
         keys: ["precrime-tasks"]
-        onDropped: backend.dropBefore(root.row.taskId)
+        onDropped: backend.dropBefore(root.r.taskId)
         Rectangle {
             visible: parent.containsDrag
             x: root.margin + root.indent
@@ -343,7 +347,7 @@ Item {
             if (!root.proxy) return
             if (drag.active) {
                 const n = backend.selectionCount
-                root.proxy.start(n > 1 ? n + " tasks" : root.row.title)
+                root.proxy.start(n > 1 ? n + " tasks" : root.r.title)
             } else {
                 root.proxy.finish()
             }
@@ -351,11 +355,11 @@ Item {
         onPressed: (m) => {
             if (root.proxy) root.proxy.place(mapToItem(null, m.x, m.y))
             const mode = m.modifiers & Qt.ShiftModifier ? 1 : m.modifiers & Qt.ControlModifier ? 2 : 0
-            if (m.button === Qt.RightButton && root.row.selected) return
-            backend.selectTask(root.row.taskId, mode)
+            if (m.button === Qt.RightButton && root.r.selected) return
+            backend.selectTask(root.r.taskId, mode)
         }
         onClicked: (m) => { if (m.button === Qt.RightButton) contextMenu.popup() }
-        onDoubleClicked: backend.beginEdit(root.row.taskId)
+        onDoubleClicked: backend.beginEdit(root.r.taskId)
     }
 
     TaskMenu { id: contextMenu; row: root.row }

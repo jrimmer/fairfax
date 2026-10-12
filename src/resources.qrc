@@ -24,6 +24,7 @@
         <file>qml/RepeatEditor.qml</file>
         <file>qml/RollingNumber.qml</file>
         <file>qml/SearchBox.qml</file>
+        <file>qml/SearchBuilder.qml</file>
         <file>qml/SectionHeader.qml</file>
         <file>qml/SettingsWindow.qml</file>
         <file>qml/ShortcutOverlay.qml</file>

@@ -260,7 +260,22 @@ Window {
                     Hint { visible: !!gitSync; text: gitSync ? "Working copy: " + gitSync.directory : "" }
                     Hint { visible: !gitSync; text: "Sync is off in demo mode." }
                     Label { text: "Todoist"; font.bold: true; Layout.topMargin: 16 }
-                    Hint { Layout.topMargin: 0; text: "Coming next: two-way sync with Todoist, for your phone." }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Two-way sync with Todoist, so your phone sees your tasks. Paste your API token from Todoist's Settings → Integrations → Developer; it's kept in your keyring, not in Precrime's database. Lists, tags, dates, repeats, priority and sub-tasks sync; start dates, stars and task types ride along in a small metadata block in each task's description. List groups, smart lists and alerts stay local. Turn it on on one machine only if you also use git sync."
+                    }
+                    RowLayout {
+                        visible: !!todoist && !todoist.connected
+                        Layout.fillWidth: true
+                        TextField { id: todoistToken; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Todoist API token" }
+                        Button { text: "Connect"; enabled: todoistToken.text.trim() !== ""; onClicked: { todoist.connectAccount(todoistToken.text.trim()); todoistToken.text = "" } }
+                    }
+                    RowLayout {
+                        visible: !!todoist && todoist.connected
+                        Button { text: todoist && todoist.busy ? "Syncing…" : "Sync Now"; enabled: !!todoist && !todoist.busy; onClicked: todoist.syncNow() }
+                        Button { text: "Disconnect"; flat: true; onClicked: todoist.disconnectAccount() }
+                    }
+                    Text { visible: !!todoist; text: todoist ? todoist.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
                 }
 
                 // Backups
@@ -362,6 +377,8 @@ Window {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmInbox
         anchors.centerIn: parent
         modal: true
@@ -372,6 +389,8 @@ Window {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmRestore
         property string path
         anchors.centerIn: parent

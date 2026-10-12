@@ -55,6 +55,11 @@ syncs right away. git runs with your own SSH keys and config and never prompts, 
 remote must work non-interactively (`ssh -T git@github.com` should succeed without a
 password prompt).
 
+**Todoist** (for your phone): Settings → Sync → paste your Todoist API token. Lists, tags,
+dates, repeats, priority and sub-tasks sync both ways; start dates, stars and task types travel
+in a small metadata block in each task's description, as the reference app does. If you also use git sync,
+connect Todoist on one machine only.
+
 To get alarms after you sign in, start Precrime in the background from
 `~/.config/hypr/autostart.conf`:
 
@@ -165,6 +170,7 @@ For a Waybar module with today's counts (like the reference app's Dock badge), a
 bin/build    # qmake6 + make into build/precrime
 bin/test     # builds and runs the Qt Test suite offscreen
 build/precrime --demo --screenshot shot.png   # render offscreen to a PNG
+QT_QPA_PLATFORM=offscreen build/precrime --demo --selftest   # drive the UI with scripted keys; fails on any QML error
 ```
 
 `src/` holds the C++ (store, scheduling rules, view building, the `backend` QObject) and

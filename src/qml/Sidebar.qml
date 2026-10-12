@@ -60,6 +60,8 @@ Rectangle {
     }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: deleteGroupDialog
         parent: Overlay.overlay
         anchors.centerIn: parent

@@ -45,6 +45,8 @@ Menu {
     MenuItem { text: "Delete List…"; onTriggered: confirm.open() }
 
     Dialog {
+
+        width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirm
         parent: Overlay.overlay
         anchors.centerIn: parent

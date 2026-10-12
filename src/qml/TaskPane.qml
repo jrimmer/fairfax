@@ -19,6 +19,7 @@ Item {
     property bool altHeld: false
 
     function focusList() { list.forceActiveFocus() }
+    function openSearchBuilder() { searchBuilder.openAt(search) }
     function focusSearch() { search.expanded = true; search.field.forceActiveFocus() }
     function toggleProjectView() {
         if (backend.sourceKey.startsWith("project:")) {
@@ -66,6 +67,7 @@ Item {
             }
             Item { Layout.fillWidth: true }
             SearchBox { id: search; onFinished: root.focusList() }
+            IconButton { icon: "sort"; size: 15; tip: "Search Options (Ctrl+Shift+Alt+F)"; onClicked: root.openSearchBuilder() }
             IconButton { icon: "panel"; tip: root.utilityVisible ? "Hide Tags (Ctrl+Alt+→)" : "Show Tags (Ctrl+Alt+→)"; onClicked: root.toggleUtility() }
         }
 
@@ -210,11 +212,11 @@ Item {
 
             Component {
                 id: sectionComponent
-                SectionHeader { row: parent.model; margin: root.contentMargin }
+                SectionHeader { row: parent.model ? parent.model.row : null; margin: root.contentMargin }
             }
             Component {
                 id: rowComponent
-                TaskRow { row: parent.model; margin: root.contentMargin; revealNames: root.altHeld }
+                TaskRow { row: parent.model ? parent.model.row : null; margin: root.contentMargin; revealNames: root.altHeld }
             }
             Component {
                 id: editorComponent
@@ -300,6 +302,8 @@ Item {
             }
         }
     }
+
+    SearchBuilder { id: searchBuilder; onClosed: Qt.callLater(root.focusList) }
 
     Confetti { id: confetti; anchors.fill: parent; enabled: backend.setting("general.celebrate").value !== "false" }
     Connections {

@@ -33,7 +33,10 @@ ApplicationWindow {
     readonly property bool utilityVisible: utilityShown && width >= 1040
 
     function openCommand(kind) { command.openFor(kind) }
-    function focusList() { pane.focusList() }
+    // Popups restore focus to whatever they found when they close, which can
+    // be the window itself; handing focus back to the list afterwards keeps
+    // the bare-key commands working.
+    function focusList() { Qt.callLater(pane.focusList) }
 
     RowLayout {
         anchors.fill: parent
@@ -194,7 +197,14 @@ ApplicationWindow {
     AppShortcut { sequence: "Shift+F5"; onActivated: backend.showLastSelected() }
     AppShortcut { sequence: "Ctrl+Alt+F"; onActivated: backend.toggleSearchScope() }
     AppShortcut { sequence: "Ctrl+Alt+W"; onActivated: backend.requestNewWindow() }
-    AppShortcut { sequence: "Ctrl+S"; onActivated: if (gitSync && gitSync.configured) gitSync.syncNow() }
+    AppShortcut {
+        sequence: "Ctrl+S"
+        onActivated: {
+            if (gitSync && gitSync.configured) gitSync.syncNow()
+            if (todoist && todoist.connected) todoist.syncNow()
+        }
+    }
+    AppShortcut { sequence: "Ctrl+Shift+Alt+F"; onActivated: pane.openSearchBuilder() }
     AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
     AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
     AppShortcut { sequence: "Ctrl+'"; onActivated: if (!backend.editingTaskId) backend.beginEdit() }
