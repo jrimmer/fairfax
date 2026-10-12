@@ -255,6 +255,7 @@ public:
     Q_INVOKABLE bool inboxEnabled() const;
     Q_INVOKABLE void requestWindow() { emit windowRequested(); }
     Q_INVOKABLE void requestNewWindow() { emit newWindowRequested(); }
+    void requestPanel(const QString &panel) { emit windowRequested(); emit panelRequested(panel); }
     Q_INVOKABLE void setTagPaused(qint64 tagId, bool paused);
     Q_INVOKABLE qint64 newTag(const QString &name, qint64 groupId = 0);
 
@@ -345,6 +346,7 @@ signals:
     void taskCompleted(bool done);   // For the completion sound.
     void celebrate();                // The last open task in view was just completed.
     void newWindowRequested();
+    void panelRequested(const QString &panel);  // "open" (Quick Open) or "settings".
     void recordingChanged();
     void quickEntryTextRequested(const QString &text);
     void windowRequested();

@@ -103,7 +103,7 @@ Window {
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
                     Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
                     Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }
-                    Hint { text: "Quick Entry from anywhere: add to ~/.config/hypr/bindings.conf\nbindd = SUPER SHIFT, T, Precrime quick entry, exec, precrime --quick\nwindowrule = float, title:^(Precrime Quick Entry)$\nTo get alarms after signing in: exec-once = precrime --background" }
+                    Hint { text: "On Omarchy, run  precrime setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Precrime section in the Super+Space menu, and starts Precrime at sign-in so alarms arrive. Undo with  precrime setup omarchy --remove." }
                 }
 
                 // Appearance

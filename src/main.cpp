@@ -8,7 +8,9 @@
 #include <QDir>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QFileInfo>
 #include <QIcon>
+#include <QProcess>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlApplicationEngine>
@@ -25,6 +27,7 @@
 #include "alarms.h"
 #include "automation.h"
 #include "calendar.h"
+#include "cli.h"
 #include "exchange.h"
 #include "markdown.h"
 #include "selftest.h"
@@ -53,6 +56,27 @@ int runHeadless(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     app.setApplicationName("precrime");
     QStringList args = app.arguments();
+    if (args.value(1) == "setup") {
+        // `precrime setup omarchy [--remove] [--key …]` runs the packaged
+        // script (or the repo's copy when running from a build).
+        if (args.value(2) != "omarchy") {
+            QTextStream(stderr) << "usage: precrime setup omarchy [--remove] [--key \"SUPER + SHIFT + T\"]" << Qt::endl;
+            return 2;
+        }
+        const QString appDir = QCoreApplication::applicationDirPath();
+        for (const QString &script : {QStringLiteral("/usr/lib/precrime/precrime-omarchy-setup"),
+                                      appDir + "/../scripts/precrime-omarchy-setup"}) {
+            if (QFileInfo(script).isExecutable()) {
+                QProcess run;
+                run.setProcessChannelMode(QProcess::ForwardedChannels);
+                run.start(script, args.mid(3));
+                run.waitForFinished(-1);
+                return run.exitCode();
+            }
+        }
+        QTextStream(stderr) << "precrime: the Omarchy setup script isn't installed." << Qt::endl;
+        return 1;
+    }
     const QString dbPath = databasePath(args);
     if (const int i = args.indexOf("--db"); i >= 0)
         args.remove(i, qMin<qsizetype>(2, args.size() - i));
@@ -63,7 +87,12 @@ int runHeadless(int argc, char *argv[]) {
         err << "precrime: can't open the database: " << error << Qt::endl;
         return 1;
     }
+    const bool shorthand = args.value(0).section('/', -1) == "pc";
+    if (shorthand)
+        return Cli::pc(store, args.mid(1), out, err);
     const QString mode = args.value(1);
+    if (mode == "add")
+        return Cli::add(store, args.mid(2), out, err);
     if (mode == "--waybar") {
         // A Waybar custom module: overdue and due-today counts, like the reference app's
         // Dock badge.
@@ -115,14 +144,17 @@ int runHeadless(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     {
+        // Invoked as `pc` (a symlink), everything is the terminal shorthand.
+        const QString self = QString::fromLocal8Bit(argv[0]).section('/', -1);
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
-        if (first == "mcp" || first == "ctl" || first == "--waybar" || first == "import")
+        if (self == "pc" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" ||
+            first == "add" || first == "setup")
             return runHeadless(argc, argv);
     }
 
     QGuiApplication app(argc, argv);
     app.setApplicationName("precrime");
-    app.setApplicationVersion("0.1.0");
+    app.setApplicationVersion("0.2.0");
 
     // Matches the window to precrime.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
@@ -141,11 +173,13 @@ int main(int argc, char *argv[]) {
     QCommandLineOption editOption("edit", "Open the editor on this task id (for screenshots).", "id");
     QCommandLineOption themeOption("theme-dir", "Read the theme from this directory instead of Omarchy's.", "dir");
     QCommandLineOption quickOption("quick", "Open Quick Entry (bind this to a key in Hyprland).");
+    QCommandLineOption openOption("open", "Open Quick Open, to find any task or list.");
+    QCommandLineOption settingsOption("settings", "Open Settings.");
     QCommandLineOption selfTestOption("selftest", "Drive the window with scripted keys and report QML errors (use with --demo).");
     QCommandLineOption quickTextOption("quick-text", "Type this into Quick Entry (for screenshots).", "text");
     QCommandLineOption daemonOption("background", "Start without a window, to deliver alarms (for exec-once).");
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
-                    daemonOption, quickTextOption, selfTestOption});
+                    daemonOption, quickTextOption, selfTestOption, openOption, settingsOption});
     cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
@@ -164,6 +198,10 @@ int main(int argc, char *argv[]) {
                 return 0;
             if (openUrl.startsWith("precrime:"))
                 probe.write(("url " + openUrl + "\n").toUtf8());
+            else if (cli.isSet(openOption))
+                probe.write("open\n");
+            else if (cli.isSet(settingsOption))
+                probe.write("settings\n");
             else
                 probe.write(cli.isSet(quickOption) ? "quick\n" : "show\n");
             probe.waitForBytesWritten(300);
@@ -274,6 +312,10 @@ int main(int argc, char *argv[]) {
                         backend.requestQuickEntry();
                     else if (request.startsWith("url "))
                         handleUrl(QString::fromUtf8(request.mid(4)));
+                    else if (request == "open")
+                        backend.requestPanel("open");
+                    else if (request == "settings")
+                        backend.requestPanel("settings");
                     else
                         backend.requestWindow();
                     client->disconnectFromServer();
@@ -286,6 +328,10 @@ int main(int argc, char *argv[]) {
         QTimer::singleShot(0, &backend, &Backend::requestQuickEntry);
     if (openUrl.startsWith("precrime:"))
         QTimer::singleShot(0, &backend, [handleUrl, openUrl] { handleUrl(openUrl); });
+    if (cli.isSet(openOption))
+        QTimer::singleShot(300, &backend, [&backend] { backend.requestPanel("open"); });
+    if (cli.isSet(settingsOption))
+        QTimer::singleShot(300, &backend, [&backend] { backend.requestPanel("settings"); });
 
     // Alarms are delivered by this process, so like the reference app's Alarm Helper it
     // keeps running after the window closes; Q or Ctrl+Q quits for real.

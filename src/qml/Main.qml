@@ -95,6 +95,10 @@ ApplicationWindow {
         target: backend
         function onQuickEntryRequested() { quickEntry.summon() }
         function onQuickEntryTextRequested(text) { quickEntry.summon(); quickEntry.prefill(text) }
+        function onPanelRequested(panel) {
+            if (panel === "open") win.openCommand("open")
+            else if (panel === "settings") { settings.show(); settings.raise(); settings.requestActivate() }
+        }
         function onWindowRequested() { win.show(); win.raise(); win.requestActivate() }
     }
     QuickLook { id: quickLook; onClosed: win.focusList() }

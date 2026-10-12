@@ -22,49 +22,45 @@ bin/build && build/precrime --demo
 
 Your tasks live in `~/.local/share/precrime/precrime.db`. `--db PATH` opens another file.
 
-## Quick Entry
+## On Omarchy
 
-Capture a task from anywhere by binding Quick Entry to a key in
-`~/.config/hypr/bindings.conf`, and floating its window:
+After installing, wire Precrime into Omarchy with one command (undo with `--remove`):
 
-```ini
-bindd = SUPER SHIFT, T, Precrime quick entry, exec, precrime --quick
-windowrule = float, title:^(Precrime Quick Entry)$
-windowrule = center, title:^(Precrime Quick Entry)$
+```sh
+precrime setup omarchy
 ```
 
-Type the task the way you'd say it, and Precrime picks out the details:
+It adds, each in a clearly marked place:
+
+- **Super+Shift+T** opens Quick Entry from anywhere (`--key "SUPER + ALT + T"` to pick
+  another; it refuses a key that's already taken). Quick Entry and Settings float, centred.
+- **Super+Space → Precrime**: New Task, Today, Find a Task and Settings in the Omarchy menu.
+- Precrime starts in the background when you sign in, so alarms arrive and Quick Entry is
+  instant.
+
+Hyprland's part lives in `~/.config/hypr/precrime.lua`, loaded by one line in
+`hyprland.lua`; the menu entries are a marked block in
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`. Both files are backed up first.
+
+## Quick Entry and the terminal
+
+Type a task the way you'd say it, and Precrime picks out the details:
 `Call Sam tomorrow at 3pm #family !! every Monday [30m] /work/`. Dates, start dates
 (`starting Friday`), ranges (`from Monday until Friday`), repeats, `alert 30m`,
-`[durations]`, `!`/`!!`/`!!!` priority, `*` star, `#tags` and `/list/` all work, and
-`"quotes"` keep words literal. The same parsing applies to a new task's title in the main
-window. Return saves, Shift+Return saves and starts another (so does pressing the bind
-again), Ctrl+Return saves and opens the task.
+`[durations]`, `!`/`!!`/`!!!` priority, `*` star, `#tags`, `/list/` and `@ Place` all work,
+and `"quotes"` keep words literal. The same parsing applies to a new task's title in the
+main window. In Quick Entry, Return saves, Shift+Return saves and starts another (so does
+pressing the key again), and Ctrl+Return saves and opens the task.
 
-## Sync
+From any terminal, `pc` (short for `precrime`) does the same:
 
-Precrime syncs through a git repository of your own. Make a **private** repository, then
-open Settings (Ctrl+,) → Sync and paste its URL (`git@github.com:you/tasks.git`, or any URL
-or path git accepts). Every machine pointed at it stays in step.
-
-The database never goes into git. Each task, list and tag is a small JSON file, so changes
-on different machines merge record by record, with the most recent edit winning, and git
-never reports a conflict. Precrime syncs at startup, about 20 seconds after you change
-something, every five minutes, and once more on quit; Ctrl+S or the sidebar's sync button
-syncs right away. git runs with your own SSH keys and config and never prompts, so the
-remote must work non-interactively (`ssh -T git@github.com` should succeed without a
-password prompt).
-
-**Todoist** (for your phone): Settings → Sync → paste your Todoist API token. Lists, tags,
-dates, repeats, priority and sub-tasks sync both ways; start dates, stars and task types travel
-in a small metadata block in each task's description, as the reference app does. If you also use git sync,
-connect Todoist on one machine only.
-
-To get alarms after you sign in, start Precrime in the background from
-`~/.config/hypr/autostart.conf`:
-
-```ini
-exec-once = precrime --background
+```sh
+pc Call Sam tomorrow 3pm #family !!   # add a task
+pc                                    # Today, numbered
+pc ls Personal                        # a list (or all, starred, scheduled, done)
+pc find dentist                       # search everything; the reference app search syntax works
+pc done 347                           # complete by number
+pc help
 ```
 
 ## How it works
@@ -172,8 +168,8 @@ xdg-open 'precrime://x-callback-url/add?task=Buy%20milk&due=tomorrow'
 
 Changes made this way appear in the open window within a couple of seconds.
 
-For a Waybar module with today's counts (like the reference app's Dock badge), add to
-`~/.config/waybar/config.jsonc`:
+If you use Waybar rather than Omarchy's own bar, a module with today's counts (like the reference app's
+Dock badge) goes in `~/.config/waybar/config.jsonc`:
 
 ```jsonc
 "custom/precrime": { "exec": "precrime --waybar", "return-type": "json", "interval": 60, "on-click": "precrime" }

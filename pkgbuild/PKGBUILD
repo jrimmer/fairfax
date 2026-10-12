@@ -1,10 +1,12 @@
 pkgname=precrime
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='A keyboard-first task manager for Omarchy, modelled on the reference app'
 arch=('x86_64' 'aarch64')
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal' 'git' 'python')
+optdepends=('libsecret: keep the Todoist token in the keyring'
+            'pipewire: record audio notes')
 makedepends=('gcc' 'make')
 source=()
 sha256sums=()
@@ -17,6 +19,9 @@ build() {
 package() {
   cd "$startdir/.."
   install -Dm755 build/precrime "$pkgdir/usr/bin/precrime"
+  # `pc` is the terminal shorthand: pc <task> adds one, pc lists Today.
+  ln -s precrime "$pkgdir/usr/bin/pc"
+  install -Dm755 scripts/precrime-omarchy-setup "$pkgdir/usr/lib/precrime/precrime-omarchy-setup"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 "$startdir/precrime.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/precrime.svg"
   install -Dm644 "$startdir/precrime.desktop" "$pkgdir/usr/share/applications/precrime.desktop"

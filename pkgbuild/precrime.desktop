@@ -10,3 +10,17 @@ Terminal=false
 Categories=Office;ProjectManagement;Utility;
 Keywords=todo;tasks;gtd;taskapp;
 StartupWMClass=precrime
+Actions=new-task;today;find;
+
+[Desktop Action new-task]
+Name=New Task
+Exec=precrime --quick
+
+[Desktop Action today]
+Name=Today
+Exec=precrime precrime://x-callback-url/showtoday
+
+[Desktop Action find]
+Name=Find a Task
+Exec=precrime --open
+
