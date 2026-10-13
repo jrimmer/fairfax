@@ -35,3 +35,6 @@ SOURCES += test_misc_sort.cpp test_misc_keys.cpp test_misc_tags.cpp test_misc_io
 # Gap tests: editor, Quick Look, notes, attachments, alerts and Settings leftovers.
 HEADERS += gapskit2.h
 SOURCES += test_gaps_editor.cpp test_gaps_notes.cpp test_gaps_settings.cpp
+
+# Gap-filling end-to-end tests: menus, sections and sidebar buttons.
+SOURCES += test_gaps_menus.cpp
