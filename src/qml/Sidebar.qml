@@ -396,7 +396,7 @@ Rectangle {
         Item {
             id: header
             height: 34
-            property var row: parent ? parent.model : ({})
+            property var row: parent && parent.model ? parent.model : ({})
             Text {
                 id: headerTitle
                 anchors.left: parent.left
@@ -533,7 +533,7 @@ Rectangle {
             id: item
             objectName: "sidebarRow:" + (row.sourceKey || "")
             height: row.kind === "project" ? 28 : 32
-            property var row: parent ? parent.model : ({})
+            property var row: parent && parent.model ? parent.model : ({})
             property int rowIndex: parent ? parent.index : 0
             readonly property bool isList: row.kind === "list"
             readonly property color band: theme.listColor(row.color || 0)
