@@ -589,6 +589,27 @@ private slots:
         QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"later", "open"}));
     }
 
+    // A search that names scheduled or paused tasks finds them, though they
+    // are hidden by default: otherwise `type: scheduled` could match nothing.
+    void queryNamingScheduledOrPausedShowsThem() {
+        const auto l = addList("L");
+        const auto onHold = addTag("onhold", true);
+        addTask(l, "open");
+        addTask(l, "later", [](Task &t) { t.startDate = day(5); });
+        addTask(l, "held", [onHold](Task &t) { t.tagIds << onHold; });
+        ViewOptions o;
+        o.search = "type: scheduled";
+        QCOMPARE(titles(build(Source{Source::All}, o)), QStringList{"later"});
+        o.search = "type: paused";
+        QCOMPARE(titles(build(Source{Source::All}, o)), QStringList{"held"});
+        // Excluding them does not ask for them.
+        o.search = "type: !scheduled";
+        QCOMPARE(titles(build(Source{Source::All}, o)), QStringList{"open"});
+        // A Smart List built on the preset behaves the same.
+        const auto smart = addList("Soon", [](TaskList &sl) { sl.kind = ListKind::Smart; sl.smartQuery = "type: scheduled"; });
+        QCOMPARE(titles(build(list(smart))), QStringList{"later"});
+    }
+
     void smartListDateRange() {
         const auto l = addList("L");
         addTask(l, "soon", [](Task &t) { t.dueDate = day(2); });

@@ -799,7 +799,7 @@ Query Query::parse(const QString &input, QString *error) {
         hits.push_back({int(m.capturedStart()), int(m.capturedEnd()), m.captured().toLower()});
     }
 
-    bool namesCompleted = false, replacesScope = false;
+    bool namesCompleted = false, namesScheduled = false, namesPaused = false, replacesScope = false;
     bool nextOr = false;
     {
         QString pre = text.left(hits.empty() ? text.size() : hits.front().start);
@@ -835,6 +835,8 @@ Query Query::parse(const QString &input, QString *error) {
                 segs.push_back(s);
             }
             namesCompleted = namesCompleted || sub.m_namesCompleted;
+            namesScheduled = namesScheduled || sub.m_namesScheduled;
+            namesPaused = namesPaused || sub.m_namesPaused;
             replacesScope = replacesScope || sub.m_replacesScope;
             continue;
         }
@@ -882,12 +884,20 @@ Query Query::parse(const QString &input, QString *error) {
     Query q;
     q.m_root = root;
     q.m_namesCompleted = namesCompleted;
+    q.m_namesScheduled = namesScheduled;
+    q.m_namesPaused = namesPaused;
     q.m_replacesScope = replacesScope;
     for (const Segment &s : segs) {
         const bool done = s.kind == Segment::Completed && !s.negated;
         const bool doneType = s.kind == Segment::Type && !s.negated &&
                               s.value.contains(doneTypes);
         if (done || doneType) q.m_namesCompleted = q.m_replacesScope = true;
+        if (s.kind == Segment::Type && !s.negated) {
+            static const QRegularExpression scheduled(QStringLiteral(R"((?<![!\w])scheduled\b)"), QRegularExpression::CaseInsensitiveOption);
+            static const QRegularExpression paused(QStringLiteral(R"((?<![!\w])paused\b)"), QRegularExpression::CaseInsensitiveOption);
+            if (s.value.contains(scheduled)) q.m_namesScheduled = true;
+            if (s.value.contains(paused)) q.m_namesPaused = true;
+        }
         if (s.kind == Segment::Lists || s.kind == Segment::Groups) q.m_replacesScope = true;
     }
     return q;

@@ -574,6 +574,12 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
     ViewOptions o = options;
     if (smart && smartList.includeScheduled)
         o.showScheduled = true;
+    // Asking for scheduled or paused tasks by name brings them into view:
+    // they are hidden by default, so the search would otherwise find nothing.
+    if (search.namesScheduled() || saved.namesScheduled())
+        o.showScheduled = true;
+    if (search.namesPaused() || saved.namesPaused())
+        o.showPaused = true;
     // Sorting one of your own lists by Start Date shows its scheduled tasks,
     // in the order they start.
     if (!smart && sort.field == SortField::StartDate && (source.kind == Source::List || source.kind == Source::Project))
@@ -588,7 +594,11 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
         if (source.kind == Source::List) listId = source.id;
         else if (source.kind == Source::Project) listId = m_store.task(source.id).listId;
         const int mode = listId ? m_store.list(listId).completedMode : 0;
-        policy = mode == 1 ? 1 : mode == 2 ? 2 : 0;
+        // A Smart List leaves completed tasks out unless told to include them.
+        policy = mode == 1 ? 1 : mode == 2 || smart ? 2 : 0;
+    } else {
+        // So does a search across every list, such as one naming `lists:`.
+        policy = 2;
     }
 
     const bool inherit = source.kind == Source::Project && o.inheritSearch;

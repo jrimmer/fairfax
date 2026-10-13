@@ -46,6 +46,10 @@ public:
     // and friends); views then show them whatever the completed-visibility
     // setting says.
     bool namesCompleted() const { return m_namesCompleted; }
+    // Likewise for type: scheduled and type: paused, which would otherwise
+    // find nothing, as scheduled and paused tasks are hidden by default.
+    bool namesScheduled() const { return m_namesScheduled; }
+    bool namesPaused() const { return m_namesPaused; }
     // Whether the query names lists, groups or completed tasks. Such a search
     // looks across every list, not just the one on screen.
     bool replacesScope() const { return m_replacesScope; }
@@ -54,5 +58,7 @@ public:
 private:
     std::shared_ptr<const Node> m_root;
     bool m_namesCompleted = false;
+    bool m_namesScheduled = false;
+    bool m_namesPaused = false;
     bool m_replacesScope = false;
 };
