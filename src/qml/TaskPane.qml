@@ -219,6 +219,7 @@ Item {
 
         // Today's calendar events, above Today (or every list, by setting).
         DayBar {
+            objectName: "dayBar"
             Layout.fillWidth: true
             Layout.leftMargin: root.contentMargin
             Layout.rightMargin: root.contentMargin
@@ -376,7 +377,7 @@ Item {
 
     SearchBuilder { id: searchBuilder; objectName: "searchBuilder"; onClosed: Qt.callLater(root.focusList) }
 
-    Confetti { id: confetti; anchors.fill: parent; enabled: (backend.settingsRevision, backend.settingFlag("general.celebrate", true)) }
+    Confetti { id: confetti; objectName: "confetti"; anchors.fill: parent; enabled: (backend.settingsRevision, backend.settingFlag("general.celebrate", true)) }
     Connections {
         target: backend
         function onCelebrate() { if (confetti.enabled) confetti.burst(root.width / 2, root.height / 3) }

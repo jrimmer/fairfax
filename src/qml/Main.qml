@@ -88,7 +88,7 @@ ApplicationWindow {
     }
 
     DragProxy { id: dragProxy; parent: Overlay.overlay }
-    CommandPopup { id: command; onClosed: win.focusList() }
+    CommandPopup { id: command; objectName: "commandPopup"; onClosed: win.focusList() }
     QuickEntry { id: quickEntry }
     SettingsWindow { id: settings }
 
@@ -141,7 +141,7 @@ ApplicationWindow {
         }
         function onWindowRequested() { win.show(); win.raise(); win.requestActivate() }
     }
-    QuickLook { id: quickLook; onClosed: win.focusList() }
+    QuickLook { id: quickLook; objectName: "quickLook"; onClosed: win.focusList() }
     ShortcutOverlay { id: help; onClosed: win.focusList() }
 
     // Errors and confirmations, e.g. "Undo Change Due Date".

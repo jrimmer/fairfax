@@ -4,6 +4,7 @@ import QtQuick.Controls
 // "Due Date ⌄": picks the list's sort, plus the Separated switch.
 Item {
     id: root
+    objectName: "sortButton"
     implicitWidth: row.implicitWidth + 12
     implicitHeight: 28
 

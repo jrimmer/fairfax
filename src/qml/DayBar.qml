@@ -219,6 +219,7 @@ Item {
                 }
             }
             MouseArea {
+                objectName: "dayBarToggle"
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.expanded = !root.expanded

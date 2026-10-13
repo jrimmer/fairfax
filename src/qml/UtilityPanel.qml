@@ -449,6 +449,7 @@ Rectangle {
             }
             // Tag Sorting: alphabetical, or the order tags are dragged into.
             IconButton {
+                objectName: "tagsManualToggle"
                 anchors.right: usedBtn.left
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter

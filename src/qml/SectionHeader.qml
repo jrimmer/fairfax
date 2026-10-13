@@ -18,6 +18,7 @@ Item {
 
     Text {
         id: title
+        objectName: "sectionTitle"
         x: root.margin
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 8
@@ -34,6 +35,7 @@ Item {
         anchors.left: title.right
         anchors.leftMargin: 10
         anchors.baseline: title.baseline
+        objectName: "sectionDuration"
         visible: !!root.r.durationTotal
         text: root.r.durationTotal || ""
         color: theme.duration

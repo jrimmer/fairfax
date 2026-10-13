@@ -505,6 +505,7 @@ Popup {
             }
             CheckBox {
                 id: soundexBox
+                objectName: "soundexBox"
                 text: "Sounds like"
                 checked: backend.soundex
                 onToggled: backend.soundex = checked

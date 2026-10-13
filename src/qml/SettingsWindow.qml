@@ -75,6 +75,7 @@ Window {
     }
 
     IconButton {
+        objectName: "settingsClose"
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 10
@@ -150,6 +151,7 @@ Window {
                     Rectangle {
                         required property int index
                         required property string modelData
+                        objectName: "settingsPane:" + modelData
                         x: 8
                         width: parent.width - 16
                         height: 32
@@ -192,6 +194,7 @@ Window {
                     RowLayout {
                         Label { text: "Week starts on"; Layout.preferredWidth: 160 }
                         ComboBox {
+                            objectName: "setting:general.weekStart"
                             // 0 follows the system locale; 1 to 7 are Qt's Monday to Sunday.
                             readonly property var days: [0, 1, 7, 6]
                             model: ["Automatic (" + Qt.locale().dayName(Qt.locale().firstDayOfWeek, Locale.LongFormat) + ")", "Monday", "Sunday", "Saturday"]
@@ -217,6 +220,7 @@ Window {
                             model: [["system", "System"], ["dark", "Dark"], ["light", "Light"]]
                             Button {
                                 required property var modelData
+                                objectName: "setting:appearance.scheme:" + modelData[0]
                                 text: modelData[1]
                                 checkable: true
                                 autoExclusive: true
@@ -229,17 +233,18 @@ Window {
                     }
                     RowLayout {
                         Label { text: "Text size"; Layout.preferredWidth: 160 }
-                        Slider { from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }
+                        Slider { objectName: "setting:appearance.textSize"; from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }
                         Label { text: backend.textSizeName; Layout.preferredWidth: 70 }
                     }
                     RowLayout {
                         Label { text: "Content width"; Layout.preferredWidth: 160 }
-                        Slider { from: 1400; to: 640; stepSize: 20; value: Number(root.value("appearance.contentWidth", 980)); onMoved: backend.setSetting("appearance.contentWidth", value); Layout.fillWidth: true }
+                        Slider { objectName: "setting:appearance.contentWidth"; from: 1400; to: 640; stepSize: 20; value: Number(root.value("appearance.contentWidth", 980)); onMoved: backend.setSetting("appearance.contentWidth", value); Layout.fillWidth: true }
                         Label { text: "Compact"; color: theme.muted }
                     }
                     RowLayout {
                         Label { text: "Task rows"; Layout.preferredWidth: 160 }
                         ComboBox {
+                            objectName: "setting:appearance.density"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             model: ["Compressed", "Normal", "Extended"]
                             currentIndex: Number(root.value("appearance.density", 1))
@@ -249,6 +254,7 @@ Window {
                     RowLayout {
                         Label { text: "Mini calendar busy days"; Layout.preferredWidth: 160 }
                         ComboBox {
+                            objectName: "setting:appearance.calendarStyle"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var styles: ["heat", "dots", "none"]
                             model: ["Heat Map", "Dots", "None"]
@@ -271,6 +277,7 @@ Window {
                     visible: root.pane === 2
                     Layout.fillWidth: true
                     CheckBox {
+                        objectName: "setting:inbox"
                         text: "Getting Things Done® Inbox"
                         checked: backend.inboxEnabled()
                         onToggled: {
@@ -283,6 +290,7 @@ Window {
                     RowLayout {
                         Label { text: "Show completed tasks for"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            objectName: "setting:tasks.completedWindow"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var minutes: [0, 1, 60, 1440, 10080, 43200, -1]
                             model: ["Never", "1 minute", "1 hour", "1 day", "1 week", "1 month", "Always"]
@@ -294,6 +302,7 @@ Window {
                     RowLayout {
                         Label { text: "Default list"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            objectName: "setting:tasks.defaultList"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             // 0 is the first list and -1 the list used last.
                             model: [{ name: "First list", id: 0 }, { name: "Last used", id: -1 }].concat(backend.listChoices)
@@ -308,6 +317,7 @@ Window {
                     RowLayout {
                         Label { text: "Default due date for new tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            objectName: "setting:tasks.defaultDueOffset"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [-1, 0, 1, 2, 3, 7, 14, 30]
                             model: ["None", "Same Day", "Day After", "2 Days Later", "3 Days Later", "1 Week Later", "2 Weeks Later", "Next Month"]
@@ -317,6 +327,7 @@ Window {
                     }
                     // Quick Entry only, or everywhere but Quick Entry: never both.
                     CheckBox {
+                        objectName: "setting:tasks.defaultDueQuickEntryOnly"
                         enabled: Number(root.value("tasks.defaultDueOffset", -1)) >= 0
                         text: "Only use the default due date in Quick Entry"
                         checked: root.bool("tasks.defaultDueQuickEntryOnly", false)
@@ -326,6 +337,7 @@ Window {
                         }
                     }
                     CheckBox {
+                        objectName: "setting:tasks.defaultDueNotQuickEntry"
                         enabled: Number(root.value("tasks.defaultDueOffset", -1)) >= 0
                         text: "Do not use the default due date in Quick Entry"
                         checked: root.bool("tasks.defaultDueNotQuickEntry", false)
@@ -338,11 +350,13 @@ Window {
                     RowLayout {
                         CheckBox {
                             id: useDueTime
+                            objectName: "setting:tasks.useDefaultDueTime"
                             text: "Default due time"
                             checked: root.bool("tasks.useDefaultDueTime", false)
                             onToggled: backend.setSetting("tasks.useDefaultDueTime", checked)
                         }
                         ComboBox {
+                            objectName: "setting:tasks.defaultDueTime"
                             enabled: useDueTime.checked
                             model: root.timeSteps.map(m => root.timeLabel(m))
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -354,6 +368,7 @@ Window {
                     RowLayout {
                         Label { text: "Auto-delete completed tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
+                            objectName: "setting:tasks.autoDeleteDays"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [0, 1, 7, 30, 90, 180, 365]
                             model: ["Never", "After 1 day", "After 1 week", "After 1 month", "After 3 months", "After 6 months", "After 1 year"]
@@ -367,6 +382,7 @@ Window {
                     RowLayout {
                         Label { text: "Due time shortcuts"; Layout.preferredWidth: 220 }
                         TextField {
+                            objectName: "setting:tasks.dueTimeChips"
                             Layout.fillWidth: true
                             placeholderText: "9am, 12pm, 3pm, 6pm"
                             text: root.value("tasks.dueTimeChips", "")
@@ -391,6 +407,7 @@ Window {
                     RowLayout {
                         Label { text: "Counts on lists"; Layout.preferredWidth: 260 }
                         ComboBox {
+                            objectName: "setting:lists.counts"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             model: ["None", "Overdue", "Overdue + Undone"]
                             currentIndex: Math.max(0, Math.min(2, Number(root.value("lists.counts", 2))))
@@ -405,6 +422,7 @@ Window {
                         model: root.pane === 3 ? root.hideable : []
                         CheckBox {
                             required property var modelData
+                            objectName: "hideList:" + modelData.id
                             text: modelData.name
                             checked: modelData.hidden
                             onToggled: backend.setListHidden(modelData.id, checked)
@@ -419,6 +437,7 @@ Window {
                     RowLayout {
                         Label { text: "Alerts on date-only tasks fire at"; Layout.preferredWidth: 260 }
                         ComboBox {
+                            objectName: "setting:tasks.defaultDueTime"
                             readonly property var minutes: root.timeSteps
                             model: minutes.map(m => root.timeLabel(m))
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -429,6 +448,7 @@ Window {
                     RowLayout {
                         Label { text: "Sound alerts repeat until dismissed"; Layout.preferredWidth: 260 }
                         ComboBox {
+                            objectName: "setting:alerts.nagMinutes"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var minutes: [0, 2, 5, 10]
                             model: ["Never", "Every 2 mins", "Every 5 mins", "Every 10 mins"]
@@ -441,6 +461,7 @@ Window {
                     RowLayout {
                         Label { text: "Badge shows"; Layout.preferredWidth: 260 }
                         ComboBox {
+                            objectName: "setting:alerts.badge"
                             readonly property var metrics: ["both", "overdue", "today", "none"]
                             model: ["Overdue + Today", "Overdue", "Today", "None"]
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -454,6 +475,7 @@ Window {
                     RowLayout {
                         Label { text: "Tasks with a due time"; Layout.preferredWidth: 170 }
                         ComboBox {
+                            objectName: "setting:alerts.defaultTimed"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var offsets: [-1, 0, 5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880]
                             model: ["None", "At due time", "5 minutes before", "10 minutes before", "15 minutes before", "30 minutes before",
@@ -465,6 +487,7 @@ Window {
                     RowLayout {
                         Label { text: "Tasks with only a date"; Layout.preferredWidth: 170 }
                         ComboBox {
+                            objectName: "setting:alerts.defaultDateOnly"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [-1, 0, 1, 2]
                             model: ["None", "On the day", "1 day before", "2 days before"]
@@ -473,6 +496,7 @@ Window {
                         }
                         Label { text: "at" }
                         ComboBox {
+                            objectName: "setting:alerts.defaultDateOnlyTime"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             id: reminderTime
                             readonly property var minutes: [360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260]
@@ -503,12 +527,14 @@ Window {
                         Layout.fillWidth: true
                         TextField {
                             id: remoteField
+                            objectName: "gitRemote"
                             Layout.fillWidth: true
                             placeholderText: "git@github.com:you/tasks.git"
                             text: gitSync ? gitSync.remote : ""
                             enabled: !!gitSync
                         }
                         Button {
+                            objectName: "gitConnect"
                             text: gitSync && gitSync.configured ? "Change" : "Connect"
                             enabled: !!gitSync && remoteField.text.trim() !== ""
                             onClicked: gitSync.setRemote(remoteField.text.trim())
@@ -516,8 +542,8 @@ Window {
                     }
                     RowLayout {
                         visible: !!gitSync && gitSync.configured
-                        Button { text: gitSync && gitSync.busy ? "Syncing…" : "Sync Now"; enabled: !!gitSync && !gitSync.busy; onClicked: gitSync.syncNow() }
-                        Button { text: "Disconnect"; flat: true; onClicked: gitSync.disconnectRemote() }
+                        Button { objectName: "gitSyncNow"; text: gitSync && gitSync.busy ? "Syncing…" : "Sync Now"; enabled: !!gitSync && !gitSync.busy; onClicked: gitSync.syncNow() }
+                        Button { objectName: "gitDisconnect"; text: "Disconnect"; flat: true; onClicked: gitSync.disconnectRemote() }
                     }
                     Text {
                         visible: !!gitSync
@@ -537,8 +563,8 @@ Window {
                     RowLayout {
                         visible: !!todoist && !todoist.connected
                         Layout.fillWidth: true
-                        TextField { id: todoistToken; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Todoist API token" }
-                        Button { text: "Connect"; enabled: todoistToken.text.trim() !== ""; onClicked: { todoist.connectAccount(todoistToken.text.trim()); todoistToken.text = "" } }
+                        TextField { id: todoistToken; objectName: "todoistToken"; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Todoist API token" }
+                        Button { objectName: "todoistConnect"; text: "Connect"; enabled: todoistToken.text.trim() !== ""; onClicked: { todoist.connectAccount(todoistToken.text.trim()); todoistToken.text = "" } }
                     }
                     RowLayout {
                         visible: !!todoist && todoist.connected
@@ -556,16 +582,16 @@ Window {
                     RowLayout {
                         Layout.fillWidth: true
                         visible: !!folderSync
-                        Text { Layout.fillWidth: true; elide: Text.ElideMiddle; color: theme.foreground; font.pixelSize: backend.fontSize - 1; text: folderSync && folderSync.configured ? folderSync.folder : "No folder chosen" }
-                        Button { text: folderSync && folderSync.configured ? "Change…" : "Choose Folder…"; onClicked: filePicker.openFolder("Choose the sync folder", "sync-folder") }
+                        Text { objectName: "folderPath"; Layout.fillWidth: true; elide: Text.ElideMiddle; color: theme.foreground; font.pixelSize: backend.fontSize - 1; text: folderSync && folderSync.configured ? folderSync.folder : "No folder chosen" }
+                        Button { objectName: "folderChoose"; text: folderSync && folderSync.configured ? "Change…" : "Choose Folder…"; onClicked: filePicker.openFolder("Choose the sync folder", "sync-folder") }
                     }
                     RowLayout {
                         visible: !!folderSync && folderSync.configured
-                        Button { text: folderSync && folderSync.busy ? "Syncing…" : "Sync Now"; enabled: !!folderSync && !folderSync.busy && !folderSync.needsChoice; onClicked: folderSync.syncNow() }
-                        Button { text: "Disconnect"; flat: true; onClicked: folderSync.disconnectProvider() }
+                        Button { objectName: "folderSyncNow"; text: folderSync && folderSync.busy ? "Syncing…" : "Sync Now"; enabled: !!folderSync && !folderSync.busy && !folderSync.needsChoice; onClicked: folderSync.syncNow() }
+                        Button { objectName: "folderDisconnect"; text: "Disconnect"; flat: true; onClicked: folderSync.disconnectProvider() }
                     }
                     FirstSyncChoice { provider: folderSync }
-                    Text { visible: !!folderSync && folderSync.configured; text: folderSync ? folderSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Text { objectName: "folderStatus"; visible: !!folderSync && folderSync.configured; text: folderSync ? folderSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
 
                     // WebDAV
                     Label { text: "WebDAV"; font.bold: true; Layout.topMargin: 16 }
@@ -576,12 +602,13 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true
                         visible: !!webDavSync
-                        TextField { id: davUrl; Layout.fillWidth: true; placeholderText: "https://…/dav/files/you/Precrime/"; text: webDavSync ? webDavSync.url : "" }
+                        TextField { id: davUrl; objectName: "davUrl"; Layout.fillWidth: true; placeholderText: "https://…/dav/files/you/Precrime/"; text: webDavSync ? webDavSync.url : "" }
                         RowLayout {
                             Layout.fillWidth: true
-                            TextField { id: davUser; Layout.fillWidth: true; placeholderText: "User name"; text: webDavSync ? webDavSync.user : "" }
-                            TextField { id: davPassword; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Password" }
+                            TextField { id: davUser; objectName: "davUser"; Layout.fillWidth: true; placeholderText: "User name"; text: webDavSync ? webDavSync.user : "" }
+                            TextField { id: davPassword; objectName: "davPassword"; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Password" }
                             Button {
+                                objectName: "davConnect"
                                 text: webDavSync && webDavSync.configured ? "Change" : "Connect"
                                 enabled: davUrl.text.trim() !== "" && davPassword.text !== ""
                                 onClicked: { webDavSync.setServer(davUrl.text.trim(), davUser.text.trim(), davPassword.text); davPassword.text = "" }
@@ -590,11 +617,11 @@ Window {
                     }
                     RowLayout {
                         visible: !!webDavSync && webDavSync.configured
-                        Button { text: webDavSync && webDavSync.busy ? "Syncing…" : "Sync Now"; enabled: !!webDavSync && !webDavSync.busy && !webDavSync.needsChoice; onClicked: webDavSync.syncNow() }
-                        Button { text: "Disconnect"; flat: true; onClicked: webDavSync.disconnectProvider() }
+                        Button { objectName: "davSyncNow"; text: webDavSync && webDavSync.busy ? "Syncing…" : "Sync Now"; enabled: !!webDavSync && !webDavSync.busy && !webDavSync.needsChoice; onClicked: webDavSync.syncNow() }
+                        Button { objectName: "davDisconnect"; text: "Disconnect"; flat: true; onClicked: webDavSync.disconnectProvider() }
                     }
                     FirstSyncChoice { provider: webDavSync }
-                    Text { visible: !!webDavSync && webDavSync.configured; text: webDavSync ? webDavSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Text { objectName: "davStatus"; visible: !!webDavSync && webDavSync.configured; text: webDavSync ? webDavSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
 
                     Label { text: "Exclusions"; font.bold: true; Layout.topMargin: 16 }
                     Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV and Todoist sync all skip it." }
@@ -607,6 +634,7 @@ Window {
                     RowLayout {
                         Label { text: "Back up automatically"; Layout.preferredWidth: 200 }
                         ComboBox {
+                            objectName: "setting:backup.intervalHours"
                             readonly property var hours: [0, 24, 48]
                             model: ["Never", "Every 24 hours", "Every 48 hours"]
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -616,10 +644,10 @@ Window {
                     }
                     RowLayout {
                         Label { text: "Keep at most"; Layout.preferredWidth: 200 }
-                        SpinBox { from: 1; to: 100; value: Number(root.value("backup.keep", 10)); onValueModified: backend.setSetting("backup.keep", value) }
+                        SpinBox { objectName: "setting:backup.keep"; from: 1; to: 100; value: Number(root.value("backup.keep", 10)); onValueModified: backend.setSetting("backup.keep", value) }
                     }
                     RowLayout {
-                        Button { text: "Back Up Now"; onClicked: { backend.backupNow(); backupList.model = backend.backups() } }
+                        Button { objectName: "backupNow"; text: "Back Up Now"; onClicked: { backend.backupNow(); backupList.model = backend.backups() } }
                         Button { text: "Restore from File…"; flat: true; onClicked: filePicker.open("Restore a Precrime backup", "restore") }
                     }
                     Hint { text: "Backups are kept in " + backend.backupFolder() }
@@ -631,10 +659,10 @@ Window {
                             Layout.fillWidth: true
                             Label { text: modelData.date; Layout.fillWidth: true }
                             Label { text: modelData.size; color: theme.muted }
-                            Button { text: "Restore"; flat: true; onClicked: { confirmRestore.path = modelData.path; confirmRestore.open() } }
+                            Button { objectName: "backupRestore:" + modelData.name; text: "Restore"; flat: true; onClicked: { confirmRestore.path = modelData.path; confirmRestore.open() } }
                             Button { text: "Lists…"; flat: true; onClicked: restoreLists.show(modelData.path, modelData.date) }
-                            Button { text: "Save a Copy…"; flat: true; onClicked: { root.copySource = modelData.path; filePicker.save("Save a copy of this backup", modelData.name, "backup-copy") } }
-                            Button { text: "Delete"; flat: true; onClicked: { confirmDelete.path = modelData.path; confirmDelete.open() } }
+                            Button { objectName: "backupCopy:" + modelData.name; text: "Save a Copy…"; flat: true; onClicked: { root.copySource = modelData.path; filePicker.save("Save a copy of this backup", modelData.name, "backup-copy") } }
+                            Button { objectName: "backupDelete:" + modelData.name; text: "Delete"; flat: true; onClicked: { confirmDelete.path = modelData.path; confirmDelete.open() } }
                         }
                     }
                 }
@@ -645,19 +673,19 @@ Window {
                     Layout.fillWidth: true
                     Label { text: "Export"; font.bold: true }
                     RowLayout {
-                        Button { text: "Choose Lists…"; onClicked: exportDialog.show() }
-                        Button { text: "Everything as CSV…"; flat: true; onClicked: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
-                        Button { text: "Everything as .ics…"; flat: true; onClicked: filePicker.save("Export tasks as iCalendar", "Precrime.ics", "export-ics") }
+                        Button { objectName: "exportChoose"; text: "Choose Lists…"; onClicked: exportDialog.show() }
+                        Button { objectName: "exportCsv"; text: "Everything as CSV…"; flat: true; onClicked: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
+                        Button { objectName: "exportIcs"; text: "Everything as .ics…"; flat: true; onClicked: filePicker.save("Export tasks as iCalendar", "Precrime.ics", "export-ics") }
                     }
                     Label { text: "Import"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
-                        Button { text: "From TickTick…"; onClicked: filePicker.open("Choose a TickTick backup (.csv)", "import-ticktick") }
-                        Button { text: "From the reference app…"; onClicked: filePicker.open("Choose a the reference app database (tasks.db or a .taskdb backup)", "import-taskdb") }
-                        Button { text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
+                        Button { objectName: "importTickTick"; text: "From TickTick…"; onClicked: filePicker.open("Choose a TickTick backup (.csv)", "import-ticktick") }
+                        Button { objectName: "importTaskDb"; text: "From the reference app…"; onClicked: filePicker.open("Choose a the reference app database (tasks.db or a .taskdb backup)", "import-taskdb") }
+                        Button { objectName: "importIcs"; text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
                     }
                     RowLayout {
-                        Button { text: "From Things…"; onClicked: filePicker.open("Choose a Things 3 JSON export", "import-things") }
-                        Button { text: "From OmniFocus…"; onClicked: filePicker.open("Choose an OmniFocus TaskPaper export", "import-omnifocus") }
+                        Button { objectName: "importThings"; text: "From Things…"; onClicked: filePicker.open("Choose a Things 3 JSON export", "import-things") }
+                        Button { objectName: "importOmnifocus"; text: "From OmniFocus…"; onClicked: filePicker.open("Choose an OmniFocus TaskPaper export", "import-omnifocus") }
                     }
                     Hint { text: "From Things 3 (a JSON export) and OmniFocus (File > Export > TaskPaper): areas, folders and projects become lists and projects; dates, tags, flags, notes and checklists come across." }
                     Hint { text: "From TickTick: in TickTick's web app, Settings → Account → Generate Backup, then choose the .csv here. Lists, tags, dates, repeats, reminders, checklists and completed history come across; importing the same backup again adds only what's new." }
@@ -677,6 +705,7 @@ Window {
                         Layout.preferredHeight: 120
                         TextArea {
                             id: calendarSources
+                            objectName: "setting:calendar.sources"
                             text: String(root.value("calendar.sources", ""))
                             placeholderText: "https://calendar.example.com/private.ics"
                             wrapMode: TextEdit.NoWrap
@@ -685,6 +714,7 @@ Window {
                         }
                     }
                     Button {
+                        objectName: "calendarApply"
                         text: "Apply"
                         onClicked: {
                             backend.setSetting("calendar.sources", calendarSources.text.trim())
@@ -703,6 +733,7 @@ Window {
                             Layout.fillWidth: true
                             spacing: 8
                             CheckBox {
+                                objectName: "calendarEnabled:" + modelData.name
                                 checked: modelData.enabled
                                 text: modelData.name
                                 Layout.fillWidth: true
@@ -718,6 +749,7 @@ Window {
                                 delegate: Rectangle {
                                     required property string modelData
                                     readonly property var info: calendarRow.modelData
+                                    objectName: "calendarColor:" + modelData
                                     width: 16; height: 16; radius: 8
                                     color: modelData
                                     opacity: info.enabled ? 1 : 0.4
@@ -739,6 +771,7 @@ Window {
                     }
                     Label { text: "My email addresses"; Layout.topMargin: 8 }
                     TextField {
+                        objectName: "setting:calendar.emails"
                         Layout.fillWidth: true
                         text: String(root.value("calendar.emails", ""))
                         placeholderText: "me@example.com, me@work.example"
@@ -756,6 +789,7 @@ Window {
                     visible: root.pane === 9
                     Layout.fillWidth: true
                     Hint {
+                        objectName: "automationHint"
                         Layout.topMargin: 0
                         text: "Let Claude work with your tasks: add Precrime as an MCP server. In Claude Code run:\n  claude mcp add precrime -- precrime mcp\n\nScripts can use the same commands from a terminal:\n  precrime ctl help\n  precrime ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like precrime://x-callback-url/add?task=Buy%20milk open in the app.\n\nWaybar: add a custom module that runs  precrime --waybar  every 60 seconds to show overdue and due-today counts."
                     }
@@ -779,6 +813,7 @@ Window {
                     Frame {
                         Layout.fillWidth: true
                         Text {
+                            objectName: "diagReport"
                             width: parent.width
                             text: diag.report
                             color: theme.foreground
@@ -789,8 +824,8 @@ Window {
                         }
                     }
                     RowLayout {
-                        Button { text: "Copy Diagnostics"; onClicked: backend.copyDiagnostics(diag.syncStatus) }
-                        Button { text: "Refresh"; flat: true; onClicked: diag.report = backend.diagnosticsReport(diag.syncStatus) }
+                        Button { objectName: "diagCopy"; text: "Copy Diagnostics"; onClicked: backend.copyDiagnostics(diag.syncStatus) }
+                        Button { objectName: "diagRefresh"; text: "Refresh"; flat: true; onClicked: diag.report = backend.diagnosticsReport(diag.syncStatus) }
                     }
                 }
 
@@ -803,6 +838,7 @@ Window {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmInbox
+        objectName: "confirmInbox"
         anchors.centerIn: parent
         modal: true
         title: "Turn off the Inbox?"
@@ -815,6 +851,7 @@ Window {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmRestore
+        objectName: "confirmRestore"
         property string path
         anchors.centerIn: parent
         modal: true
@@ -827,6 +864,7 @@ Window {
     ThemedDialog {
         width: Math.min(440, (parent ? parent.width : 480) - 40)
         id: confirmDelete
+        objectName: "confirmDelete"
         property string path
         anchors.centerIn: parent
         modal: true
@@ -893,6 +931,7 @@ Window {
         Layout.fillWidth: true
         spacing: 0
         CheckBox {
+            objectName: "setting:" + parent.key
             text: parent.label
             checked: root.bool(parent.key, parent.fallback)
             onToggled: backend.setSetting(parent.key, checked)

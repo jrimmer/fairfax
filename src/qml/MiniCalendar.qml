@@ -135,6 +135,7 @@ ColumnLayout {
                 // "Show month dividers": a line wherever the next cell to the
                 // right or below belongs to another month.
                 Rectangle {
+                    objectName: "calDividerRight"
                     visible: backend.monthDividers && index % 7 < 6 && cell.day.getMonth() !== new Date(root.year, root.month, 2 + cell.index - cell.lead).getMonth()
                     anchors.right: parent.right
                     width: 1
@@ -142,6 +143,7 @@ ColumnLayout {
                     color: Qt.alpha(theme.foreground, 0.28)
                 }
                 Rectangle {
+                    objectName: "calDividerBottom"
                     visible: backend.monthDividers && index < 35 && cell.day.getMonth() !== new Date(root.year, root.month, 8 + cell.index - cell.lead).getMonth()
                     anchors.bottom: parent.bottom
                     width: parent.width

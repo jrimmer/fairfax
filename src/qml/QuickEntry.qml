@@ -1007,6 +1007,7 @@ Window {
             Icon { x: 16; y: 12; name: "note"; size: 16; color: theme.faint }
             Plain.TextArea {
                 id: notes
+                objectName: "quickNotes"
                 anchors.fill: parent
                 anchors.leftMargin: 44
                 anchors.rightMargin: 16
