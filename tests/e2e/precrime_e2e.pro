@@ -16,3 +16,8 @@ SOURCES += test_lists.cpp test_lists_groups.cpp test_lists_nav.cpp
 HEADERS += listkit.h
 
 RESOURCES += ../../src/resources.qrc
+
+# Settings end-to-end tests.
+HEADERS += settingskit.h settingscases_general.h settingscases_tasks.h settingscases_lists.h
+SOURCES += test_settings.cpp test_settings_lists.cpp test_settings_system.cpp
+DEFINES += SRCDIR=\\\"$$PWD/../../src\\\"

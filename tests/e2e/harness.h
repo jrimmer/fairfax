@@ -248,8 +248,9 @@ inline QQuickItem *popupSurface(QObject *popup) {
 
 class App {
 public:
-    // `reopen` boots on an existing database (a restart) instead of a new one.
-    explicit App(const std::function<Seed(Store &)> &seed = seedWorld, const QString &reopen = QString()) {
+    // `reopen` boots on an existing database (a restart) instead of a new one;
+    // `withSync` starts the sync providers, which offscreen runs otherwise leave out.
+    explicit App(const std::function<Seed(Store &)> &seed = seedWorld, const QString &reopen = QString(), bool withSync = false) {
         QStandardPaths::setTestModeEnabled(true);
         QVERIFY2(m_dir.isValid(), "temporary directory");
         QString error;
@@ -259,7 +260,7 @@ public:
             ids = seed(m_store);
         m_services = std::make_unique<AppServices>(m_store, QString());
         m_services->backend.ensureDefaults();
-        m_services->startSync(true, true);
+        m_services->startSync(true, !withSync);
         m_services->install(m_engine, QString(), false);
         m_engine.load(QUrl("qrc:/qml/Main.qml"));
         QVERIFY2(!m_engine.rootObjects().isEmpty(), "Main.qml failed to load");
@@ -281,6 +282,8 @@ public:
     }
 
     Backend &backend() { return m_services->backend; }
+    AppServices &services() { return *m_services; }
+    QString dir() const { return QFileInfo(m_store.path()).absolutePath(); }
     Store &store() { return m_store; }
     QString dbPath() const { return m_dbPath; }
 
