@@ -34,7 +34,10 @@ Item {
     Menu {
         id: menu
         onAboutToShow: {
-            while (count > 0) removeItem(itemAt(0))
+            for (let i = count - 1; i >= 0; --i) {
+                const old = itemAt(i)
+                if (old) removeItem(old)
+            }
             for (const choice of backend.sortChoices)
                 addItem(choiceItem.createObject(null, { field: choice.field, text: choice.name }))
             addItem(separator.createObject(null))
