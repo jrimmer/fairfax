@@ -163,7 +163,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
         } else if (r.reason == "duplicate" || r.reason == "empty") {
             out << "Skipped: " << r.reason << Qt::endl;
         } else {
-            err << "precrime: " << source << ": " << r.reason << Qt::endl;
+            err << "precrime: " << source << ": there is no list to put the task in; open Precrime once to set up the database" << Qt::endl;
             return false;
         }
         return true;
