@@ -4081,6 +4081,28 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
                      {"warn", k == Source::Done && doneWarningShown()}});
     }
 
+    // A group nobody has put a list in yet still shows, as a header to drop
+    // lists on; one whose lists are only hidden or archived does not.
+    QSet<qint64> occupied;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted)
+            occupied.insert(l.groupId);
+    QVector<ListGroup> bare;
+    for (const auto &g : m_store->groups())
+        if (!g.deleted && !occupied.contains(g.id))
+            bare.append(g);
+    std::sort(bare.begin(), bare.end(), [](const ListGroup &a, const ListGroup &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    auto groupHeader = [&](const ListGroup &g) {
+        rows.append({{"key", QStringLiteral("g:%1").arg(g.id)}, {"kind", "header"}, {"title", g.name},
+                     {"groupId", g.id}, {"collapsed", g.collapsed}, {"color", g.color}});
+    };
+    auto bareBefore = [&](const ListGroup *next) {
+        while (!bare.isEmpty() && (!next || bare.first().order < next->order || (bare.first().order == next->order && bare.first().id < next->id)))
+            groupHeader(bare.takeFirst());
+    };
+
     qint64 lastGroup = -1;
     for (const auto &l : lists) {
         if (l.kind == ListKind::Inbox)
@@ -4090,8 +4112,8 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         if (groupId != lastGroup) {
             lastGroup = groupId;
             if (groupId) {
-                rows.append({{"key", QStringLiteral("g:%1").arg(groupId)}, {"kind", "header"}, {"title", g.name},
-                             {"groupId", groupId}, {"collapsed", g.collapsed}, {"color", g.color}});
+                bareBefore(&g);
+                groupHeader(g);
             } else {
                 rows.append({{"key", "gap:ungrouped"}, {"kind", "gap"}});
             }
@@ -4122,6 +4144,8 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
             }
         }
     }
+
+    bareBefore(nullptr);
 
     // Smart Lists follow under their own heading; each counts what it matches.
     QVector<TaskList> smart;
