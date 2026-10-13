@@ -723,8 +723,9 @@ void Backend::newTask(int type, bool subtask) {
         t.parentId = parent.id;
         t.listId = parent.listId;
         t.type = TaskType::Task;
-    } else if (m_source.kind == Source::List && m_store->setting("tasks.alwaysDefaultList", false).toBool()) {
-        // "Always Use Default List": new tasks ignore the list being viewed.
+    } else if (m_source.kind == Source::List && (sourceIsSmart() || m_store->setting("tasks.alwaysDefaultList", false).toBool())) {
+        // "Always Use Default List": new tasks ignore the list being viewed. A
+        // Smart List is a search, not a place to keep tasks, so it counts too.
         t.listId = defaultListId();
     } else if (m_source.kind == Source::List) {
         t.listId = m_source.id;
