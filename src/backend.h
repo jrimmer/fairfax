@@ -316,6 +316,11 @@ public:
     Q_INVOKABLE void setSmartQuery(qint64 listId, const QString &query);
     // The pieces of a Smart List the search builder edits.
     Q_INVOKABLE QVariantMap smartListInfo(qint64 listId) const;
+    // The rule builder's tree for a `type:` value (with `ok` added; false when
+    // it has no row form), the value for a tree, and the property table.
+    Q_INVOKABLE QVariantMap rulesFromType(const QString &typeValue) const;
+    Q_INVOKABLE QString rulesToType(const QVariantMap &tree) const;
+    Q_INVOKABLE QVariantList ruleProperties() const;
     Q_INVOKABLE void updateSmartList(qint64 listId, const QString &name, const QString &query, const QString &range,
                                      int completedMode, bool includeScheduled);
     // Include/Exclude Completed on a list (0 follows the global setting).

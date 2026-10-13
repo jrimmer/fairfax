@@ -24,6 +24,7 @@
 #include "exchange.h"
 #include "markdown.h"
 #include "query.h"
+#include "searchrules.h"
 #include "recurrence.h"
 
 namespace {
@@ -3366,6 +3367,17 @@ QVariantMap Backend::smartListInfo(qint64 listId) const {
     return {{"id", l.id}, {"name", l.name}, {"query", l.smartQuery}, {"range", l.smartRange},
             {"completedMode", l.completedMode}, {"includeScheduled", l.includeScheduled}};
 }
+
+QVariantMap Backend::rulesFromType(const QString &typeValue) const {
+    bool ok = false;
+    QVariantMap tree = SearchRules::fromType(typeValue, &ok);
+    tree.insert("ok", ok);
+    return tree;
+}
+
+QString Backend::rulesToType(const QVariantMap &tree) const { return SearchRules::toType(tree); }
+
+QVariantList Backend::ruleProperties() const { return SearchRules::properties(); }
 
 void Backend::updateSmartList(qint64 listId, const QString &name, const QString &query, const QString &range,
                               int completedMode, bool includeScheduled) {
