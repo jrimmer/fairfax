@@ -90,7 +90,9 @@ offers your lists and `pc done <Tab>` your open tasks.
   hide every task that carries it until you resume it.
 - **Smart Lists.** Type a search in the reference app's syntax (`type: hiprio tags: !work`,
   `"exact phrase"`, `OR`, `-word`) and save it as a Smart List. Search Options
-  (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) also sets a due-date range
+  (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) has a Search Presets rule
+  builder, a row per clause (Priority is High, Tag is not set…) with Match All or Any, [−] and
+  [+], and Alt+click on [+] (or right-click) for a sub-filter; it also sets a due-date range
   (between two dates, in the next N days to years, or no due date) and whether the list
   includes completed or scheduled tasks. `lists:`, `groups:` and `completed:` search every
   list, and `completed:` or `type: donetoday` find finished tasks; `type: scheduled` and

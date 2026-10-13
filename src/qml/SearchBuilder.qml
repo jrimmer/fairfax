@@ -2,17 +2,19 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// the reference app's "Search Options", as a visual builder for the search language. Chips
-// and pickers write a query string (shown live, and editable); opening it with
-// an existing search reads back what it recognises and keeps the rest as text.
-// Chip states: off -> include -> exclude (written as !value) -> off.
+// the reference app's "Search Options", as a visual builder for the search language. The
+// Search Presets rule rows, chips and pickers write a query string (shown live,
+// and editable); opening it with an existing search reads back what it
+// recognises and keeps the rest as text. Name chip states: off -> include ->
+// exclude (written as !value) -> off.
 Popup {
     id: root
 
     // ---- builder state -------------------------------------------------
     property string freeText: ""
-    property var types: ({})                  // preset value -> 1 include, 2 exclude
-    property string typeMode: "or"            // "or" | "and"
+    // The Search Presets rule tree (see searchrules.h): a group of clauses and
+    // nested groups, written as the query's `type:` section.
+    property var rules: ({ match: "all", items: [] })
     property var names: ({ tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} })
     property var dates: ({ modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } })
     property int pickerTab: 0
@@ -35,24 +37,7 @@ Popup {
     property bool includeScheduled: false
     readonly property string range: rangeString()
 
-    readonly property var typeGroups: [
-        { title: "Priority", items: [["hiprio", "High"], ["medprio", "Medium"], ["lowprio", "Low"], ["prio", "Any priority"], ["noprio", "No priority"], ["starred", "Starred"]] },
-        { title: "Dates", items: [["overdue", "Overdue"], ["duetoday", "Due today"], ["tomorrow", "Due tomorrow"], ["duethisweek", "Due this week"],
-                                  ["starttoday", "Starts today"], ["startthisweek", "Starts this week"], ["anythisweek", "Any this week"],
-                                  ["due", "Has due date"], ["nodue", "No due date"], ["nostart", "No start date"]] },
-        { title: "Status", items: [["inprogress", "In progress"], ["scheduled", "Scheduled"], ["paused", "Paused"], ["repeat", "Repeating"],
-                                   ["duration", "Has duration"], ["donetoday", "Done today"], ["doneyesterday", "Done yesterday"], ["donethisweek", "Done this week"]] },
-        { title: "Kind", items: [["task", "Task"], ["subtasks", "Subtask"], ["project", "Project"], ["checklist", "Checklist"], ["emptyproj", "Empty project"], ["note", "Has note"]] },
-        { title: "Has", items: [["action", "Action"], ["call", "Call"], ["sms", "SMS"], ["email", "Email"], ["url", "URL"], ["visit", "Visit"],
-                                ["google", "Google"], ["anytag", "Any tag"], ["notag", "No tag"]] }
-    ]
-    readonly property var knownTypes: {
-        const s = {}
-        for (const g of typeGroups) for (const it of g.items) s[it[0]] = true
-        for (const a of ["today", "tomorrow", "thisweek", "anytoday", "anytomorrow", "starttomorrow", "duetomorrow", "emptychck", "proj", "chck",
-                         "mail", "message", "browse", "tasksoverdue", "alltasks"]) s[a] = true
-        return s
-    }
+    readonly property var ruleProps: backend.ruleProperties()
     readonly property var tabs: [
         { key: "tags", title: "Tags", kw: "tags:" }, { key: "lists", title: "Lists", kw: "lists:" },
         { key: "taggroups", title: "Tag groups", kw: "taggroups:" }, { key: "groups", title: "List groups", kw: "groups:" },
@@ -142,14 +127,8 @@ Popup {
     function build() {
         const parts = []
         if (freeText.trim()) parts.push(freeText.trim())
-        const inc = keysWith(types, 1), exc = keysWith(types, 2)
-        if (inc.length || exc.length) {
-            const op = typeMode === "and" ? "AND" : "OR"
-            const pieces = []
-            if (inc.length) pieces.push(inc.length > 1 && exc.length ? "(" + inc.join(" " + op + " ") + ")" : inc.join(" " + op + " "))
-            for (const e of exc) pieces.push("!" + e)
-            parts.push("type: " + pieces.join(" AND "))
-        }
+        const typeText = backend.rulesToType(rules)
+        if (typeText) parts.push("type: " + typeText)
         for (const t of tabs) {
             const m = names[t.key]
             const i = keysWith(m, 1), e = keysWith(m, 2)
@@ -210,8 +189,7 @@ Popup {
     }
 
     onFreeTextChanged: rebuild()
-    onTypesChanged: rebuild()
-    onTypeModeChanged: rebuild()
+    onRulesChanged: rebuild()
     onNamesChanged: rebuild()
     onDatesChanged: rebuild()
     onGroupsChanged: rebuild()
@@ -223,8 +201,6 @@ Popup {
         if (next === 0) delete c[key]; else c[key] = next
         return c
     }
-
-    function cycleType(key, toExclude) { types = cycled(types, key, toExclude) }
 
     function cycleName(tab, key, toExclude) {
         const c = Object.assign({}, names)
@@ -238,11 +214,89 @@ Popup {
         dates = c
     }
 
+    // ---- Search Presets rules --------------------------------------------
+    // Rows are addressed by an index path: "2" is the third item of the top
+    // group, "2.1" the second item of the sub-filter that is the third item.
+    // The top group's path is "".
+    function propOf(key) { return ruleProps.find(p => p.key === key) || ruleProps[0] }
+
+    function newClause() { const p = ruleProps[0]; return { prop: p.key, neg: false, value: p.values[0].token } }
+
+    function newGroup() { return { match: "all", items: [newClause()] } }
+
+    function nodeAt(tree, path) {
+        let n = tree
+        if (path === "") return n
+        for (const i of path.split(".")) n = n.items[parseInt(i)]
+        return n
+    }
+
+    // Edits a copy of the tree, then swaps it in, so bindings see a change.
+    function editRules(fn) {
+        const c = JSON.parse(JSON.stringify(rules))
+        fn(c)
+        rules = c
+    }
+
+    function splitPath(path) {
+        const parts = path.split(".")
+        const index = parseInt(parts.pop())
+        return { parent: parts.join("."), index: index }
+    }
+
+    function setMatch(path, match) { editRules(t => { nodeAt(t, path).match = match }) }
+
+    function setProp(path, key) {
+        editRules(t => {
+            const c = nodeAt(t, path)
+            c.prop = key
+            c.value = propOf(key).values[0].token
+        })
+    }
+
+    function setNeg(path, neg) { editRules(t => { nodeAt(t, path).neg = neg }) }
+
+    function setValue(path, token) { editRules(t => { nodeAt(t, path).value = token }) }
+
+    // A new clause, or with `sub` a sub-filter, after the row at `path` (or at
+    // the end of the top group when the path is empty).
+    function addRule(path, sub) {
+        editRules(t => {
+            const made = sub ? newGroup() : newClause()
+            if (path === "") { t.items.push(made); return }
+            const at = splitPath(path)
+            nodeAt(t, at.parent).items.splice(at.index + 1, 0, made)
+        })
+    }
+
+    // Removes a clause or a sub-filter; a sub-filter left empty goes too.
+    function removeRule(path) {
+        editRules(t => {
+            let at = splitPath(path)
+            nodeAt(t, at.parent).items.splice(at.index, 1)
+            while (at.parent !== "" && nodeAt(t, at.parent).items.length === 0) {
+                at = splitPath(at.parent)
+                nodeAt(t, at.parent).items.splice(at.index, 1)
+            }
+        })
+    }
+
+    function flatRules(group, prefix, depth, out) {
+        out.push({ kind: "group", path: prefix, depth: depth, match: group.match })
+        group.items.forEach((item, i) => {
+            const path = prefix === "" ? String(i) : prefix + "." + i
+            if (item.items) flatRules(item, path, depth + 1, out)
+            else out.push({ kind: "clause", path: path, depth: depth, clause: item })
+        })
+        return out
+    }
+
+    readonly property var ruleRows: flatRules(rules, "", 0, [])
+
     function reset() {
         loading = true
         freeText = ""
-        types = ({})
-        typeMode = "or"
+        rules = { match: "all", items: [] }
         names = { tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} }
         dates = { modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } }
         groups = []
@@ -265,48 +319,11 @@ Popup {
 
     function unquote(s) { return s.length > 1 && s[0] === "\"" && s[s.length - 1] === "\"" ? s.slice(1, -1) : s }
 
-    // Returns {inc, exc, mode} or null when the type: value isn't ours to edit.
-    function parseTypeValue(val) {
-        let raw = val.trim()
-        let incPart = raw, excPart = ""
-        const paren = raw.match(/^\(([^()]*)\)\s*(?:AND\s+(.*))?$/i)
-        if (paren) { incPart = paren[1]; excPart = paren[2] || "" }
-        const inc = [], exc = []
-        let mode = ""
-        const take = (text, allowOr) => {
-            const toks = text.split(/\s*,\s*|\s+/).filter(x => x.length)
-            for (const tk of toks) {
-                const up = tk.toUpperCase()
-                if (up === "OR") { if (!allowOr || mode === "and") return false; mode = "or"; continue }
-                if (up === "AND") { if (mode === "or") return false; mode = "and"; continue }
-                const neg = tk[0] === "!"
-                const name = (neg ? tk.slice(1) : tk).toLowerCase()
-                if (!knownTypes[name]) return false
-                if (neg) exc.push(name); else inc.push(name)
-            }
-            return true
-        }
-        if (paren) {
-            if (!take(incPart, true) || exc.length) return null
-            const m = mode
-            mode = ""
-            if (!take(excPart, false) || inc.length === 0 && exc.length === 0) return null
-            if (!incPart.trim() || !exc.length && excPart.trim()) return null
-            mode = m
-        } else {
-            if (!take(raw, true)) return null
-            if (mode === "or" && exc.length) return null
-        }
-        if (!inc.length && !exc.length) return null
-        if (mode === "or" && inc.length > 1 && !paren) { /* plain OR list */ }
-        return { inc: inc, exc: exc, mode: mode }
-    }
-
     function loadFrom(text) {
         loading = true
         reset()
         loading = true
-        const st = { types: {}, typeMode: "or", names: { tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} },
+        const st = { rules: null, names: { tags: {}, lists: {}, taggroups: {}, groups: {}, locations: {} },
                      dates: { modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } } }
         const extras = []
         const lifted = liftGroups(text || "")
@@ -335,12 +352,12 @@ Popup {
             let ok = false
             if (!thisOr && value.trim()) {
                 if (kw === "type:") {
-                    const r = haveTypes ? null : parseTypeValue(value)
-                    if (r) {
+                    // Only the first type: section becomes rows, and only when
+                    // the rows can say all of it; anything else stays text.
+                    const r = haveTypes ? null : backend.rulesFromType(value)
+                    if (r && r.ok) {
                         haveTypes = true
-                        for (const n of r.inc) st.types[n] = 1
-                        for (const n of r.exc) st.types[n] = 2
-                        if (r.mode) st.typeMode = r.mode
+                        st.rules = { match: r.match, items: r.items }
                         ok = true
                     }
                 } else if (kw === "modified:" || kw === "created:" || kw === "completed:") {
@@ -367,8 +384,7 @@ Popup {
             if (!ok) extras.push(verbatim.trim())
         }
         freeText = [free.trim()].concat(extras).filter(x => x.length).join(" ")
-        types = st.types
-        typeMode = st.typeMode
+        rules = st.rules || { match: "all", items: [] }
         names = st.names
         dates = st.dates
         groups = lifted.groups
@@ -489,6 +505,47 @@ Popup {
         MouseArea { id: segMouse; anchors.fill: parent; hoverEnabled: true; onClicked: seg.clicked() }
     }
 
+    // A drop-down trimmed to the height of a rule row.
+    component RuleCombo: ComboBox {
+        implicitHeight: 34
+        topInset: 0
+        bottomInset: 0
+        topPadding: 0
+        bottomPadding: 0
+        font.pixelSize: backend.fontSize - 1
+    }
+
+    // The round [-] and [+] buttons of a rule row. A plain click emits
+    // clicked(false), an Alt+click clicked(true); right-click asks for a menu.
+    component RuleButton: Rectangle {
+        id: rb
+        property string symbol
+        property string tip
+        property bool menu: false
+        signal clicked(bool alt)
+        signal menuRequested()
+        implicitWidth: 26
+        implicitHeight: 26
+        radius: 13
+        color: rbMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07)
+        Text {
+            anchors.centerIn: parent
+            text: rb.symbol
+            color: theme.foreground
+            font.pixelSize: backend.fontSize + 2
+        }
+        MouseArea {
+            id: rbMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: rb.menu ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
+            onClicked: (e) => { if (e.button === Qt.RightButton) rb.menuRequested(); else rb.clicked(!!(e.modifiers & Qt.AltModifier)) }
+        }
+        ToolTip.visible: rbMouse.containsMouse && rb.tip !== ""
+        ToolTip.delay: 600
+        ToolTip.text: rb.tip
+    }
+
     // ---- layout --------------------------------------------------------
     contentItem: ColumnLayout {
         spacing: 0
@@ -556,50 +613,142 @@ Popup {
                     Keys.onEnterPressed: root.doSearch()
                 }
 
-                RowLayout {
-                    Layout.topMargin: 6
-                    spacing: 6
-                    Heading { text: "TASK TYPE"; Layout.rightMargin: 6 }
-                    Segment { objectName: "typeModeOr"; label: "Any of these (OR)"; active: root.typeMode === "or"; onClicked: root.typeMode = "or" }
-                    Segment { objectName: "typeModeAnd"; label: "All of these (AND)"; active: root.typeMode === "and"; onClicked: root.typeMode = "and" }
-                }
+                Heading { text: "SEARCH PRESETS"; Layout.topMargin: 6 }
+                Column {
+                    Layout.fillWidth: true
+                    spacing: 0
 
-                Repeater {
-                    model: root.typeGroups
-                    RowLayout {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: 8
-                        Text {
-                            Layout.preferredWidth: 64
-                            Layout.alignment: Qt.AlignTop
-                            Layout.topMargin: 5
-                            text: modelData.title
-                            color: theme.muted
-                            font.pixelSize: backend.fontSize - 2
-                        }
-                        Flow {
-                            Layout.fillWidth: true
-                            spacing: 6
+                    Repeater {
+                        model: root.ruleRows
+                        Item {
+                            id: ruleRow
+                            required property var modelData
+                            readonly property bool isGroup: modelData.kind === "group"
+                            readonly property string path: modelData.path
+                            readonly property int indent: 18 * modelData.depth
+                            // A rule-less builder shows just the Add Rule button.
+                            visible: !(isGroup && path === "" && root.rules.items.length === 0)
+                            width: parent.width
+                            height: visible ? 40 : 0
+
+                            // A sub-filter is a lightly tinted block with a bar down its left edge.
                             Repeater {
-                                model: modelData.items
-                                TriChip {
-                                    required property var modelData
-                                    objectName: "typeChip:" + modelData[0]
-                                    label: modelData[1]
-                                    state: root.stateOf(root.types, modelData[0])
-                                    onClicked: root.cycleType(modelData[0], false)
-                                    onExcluded: root.cycleType(modelData[0], true)
+                                model: ruleRow.modelData.depth
+                                Rectangle {
+                                    required property int index
+                                    x: 18 * index + 2
+                                    width: ruleRow.width - x
+                                    height: ruleRow.height
+                                    color: Qt.alpha(theme.foreground, 0.035)
+                                    Rectangle { width: 2; height: parent.height; color: theme.divider }
+                                }
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: ruleRow.indent + 10
+                                anchors.rightMargin: 4
+                                spacing: 6
+
+                                // Group header: Match [All] [Any] of the following.
+                                Text {
+                                    visible: ruleRow.isGroup
+                                    text: "Match"
+                                    color: theme.foreground
+                                    font.pixelSize: backend.fontSize
+                                }
+                                Segment {
+                                    visible: ruleRow.isGroup
+                                    objectName: "ruleMatchAll:" + ruleRow.path
+                                    label: "All"
+                                    active: ruleRow.modelData.match === "all"
+                                    onClicked: root.setMatch(ruleRow.path, "all")
+                                }
+                                Segment {
+                                    visible: ruleRow.isGroup
+                                    objectName: "ruleMatchAny:" + ruleRow.path
+                                    label: "Any"
+                                    active: ruleRow.modelData.match === "any"
+                                    onClicked: root.setMatch(ruleRow.path, "any")
+                                }
+                                Text {
+                                    visible: ruleRow.isGroup
+                                    text: "of the following"
+                                    color: theme.foreground
+                                    font.pixelSize: backend.fontSize
+                                }
+                                Item { visible: ruleRow.isGroup; Layout.fillWidth: true }
+                                RuleButton {
+                                    visible: ruleRow.isGroup && ruleRow.path !== ""
+                                    objectName: "ruleGroupRemove:" + ruleRow.path
+                                    symbol: "\u2212"
+                                    tip: "Remove this sub-filter"
+                                    onClicked: root.removeRule(ruleRow.path)
+                                }
+
+                                // Clause: Property, operator, value, and the [-] [+] buttons.
+                                RuleCombo {
+                                    id: propBox
+                                    visible: !ruleRow.isGroup
+                                    objectName: "ruleProp:" + ruleRow.path
+                                    Layout.preferredWidth: 150
+                                    Layout.fillWidth: true
+                                    model: root.ruleProps
+                                    textRole: "title"
+                                    currentIndex: ruleRow.isGroup ? 0 : root.ruleProps.indexOf(root.propOf(ruleRow.modelData.clause.prop))
+                                    onActivated: (i) => root.setProp(ruleRow.path, root.ruleProps[i].key)
+                                }
+                                RuleCombo {
+                                    id: opBox
+                                    visible: !ruleRow.isGroup
+                                    objectName: "ruleOp:" + ruleRow.path
+                                    Layout.preferredWidth: 130
+                                    Layout.fillWidth: true
+                                    model: ruleRow.isGroup ? [] : root.propOf(ruleRow.modelData.clause.prop).ops
+                                    currentIndex: !ruleRow.isGroup && ruleRow.modelData.clause.neg ? 1 : 0
+                                    onActivated: (i) => root.setNeg(ruleRow.path, i === 1)
+                                }
+                                RuleCombo {
+                                    id: valueBox
+                                    // A single-valued property reads in full from its operator ("Note has a note").
+                                    visible: !ruleRow.isGroup && !root.propOf(ruleRow.modelData.clause.prop).single
+                                    objectName: "ruleValue:" + ruleRow.path
+                                    Layout.preferredWidth: 150
+                                    Layout.fillWidth: true
+                                    model: ruleRow.isGroup ? [] : root.propOf(ruleRow.modelData.clause.prop).values
+                                    textRole: "label"
+                                    currentIndex: {
+                                        if (ruleRow.isGroup) return 0
+                                        const vs = root.propOf(ruleRow.modelData.clause.prop).values
+                                        return Math.max(0, vs.findIndex(v => v.token === ruleRow.modelData.clause.value))
+                                    }
+                                    onActivated: (i) => root.setValue(ruleRow.path, root.propOf(ruleRow.modelData.clause.prop).values[i].token)
+                                }
+                                Item { visible: !ruleRow.isGroup && !valueBox.visible; Layout.fillWidth: true; Layout.preferredWidth: 150 }
+                                RuleButton {
+                                    visible: !ruleRow.isGroup
+                                    objectName: "ruleRemove:" + ruleRow.path
+                                    symbol: "\u2212"
+                                    tip: "Remove this rule"
+                                    onClicked: root.removeRule(ruleRow.path)
+                                }
+                                RuleButton {
+                                    id: plusButton
+                                    visible: !ruleRow.isGroup
+                                    objectName: "ruleAdd:" + ruleRow.path
+                                    symbol: "+"
+                                    tip: "Add a rule below. Alt+click adds a sub-filter; right-click for both."
+                                    menu: true
+                                    onClicked: (alt) => root.addRule(ruleRow.path, alt)
+                                    onMenuRequested: root.addMenuAt(plusButton, ruleRow.path)
                                 }
                             }
                         }
                     }
                 }
-
-                Text {
-                    text: "Click to include, click again to exclude, again to clear. Right-click excludes directly."
-                    color: theme.faint
-                    font.pixelSize: backend.fontSize - 3
+                RowLayout {
+                    Layout.topMargin: 4
+                    Segment { objectName: "ruleAdd"; label: "+  Add Rule"; onClicked: root.addRule("", false) }
                 }
 
                 Heading { text: "NAMED"; Layout.topMargin: 6 }
@@ -930,6 +1079,19 @@ Popup {
                 }
             }
         }
+    }
+
+    // Right-click on a [+]: the two things click and Alt+click do.
+    function addMenuAt(button, path) {
+        addMenu.path = path
+        addMenu.popup(button, 0, button.height)
+    }
+
+    Menu {
+        id: addMenu
+        property string path: ""
+        MenuItem { objectName: "ruleAddMenuRule"; text: "Add Rule"; onTriggered: root.addRule(addMenu.path, false) }
+        MenuItem { objectName: "ruleAddMenuSub"; text: "Add Sub-filter"; onTriggered: root.addRule(addMenu.path, true) }
     }
 
     function doSearch() {
