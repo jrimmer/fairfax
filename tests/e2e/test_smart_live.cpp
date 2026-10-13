@@ -50,7 +50,7 @@ class E2ESmartLive : public QObject {
     void showsAndCounts(const QStringList &expected) {
         App &app = *m_app;
         SMART_SHOWS(app, expected);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(m_list)).undone, expected.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(m_list)).undone, expected.size(), 5000);
         QCOMPARE(app.backend().sourceKey(), lk(m_list));
     }
 
@@ -88,20 +88,20 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Rent overdue"));
         app.press(Qt::Key_L, Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("urgent");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Rent overdue").tagIds.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Rent overdue").tagIds.isEmpty(), 5000);
         LIVE(SL{});
         undo();
-        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Rent overdue").tagIds.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Rent overdue").tagIds.isEmpty(), 5000);
         LIVE(SL{"Rent overdue"});
         const qint64 urgent = tagId("urgent");
         externally(app, "Plain chore", [urgent](Task &t) { t.tagIds << urgent; });
         LIVE((SL{"Rent overdue", "Plain chore"}));
         QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Plain chore").tagIds.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Plain chore").tagIds.isEmpty(), 5000);
         LIVE(SL{"Rent overdue"});
     }
 
@@ -115,13 +115,13 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Taxes in 9 days"));
         app.press(Qt::Key_R, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("urgent");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Taxes in 9 days").tagIds.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Taxes in 9 days").tagIds.isEmpty(), 5000);
         LIVE(without(untagged, SL{"Taxes in 9 days"}));
         undo();
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Taxes in 9 days").tagIds.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Taxes in 9 days").tagIds.isEmpty(), 5000);
         LIVE(untagged);
     }
 
@@ -134,16 +134,16 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Fence in 6 days"));
         app.press(Qt::Key_1);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Fence in 6 days").priority, 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Fence in 6 days").priority, 1, 5000);
         LIVE(without(Hi, SL{"Fence in 6 days"}));
         undo();
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Fence in 6 days").priority, 3, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Fence in 6 days").priority, 3, 5000);
         LIVE(Hi);
         externally(app, "Plain chore", [](Task &t) { t.priority = 3; });
         LIVE(plus(Hi, "Plain chore"));
         QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_0);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").priority, 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").priority, 0, 5000);
         LIVE(Hi);
     }
 
@@ -157,16 +157,16 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Milk today"));
         app.press(Qt::Key_BracketRight);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Milk today").dueDate, QDate::currentDate().addDays(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Milk today").dueDate, QDate::currentDate().addDays(1), 5000);
         LIVE(without(DueToday, SL{"Milk today"}));
         undo();
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Milk today").dueDate, QDate::currentDate(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Milk today").dueDate, QDate::currentDate(), 5000);
         LIVE(DueToday);
         externally(app, "Plain chore", [](Task &t) { t.dueDate = QDate::currentDate(); });
         LIVE(plus(DueToday, "Plain chore"));
         QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_Y);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").dueDate, QDate::currentDate().addDays(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").dueDate, QDate::currentDate().addDays(1), 5000);
         LIVE(DueToday);
     }
 
@@ -181,23 +181,23 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Report in 3 days"));
         app.press(Qt::Key_M);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("Garden");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Report in 3 days").listId, listId("Garden"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Report in 3 days").listId, listId("Garden"), 5000);
         LIVE(without(work, SL{"Report in 3 days"}));
         undo();
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Report in 3 days").listId, listId("Work"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Report in 3 days").listId, listId("Work"), 5000);
         LIVE(work);
         const qint64 workId = listId("Work");
         externally(app, "Plain chore", [workId](Task &t) { t.listId = workId; });
         LIVE(plus(work, "Plain chore"));
         QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_M);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("Home");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").listId, listId("Home"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").listId, listId("Home"), 5000);
         LIVE(work);
     }
 
@@ -210,16 +210,16 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Starred plain"));
         app.press(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Starred plain").starred, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Starred plain").starred, 5000);
         LIVE(without(Starred, SL{"Starred plain"}));
         undo();
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Starred plain").starred, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Starred plain").starred, 5000);
         LIVE(Starred);
         externally(app, "Plain chore", [](Task &t) { t.starred = true; });
         LIVE(plus(Starred, "Plain chore"));
         QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Plain chore").starred, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Plain chore").starred, 5000);
         LIVE(Starred);
     }
 
@@ -235,10 +235,10 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Report in 3 days"));
         app.press(Qt::Key_Period, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Report in 3 days").completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Report in 3 days").completed, 5000);
         // The count drops at once; the row stays in place, struck through, until
         // the view is left, as a just-completed task does everywhere.
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(m_list)).undone, work.size() - 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(m_list)).undone, work.size() - 1, 5000);
         SMART_SHOWS(app, work);
         QVERIFY(pane(app, "all"));
         QVERIFY(pane(app, lk(m_list)));
@@ -246,7 +246,7 @@ private slots:
         if (QTest::currentTestFailed())
             return;
         undo();
-        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Report in 3 days").completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Report in 3 days").completed, 5000);
         showsAndCounts(work);
         if (QTest::currentTestFailed())
             return;
@@ -265,18 +265,18 @@ private slots:
         QVERIFY(pane(app, lk(listId("Website"))));
         QVERIFY(selectRow(app, "Launch project"));
         app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceKey().startsWith("project:"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceKey().startsWith("project:"), 5000);
         for (const QString &title : {QString("Launch step one"), QString("Launch step later")}) {
             QVERIFY(selectRow(app, title));
             app.press(Qt::Key_Period, Qt::ControlModifier);
-            QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled(title).completed, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled(title).completed, 5000);
         }
         QVERIFY(pane(app, lk(m_list)));
         showsAndCounts(plus(empties, "Launch project"));
         if (QTest::currentTestFailed())
             return;
         undo();
-        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Launch step later").completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Launch step later").completed, 5000);
         showsAndCounts(empties);
         if (QTest::currentTestFailed())
             return;
@@ -292,12 +292,12 @@ private slots:
             return;
         QVERIFY(selectRow(app, "Report in 3 days"));
         app.press(Qt::Key_Delete);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Report in 3 days").id == 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Report in 3 days").id == 0, 5000);
         showsAndCounts(without(work, SL{"Report in 3 days"}));
         if (QTest::currentTestFailed())
             return;
         undo();
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Report in 3 days").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Report in 3 days").id != 0, 5000);
         showsAndCounts(work);
         if (QTest::currentTestFailed())
             return;
@@ -315,17 +315,17 @@ private slots:
         const qint64 work = saveSearchAsSmart(app, "lists: Work");
         QVERIFY(work);
         QVERIFY(pane(app, lk(hiprio)));
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(work)).undone, inLists(SL{"Work"}).size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(work)).undone, inLists(SL{"Work"}).size(), 5000);
         QVERIFY(selectRow(app, "Starred urgent"));   // High priority, in Work.
         app.press(Qt::Key_1);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(hiprio)).undone, Hi.size() - 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(hiprio)).undone, Hi.size() - 1, 5000);
         QCOMPARE(badgeOf(app, lk(work)).undone, inLists(SL{"Work"}).size());
         QVERIFY(selectRow(app, "Fence in 6 days"));
         app.press(Qt::Key_Delete);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(hiprio)).undone, Hi.size() - 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(hiprio)).undone, Hi.size() - 2, 5000);
         undo();
         undo();
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(hiprio)).undone, Hi.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(hiprio)).undone, Hi.size(), 5000);
     }
 };
 

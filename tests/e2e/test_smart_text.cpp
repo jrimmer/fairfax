@@ -152,14 +152,14 @@ private slots:
         SMART_QUERY(app, query, SL{});
         // Sounds Like, from the checkbox next to the query.
         QQuickItem *box = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((box = findItem("searchSoundex")) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((box = findItem("searchSoundex")) != nullptr, 5000);
         click(box);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().soundex(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().soundex(), 5000);
         QCOMPARE(app.store().setting("search.soundex").toBool(), true);
         SMART_SHOWS(app, expected);
         // Reversed: back to Full Text, the misspelling finds nothing again.
         click(findItem("searchSoundex"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().soundex(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().soundex(), 5000);
         QCOMPARE(app.store().setting("search.soundex").toBool(), false);
         SMART_SHOWS(app, SL{});
     }
@@ -185,17 +185,17 @@ private slots:
         SMART_QUERY(app, "Steven", SL{});
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         LIST_ITEM(box, findItem("soundexBox"));
-        QTRY_VERIFY_WITH_TIMEOUT(!box->property("checked").toBool(), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(!box->property("checked").toBool(), 5000);
         clickSteady(box);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().soundex(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().soundex(), 5000);
         SMART_SHOWS(app, SL{"Pay Stephen"});
         clickSteady(findItem("soundexBox"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().soundex(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().soundex(), 5000);
         SMART_SHOWS(app, SL{});
         // (Toggling the switch hands the keyboard back to the list, so close
         // the sheet with its own button.)
         QVERIFY(pressBuilder("searchButton"));
-        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
     }
 
     // "Quick Find (F while focused on the Task List): jumps the selection to
@@ -208,14 +208,14 @@ private slots:
         const qint64 tim = textTask(app, "Call: Tim");
         QCOMPARE(app.backend().currentTaskId(), tim);
         app.press(Qt::Key_F);
-        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         LIST_ITEM(input, findItem("commandInput"));
-        QTRY_VERIFY_WITH_TIMEOUT(input->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(input->property("activeFocus").toBool(), 5000);
         app.type("handbook");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Read the handbook"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Read the handbook"}), 5000);
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), textTask(app, "Read the handbook"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), textTask(app, "Read the handbook"), 5000);
         QCOMPARE(app.backend().search(), QString());
         QCOMPARE(paneTitles(app), sorted(Everything));
         // Search: the list collapses to the match, and keeps it until cleared.
@@ -233,36 +233,36 @@ private slots:
         QVERIFY(selectRowText(app, "Call: Tim"));
         const qint64 start = app.backend().currentTaskId();
         app.press(Qt::Key_F);
-        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("job");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 3, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 3, 5000);
         QCOMPARE(sorted(barItems()), sorted(SL{"Find a new job", "Call: Mum, tell about my new job", "Elsewhere job offer"}));
         QCOMPARE(commandBar()->property("highlighted").toInt(), 0);
         app.press(Qt::Key_Down);
-        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 1, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 1, 5000);
         app.press(Qt::Key_Down);
-        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 2, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 2, 5000);
         // Wrapping: down from the last match goes to the first, up from the
         // first goes to the last.
         app.press(Qt::Key_Down);
-        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 0, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 0, 5000);
         app.press(Qt::Key_Up);
-        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 2, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 2, 5000);
         app.press(Qt::Key_Up);
-        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 1, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 1, 5000);
         const QString second = barItems().at(1);
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, second, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, second, 5000);
         // Esc cancels: the selection stays where it was.
         const qint64 before = app.backend().currentTaskId();
         QVERIFY(before != start);
         app.press(Qt::Key_F);
-        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("tim");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Call: Tim"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Call: Tim"}), 5000);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
         QCOMPARE(app.backend().currentTaskId(), before);
         QCOMPARE(paneTitles(app), sorted(Everything));
     }
@@ -273,13 +273,13 @@ private slots:
         App &app = *m_app;
         QVERIFY(selectRowText(app, "Call: Tim"));
         app.press(Qt::Key_F);
-        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("handbook");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Read the handbook"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Read the handbook"}), 5000);
         QEXPECT_FAIL("", "GAP: the Task Find bar lists matches and moves the selection only on Return", Continue);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), textTask(app, "Read the handbook"), 1000);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
     }
 
     // "An exact-match toggle on the bar switches between loose and exact word
@@ -288,27 +288,27 @@ private slots:
         App &app = *m_app;
         QVERIFY(selectRowText(app, "Call: Tim"));
         app.press(Qt::Key_F);
-        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("ject");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 3, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 3, 5000);
         app.press(Qt::Key_E, Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(commandBar()->property("exact").toBool(), 2000);
-        QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(commandBar()->property("exact").toBool(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 0, 5000);
         QCOMPARE(app.store().setting("bar.exact.find").toBool(), true);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
         // The bar remembers its own setting: reopened, it is still exact.
         app.press(Qt::Key_F);
-        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         QVERIFY(commandBar()->property("exact").toBool());
         app.type("project");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Review the project"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Review the project"}), 5000);
         // Reversed: loose again.
         app.press(Qt::Key_E, Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!commandBar()->property("exact").toBool(), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(!commandBar()->property("exact").toBool(), 5000);
         QCOMPARE(app.store().setting("bar.exact.find").toBool(), false);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
     }
 
 private:

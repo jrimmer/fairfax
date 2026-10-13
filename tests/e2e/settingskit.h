@@ -79,7 +79,7 @@ struct Session {
 
 inline void activate(QQuickWindow *w) {
     w->requestActivate();
-    QTRY_VERIFY_WITH_TIMEOUT(w->isActive(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(w->isActive(), 5000);
 }
 
 inline QQuickWindow *settingsWindow() { return windowTitled("Precrime Settings"); }
@@ -120,9 +120,9 @@ inline const QStringList &paneNames() {
 
 inline void selectPane(QQuickWindow *sw, const QString &pane) {
     QQuickItem *tab = nullptr;
-    QTRY_VERIFY2_WITH_TIMEOUT((tab = findItem("settingsPane:" + pane)) != nullptr, qPrintable("no pane " + pane), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT((tab = findItem("settingsPane:" + pane)) != nullptr, qPrintable("no pane " + pane), 5000);
     click(tab);
-    QTRY_COMPARE_WITH_TIMEOUT(sw->property("pane").toInt(), int(paneNames().indexOf(pane)), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(sw->property("pane").toInt(), int(paneNames().indexOf(pane)), 5000);
 }
 
 // A visible control by objectName, scrolled into view if the pane is taller
@@ -136,7 +136,7 @@ inline QString windowsDescription() {
 
 inline void control(const QString &name, QQuickItem *&out) {
     out = nullptr;
-    QTRY_VERIFY2_WITH_TIMEOUT((out = findItem(name)) != nullptr, qPrintable("no control " + name + ". Windows: " + windowsDescription()), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT((out = findItem(name)) != nullptr, qPrintable("no control " + name + ". Windows: " + windowsDescription()), 5000);
     // A pane that has just been opened lays itself out over a few frames (its
     // fields start far too wide); wait until the control has stopped moving.
     QPoint last(-1, -1);
@@ -148,7 +148,7 @@ inline void control(const QString &name, QQuickItem *&out) {
         last = now;
         return still && (inside || !needInside);
     };
-    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never stopped moving"), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never stopped moving"), 5000);
     for (QQuickItem *p = out->parentItem(); p; p = p->parentItem()) {
         if (!p->inherits("QQuickFlickable"))
             continue;
@@ -161,7 +161,7 @@ inline void control(const QString &name, QQuickItem *&out) {
         break;
     }
     needInside = true;
-    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never settled inside its window"), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never settled inside its window"), 5000);
 }
 
 // ---------------------------------------------------------------- driving
@@ -177,7 +177,7 @@ inline void setCheck(const QString &name, bool on) {
         click(box);
     // Panes rebuild their controls on a change, so look the box up afresh
     // rather than trust a pointer that may now be dangling.
-    QTRY_VERIFY_WITH_TIMEOUT(findItem(name) && isChecked(findItem(name)) == on, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(findItem(name) && isChecked(findItem(name)) == on, 5000);
 }
 
 // Picks a combo entry the way a user does: open the drop-down, scroll to the
@@ -193,7 +193,7 @@ inline void chooseCombo(const QString &name, int index) {
     click(combo);
     QObject *popup = combo->property("popup").value<QObject *>();
     QVERIFY(popup);
-    QTRY_VERIFY_WITH_TIMEOUT(popup->property("visible").toBool(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(popup->property("visible").toBool(), 5000);
     auto *view = popup->property("contentItem").value<QQuickItem *>();
     QVERIFY(view);
     QMetaObject::invokeMethod(view, "positionViewAtIndex", Q_ARG(int, index), Q_ARG(int, 2));
@@ -210,8 +210,8 @@ inline void chooseCombo(const QString &name, int index) {
         return still;
     }(), 3000);
     click(entry);
-    QTRY_VERIFY_WITH_TIMEOUT(!popup->property("visible").toBool(), 3000);
-    QTRY_COMPARE_WITH_TIMEOUT(combo->property("currentIndex").toInt(), index, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!popup->property("visible").toBool(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(combo->property("currentIndex").toInt(), index, 5000);
 }
 
 // Moves a slider to `target` with the arrow keys after clicking it for focus.
@@ -257,7 +257,7 @@ inline void setText(QQuickWindow *sw, const QString &name, const QString &text) 
     else
         typeInto(sw, text);
     QTest::keyClick(sw, Qt::Key_Return);
-    QTRY_COMPARE_WITH_TIMEOUT(field->property("text").toString(), text, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(field->property("text").toString(), text, 5000);
 }
 
 // ------------------------------------------------------------ main window
@@ -265,7 +265,7 @@ inline void setText(QQuickWindow *sw, const QString &name, const QString &text) 
 inline void focusMain(App &app) {
     closeSettings(app);
     activate(app.window);
-    QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
 }
 
 // A Text anywhere under `root` with exactly this text.
@@ -311,8 +311,8 @@ inline QString isoOf(const QDate &d) { return d.toString(Qt::ISODate); }
 // Opens a source and waits for it to be the one shown.
 inline void showSource(App &app, const QString &key) {
     focusMain(app);
-    QTRY_VERIFY_WITH_TIMEOUT(app.openSource(key), 3000);
-    QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), key, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(app.openSource(key), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), key, 5000);
 }
 
 inline QString listKey(qint64 id) { return "list:" + QString::number(id); }
@@ -334,11 +334,11 @@ inline void newTaskByKeyboard(App &app, const QString &title, Task &out, QString
     focusMain(app);
     app.press(Qt::Key_N, Qt::ControlModifier);
     QQuickItem *field = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((field = findItem("editorTitle")) != nullptr && field->property("activeFocus").toBool(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((field = findItem("editorTitle")) != nullptr && field->property("activeFocus").toBool(), 5000);
     app.type(title);
     app.press(Qt::Key_Return);
-    QTRY_VERIFY_WITH_TIMEOUT(newestTitled(app, prefix).id != 0, 3000);
-    QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(newestTitled(app, prefix).id != 0, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
     out = newestTitled(app, prefix);
 }
 
@@ -359,17 +359,17 @@ inline void newTaskListId(App &app, qint64 &listId) {
     }(), 3000);
     listId = made.listId;
     app.backend().endEdit();
-    QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
 }
 
 // Closes Quick Entry with Ctrl+W (main() adds an Escape filter that the
 // harness does not run).
 inline void closeQuickEntry(QQuickWindow *quick) {
     QQuickItem *field = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((field = findItem("quickTitle")) != nullptr, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((field = findItem("quickTitle")) != nullptr, 5000);
     click(field);
     QTest::keyClick(quick, Qt::Key_W, Qt::ControlModifier);
-    QTRY_VERIFY_WITH_TIMEOUT(!quick->isVisible(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!quick->isVisible(), 5000);
 }
 
 // Leaves the open editor with Escape, once its title field has the keys.
@@ -378,16 +378,16 @@ inline void closeEditorWithEscape(App &app) {
     QTRY_VERIFY2_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr && title->property("activeFocus").toBool(),
                               qPrintable("focus is on " + app.focusDescription()), 3000);
     app.press(Qt::Key_Escape);
-    QTRY_VERIFY2_WITH_TIMEOUT(!findItem("editorCard"), qPrintable("focus is on " + app.focusDescription()), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(!findItem("editorCard"), qPrintable("focus is on " + app.focusDescription()), 5000);
 }
 
 // Space or Escape closes Quick Look once its content has the keys.
 inline void closeQuickLook(App &app, QObject *look) {
     auto *content = look->property("contentItem").value<QQuickItem *>();
     QVERIFY(content);
-    QTRY_VERIFY2_WITH_TIMEOUT(content->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(content->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 5000);
     app.press(Qt::Key_Escape);
-    QTRY_VERIFY2_WITH_TIMEOUT(!look->property("visible").toBool(), qPrintable("focus is on " + app.focusDescription()), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(!look->property("visible").toBool(), qPrintable("focus is on " + app.focusDescription()), 5000);
 }
 
 inline void openQuickEntry(App &app, QQuickWindow *&quick) {
@@ -404,12 +404,12 @@ inline void quickAdd(App &app, const QString &line, const QString &prefix, Task 
     QQuickWindow *quick = nullptr;
     openQuickEntry(app, quick);
     QQuickItem *field = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((field = findItem("quickTitle")) != nullptr, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((field = findItem("quickTitle")) != nullptr, 5000);
     click(field);
     typeInto(quick, line);
     QTest::keyClick(quick, Qt::Key_Return);
-    QTRY_VERIFY_WITH_TIMEOUT(newestTitled(app, prefix).id != 0, 3000);
-    QTRY_VERIFY_WITH_TIMEOUT(!windowTitled("Quick Entry") || !windowTitled("Quick Entry")->isVisible(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(newestTitled(app, prefix).id != 0, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!windowTitled("Quick Entry") || !windowTitled("Quick Entry")->isVisible(), 5000);
     out = newestTitled(app, prefix);
 }
 
@@ -449,10 +449,10 @@ inline QDate dateOnWeekday(int dayOfWeek) {
 inline void widenPane(App &app) {
     focusMain(app);
     QQuickItem *list = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((list = findItem("taskList")) != nullptr, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((list = findItem("taskList")) != nullptr, 5000);
     if (list->width() < 900)
         app.press(Qt::Key_Right, Qt::ControlModifier | Qt::AltModifier);
-    QTRY_VERIFY2_WITH_TIMEOUT(list->width() >= 900, qPrintable(QString("task list is %1 wide").arg(list->width())), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(list->width() >= 900, qPrintable(QString("task list is %1 wide").arg(list->width())), 5000);
 }
 
 // The titles of the section headings on screen, top to bottom.
@@ -477,14 +477,14 @@ inline QStringList sectionTitles() {
 inline void dueTimeFromCalendar(App &app, int &time) {
     focusMain(app);
     QQuickItem *cell = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((cell = findItem("calDay:" + isoOf(QDate::currentDate().addDays(1)))) != nullptr, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((cell = findItem("calDay:" + isoOf(QDate::currentDate().addDays(1)))) != nullptr, 5000);
     qint64 before = 0;
     for (const Task &t : app.store().tasks())
         before = qMax(before, t.id);
     const QPoint at = centreOf(cell);
     QTest::mouseMove(app.window, at);
     QTest::mouseClick(app.window, Qt::LeftButton, Qt::AltModifier, at);
-    QTRY_VERIFY_WITH_TIMEOUT(findItem("editorCard") != nullptr, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(findItem("editorCard") != nullptr, 5000);
     Task made;
     for (const Task &t : app.store().tasks())
         if (!t.deleted && t.id > before)

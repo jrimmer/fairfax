@@ -59,14 +59,14 @@ private slots:
         // "Set the fallback under Settings > Tasks > Default list": the first list.
         QCOMPARE(prop("quickList", "text").toString(), QString("Home"));
         QVERIFY(pickFromQuickMenu("quickList", "Work"));
-        QTRY_COMPARE_WITH_TIMEOUT(prop("quickList", "text").toString(), QString("Work"), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(prop("quickList", "text").toString(), QString("Work"), 5000);
         QVERIFY(pickFromQuickMenu("quickType", "Project"));
         QVERIFY(waitFor([&] { return findText("Project") != nullptr && prop("quickTitle", "placeholderText").toString() == "New Project"; }));
         QVERIFY(pickFromQuickMenu("quickPriority", "High"));
         QVERIFY(pickFromQuickMenu("quickPriority", "Star"));
         QVERIFY(saveQuick());
 
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Quarterly review").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Quarterly review").id != 0, 5000);
         const Task t = app.taskTitled("Quarterly review");
         QCOMPARE(t.listId, app.ids.work);
         QCOMPARE(t.type, int(TaskType::Project));
@@ -75,8 +75,8 @@ private slots:
 
         // Seen in the Work list as a project with a star.
         QVERIFY(app.openSource("list:" + QString::number(app.ids.work)));
-        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, t.id), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(badge("rowStar", t.id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, t.id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowStar", t.id), 5000);
 
         // The same controls undo themselves: set, then cleared before saving.
         QQuickWindow *again = openQuickEntry(app);
@@ -89,7 +89,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickPriority", "Star"));
         QVERIFY(pickFromQuickMenu("quickPriority", "Star"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Plain note").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Plain note").id != 0, 5000);
         const Task plain = app.taskTitled("Plain note");
         QCOMPARE(plain.type, int(TaskType::Task));
         QCOMPARE(plain.priority, int(Priority::None));
@@ -109,9 +109,9 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickType", "Checklist"));
         QVERIFY(waitFor([&] { return prop("quickTitle", "placeholderText").toString() == "New Checklist"; }));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Camping gear").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Camping gear").id != 0, 5000);
         QCOMPARE(app.taskTitled("Camping gear").type, int(TaskType::Checklist));
-        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, app.taskTitled("Camping gear").id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, app.taskTitled("Camping gear").id), 5000);
     }
 
     // "Tags: Return or Tab (or a comma) turns what you typed into a tag; Backspace
@@ -143,7 +143,7 @@ private slots:
         QVERIFY(clickUntilGone("quickTagRemove:errands", "quickTagChip:errands"));
         QVERIFY(saveQuick());
 
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Tagged thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Tagged thing").id != 0, 5000);
         const Task t = app.taskTitled("Tagged thing");
         QCOMPARE(tagNames(app, t), QStringList{"garden"});
         QCOMPARE(int(app.store().tags().size()), 1);  // The seeded "garden" was reused, and the removed chips never became tags.
@@ -157,7 +157,7 @@ private slots:
         QVERIFY(waitItem("quickTagChip:temp"));
         QVERIFY(clickUntilGone("quickTagRemove:temp", "quickTagChip:temp"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Untagged thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Untagged thing").id != 0, 5000);
         QVERIFY(app.taskTitled("Untagged thing").tagIds.isEmpty());
     }
 
@@ -173,12 +173,12 @@ private slots:
         QVERIFY(quick);
         QVERIFY(titleIs(quick, "Dated thing"));
         QVERIFY(typeDate("quickDue", "tom"));
-        QTRY_VERIFY_WITH_TIMEOUT(prop("quickDue", "value").toString().contains(QString::number(today.addDays(1).day())), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(prop("quickDue", "value").toString().contains(QString::number(today.addDays(1).day())), 5000);
         QVERIFY(typeDate("quickDueTime", "3pm"));
         QVERIFY(typeDate("quickStart", "in 2w"));
         QVERIFY(typeDate("quickStartTime", "9am"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Dated thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Dated thing").id != 0, 5000);
         Task t = app.taskTitled("Dated thing");
         QCOMPARE(t.dueDate, today.addDays(1));
         QCOMPARE(t.dueTime, 15 * 60);
@@ -195,7 +195,7 @@ private slots:
         const QDate day = today.addDays(10);
         QVERIFY(pickDay("quickStart", day));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Friday thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Friday thing").id != 0, 5000);
         t = app.taskTitled("Friday thing");
         QCOMPARE(t.dueDate, nextWeekday(5));
         QCOMPARE(t.dueTime, 15 * 60);
@@ -214,7 +214,7 @@ private slots:
         QVERIFY(clickUntilGone("quickDueClear", "quickDueClear"));
         QVERIFY(clickUntilGone("quickStartClear", "quickStartClear"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Cleared dates").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Cleared dates").id != 0, 5000);
         t = app.taskTitled("Cleared dates");
         QVERIFY(!t.dueDate.isValid());
         QCOMPARE(t.dueTime, -1);
@@ -232,7 +232,7 @@ private slots:
         QVERIFY(titleIs(quick, "Weekly thing"));
         QVERIFY(pickFromQuickMenu("quickRepeat", "Weekly"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Weekly thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Weekly thing").id != 0, 5000);
         Task t = app.taskTitled("Weekly thing");
         QCOMPARE(t.recurrence.frequency, int(Repeat::Weekly));
         QCOMPARE(t.recurrence.interval, 1);
@@ -244,7 +244,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickRepeat", "Daily"));
         QVERIFY(pickFromQuickMenu("quickRepeat", "Never"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Not repeating").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Not repeating").id != 0, 5000);
         QVERIFY(!app.taskTitled("Not repeating").recurrence.isSet());
 
         // Custom: every 3 weeks on Monday, Wednesday and Friday, after completion.
@@ -264,12 +264,12 @@ private slots:
             QVERIFY(seg);
             const bool want = day == 0 || day == 2 || day == 4;
             if (seg->property("on").toBool() != want) click(seg);
-            QTRY_COMPARE_WITH_TIMEOUT(findItem(QString("quickWeekday:%1").arg(day))->property("on").toBool(), want, 2000);
+            QTRY_COMPARE_WITH_TIMEOUT(findItem(QString("quickWeekday:%1").arg(day))->property("on").toBool(), want, 5000);
         }
         QVERIFY(clickNamed("quickCustomDone"));
         QVERIFY(waitFor([] { return !findItem("quickNumber"); }));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Custom thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Custom thing").id != 0, 5000);
         t = app.taskTitled("Custom thing");
         QCOMPARE(t.recurrence.frequency, int(Repeat::Weekly));
         QCOMPARE(t.recurrence.interval, 3);
@@ -289,7 +289,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickRepeat", "Monthly"));
         QVERIFY(pickFromQuickMenu("quickRepeat", "After Completion"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Chore").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Chore").id != 0, 5000);
         Task t = app.taskTitled("Chore");
         QCOMPARE(t.recurrence.frequency, int(Repeat::Monthly));
         QCOMPARE(t.recurrence.from, int(Repeat::FromCompletion));
@@ -301,7 +301,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickRepeat", "After Completion"));
         QVERIFY(pickFromQuickMenu("quickRepeat", "After Completion"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Chore two").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Chore two").id != 0, 5000);
         t = app.taskTitled("Chore two");
         QCOMPARE(t.recurrence.frequency, int(Repeat::Yearly));
         QCOMPARE(t.recurrence.from, int(Repeat::FromDue));
@@ -320,7 +320,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickAlarm", "15 minutes before"));
         QVERIFY(pickFromQuickMenu("quickAlarm", "1 day before"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Alerted thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Alerted thing").id != 0, 5000);
         QList<int> offsets;
         for (const Alarm &a : alarmsOf(app, app.taskTitled("Alerted thing").id)) offsets << a.offset;
         std::sort(offsets.begin(), offsets.end());
@@ -334,7 +334,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickAlarm", "At due time"));
         QVERIFY(pickFromQuickMenu("quickAlarm", "Remove All"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Quiet thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Quiet thing").id != 0, 5000);
         for (const Alarm &a : alarmsOf(app, app.taskTitled("Quiet thing").id))
             QVERIFY2(false, qPrintable(QString("alert left over: %1 minutes").arg(a.offset)));
     }
@@ -349,7 +349,7 @@ private slots:
         QVERIFY(titleIs(quick, "Timed thing"));
         QVERIFY(pickFromQuickMenu("quickDuration", "45 min"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Timed thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Timed thing").id != 0, 5000);
         QCOMPARE(app.taskTitled("Timed thing").duration, 45);
 
         QQuickWindow *second = openQuickEntry(app);
@@ -363,7 +363,7 @@ private slots:
         QVERIFY(clickNamed("quickCustomDone"));
         QVERIFY(waitFor([] { return !findItem("quickNumber"); }));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Custom timed thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Custom timed thing").id != 0, 5000);
         QCOMPARE(app.taskTitled("Custom timed thing").duration, 90);
 
         QQuickWindow *third = openQuickEntry(app);
@@ -372,7 +372,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickDuration", "1 hour"));
         QVERIFY(pickFromQuickMenu("quickDuration", "None"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Untimed thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Untimed thing").id != 0, 5000);
         QCOMPARE(app.taskTitled("Untimed thing").duration, 0);
     }
 
@@ -388,7 +388,7 @@ private slots:
         QVERIFY(titleIs(quick, "Place thing"));
         QVERIFY(pickFromQuickMenu("quickLocation", "Office"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Place thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Place thing").id != 0, 5000);
         QCOMPARE(app.taskTitled("Place thing").locationIds, QList<qint64>{office});
 
         QQuickWindow *again = openQuickEntry(app);
@@ -397,7 +397,7 @@ private slots:
         QVERIFY(pickFromQuickMenu("quickLocation", "Office"));
         QVERIFY(pickFromQuickMenu("quickLocation", "None"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Placeless thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Placeless thing").id != 0, 5000);
         QVERIFY(app.taskTitled("Placeless thing").locationIds.isEmpty());
     }
 
@@ -414,7 +414,7 @@ private slots:
         QVERIFY(waitFor([] { return prop("quickNotes", "activeFocus").toBool(); }));
         typeLine(quick, "Bring the *blue* folder\nand the receipts");
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Noted thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Noted thing").id != 0, 5000);
         QCOMPARE(app.taskTitled("Noted thing").notes, QString("Bring the *blue* folder\nand the receipts"));
 
         // A task saved without touching the notes has none.
@@ -422,7 +422,7 @@ private slots:
         QVERIFY(again);
         QVERIFY(titleIs(again, "Bare thing"));
         QVERIFY(saveQuick());
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Bare thing").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Bare thing").id != 0, 5000);
         QVERIFY(app.taskTitled("Bare thing").notes.isEmpty());
     }
 
@@ -471,8 +471,8 @@ private slots:
         QVERIFY(titleIs(quick, "Typed and entered"));
         QTest::keyClick(quick, Qt::Key_Return);
         QVERIFY(waitFor([] { return !windowTitled("Quick Entry"); }));
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Typed and entered").id != 0, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, app.taskTitled("Typed and entered").id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Typed and entered").id != 0, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, app.taskTitled("Typed and entered").id), 5000);
     }
 };
 

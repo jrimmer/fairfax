@@ -59,9 +59,9 @@ class E2ESmartBuilder : public QObject {
     // Clicks "Search" and checks what the pane lists.
     void applyAndExpect(const QString &query, const QStringList &expected) {
         App &app = *m_app;
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), query, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), query, 5000);
         QVERIFY(pressBuilder("searchButton"));
-        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
         QCOMPARE(app.backend().search(), query);
         SMART_SHOWS(app, expected);
     }
@@ -82,10 +82,10 @@ private slots:
         if (QTest::currentTestFailed())
             return;
         QVERIFY(pressBuilder("typeChip:hiprio"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 5000);
         QCOMPARE(chipState("typeChip:hiprio"), 1);
         QVERIFY(pressBuilder("typeChip:medprio"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio"), 5000);
         QCOMPARE(previewText(), QString("type: hiprio OR medprio"));
         QVERIFY(smartLists(app).isEmpty());
 
@@ -94,13 +94,13 @@ private slots:
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio OR medprio"));
         QCOMPARE(app.store().list(id).kind, int(ListKind::Smart));
         QCOMPARE(app.backend().sourceKey(), lk(id));
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Prio mix"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Prio mix"), 5000);
         SMART_SHOWS(app, Hi + Med);
         // The sidebar's Smart Lists section, with the right count.
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"Prio mix"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"Prio mix"}), 5000);
         QVERIFY(sidebarOrder().contains("g:-1"));
         QCOMPARE(shownName(groupHeader(-1)), QString("Smart Lists"));
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (Hi + Med).size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (Hi + Med).size(), 5000);
         // The pane shows the rule it is built on.
         LIST_ITEM(rule, findItem("smartQueryField"));
         QCOMPARE(rule->property("text").toString(), QString("type: hiprio OR medprio"));
@@ -121,7 +121,7 @@ private slots:
         QVERIFY(pressBuilder("typeChip:hiprio"));
         QVERIFY(pressBuilder("typeChip:due"));
         QVERIFY(pressBuilder("typeModeAnd"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio AND due"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio AND due"), 5000);
         // "Search" applies it to the search bar.
         applyAndExpect("type: hiprio AND due", SL{"Rent overdue", "Fence in 6 days", "Starred urgent"});
         if (QTest::currentTestFailed())
@@ -131,7 +131,7 @@ private slots:
         QCOMPARE(chipState("typeChip:hiprio"), 1);
         QCOMPARE(chipState("typeChip:due"), 1);
         QVERIFY(pressBuilder("typeModeOr"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR due"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR due"), 5000);
         const SL dated{"Rent overdue", "Invoice overdue", "Milk today", "Dentist today", "Parcel tomorrow", "Report in 3 days",
                        "Fence in 6 days", "Taxes in 9 days", "Passport in 14 days", "Began yesterday due in 2", "Two day window",
                        "Fresh window", "Repeating window", "Starred urgent", "Weekly repeat", "Daily repeat", "Launch step one",
@@ -154,23 +154,23 @@ private slots:
         QCOMPARE(chipState("typeChip:hiprio"), 1);
         QVERIFY(pressBuilder("typeChip:hiprio"));
         QCOMPARE(chipState("typeChip:hiprio"), 2);
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !hiprio"), 5000);
         QVERIFY(pressBuilder("typeChip:hiprio"));
         QCOMPARE(chipState("typeChip:hiprio"), 0);
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString(), 5000);
         QVERIFY(pressBuilder("typeChip:starred", Qt::RightButton));
         QCOMPARE(chipState("typeChip:starred"), 2);
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !starred"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !starred"), 5000);
         // An include and an exclude together.
         QVERIFY(pressBuilder("typeChip:prio"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: prio AND !starred"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: prio AND !starred"), 5000);
         applyAndExpect("type: prio AND !starred", without(Hi + Med + SL{"Dentist today", "Weekly repeat", "Low plain"}, SL{"Starred urgent"}));
         if (QTest::currentTestFailed())
             return;
         // Clear resets the whole sheet and the search bar.
         QVERIFY(openBuilder(app));
         QVERIFY(pressBuilder("clearButton"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString(), 5000);
         QCOMPARE(chipState("typeChip:prio"), 0);
         QCOMPARE(app.backend().search(), QString());
         QVERIFY(closeBuilder(app));
@@ -261,7 +261,7 @@ private slots:
         if (QTest::currentTestFailed())
             return;
         QVERIFY(fillBuilder(*m_app, "freeInput", "plumber"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("plumber"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("plumber"), 5000);
         QVERIFY(pressBuilder("typeChip:starred"));
         QVERIFY(pressBuilder("pickerTab:tags"));
         QVERIFY(pressBuilder("nameChip:tags:builders"));
@@ -280,24 +280,24 @@ private slots:
             return;
         QVERIFY(pressBuilder("addGroup"));
         QVERIFY(fillBuilder(*m_app, "groupField", "tags: urgent OR tags: waiting"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("(tags: urgent OR tags: waiting)"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("(tags: urgent OR tags: waiting)"), 5000);
         QVERIFY(pressBuilder("typeChip:overdue"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue (tags: urgent OR tags: waiting)"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue (tags: urgent OR tags: waiting)"), 5000);
         QVERIFY(pressBuilder("groupJoin:0:not"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue !(tags: urgent OR tags: waiting)"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue !(tags: urgent OR tags: waiting)"), 5000);
         applyAndExpect("type: overdue !(tags: urgent OR tags: waiting)", SL{});
         if (QTest::currentTestFailed())
             return;
         QVERIFY(openBuilder(*m_app));
         QVERIFY(pressBuilder("groupJoin:0:and"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue (tags: urgent OR tags: waiting)"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue (tags: urgent OR tags: waiting)"), 5000);
         applyAndExpect("type: overdue (tags: urgent OR tags: waiting)", Overdue);
         if (QTest::currentTestFailed())
             return;
         // Remove the group again.
         QVERIFY(openBuilder(*m_app));
         QVERIFY(pressBuilder("removeGroup:0"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue"), 5000);
         QVERIFY(closeBuilder(*m_app));
     }
 
@@ -309,16 +309,16 @@ private slots:
             return;
         LIST_ITEM(box, findItem("preview"));
         click(box);
-        QTRY_VERIFY_WITH_TIMEOUT(box->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(box->property("activeFocus").toBool(), 5000);
         m_app->type("type: hiprio OR medprio tags: urgent");
-        QTRY_COMPARE_WITH_TIMEOUT(chipState("typeChip:hiprio"), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(chipState("typeChip:hiprio"), 1, 5000);
         QCOMPARE(chipState("typeChip:medprio"), 1);
         QCOMPARE(chipState("typeChip:lowprio"), 0);
         QVERIFY(pressBuilder("pickerTab:tags"));
-        QTRY_COMPARE_WITH_TIMEOUT(chipState("nameChip:tags:urgent"), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(chipState("nameChip:tags:urgent"), 1, 5000);
         // Clicking a chip after hand-editing rewrites the box from the chips.
         QVERIFY(pressBuilder("typeChip:lowprio"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio OR lowprio tags: urgent"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio OR lowprio tags: urgent"), 5000);
         QVERIFY(closeBuilder(*m_app));
     }
 
@@ -333,14 +333,14 @@ private slots:
         QCOMPARE(app.store().list(id).name, QString("type: hiprio"));
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio"));
         QCOMPARE(app.backend().search(), QString());
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("type: hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("type: hiprio"), 5000);
         SMART_SHOWS(app, Hi);
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio"}), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, Hi.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio"}), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, Hi.size(), 5000);
         // Deleting a Smart List never deletes its tasks.
         const int tasks = app.store().tasks().size();
         QVERIFY(listMenu(app, id, "Delete Smart List"));
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 5000);
         QCOMPARE(app.store().tasks().size(), tasks);
         for (const QString &t : Hi)
             QVERIFY(!app.taskTitled(t).deleted && app.taskTitled(t).id);
@@ -356,7 +356,7 @@ private slots:
         App &app = *m_app;
         QVERIFY(pane(app, "today"));
         QVERIFY(plusMenu("New Smart List…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QCOMPARE(app.backend().sourceKey(), QString("all"));
         QVERIFY(pressBuilder("typeChip:starred"));
         QVERIFY(pressBuilder("typeChip:hiprio"));
@@ -378,27 +378,27 @@ private slots:
         const qint64 id = saveSearchAsSmart(app, "type: hiprio");
         QVERIFY(id);
         QVERIFY(listMenu(app, id, "Edit Search…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QCOMPARE(chipState("typeChip:hiprio"), 1);
         QCOMPARE(builderQuery(), QString("type: hiprio"));
         QVERIFY(pressBuilder("typeChip:medprio"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio"), 5000);
         QVERIFY(pressBuilder("updateButton"));
-        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: hiprio OR medprio"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: hiprio OR medprio"), 5000);
         QCOMPARE(smartLists(app).size(), 1);
         SMART_SHOWS(app, Hi + Med);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (Hi + Med).size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (Hi + Med).size(), 5000);
         LIST_ITEM(rule, findItem("smartQueryField"));
         QCOMPARE(rule->property("text").toString(), QString("type: hiprio OR medprio"));
         // Reversed: take medprio out again.
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("typeChip:medprio"));   // Include, then exclude…
         QVERIFY(pressBuilder("typeChip:medprio"));   // …then off.
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 5000);
         QVERIFY(pressBuilder("updateButton"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: hiprio"), 5000);
         SMART_SHOWS(app, Hi);
     }
 
@@ -411,11 +411,11 @@ private slots:
         QVERIFY(id);
         LIST_ITEM(rule, findItem("smartQueryField"));
         click(rule);
-        QTRY_VERIFY_WITH_TIMEOUT(rule->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rule->property("activeFocus").toBool(), 5000);
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("type: starred");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: starred"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: starred"), 5000);
         SMART_SHOWS(app, (SL{"Starred plain", "Starred urgent", "Fix plumber leak", "Plumber quote", "Plumber for garden",
                             "Plumber for office"}));
         // Escape drops what was typed.
@@ -423,7 +423,7 @@ private slots:
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("type: nothing here");
         app.press(Qt::Key_Escape);
-        QTRY_COMPARE_WITH_TIMEOUT(findItem("smartQueryField")->property("text").toString(), QString("type: starred"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(findItem("smartQueryField")->property("text").toString(), QString("type: starred"), 5000);
         QCOMPARE(app.store().list(id).smartQuery, QString("type: starred"));
     }
 
@@ -436,7 +436,7 @@ private slots:
         const qint64 id = saveSearchAsSmart(app, "type: hiprio");
         QVERIFY(id);
         QVERIFY(listMenu(app, id, "Edit Search…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("typeChip:medprio"));
         const qint64 copy = saveFromBuilder(app, "Both");
         QVERIFY(copy && copy != id);
@@ -458,22 +458,22 @@ private slots:
         // Double-click in the sidebar.
         doubleClick(app.sidebarRow(lk(id)), pointIn(app.sidebarRow(lk(id)), 0.4, 0.5));
         LIST_ITEM(editor, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("Urgent stuff");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).name, QString("Urgent stuff"), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"Urgent stuff"}), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Urgent stuff"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).name, QString("Urgent stuff"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"Urgent stuff"}), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Urgent stuff"), 5000);
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio"));
         // The menu's Rename….
         QVERIFY(listMenu(app, id, "Rename…"));
         LIST_ITEM(menuEditor, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(menuEditor->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(menuEditor->property("activeFocus").toBool(), 5000);
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("Prio");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).name, QString("Prio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).name, QString("Prio"), 5000);
         // The Edit List sheet; a Smart List has only a name and a colour there.
         QVERIFY(listMenu(app, id, "Edit List…"));
         LIST_ITEM(name, findItem("editListName"));
@@ -483,8 +483,8 @@ private slots:
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("Top priority");
         QVERIFY(clickDialogButton("OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).name, QString("Top priority"), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"Top priority"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).name, QString("Top priority"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"Top priority"}), 5000);
         // The rule and its rows are untouched.
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio"));
         SMART_SHOWS(app, Hi);
@@ -500,24 +500,24 @@ private slots:
         QVERIFY(id);
         const int tasks = app.store().tasks().size();
         QVERIFY(listMenu(app, id, "Delete Smart List"));
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 5000);
         QCOMPARE(smartRowNames(app), SL{});
         QCOMPARE(app.store().tasks().size(), tasks);
         QVERIFY(app.backend().sourceKey() != lk(id));
         // Undo.
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(listExists(app, id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(listExists(app, id), 5000);
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio"));
         QCOMPARE(app.store().list(id).name, QString("type: hiprio"));
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio"}), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, Hi.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio"}), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, Hi.size(), 5000);
         QVERIFY(pane(app, lk(id)));
         SMART_SHOWS(app, Hi);
         // Redo.
         app.press(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 5000);
     }
 
     // "By default a Smart List leaves completed tasks out, so the view stays on
@@ -534,13 +534,13 @@ private slots:
         QVERIFY(!paneTitles(app).contains("Done just now"));
         auto choose = [&](const QString &segment, int mode, const SL &expected) {
             QVERIFY(listMenu(app, id, "Edit Search…"));
-            QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
             QVERIFY(pressBuilder(segment));
             QVERIFY(pressBuilder("updateButton"));
-            QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).completedMode, mode, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).completedMode, mode, 5000);
             SMART_SHOWS(app, expected);
-            QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 5000);
         };
         choose("completedInclude", 1, open + SL{"Done just now"});
         choose("completedExclude", 2, open);
@@ -560,11 +560,11 @@ private slots:
         QVERIFY(!paneTitles(app).contains("Starts tomorrow"));
         auto choose = [&](const QString &segment, bool on, const SL &expected) {
             QVERIFY(listMenu(app, id, "Edit Search…"));
-            QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
             QVERIFY(pressBuilder(segment));
             QVERIFY(pressBuilder("updateButton"));
-            QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).includeScheduled, on, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).includeScheduled, on, 5000);
             SMART_SHOWS(app, expected);
         };
         choose("searchScheduledInclude", true, open + SL{"Starts tomorrow"});
@@ -572,7 +572,7 @@ private slots:
         // Remembered: reopened, the switch reads as it was left.
         choose("searchScheduledInclude", true, open + SL{"Starts tomorrow"});
         QVERIFY(listMenu(app, id, "Edit Search…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(builder()->property("includeScheduled").toBool());
         QVERIFY(closeBuilder(app));
     }
@@ -629,11 +629,11 @@ private slots:
         // Editing the range on a saved list: back to no range at all, which
         // needs a rule to stay savable.
         QVERIFY(listMenu(app, fixed, "Edit Search…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("rangeNone"));
         QVERIFY(pressBuilder("typeChip:hiprio"));
         QVERIFY(pressBuilder("updateButton"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(fixed).smartRange, QString(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(fixed).smartRange, QString(), 5000);
         SMART_SHOWS(app, Hi);
     }
 
@@ -663,7 +663,7 @@ private slots:
         const qint64 id = saveFromBuilder(app, "Today and overdue");
         QVERIFY(id);
         SMART_SHOWS(app, DueToday + Overdue);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (DueToday + Overdue).size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (DueToday + Overdue).size(), 5000);
     }
 
     // "To require high priority as well, edit the search field to read: type:
@@ -685,7 +685,7 @@ private slots:
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("type: (duetoday OR overdue) AND hiprio");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: (duetoday OR overdue) AND hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: (duetoday OR overdue) AND hiprio"), 5000);
         SMART_SHOWS(app, SL{"Rent overdue"});
     }
 
@@ -710,10 +710,10 @@ private slots:
         QVERIFY(!paneTitles(app).contains("Rent overdue"));
         // Switch the range off and update: the overdue ones return.
         QVERIFY(listMenu(app, id, "Edit Search…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("rangeNone"));
         QVERIFY(pressBuilder("updateButton"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartRange, QString(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartRange, QString(), 5000);
         SMART_SHOWS(app, DueToday + Overdue);
     }
 

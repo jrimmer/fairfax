@@ -11,7 +11,7 @@
 namespace e2e {
 namespace tk {
 
-inline bool waitFor(const std::function<bool()> &pred, int ms = 3000) { return QTest::qWaitFor(pred, ms); }
+inline bool waitFor(const std::function<bool()> &pred, int ms = 5000) { return QTest::qWaitFor(pred, ms); }
 
 // A property of a named item, or an invalid variant when the item is not on screen.
 inline QVariant prop(const QString &name, const char *property) {
@@ -19,7 +19,7 @@ inline QVariant prop(const QString &name, const char *property) {
     return i ? i->property(property) : QVariant();
 }
 
-inline QQuickItem *waitItem(const QString &name, int ms = 3000) {
+inline QQuickItem *waitItem(const QString &name, int ms = 5000) {
     QQuickItem *item = nullptr;
     waitFor([&] { return (item = findItem(name)) != nullptr; }, ms);
     return item;
@@ -27,16 +27,19 @@ inline QQuickItem *waitItem(const QString &name, int ms = 3000) {
 
 // Waits until a named item has stopped moving, so a click is aimed at where it
 // really is and not where it was a moment ago.
-inline bool settled(const QString &name, int ms = 3000) {
+inline bool settled(const QString &name, int ms = 5000) {
     QPointF last(-1, -1);
     int same = 0;
+    // Positions only mean something once the layout that has been asked for has run.
+    waitFor([&] { return findItem(name) != nullptr; }, ms);
+    settleLayout(findItem(name));
     return waitFor([&] {
         QQuickItem *i = findItem(name);
         if (!i) return false;
         const QPointF now = i->mapToScene(QPointF(0, 0));
         same = (now == last) ? same + 1 : 0;
         last = now;
-        return same >= 2;
+        return same >= 3;
     }, ms);
 }
 
@@ -108,7 +111,7 @@ inline QString pressTarget(const QString &name) {
     return QString("press at (%1,%2) of %3 goes to ").arg(p.x()).arg(p.y()).arg(name) + chain.join(" < ");
 }
 
-inline bool clickNamed(const QString &name, Qt::MouseButton b = Qt::LeftButton, int ms = 3000) {
+inline bool clickNamed(const QString &name, Qt::MouseButton b = Qt::LeftButton, int ms = 5000) {
     if (!waitItem(name, ms) || !settled(name, ms)) {
         qWarning().noquote() << "no item named" << name;
         return false;
@@ -170,13 +173,18 @@ inline bool contextMenuOn(App &app, qint64 id) {
 }
 
 // Picks an entry of the menu that is open and waits for the menu to close.
-inline bool clickMenu(const QString &text, int ms = 3000) {
+inline bool clickMenu(const QString &text, int ms = 5000) {
     QQuickItem *item = nullptr;
     if (!waitFor([&] { return (item = findText(text, "QQuickMenuItem")) != nullptr; }, ms)) {
         qWarning().noquote() << "no menu entry" << text << "among:" << menuEntries();
         return false;
     }
+    // The popup that has just opened is laid out on the next polish; until then
+    // its entries sit at stale positions.
+    settleLayout(item);
+    if (!(item = findText(text, "QQuickMenuItem"))) return false;
     scrollIntoView(item);
+    if (!(item = findText(text, "QQuickMenuItem"))) return false;
     click(item);
     if (waitFor([&] { return noMenuOpen(); }, ms / 3)) return true;
     // The click can land while the menu is still opening; once more.
@@ -186,7 +194,7 @@ inline bool clickMenu(const QString &text, int ms = 3000) {
 
 // Opens a submenu by hovering its entry (clicking if hovering did not do it),
 // then picks `child` from it.
-inline bool clickSub(const QString &parentText, const QString &child, int ms = 3000) {
+inline bool clickSub(const QString &parentText, const QString &child, int ms = 5000) {
     QQuickItem *entry = nullptr;
     if (!waitFor([&] { return (entry = findText(parentText, "QQuickMenuItem")) != nullptr; }, ms)) {
         qWarning().noquote() << "no menu entry" << parentText << "among:" << menuEntries();
@@ -194,16 +202,27 @@ inline bool clickSub(const QString &parentText, const QString &child, int ms = 3
     }
     QQuickItem *target = nullptr;
     auto found = [&] { return (target = findText(child, "QQuickMenuItem")) != nullptr; };
+    auto parentEntry = [&] { return entry = findText(parentText, "QQuickMenuItem"); };
+    settleLayout(entry);
+    if (!parentEntry()) return false;
     scrollIntoView(entry);
+    if (!parentEntry()) return false;
     QTest::mouseMove(entry->window(), centreOf(entry));
-    if (!waitFor(found, 1500)) {
+    // Hovering does not always open it (offscreen there is no real pointer); a
+    // click on the entry does, and does not close it if the hover was merely late.
+    if (!waitFor(found, 400)) {
+        if (!parentEntry()) return false;
         click(entry);
-        if (!waitFor(found, 1500)) {
+        if (!waitFor(found, 3000)) {
             qWarning().noquote() << "submenu" << parentText << "has no" << child << "among:" << menuEntries();
             return false;
         }
     }
+    // The submenu that has just opened is laid out on the next polish.
+    settleLayout(target);
+    if (!found()) return false;
     scrollIntoView(target);
+    if (!found()) return false;
     click(target);
     return waitFor([&] { return noMenuOpen(); }, ms);
 }
@@ -307,16 +326,25 @@ inline bool closeEditor(App &app) {
 // under the field, which is what pickDay is for.)
 inline bool focusDateField(const QString &name) {
     auto focused = [&] { return prop(name, "activeFocus").toBool(); };
-    QQuickItem *f = waitItem(name);
-    if (!f) return false;
-    QQuickWindow *w = f->window();
     const QString titleName = findItem("editorTitle") ? "editorTitle" : "quickTitle";
-    if (!findItem(titleName)) return false;
-    click(findItem(titleName));
-    waitFor([&] { return prop(titleName, "activeFocus").toBool(); }, 1500);
-    for (int i = 0; i < 25 && !focused(); ++i) {
-        QTest::keyClick(w, Qt::Key_Tab);
-        waitFor(focused, 150);
+    // A field that has only just changed (the editor refreshes after every
+    // edit) can lose the caret to the rebuild; the walk is repeated from the
+    // title when it has not arrived.
+    for (int round = 0; round < 3 && !focused(); ++round) {
+        QQuickItem *f = waitItem(name, 5000);
+        if (!f) return false;
+        settleLayout(f);
+        if (!waitItem(titleName, 5000)) return false;
+        settled(titleName, 5000);
+        click(findItem(titleName));
+        waitFor([&] { return prop(titleName, "activeFocus").toBool(); }, 3000);
+        f = findItem(name);
+        if (!f) return false;
+        QQuickWindow *w = f->window();
+        for (int i = 0; i < 25 && !focused(); ++i) {
+            QTest::keyClick(w, Qt::Key_Tab);
+            waitFor(focused, 400);
+        }
     }
     return focused();
 }

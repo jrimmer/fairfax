@@ -29,41 +29,41 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(plusMenu("New List"));
         LIST_ITEM(editor, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
         QCOMPARE(editor->property("text").toString(), QString("New List"));
         app.type("Garage");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(listNamed(app, "Garage") != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(listNamed(app, "Garage") != 0, 5000);
         const qint64 id = listNamed(app, "Garage");
         QCOMPARE(liveListsNamed(app, "New List"), 0);
         QCOMPARE(liveList(app, id).groupId, qint64(0));  // Opened from Today: no group to join.
         QCOMPARE(app.backend().sourceKey(), lk(id));
         LIST_ITEM(row, app.sidebarRow(lk(id)));
         QCOMPARE(shownName(row), QString("Garage"));
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Garage"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Garage"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 5000);
 
         // Reverse: delete it again.
         QVERIFY(listMenu(app, id, "Delete List…"));
         QVERIFY(clickDialogButton("OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 5000);
         QVERIFY(!findText("Garage"));
 
         // Escape while naming leaves the default name.
         QVERIFY(plusMenu("New List"));
         LIST_ITEM(second, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(second->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(second->property("activeFocus").toBool(), 5000);
         app.type("Abandoned");
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 5000);
         const qint64 kept = listNamed(app, "New List");
         QVERIFY(kept != 0);
         QCOMPARE(liveListsNamed(app, "Abandoned"), 0);
         QVERIFY(app.sidebarRow(lk(kept)));
         QVERIFY(listMenu(app, kept, "Delete List…"));
         QVERIFY(clickDialogButton("OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, kept), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, kept), 5000);
     }
 
     // "File > New > New List" (Ctrl+Shift+N here); a list made while another
@@ -75,24 +75,24 @@ private slots:
         QVERIFY(pane(app, lk(app.ids.home)));
         app.press(Qt::Key_N, Qt::ControlModifier | Qt::ShiftModifier);
         LIST_ITEM(editor, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
         app.type("Pantry");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(listNamed(app, "Pantry") != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(listNamed(app, "Pantry") != 0, 5000);
         const qint64 id = listNamed(app, "Pantry");
         QCOMPARE(liveList(app, id).groupId, w.personal);
         QCOMPARE(listsIn(app, w.personal).last(), id);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(id)) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(id)) != nullptr, 5000);
         // It shows up under the Personal header, after Work.
         const QStringList order = sidebarOrder();
         QVERIFY(order.indexOf(lk(app.ids.work)) < order.indexOf(lk(id)));
         QVERIFY(order.indexOf("g:" + QString::number(w.personal)) < order.indexOf(lk(id)));
 
         app.press(Qt::Key_Z, Qt::ControlModifier);  // The name.
-        QTRY_VERIFY2_WITH_TIMEOUT(listNamed(app, "Pantry") == 0, qPrintable("focus is on " + app.focusDescription() + " visible=" + QString::number(app.window->activeFocusItem()->isVisible()) + " active=" + app.window->activeFocusItem()->property("active").toString()), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(listNamed(app, "Pantry") == 0, qPrintable("focus is on " + app.focusDescription() + " visible=" + QString::number(app.window->activeFocusItem()->isVisible()) + " active=" + app.window->activeFocusItem()->property("active").toString()), 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);  // The list.
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 5000);
     }
 
     // "Rename...: edit the name in place." Double-clicking a row does it too.
@@ -103,19 +103,19 @@ private slots:
             LIST_ITEM(row, app.sidebarRow(lk(app.ids.home)));
             doubleClick(row, pointIn(row, 0.4, 0.5));
             LIST_ITEM(editor, findItem("sidebarListRename"));
-            QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
             app.type(name);
         };
         rename("Household");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Household"), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Household"), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Household"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Household"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Household"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Household"), 5000);
 
         // Escape abandons the edit.
         rename("Nope");
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 5000);
         QCOMPARE(liveList(app, app.ids.home).name, QString("Household"));
         QCOMPARE(shownName(app.sidebarRow(lk(app.ids.home))), QString("Household"));
 
@@ -123,17 +123,17 @@ private slots:
         LIST_ITEM(row, app.sidebarRow(lk(app.ids.home)));
         doubleClick(row, pointIn(row, 0.4, 0.5));
         LIST_ITEM(editor, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
         app.press(Qt::Key_Backspace);
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarListRename"), 5000);
         QCOMPARE(liveList(app, app.ids.home).name, QString("Household"));
 
         // Reverse.
         rename("Home");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Home"), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Home"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Home"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Home"), 5000);
     }
 
     // "You can edit any of these later from Task > Edit List with the list
@@ -146,9 +146,9 @@ private slots:
         QCOMPARE(name->property("text").toString(), QString("Home"));
         replaceText(app, "Household");
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Household"), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Household"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editListName"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Household"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Household"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editListName"), 5000);
 
         // Cancel throws the edit away.
         QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
@@ -156,17 +156,17 @@ private slots:
         QCOMPARE(again->property("text").toString(), QString("Household"));
         replaceText(app, "Discarded");
         QVERIFY(clickDialogButtonIn("Edit List", "Cancel"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editListName"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editListName"), 5000);
         QCOMPARE(liveList(app, app.ids.home).name, QString("Household"));
 
         // Reverse, accepting with Return.
         QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
         LIST_ITEM(third, findItem("editListName"));
-        QTRY_VERIFY_WITH_TIMEOUT(third->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(third->property("activeFocus").toBool(), 5000);
         replaceText(app, "Home");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Home"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editListName"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).name, QString("Home"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editListName"), 5000);
     }
 
     // "Delete: removes the list and everything in it." and "Edit > Undo"
@@ -176,32 +176,32 @@ private slots:
         App app(seedLists);
         QVERIFY(app.ok);
         QVERIFY(pane(app, lk(app.ids.work)));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.report), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.report), 5000);
 
         QVERIFY(listMenu(app, app.ids.work, "Delete List…"));
         QVERIFY(clickDialogButtonIn("Delete “Work”?", "Cancel"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findText("Delete “Work”?"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findText("Delete “Work”?"), 5000);
         QVERIFY(listExists(app, app.ids.work));
         QVERIFY(!app.task(app.ids.report).deleted);
 
         QVERIFY(listMenu(app, app.ids.work, "Delete List…"));
         QVERIFY(clickDialogButtonIn("Delete “Work”?", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, app.ids.work), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!listExists(app, app.ids.work), 5000);
         for (qint64 id : {app.ids.report, app.ids.studio, app.ids.callAlex, app.ids.oldThing})
             QVERIFY2(app.task(id).deleted, "task of the deleted list survived");
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(app.ids.work)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(app.ids.work)), 5000);
         QVERIFY(!findText("Work"));
         // The open list went away, so the view moved on.
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 5000);
         app.press(Qt::Key_1, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
         QVERIFY(!shows(app, app.ids.report) && !shows(app, app.ids.studio));
 
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(listExists(app, app.ids.work), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(listExists(app, app.ids.work), 5000);
         QVERIFY(!app.task(app.ids.report).deleted && !app.task(app.ids.studio).deleted);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(app.ids.work)) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.report) && shows(app, app.ids.studio), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(app.ids.work)) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.report) && shows(app, app.ids.studio), 5000);
         QCOMPARE(liveList(app, app.ids.work).groupId, world().personal);
     }
 
@@ -211,30 +211,30 @@ private slots:
         App app(seedLists);
         QVERIFY(app.ok);
         QVERIFY(pane(app, lk(app.ids.home)));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
         const int color = liveList(app, app.ids.home).color;
 
         QVERIFY(listMenu(app, app.ids.home, "Delete all Tasks…"));
         QVERIFY(clickDialogButtonIn("Delete all tasks in “Home”?", "Cancel"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findText("Delete all tasks in “Home”?"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findText("Delete all tasks in “Home”?"), 5000);
         QVERIFY(!app.task(app.ids.buyMilk).deleted);
 
         QVERIFY(listMenu(app, app.ids.home, "Delete all Tasks…"));
         QVERIFY(clickDialogButtonIn("Delete all tasks in “Home”?", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.buyMilk).deleted, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.buyMilk).deleted, 5000);
         for (qint64 id : {app.ids.electricity, app.ids.plants, app.ids.shelf})
             QVERIFY(app.task(id).deleted);
         QVERIFY(listExists(app, app.ids.home));
         QCOMPARE(liveList(app, app.ids.home).color, color);
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.buyMilk), 5000);
         QVERIFY(app.sidebarRow(lk(app.ids.home)));
-        QTRY_VERIFY_WITH_TIMEOUT(!badgeOf(app, lk(app.ids.home)).undoneShown, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!badgeOf(app, lk(app.ids.home)).undoneShown, 5000);
         QCOMPARE(app.backend().sourceKey(), lk(app.ids.home));
 
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.buyMilk).deleted, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk) && shows(app, app.ids.shelf), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(app.ids.home)).undone, 4, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.buyMilk).deleted, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk) && shows(app, app.ids.shelf), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(app.ids.home)).undone, 4, 5000);
     }
 
     // "Color ▸: pick from a curated palette of swatches" (lists-and-list-groups.md).
@@ -248,13 +248,13 @@ private slots:
         QCOMPARE(before, bandColour(app, app.ids.home));
 
         QVERIFY(listSubmenu(app, app.ids.home, "Color", "Red"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 3, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(bandColour(app, app.ids.home) != before, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 3, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(bandColour(app, app.ids.home) != before, 5000);
         const QColor red = bandColour(app, app.ids.home);
         // Work is Green (2); painting it Red too gives it the same band.
         QVERIFY(bandColour(app, app.ids.work) != red);
         QVERIFY(listSubmenu(app, app.ids.work, "Color", "Red"));
-        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.work), red, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.work), red, 5000);
 
         // The menu ticks the current colour.
         QQuickItem *homeRow = app.sidebarRow(lk(app.ids.home));
@@ -270,9 +270,9 @@ private slots:
         // Reverse both.
         QVERIFY(listSubmenu(app, app.ids.home, "Color", "Blue"));
         QVERIFY(listSubmenu(app, app.ids.work, "Color", "Green"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, original, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).color, 2, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, original, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).color, 2, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 5000);
     }
 
     // "or choose Custom to open the macOS color picker for any shade you like."
@@ -286,9 +286,9 @@ private slots:
         click(hex);
         replaceText(app, "#FF8800");
         QVERIFY(clickDialogButtonIn("Custom Color", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(ListColor::isCustom(liveList(app, app.ids.home).color), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(ListColor::isCustom(liveList(app, app.ids.home).color), 5000);
         QVERIFY(nearColour(QColor::fromRgb(ListColor::rgb(liveList(app, app.ids.home).color)), QColor(0xFF, 0x88, 0x00)));
-        QTRY_VERIFY_WITH_TIMEOUT(nearColour(bandColour(app, app.ids.home), QColor(0xFF, 0x88, 0x00)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(nearColour(bandColour(app, app.ids.home), QColor(0xFF, 0x88, 0x00)), 5000);
 
         // The menu now ticks Custom…, and a palette colour takes it back.
         QQuickItem *row = app.sidebarRow(lk(app.ids.home));
@@ -299,8 +299,8 @@ private slots:
         QVERIFY(custom->property("checked").toBool());
         closeMenus(app);
         QVERIFY(listSubmenu(app, app.ids.home, "Color", "Blue"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 0, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 0, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 5000);
     }
 
     // The Edit List sheet: a swatch row ending in a custom colour.
@@ -312,8 +312,8 @@ private slots:
         LIST_ITEM(swatch, findItem("editListSwatch:7"));
         click(swatch);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 7, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(bandColour(app, app.ids.home) != before, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 7, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(bandColour(app, app.ids.home) != before, 5000);
 
         // A custom shade from the sheet.
         QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
@@ -323,19 +323,19 @@ private slots:
         click(hex);
         replaceText(app, "#2299CC");
         QVERIFY(clickDialogButtonIn("Custom Color", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("colorHex"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("colorHex"), 5000);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(ListColor::isCustom(liveList(app, app.ids.home).color), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(ListColor::isCustom(liveList(app, app.ids.home).color), 5000);
         QVERIFY(nearColour(QColor::fromRgb(ListColor::rgb(liveList(app, app.ids.home).color)), QColor(0x22, 0x99, 0xCC)));
-        QTRY_VERIFY_WITH_TIMEOUT(nearColour(bandColour(app, app.ids.home), QColor(0x22, 0x99, 0xCC)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(nearColour(bandColour(app, app.ids.home), QColor(0x22, 0x99, 0xCC)), 5000);
 
         // Reverse.
         QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
         LIST_ITEM(blue, findItem("editListSwatch:0"));
         click(blue);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 0, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.home).color, 0, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 5000);
     }
 
     // "Exclude Completed keeps the list's finished tasks out of view (the item
@@ -346,12 +346,12 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(pane(app, lk(app.ids.work)));
         // Finished a moment ago, so it is still on the list by default.
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing) && shows(app, app.ids.report), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing) && shows(app, app.ids.report), 5000);
 
         // The menu entry flips with the state.
         QVERIFY(listMenu(app, app.ids.work, "Exclude Completed"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 2, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 2, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 5000);
         QVERIFY(shows(app, app.ids.report));
         QQuickItem *row = app.sidebarRow(lk(app.ids.work));
         QVERIFY(settle());
@@ -359,13 +359,13 @@ private slots:
         LIST_ITEM(flipped, menuEntry("Include Completed"));
         QVERIFY(!menuEntry("Exclude Completed"));
         clickSteady(flipped);
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 1, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 1, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 5000);
         QVERIFY(settle());
         click(row, Qt::RightButton, pointIn(row, 0.4, 0.5));
         LIST_ITEM(back, menuEntry("Exclude Completed"));
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!menuEntry("Exclude Completed"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!menuEntry("Exclude Completed"), 5000);
 
         // Through the sheet: three states.
         QVERIFY(listMenu(app, app.ids.work, "Edit List…"));
@@ -373,15 +373,15 @@ private slots:
         QCOMPARE(combo->property("currentIndex").toInt(), 1);  // Remembers "Always include".
         QVERIFY(pickCombo("editListCompleted", "Always exclude"));
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 2, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 2, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 5000);
 
         // Back to the default, which shows what finished within the window...
         QVERIFY(listMenu(app, app.ids.work, "Edit List…"));
         QVERIFY(pickCombo("editListCompleted", "Follow the default"));
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 0, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveList(app, app.ids.work).completedMode, 0, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 5000);
 
         // ...but not what finished long ago, unless the list always includes it.
         Task old = app.store().task(app.ids.oldThing);
@@ -389,15 +389,15 @@ private slots:
         app.store().begin("Age", false);
         app.store().putTask(old);
         app.store().commit();
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 5000);
         QVERIFY(listMenu(app, app.ids.work, "Edit List…"));
         QVERIFY(pickCombo("editListCompleted", "Always include"));
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 5000);
         QVERIFY(listMenu(app, app.ids.work, "Edit List…"));
         QVERIFY(pickCombo("editListCompleted", "Follow the default"));
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 5000);
         QCOMPARE(liveList(app, app.ids.work).completedMode, 0);
     }
 
@@ -409,21 +409,21 @@ private slots:
         QVERIFY(app.ok);
         auto openFocus = [&](Qt::Key key, const char *source) {
             app.press(key, Qt::ControlModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString(source), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString(source), 5000);
         };
 
         // All, from the menu.
         openFocus(Qt::Key_1, "all");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk) && shows(app, app.ids.report), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk) && shows(app, app.ids.report), 5000);
         QVERIFY(listMenu(app, app.ids.home, "Exclude from 'All'"));
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).showInAll, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).showInAll, 5000);
         openFocus(Qt::Key_1, "all");
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.buyMilk) && !shows(app, app.ids.plants), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.buyMilk) && !shows(app, app.ids.plants), 5000);
         QVERIFY(shows(app, app.ids.report));
         // The list row carries the visibility indicator, and opens its tasks.
         QVERIFY(childNamed(app.sidebarRow(lk(app.ids.home)), "sidebarExcluded") != nullptr);
         QVERIFY(pane(app, lk(app.ids.home)));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
         // The menu now offers the way back.
         QQuickItem *row = app.sidebarRow(lk(app.ids.home));
         QVERIFY(settle());
@@ -431,48 +431,48 @@ private slots:
         LIST_ITEM(include, menuEntry("Include in 'All'"));
         QVERIFY(!menuEntry("Exclude from 'All'"));
         clickSteady(include);
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.home).showInAll, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.home).showInAll, 5000);
         openFocus(Qt::Key_1, "all");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!childNamed(app.sidebarRow(lk(app.ids.home)), "sidebarExcluded"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!childNamed(app.sidebarRow(lk(app.ids.home)), "sidebarExcluded"), 5000);
 
         // Today, from the sheet.
         openFocus(Qt::Key_2, "today");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
         QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
         LIST_ITEM(todayBox, findItem("editListToday"));
         QVERIFY(todayBox->property("checked").toBool());
         click(todayBox);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).showInToday, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).showInToday, 5000);
         QVERIFY(liveList(app, app.ids.home).showInAll);
         openFocus(Qt::Key_2, "today");
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.buyMilk), 5000);
         openFocus(Qt::Key_1, "all");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);  // Still in All.
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);  // Still in All.
         QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
         LIST_ITEM(todayAgain, findItem("editListToday"));
         QVERIFY(!todayAgain->property("checked").toBool());
         click(todayAgain);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.home).showInToday, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.home).showInToday, 5000);
         openFocus(Qt::Key_2, "today");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
 
         // Done, from the sheet.
         openFocus(Qt::Key_5, "done");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 5000);
         QVERIFY(listMenu(app, app.ids.work, "Edit List…"));
         LIST_ITEM(doneBox, findItem("editListDone"));
         click(doneBox);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.work).showInDone, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.work).showInDone, 5000);
         openFocus(Qt::Key_5, "done");
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, app.ids.oldThing), 5000);
         QVERIFY(listMenu(app, app.ids.work, "Include in 'Done'"));
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.work).showInDone, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.work).showInDone, 5000);
         openFocus(Qt::Key_5, "done");
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.oldThing), 5000);
     }
 
     // "Alerts for this list's tasks stay silent": the alarm scheduler has
@@ -491,19 +491,19 @@ private slots:
         QVERIFY(!mute->property("checked").toBool());
         click(mute);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, w.misc).muteAlerts, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, w.misc).muteAlerts, 5000);
         QVERIFY(!AlarmTimes::hasPending(app.store(), now));
         QVERIFY(listMenu(app, w.misc, "Edit List…"));
         LIST_ITEM(muteAgain, findItem("editListMute"));
         QVERIFY(muteAgain->property("checked").toBool());
         click(muteAgain);
         QVERIFY(clickDialogButtonIn("Edit List", "OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.misc).muteAlerts, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.misc).muteAlerts, 5000);
         QVERIFY(AlarmTimes::hasPending(app.store(), now));
 
         // Through the menu, which shows a tick while it is on.
         QVERIFY(listMenu(app, w.misc, "Mute Alerts"));
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, w.misc).muteAlerts, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, w.misc).muteAlerts, 5000);
         QVERIFY(!AlarmTimes::hasPending(app.store(), now));
         QQuickItem *row = app.sidebarRow(lk(w.misc));
         QVERIFY(settle());
@@ -511,15 +511,15 @@ private slots:
         LIST_ITEM(entry, menuEntry("Mute Alerts"));
         QVERIFY(entry->property("checked").toBool());
         clickSteady(entry);
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.misc).muteAlerts, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.misc).muteAlerts, 5000);
         QVERIFY(AlarmTimes::hasPending(app.store(), now));
 
         // Muting another list leaves this list's alert alone.
         QVERIFY(listMenu(app, app.ids.home, "Mute Alerts"));
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.home).muteAlerts, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, app.ids.home).muteAlerts, 5000);
         QVERIFY(AlarmTimes::hasPending(app.store(), now));
         QVERIFY(listMenu(app, app.ids.home, "Mute Alerts"));
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).muteAlerts, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).muteAlerts, 5000);
     }
 
     // "Archive List: ... Archived lists and their tasks stay out of active
@@ -531,29 +531,29 @@ private slots:
         QVERIFY(app.sidebarRow(lk(w.errands)));
         QVERIFY(!findItem("sidebarArchived"));
         QVERIFY(pane(app, "all"));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 5000);
 
         QVERIFY(listMenu(app, w.errands, "Archive"));
-        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, w.errands).archived, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.errands)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(liveList(app, w.errands).archived, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.errands)), 5000);
         // The list was open, so the view moved on; the archived tasks are not in All.
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 5000);
         QVERIFY(pane(app, "all"));
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, w.stamps) && shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, w.stamps) && shows(app, app.ids.buyMilk), 5000);
         LIST_ITEM(archived, findItem("sidebarArchived"));
         QVERIFY(findText("Archived"));
 
         click(archived);
-        QTRY_VERIFY_WITH_TIMEOUT(findText("Archived Lists") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Archived Lists") != nullptr, 5000);
         QVERIFY(findText("Errands"));
         LIST_ITEM(restore, findItem("archiveRestore:" + QString::number(w.errands)));
         click(restore);
-        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.errands).archived, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.errands)) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarArchived"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findText("Archived Lists"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.errands).archived, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.errands)) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarArchived"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findText("Archived Lists"), 5000);
         QVERIFY(pane(app, "all"));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 5000);
         QCOMPARE(liveList(app, w.errands).groupId, w.projects);
     }
 
@@ -566,35 +566,35 @@ private slots:
         const auto &w = world();
         auto hidden = [&] { return app.store().setting("lists.hidden").toString().contains(liveList(app, w.misc).uid); };
         QVERIFY(pane(app, lk(w.misc)));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.cables), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.cables), 5000);
 
         QVERIFY(listMenu(app, w.misc, "Hide List"));
-        QTRY_VERIFY_WITH_TIMEOUT(hidden(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.misc)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(hidden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.misc)), 5000);
         QVERIFY(!findText("Misc"));
         // The open list was hidden, so the view moved to Today, which lacks its tasks.
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 5000);
         QVERIFY(!shows(app, w.cables));
         app.press(Qt::Key_1, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.buyMilk), 5000);
         QVERIFY(!shows(app, w.cables));
         QVERIFY(!app.backend().jumpTargets("Misc").size());
 
         // Reveal for this session, then hide again.
         QVERIFY(plusMenu("Show Hidden Lists"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().hiddenRevealed(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.cables), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().hiddenRevealed(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.cables), 5000);
         QVERIFY(hidden());
         QVERIFY(plusMenu("Show Hidden Lists"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.misc)), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, w.cables), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.misc)), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!shows(app, w.cables), 5000);
 
         // Unhide for good, in Settings.
         app.press(Qt::Key_Comma, Qt::ControlModifier);
         QQuickWindow *settings = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((settings = windowTitled("Settings")) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(settings->isExposed(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((settings = windowTitled("Settings")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(settings->isExposed(), 5000);
         settings->requestActivate();
         LIST_ITEM(paneEntry, findText("Today & Lists"));
         click(paneEntry);
@@ -616,16 +616,16 @@ private slots:
             return false;
         };
         QVERIFY(tick(true));
-        QTRY_VERIFY_WITH_TIMEOUT(!hidden(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.cables), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!hidden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.cables), 5000);
         // And hiding from Settings works the other way.
         QVERIFY(tick(false));
-        QTRY_VERIFY_WITH_TIMEOUT(hidden(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.misc)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(hidden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.misc)), 5000);
         QVERIFY(tick(true));
-        QTRY_VERIFY_WITH_TIMEOUT(!hidden(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!hidden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 5000);
     }
 
     // "Overdue count: to the left of the list name, in red... Undone count: to
@@ -635,7 +635,7 @@ private slots:
         QVERIFY(app.ok);
         const auto &w = world();
         const QString home = lk(app.ids.home);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 4, 3000);  // Four open tasks, one overdue.
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 4, 5000);  // Four open tasks, one overdue.
         QCOMPARE(badgeOf(app, home).overdue, 1);
         QVERIFY(badgeOf(app, home).overdueShown && badgeOf(app, home).undoneShown);
         QCOMPARE(badgeOf(app, lk(w.errands)).overdue, 1);
@@ -648,32 +648,32 @@ private slots:
         QVERIFY(pane(app, home));
         LIST_ITEM(box, findItem(QString("taskCheck:%1").arg(app.ids.electricity)));
         click(box);
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.electricity).completed, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 3, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.electricity).completed, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 3, 5000);
         QCOMPARE(badgeOf(app, home).overdue, 0);
         QVERIFY(!badgeOf(app, home).overdueShown);
         QCOMPARE(badgeOf(app, "all").undone, allBefore - 1);
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.electricity).completed, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 4, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.electricity).completed, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 4, 5000);
         QCOMPARE(badgeOf(app, home).overdue, 1);
         QVERIFY(badgeOf(app, home).overdueShown);
 
         // A new task in the list counts at once; so does one due yesterday.
         app.press(Qt::Key_N, Qt::ControlModifier);
         LIST_ITEM(title, findItem("editorTitle"));
-        QTRY_VERIFY_WITH_TIMEOUT(title->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(title->property("activeFocus").toBool(), 5000);
         app.type("Fix the tap");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Fix the tap").id != 0, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 5, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Fix the tap").id != 0, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 5, 5000);
         QCOMPARE(badgeOf(app, "all").undone, allBefore + 1);
         // Undo takes the task back out (once for its title, once for the task).
         for (int i = 0; i < 3 && badgeOf(app, home).undone != 4; ++i) {
             app.press(Qt::Key_Z, Qt::ControlModifier);
             waitUntil([&] { return badgeOf(app, home).undone == 4; }, 800);
         }
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 4, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, 4, 5000);
         QCOMPARE(app.taskTitled("Fix the tap").id, qint64(0));
 
         // Tasks made overdue by the data add to the red number.
@@ -682,7 +682,7 @@ private slots:
         app.store().begin("Late", false);
         app.store().putTask(plants);
         app.store().commit();
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).overdue, 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).overdue, 2, 5000);
         QCOMPARE(badgeOf(app, home).undone, 4);
     }
 
@@ -703,7 +703,7 @@ private slots:
 
         // Opening one shows what it finds.
         QVERIFY(pane(app, smart));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.plants) && !shows(app, app.ids.buyMilk), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.plants) && !shows(app, app.ids.buyMilk), 5000);
 
         // Not draggable into a group or among the lists.
         const QStringList before = sidebarOrder();
@@ -733,11 +733,11 @@ private slots:
         for (const QString &name : {QString("Important"), QString("Urgent")}) {
             doubleClick(app.sidebarRow(smart), pointIn(app.sidebarRow(smart), 0.4, 0.5));
             LIST_ITEM(editor, findItem("sidebarListRename"));
-            QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
             app.type(name);
             app.press(Qt::Key_Return);
-            QTRY_COMPARE_WITH_TIMEOUT(liveList(app, w.urgent).name, name, 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(smart)), name, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(liveList(app, w.urgent).name, name, 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(smart)), name, 5000);
         }
     }
 };

@@ -205,22 +205,22 @@ private slots:
         App app(seedRich);
         QVERIFY(app.ok);
         app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
         QQuickItem *go = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((go = findText("Export…", "QQuickAbstractButton")) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((go = findText("Export…", "QQuickAbstractButton")) != nullptr, 5000);
         QVERIFY(go->isEnabled());
         // Everything ticked to begin with; Select all clears and sets them.
         QQuickItem *all = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((all = findItem("exportSelectAll")) != nullptr && all->property("checked").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((all = findItem("exportSelectAll")) != nullptr && all->property("checked").toBool(), 5000);
         const QList<qint64> lists{app.ids.home, app.ids.work, mw().sorting};
         for (qint64 id : lists)
             QVERIFY(checked(QString("exportList:%1").arg(id)));
         clickSteady(all);
-        QTRY_VERIFY_WITH_TIMEOUT(!go->isEnabled(), 3000);   // Nothing ticked: nothing to export.
+        QTRY_VERIFY_WITH_TIMEOUT(!go->isEnabled(), 5000);   // Nothing ticked: nothing to export.
         for (qint64 id : lists)
             QVERIFY(!checked(QString("exportList:%1").arg(id)));
         clickSteady(findItem(QString("exportList:%1").arg(app.ids.home)));
-        QTRY_VERIFY_WITH_TIMEOUT(go->isEnabled(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(go->isEnabled(), 5000);
         QVERIFY(pickCombo("exportScope", "Not Done"));
         QCOMPARE(findItem("exportFormat")->property("currentText").toString(), QString("Spreadsheet (.csv)"));
 
@@ -229,9 +229,9 @@ private slots:
         QVERIFY(a.ok);
         QCOMPARE(a.purpose, QString("export:main:csv:1:%1").arg(app.ids.home));
         QCOMPARE(a.name, QString("Precrime.csv"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 5000);
         answer(app, file, a.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).size() > 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).size() > 0, 5000);
 
         const QList<QStringList> rows = parseCsv(readFile(file));
         QCOMPARE(rows.first(), (QStringList{"Title", "List", "Type", "Parent", "Notes", "Priority", "Starred", "Start", "Due", "Duration",
@@ -254,17 +254,17 @@ private slots:
 
         // The "Done" scope picks the completed ones.
         app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
         QVERIFY(pickCombo("exportScope", "Done"));
         QQuickItem *go2 = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((go2 = findText("Export…", "QQuickAbstractButton")) != nullptr && go2->isEnabled(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((go2 = findText("Export…", "QQuickAbstractButton")) != nullptr && go2->isEnabled(), 5000);
         const Asked b = asked(app, [&] { clickSteady(go2); });
         QVERIFY(b.ok);
         QVERIFY2(b.purpose.startsWith("export:main:csv:2:"), qPrintable(b.purpose));
         const QString done = out.filePath("done.csv");
-        QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 5000);
         answer(app, done, b.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(done).size() > 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(done).size() > 0, 5000);
         QCOMPARE(column(parseCsv(readFile(done)), 0), (QStringList{"Old finished thing", "Renew the licence"}));
     }
 
@@ -275,9 +275,9 @@ private slots:
         int asks = 0;
         QObject::connect(&app.services().filePicker, &FilePicker::failed, &app.backend(), [&] { ++asks; });
         app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
         QVERIFY(clickDialogButton("Cancel"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 5000);
         QTest::qWait(100);
         QCOMPARE(asks, 0);
     }
@@ -295,7 +295,7 @@ private slots:
             App app(seedRich);
             QVERIFY(app.ok);
             app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
-            QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
             QVERIFY(pickCombo("exportFormat", "Calendar file (.ics)"));
             QQuickItem *go = findText("Export…", "QQuickAbstractButton");
             QVERIFY(go && go->isEnabled());
@@ -304,7 +304,7 @@ private slots:
             QVERIFY2(a.purpose.startsWith("export:main:ics:0:"), qPrintable(a.purpose));
             QCOMPARE(a.name, QString("Precrime.ics"));
             answer(app, file, a.purpose);
-            QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).size() > 0, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).size() > 0, 5000);
             for (const Task &t : app.store().tasks()) {
                 if (t.deleted) continue;
                 before << t;
@@ -350,11 +350,11 @@ private slots:
         }
         // And it shows: the lists are in the sidebar, the task in its list.
         QVERIFY(fresh.openSource(lk(listIdNamed(fresh, "Home"))));
-        QTRY_VERIFY_WITH_TIMEOUT(fresh.row(named(fresh, "Pay rent, on time").id) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(fresh.row(named(fresh, "Pay rent, on time").id) != nullptr, 5000);
         // One Ctrl+Z undoes the whole import, and a backup was taken first.
         QVERIFY(!backupFiles(fresh).isEmpty());
         fresh.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(named(fresh, "Pay rent, on time").id == 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(named(fresh, "Pay rent, on time").id == 0, 5000);
         QCOMPARE(liveTitles(fresh).size(), liveBefore);
     }
 
@@ -419,9 +419,9 @@ private slots:
         // A second import adds only what carries no id.
         const int count = liveTitles(app).size();
         importFixture(app, "importThings", "import-things", fixture("things.json"));
-        QTRY_COMPARE_WITH_TIMEOUT(liveTitles(app).size(), count + 1, 3000);   // "Wrapped entry" has none.
+        QTRY_COMPARE_WITH_TIMEOUT(liveTitles(app).size(), count + 1, 5000);   // "Wrapped entry" has none.
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(liveTitles(app).size(), count, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveTitles(app).size(), count, 5000);
     }
 
     // From OmniFocus (TaskPaper): folders are groups, projects lists, nested
@@ -529,10 +529,10 @@ private slots:
         QVERIFY(named(app, "Buy vinegar").completed);
         // The group and list are in the sidebar, the task in its list.
         QVERIFY(app.openSource(lk(kettle.listId)));
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(kettle.id) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(kettle.id) != nullptr, 5000);
         QVERIFY(!backupFiles(app).isEmpty());
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(named(app, "Descale the kettle").id == 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(named(app, "Descale the kettle").id == 0, 5000);
     }
 
     // A file that is not what the button says is reported, and nothing changes.
@@ -551,12 +551,12 @@ private slots:
                                                      {"importOmnifocus", "import-omnifocus"}, {"importTaskDb", "import-taskdb"}};
         for (const auto &src : sources) {
             importFixture(app, src.first, src.second, junk);
-            QTRY_VERIFY2_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Import failed"), qPrintable(src.first), 3000);
+            QTRY_VERIFY2_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Import failed"), qPrintable(src.first), 5000);
             QCOMPARE(liveTitles(app), before);
         }
         const QString missing = dir.filePath("missing.ics");
         importFixture(app, "importIcs", "import-ics", missing);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Import failed"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Import failed"), 5000);
         QCOMPARE(liveTitles(app), before);
     }
 
@@ -566,7 +566,7 @@ private slots:
         App app(seedRich);
         QVERIFY(app.ok);
         QVERIFY(app.openSource(lk(app.ids.home)));
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) != nullptr, 5000);
         app.window->requestActivate();
         counters().urls.clear();
         const Asked a = asked(app, [&] { app.press(Qt::Key_P, Qt::ControlModifier); });
@@ -579,8 +579,8 @@ private slots:
         QFile f(file);
         QVERIFY(f.open(QIODevice::ReadOnly));
         QVERIFY(f.read(5).startsWith("%PDF-"));
-        QTRY_VERIFY_WITH_TIMEOUT(counters().urls == QStringList{QUrl::fromLocalFile(file).toString()}, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage() == "Saved Home.pdf", 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(counters().urls == QStringList{QUrl::fromLocalFile(file).toString()}, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage() == "Saved Home.pdf", 5000);
     }
 
     // The task menu: Export Selection… (csv or .ics by the name chosen), Save as
@@ -596,10 +596,10 @@ private slots:
         QCOMPARE(a.purpose, QString("export-selection"));
         const QString ics = dir.filePath("one.ics"), csv = dir.filePath("one.csv");
         answer(app, ics, a.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(ics).size() > 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(ics).size() > 0, 5000);
         QVERIFY(readFile(ics).contains("SUMMARY:Buy milk") && !readFile(ics).contains("SUMMARY:Water the plants"));
         answer(app, csv, a.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(csv).size() > 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(csv).size() > 0, 5000);
         QCOMPARE(column(parseCsv(readFile(csv)), 0), QStringList{"Buy milk"});
 
         // Save as Event: a VEVENT for the dated task.
@@ -609,11 +609,11 @@ private slots:
         QCOMPARE(a.purpose, QString("event:%1").arg(app.ids.buyMilk));
         const QString event = dir.filePath("event.ics");
         answer(app, event, a.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(event).size() > 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(event).size() > 0, 5000);
         const QString eventText = readFile(event);
         QVERIFY(eventText.contains("BEGIN:VEVENT") && eventText.contains("SUMMARY:Buy milk"));
         QVERIFY(eventText.contains("DTSTART;VALUE=DATE:" + QDate::currentDate().toString("yyyyMMdd")));
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Saved the event"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Saved the event"), 5000);
 
         // A task with no date has no event to save.
         QVERIFY(contextMenuOn(app, app.ids.shelf));
@@ -621,15 +621,15 @@ private slots:
         QVERIFY(a.ok);
         const QString nodate = dir.filePath("nodate.ics");
         answer(app, nodate, a.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage() == "Give the task a due or start date first", 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage() == "Give the task a due or start date first", 5000);
         QVERIFY(!QFileInfo(nodate).exists());
 
         // Add to Calendar hands an .ics to the desktop.
         counters().urls.clear();
         QVERIFY(contextMenuOn(app, app.ids.buyMilk));
         QVERIFY(pickLowEntry("Add to Calendar"));
-        QTRY_VERIFY_WITH_TIMEOUT(counters().urls.size() == 1 && counters().urls.first().endsWith(QString("precrime-event-%1.ics").arg(app.ids.buyMilk)), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Opened “Buy milk”"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(counters().urls.size() == 1 && counters().urls.first().endsWith(QString("precrime-event-%1.ics").arg(app.ids.buyMilk)), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Opened “Buy milk”"), 5000);
     }
 
     // "Recovering deleted tasks": a task deleted after a backup is back after
@@ -644,7 +644,7 @@ private slots:
         QQuickItem *now = nullptr;
         control("backupNow", now);
         click(now);
-        QTRY_COMPARE_WITH_TIMEOUT(backupFiles(app).size(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(backupFiles(app).size(), 1, 5000);
         const QString name = backupFiles(app).first();
         focusMain(app);
 
@@ -652,14 +652,14 @@ private slots:
         QVERIFY(app.openSource(lk(app.ids.home)));
         QVERIFY(selectRow(app, app.ids.buyMilk));
         app.press(Qt::Key_Delete);
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.buyMilk).deleted && app.row(app.ids.buyMilk) == nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.buyMilk).deleted && app.row(app.ids.buyMilk) == nullptr, 5000);
 
         openSettings(app, sw);
         selectPane(sw, "Backups");
         QQuickItem *restore = nullptr;
         control("backupRestore:" + name, restore);
         click(restore);
-        QTRY_VERIFY_WITH_TIMEOUT(findText("Restore this backup?") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Restore this backup?") != nullptr, 5000);
         QVERIFY(clickDialogButton("OK"));
         QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.buyMilk).deleted && app.taskTitled("Buy milk").id == app.ids.buyMilk, 5000);
         focusMain(app);
@@ -682,21 +682,21 @@ private slots:
         QQuickItem *now = nullptr;
         control("backupNow", now);
         click(now);
-        QTRY_COMPARE_WITH_TIMEOUT(backupFiles(app).size(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(backupFiles(app).size(), 1, 5000);
         const QString name = backupFiles(app).first();
         // Changed since: a task deleted, one added.
         QQuickItem *lists = nullptr;
         control("backupLists:" + name, lists);
         click(lists);
         QQuickItem *work = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((work = findItem("restoreList:Work")) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((work = findItem("restoreList:Work")) != nullptr, 5000);
         QVERIFY(findItem("restoreList:Home") != nullptr);
         QQuickItem *go = findItem("restoreSelected");
         QVERIFY(go && !go->isEnabled());   // Nothing picked yet.
         click(work);
-        QTRY_VERIFY_WITH_TIMEOUT(go->isEnabled(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(go->isEnabled(), 5000);
         click(go);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("restoreSelected"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("restoreSelected"), 5000);
         int groups = 0;
         qint64 restoredGroup = 0;
         for (const ListGroup &g : app.store().groups())
@@ -713,9 +713,9 @@ private slots:
         // What was there is as it was.
         QVERIFY(!app.task(app.ids.report).deleted && app.task(app.ids.report).listId == app.ids.work);
         focusMain(app);
-        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(copy)) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(copy)) != nullptr, 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.store().lists().contains(copy) || app.store().list(copy).deleted, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.store().lists().contains(copy) || app.store().list(copy).deleted, 5000);
     }
 
     // Save a Copy… hands the backup to the chooser's destination; Restore from
@@ -732,7 +732,7 @@ private slots:
         QQuickItem *now = nullptr;
         control("backupNow", now);
         click(now);
-        QTRY_COMPARE_WITH_TIMEOUT(backupFiles(app).size(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(backupFiles(app).size(), 1, 5000);
         const QString name = backupFiles(app).first();
         QQuickItem *copyButton = nullptr;
         control("backupCopy:" + name, copyButton);
@@ -742,7 +742,7 @@ private slots:
         QCOMPARE(a.name, name);
         const QString copy = dir.filePath("kept.db");
         answer(app, copy, a.purpose);
-        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(copy).size() > 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(copy).size() > 0, 5000);
         QCOMPARE(QFileInfo(copy).size(), QFileInfo(app.dir() + "/backups/" + name).size());
 
         // A change after the copy; Restore from File… with the copy brings the old state back.

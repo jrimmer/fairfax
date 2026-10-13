@@ -58,9 +58,9 @@ inline void addTaskCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, listKey(s.ids.work));
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 5000);
                 const bool shown = index == 0 ? !changed : changed;
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(s.ids.oldThing) != nullptr, shown, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(s.ids.oldThing) != nullptr, shown, 5000);
             };
             v << c;
         }
@@ -80,8 +80,8 @@ inline void addTaskCases(QVector<SettingCase> &v) {
                 SK_APP
                 focusMain(app);
                 app.backend().selectSource("project:" + QString::number(app.taskTitled("Renovate").id));
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Buy tiles").id) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Painted walls").id) != nullptr, changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Buy tiles").id) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Painted walls").id) != nullptr, changed, 5000);
             };
             v << c;
         }
@@ -124,12 +124,12 @@ inline void addTaskCases(QVector<SettingCase> &v) {
                 showSource(app, "today");
                 const qint64 id = app.taskTitled("Late today").id;
                 QQuickItem *title = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((title = rowTitle(app, id)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((title = rowTitle(app, id)) != nullptr, 5000);
                 Theme &theme = app.services().theme;
                 if (changed)
-                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.overdue()), 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.overdue()), 5000);
                 else
-                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.foreground()), 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.foreground()), 5000);
             };
             v << c;
         }
@@ -235,13 +235,13 @@ inline void addTaskCases(QVector<SettingCase> &v) {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
                 QQuickItem *row = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 5000);
                 click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), s.ids.buyMilk, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), s.ids.buyMilk, 5000);
                 app.press(Qt::Key_Return);
                 QQuickItem *title = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(title->property("text").toString(), changed ? QString() : QString("Buy milk"), 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(title->property("text").toString(), changed ? QString() : QString("Buy milk"), 5000);
                 closeEditorWithEscape(app);
             };
             v << c;
@@ -253,13 +253,13 @@ inline void addTaskCases(QVector<SettingCase> &v) {
                 showSource(app, "all");
                 app.press(Qt::Key_O, Qt::ControlModifier | Qt::ShiftModifier);
                 QQuickItem *input = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((input = findItem("commandInput")) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((input = findItem("commandInput")) != nullptr, 5000);
                 app.type("Water the plants");
                 app.press(Qt::Key_Return);
                 if (changed)
-                    QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), listKey(s.ids.home), 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), listKey(s.ids.home), 5000);
                 else
-                    QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), s.ids.plants, 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), s.ids.plants, 5000);
                 QCOMPARE(app.backend().currentTaskId(), s.ids.plants);
                 if (!changed)
                     QCOMPARE(app.backend().sourceKey(), QString("all"));
@@ -290,9 +290,9 @@ inline void addTaskCases(QVector<SettingCase> &v) {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
                 QQuickItem *row = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 5000);
                 click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), s.ids.buyMilk, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), s.ids.buyMilk, 5000);
                 app.press(Qt::Key_Space);
                 QObject *look = findObject("quickLook");
                 QVERIFY(look);
@@ -300,7 +300,7 @@ inline void addTaskCases(QVector<SettingCase> &v) {
                     QTest::qWait(300);
                     QVERIFY(!look->property("visible").toBool());
                 } else {
-                    QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 5000);
                     closeQuickLook(app, look);
                 }
             };

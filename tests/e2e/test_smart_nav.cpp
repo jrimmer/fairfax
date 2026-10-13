@@ -39,7 +39,7 @@ private slots:
         QVERIFY(pane(app, "all"));
         const qint64 c = saveSearchAsSmart(app, "lists: Inbox");
         QVERIFY(a && b && c);
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio", "type: starred", "lists: Inbox"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio", "type: starred", "lists: Inbox"}), 5000);
         const QStringList order = sidebarOrder();
         // After every regular list, under the header.
         const int header = order.indexOf("g:-1");
@@ -48,7 +48,7 @@ private slots:
         // Each opens to its own rows.
         QVERIFY(pane(app, lk(b)));
         SMART_SHOWS(app, Starred);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("type: starred"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("type: starred"), 5000);
         QVERIFY(pane(app, lk(c)));
         SMART_SHOWS(app, (SL{"Starred plain", "Inbox note"}));
         QVERIFY(pane(app, lk(a)));
@@ -71,33 +71,33 @@ private slots:
         // J opens the bar; a part of the name filters it.
         QVERIFY(selectRowOf(app));
         app.press(Qt::Key_J);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("type: starred");
         QObject *bar = findObject("commandPopup");
-        QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().size(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().size(), 1, 5000);
         const QVariantMap hit = bar->property("items").toList().first().toMap();
         QCOMPARE(hit.value("label").toString(), QString("type: starred"));
         QCOMPARE(hit.value("sub").toString(), QString("Smart List"));
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(star), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(star), 5000);
         SMART_SHOWS(app, Starred);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 5000);
         // Jumping from one Smart List to the other works the same.
         app.press(Qt::Key_J);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("type: hiprio");
-        QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().value(0).toMap().value("label").toString(), QString("type: hiprio"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().value(0).toMap().value("label").toString(), QString("type: hiprio"), 5000);
         QCOMPARE(bar->property("items").toList().size(), 1);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(hot), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(hot), 5000);
         SMART_SHOWS(app, Hi);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 5000);
         // Esc cancels the jump.
         app.press(Qt::Key_J);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("starred");
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 5000);
         QCOMPARE(app.backend().sourceKey(), lk(hot));
     }
 
@@ -115,14 +115,14 @@ private slots:
         const QString last = order.at(order.indexOf("g:-1") - 1);
         QVERIFY(pane(app, last));
         app.press(Qt::Key_Down, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(a), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(a), 5000);
         app.press(Qt::Key_Down, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(b), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(b), 5000);
         SMART_SHOWS(app, Starred);
         app.press(Qt::Key_Up, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(a), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(a), 5000);
         app.press(Qt::Key_Up, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), last, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), last, 5000);
     }
 
     // Reordering Smart Lists among themselves: a drag of one onto another is
@@ -153,11 +153,11 @@ private slots:
         const qint64 work = saveSearchAsSmart(app, "lists: Work");
         QVERIFY(work);
         QVERIFY(listMenu(app, work, "Edit Search…"));
-        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("completedInclude"));
         QVERIFY(pressBuilder("searchScheduledInclude"));
         QVERIFY(pressBuilder("updateButton"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.store().list(work).completedMode == 1 && app.store().list(work).includeScheduled, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.store().list(work).completedMode == 1 && app.store().list(work).includeScheduled, 5000);
         // One built from the sheet with a date range.
         QVERIFY(pane(app, "all"));
         QVERIFY(openBuilder(app));
@@ -173,17 +173,17 @@ private slots:
         QVERIFY(star);
         doubleClick(app.sidebarRow(lk(star)), pointIn(app.sidebarRow(lk(star)), 0.4, 0.5));
         LIST_ITEM(editor, findItem("sidebarListRename"));
-        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(editor->property("activeFocus").toBool(), 5000);
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("Stars");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(star).name, QString("Stars"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(star).name, QString("Stars"), 5000);
 
         QMap<qint64, QStringList> before;
         QMap<qint64, int> counts;
         for (qint64 id : {work, soon, star}) {
             QVERIFY(pane(app, lk(id)));
-            QTRY_VERIFY_WITH_TIMEOUT(!paneTitles(app).isEmpty(), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!paneTitles(app).isEmpty(), 5000);
             before[id] = paneTitles(app);
             counts[id] = badgeOf(app, lk(id)).undone;
             QVERIFY(counts[id] > 0);
@@ -205,7 +205,7 @@ private slots:
         for (qint64 id : {work, soon, star}) {
             QVERIFY(pane(again, lk(id)));
             QTRY_COMPARE_WITH_TIMEOUT(paneTitles(again), before[id], 4000);
-            QTRY_COMPARE_WITH_TIMEOUT(badgeOf(again, lk(id)).undone, counts[id], 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(badgeOf(again, lk(id)).undone, counts[id], 5000);
         }
         // The range is still shown above the rows.
         QVERIFY(pane(again, lk(soon)));

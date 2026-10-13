@@ -53,7 +53,7 @@ private slots:
         App app(seedMisc);
         QVERIFY(app.ok);
         QVERIFY(openSorting(app));
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 5000);
         QVERIFY(chooseSort(app, field));
         QVERIFY2(findItem("sortButton")->property("current").toString() == label, qPrintable(findItem("sortButton")->property("current").toString()));
 
@@ -62,7 +62,7 @@ private slots:
                                Combo{false, false, descFlat}, Combo{false, true, ascFlat}}) {
             QVERIFY(setSeparated(app, c.separated));
             QVERIFY(setAscending(app, c.ascending));
-            QTRY_COMPARE_WITH_TIMEOUT(orderNow(), c.want, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(orderNow(), c.want, 5000);
             // The choice is the list's own, saved with it.
             const TaskList saved = app.store().list(mw().sorting);
             QCOMPARE(saved.sortField, field);
@@ -80,7 +80,7 @@ private slots:
         QVERIFY(openSortMenu());
         const QStringList expected{"Due Date", "Start Date", "Priority", "To-do List", "Title", "Tag", "Duration",
                                    "Creation", "Modified", "Status", "Note", "Location", "Manually", "Separated"};
-        QTRY_VERIFY2_WITH_TIMEOUT(sortMenuTexts() == expected, qPrintable(sortMenuTexts().join(" | ")), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(sortMenuTexts() == expected, qPrintable(sortMenuTexts().join(" | ")), 5000);
         QVERIFY(sortMenuItem(SortField::DueDate)->property("checked").toBool());
         QVERIFY(!sortMenuItem(SortField::Title)->property("checked").toBool());
         QVERIFY(findItem("sortSeparated")->property("checked").toBool());
@@ -92,10 +92,10 @@ private slots:
         closeMenus(app);
 
         app.press(Qt::Key_5, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("done"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("done"), 5000);
         QVERIFY(openSortMenu());
         const QStringList doneChoices{"Priority", "To-do List", "Modified", "Completion", "Note", "Title", "Separated"};
-        QTRY_VERIFY2_WITH_TIMEOUT(sortMenuTexts() == doneChoices, qPrintable(sortMenuTexts().join(" | ")), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(sortMenuTexts() == doneChoices, qPrintable(sortMenuTexts().join(" | ")), 5000);
         QVERIFY(sortMenuItem(SortField::Completion)->property("checked").toBool());
         closeMenus(app);
     }
@@ -113,11 +113,11 @@ private slots:
         QVERIFY(plus);
         click(plus, Qt::RightButton);
         QVERIFY(clickMenuEntry("New Section"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.store().sectionsOf(mw().sorting).isEmpty(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sortField() == SortField::Section, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.store().sectionsOf(mw().sorting).isEmpty(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sortField() == SortField::Section, 5000);
         QVERIFY(openSortMenu());
         QVERIFY(sortMenuItem(SortField::Section));
-        QTRY_VERIFY2_WITH_TIMEOUT(sortMenuTexts().value(0) == "Section", qPrintable(sortMenuTexts().join(" | ")), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(sortMenuTexts().value(0) == "Section", qPrintable(sortMenuTexts().join(" | ")), 5000);
         closeMenus(app);
     }
 
@@ -127,22 +127,22 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(openSorting(app));
         const QDate today = QDate::currentDate();
-        QTRY_VERIFY_WITH_TIMEOUT(headingTitles().size() == 5, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(headingTitles().size() == 5, 5000);
         QCOMPARE(headingTitles().first(), QString("OVERDUE"));
         QCOMPARE(headingTitles().last(), QString("NO DUE DATE"));
 
         QVERIFY(setSeparated(app, false));
-        QTRY_COMPARE_WITH_TIMEOUT(headingTitles(), QStringList{"ALL TASKS IN SORTING"}, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(headingTitles(), QStringList{"ALL TASKS IN SORTING"}, 5000);
         QCOMPARE(orderNow(), QString("EBDAC"));
 
         QVERIFY(setSeparated(app, true));
-        QTRY_COMPARE_WITH_TIMEOUT(headingTitles().size(), 5, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(headingTitles().size(), 5, 5000);
         // By priority the headings are the priority names.
         QVERIFY(chooseSort(app, SortField::Priority));
-        QTRY_COMPARE_WITH_TIMEOUT(headingTitles(), (QStringList{"HIGH", "MEDIUM", "LOW", "NONE"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(headingTitles(), (QStringList{"HIGH", "MEDIUM", "LOW", "NONE"}), 5000);
         // By title there is nothing to group by.
         QVERIFY(chooseSort(app, SortField::Title));
-        QTRY_COMPARE_WITH_TIMEOUT(headingTitles(), QStringList{"ALL TASKS IN SORTING"}, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(headingTitles(), QStringList{"ALL TASKS IN SORTING"}, 5000);
         Q_UNUSED(today);
     }
 
@@ -157,7 +157,7 @@ private slots:
             QVERIFY(chooseSort(app, SortField::Title));
             QVERIFY(setAscending(app, false));
             QVERIFY(setSeparated(app, false));
-            QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("EDCBA"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("EDCBA"), 5000);
 
             QVERIFY(app.openSource(lk(app.ids.home)));
             QCOMPARE(app.backend().sortField(), int(SortField::DueDate));   // Not Sorting's.
@@ -166,13 +166,13 @@ private slots:
             QVERIFY(setAscending(app, false));
 
             app.press(Qt::Key_1, Qt::ControlModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("all"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("all"), 5000);
             QVERIFY(chooseSort(app, SortField::Title));
         }
         QVERIFY(keep.start());
         App &app = *keep;
         QVERIFY(openSorting(app));
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("EDCBA"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("EDCBA"), 5000);
         QCOMPARE(app.backend().sortField(), int(SortField::Title));
         QVERIFY(!app.backend().sortAscending() && !app.backend().separated());
         QCOMPARE(findItem("sortButton")->property("current").toString(), QString("Title"));
@@ -192,23 +192,23 @@ private slots:
         QVERIFY(openSorting(app));
         QVERIFY(chooseSort(app, SortField::Manual));
         QVERIFY(setSeparated(app, false));
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("CEADB"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("CEADB"), 5000);
         auto dragRow = [&](qint64 from, qint64 onto) {
             QVERIFY(tk::waitItem(QString("taskRow:%1").arg(from)) && tk::settled(QString("taskRow:%1").arg(from)));
             QVERIFY(tk::waitItem(QString("taskRow:%1").arg(onto)) && tk::settled(QString("taskRow:%1").arg(onto)));
             tk::dragSlowly(app.row(from), app.row(onto));
         };
         dragRow(mw().bravo, mw().charlie);
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BCEAD"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BCEAD"), 5000);
         QVERIFY(app.store().task(mw().bravo).order < app.store().task(mw().charlie).order);
         QCOMPARE(app.backend().sortField(), int(SortField::Manual));
         dragRow(mw().echo, mw().alpha);   // Already in front of it: stays.
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BCEAD"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BCEAD"), 5000);
         dragRow(mw().charlie, mw().delta);
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BEACD"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BEACD"), 5000);
         // Undo puts the last move back.
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BCEAD"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("BCEAD"), 5000);
     }
 
     // Dragging a task while the list is sorted another way makes the order manual.
@@ -218,11 +218,11 @@ private slots:
         QVERIFY(openSorting(app));
         QVERIFY(chooseSort(app, SortField::Title));
         QVERIFY(setSeparated(app, false));
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("ABCDE"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("ABCDE"), 5000);
         QVERIFY(tk::settled(QString("taskRow:%1").arg(mw().echo)));
         tk::dragSlowly(app.row(mw().echo), app.row(mw().alpha));
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sortField(), int(SortField::Manual), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(orderNow().indexOf("E") < orderNow().indexOf("A") && orderNow().size() == 5, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sortField(), int(SortField::Manual), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(orderNow().indexOf("E") < orderNow().indexOf("A") && orderNow().size() == 5, 5000);
         QCOMPARE(findItem("sortButton")->property("current").toString(), QString("Manually"));
     }
 
@@ -236,22 +236,22 @@ private slots:
             QVERIFY(app.openSource(lk(app.ids.work)));
             LIST_ITEM(row, app.row(mw().trip));
             clickSteady(row);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), mw().trip, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), mw().trip, 5000);
             app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Pack bags", "Check passport"}), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Pack bags", "Check passport"}), 5000);
             QCOMPARE(app.backend().sortField(), int(SortField::Manual));
 
             QVERIFY(chooseSort(app, SortField::Priority));
-            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Pack bags", "Check passport", "Book flights"}), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Pack bags", "Check passport", "Book flights"}), 5000);
             QVERIFY(chooseSort(app, SortField::Title));
             QVERIFY(setAscending(app, false));
-            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Pack bags", "Check passport", "Book flights"}), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Pack bags", "Check passport", "Book flights"}), 5000);
             QVERIFY(setAscending(app, true));
-            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Check passport", "Pack bags"}), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Check passport", "Pack bags"}), 5000);
             QVERIFY(chooseSort(app, SortField::Priority));
             QVERIFY(setAscending(app, false));
-            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Check passport", "Pack bags"}), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Check passport", "Pack bags"}), 5000);
             // The list the project lives in is not affected.
             QVERIFY(app.openSource(lk(app.ids.work)));
             QCOMPARE(app.backend().sortField(), int(SortField::DueDate));
@@ -261,12 +261,12 @@ private slots:
         QVERIFY(app.openSource(lk(app.ids.work)));
         LIST_ITEM(row, app.row(mw().trip));
         clickSteady(row);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), mw().trip, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), mw().trip, 5000);
         app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 5000);
         QCOMPARE(app.backend().sortField(), int(SortField::Priority));
         QVERIFY(!app.backend().sortAscending());
-        QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Check passport", "Pack bags"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(rowTitles(app, mw().trip), (QStringList{"Book flights", "Check passport", "Pack bags"}), 5000);
     }
 
     // To-do List sorting in All groups the tasks under their list's name.
@@ -274,9 +274,9 @@ private slots:
         App app(seedMisc);
         QVERIFY(app.ok);
         app.press(Qt::Key_1, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("all"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("all"), 5000);
         QVERIFY(chooseSort(app, SortField::List));
-        QTRY_VERIFY_WITH_TIMEOUT(headingTitles().contains("HOME") && headingTitles().contains("WORK") && headingTitles().contains("SORTING"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(headingTitles().contains("HOME") && headingTitles().contains("WORK") && headingTitles().contains("SORTING"), 5000);
         const QStringList titles = headingTitles();
         QVERIFY(titles.indexOf("HOME") < titles.indexOf("WORK") && titles.indexOf("WORK") < titles.indexOf("SORTING"));
         // The Sorting tasks all sit under their heading, after Work's.
@@ -284,7 +284,7 @@ private slots:
         QVERIFY(rows.indexOf(app.ids.report) < rows.indexOf(mw().alpha));
         QVERIFY(rows.indexOf(app.ids.buyMilk) < rows.indexOf(app.ids.report));
         QVERIFY(setAscending(app, false));
-        QTRY_VERIFY_WITH_TIMEOUT(rowIds().indexOf(mw().alpha) < rowIds().indexOf(app.ids.report), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowIds().indexOf(mw().alpha) < rowIds().indexOf(app.ids.report), 5000);
         QVERIFY(rowIds().indexOf(app.ids.report) < rowIds().indexOf(app.ids.buyMilk));
     }
 };

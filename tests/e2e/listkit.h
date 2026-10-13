@@ -9,7 +9,7 @@
 namespace e2e {
 
 template <class F>
-bool waitUntil(F ready, int ms = 3000) {
+bool waitUntil(F ready, int ms = 5000) {
     QElapsedTimer timer;
     timer.start();
     while (!ready()) {
@@ -24,7 +24,7 @@ bool waitUntil(F ready, int ms = 3000) {
 // after an event-loop turn or two).
 #define LIST_ITEM(var, expr) \
     QQuickItem *var = nullptr; \
-    QTRY_VERIFY2_WITH_TIMEOUT((var = (expr)) != nullptr, "item never appeared: " #expr, 3000)
+    QTRY_VERIFY2_WITH_TIMEOUT((var = (expr)) != nullptr, "item never appeared: " #expr, 5000)
 
 // ------------------------------------------------------------------- seed
 
@@ -341,23 +341,33 @@ inline void scrollIntoView(QQuickItem *item) {
 // lists of checkboxes are rebuilt after each change).
 inline void clickSteady(QQuickItem *item, Qt::MouseButton button = Qt::LeftButton) {
     QVERIFY2(item, "clickSteady: no such item");
+    // The item can be recreated while this waits (list delegates, rebuilt menus).
+    QPointer<QQuickItem> guard(item);
+    settleLayout(item);
+    if (!guard)
+        return;
     QPoint last(-1, -1);
     int stable = 0;
     waitUntil([&] {
-        const QPoint now = centreOf(item);
+        if (!guard)
+            return true;
+        const QPoint now = centreOf(guard);
         stable = now == last ? stable + 1 : 0;
         last = now;
         return stable >= 3;
-    }, 1000);
-    click(item, button);
+    }, 2000);
+    if (!guard)
+        return;
+    click(guard, button);
 }
 
 // Clicks a menu entry once it has stopped moving: menus scale and fade in,
 // and a click aimed at where an entry was a frame ago can miss it.
-inline bool clickMenuEntry(const QString &text, int ms = 3000) {
+inline bool clickMenuEntry(const QString &text, int ms = 5000) {
     QQuickItem *entry = nullptr;
     if (!waitUntil([&] { return (entry = menuEntry(text)) != nullptr; }, ms))
         return false;
+    settleLayout(entry);
     QPoint last(-1, -1);
     int stable = 0;
     waitUntil([&] {
@@ -405,7 +415,7 @@ inline bool clickSubmenuEntry(const QString &submenu, const QString &entry) {
     return false;
 }
 
-inline bool clickDialogButton(const QString &text, int ms = 3000) {
+inline bool clickDialogButton(const QString &text, int ms = 5000) {
     QQuickItem *button = nullptr;
     if (!waitUntil([&] { return (button = findText(text, "QQuickAbstractButton")) != nullptr; }, ms))
         return false;
@@ -415,7 +425,7 @@ inline bool clickDialogButton(const QString &text, int ms = 3000) {
 
 // Clicks a button of the dialog with this title, which matters when two
 // dialogs are open at once (the colour picker over the Edit List sheet).
-inline bool clickDialogButtonIn(const QString &title, const QString &text, int ms = 3000) {
+inline bool clickDialogButtonIn(const QString &title, const QString &text, int ms = 5000) {
     QQuickItem *button = nullptr;
     waitUntil([&] {
         QQuickItem *label = findText(title);

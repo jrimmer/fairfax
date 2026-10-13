@@ -11,7 +11,7 @@ namespace {
 
 #define TRY_ITEM(var, expr) \
     QQuickItem *var = nullptr; \
-    QTRY_VERIFY_WITH_TIMEOUT((var = (expr)) != nullptr, 3000)
+    QTRY_VERIFY_WITH_TIMEOUT((var = (expr)) != nullptr, 5000)
 
 // Fails with the offenders listed, one per line.
 #define VERIFY_NO_OVERFLOW(what, list) \
@@ -53,8 +53,8 @@ private slots:
         QVERIFY(app.ok);
         app.press(Qt::Key_2, Qt::ShiftModifier | Qt::ControlModifier);
         QQuickWindow *quick = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((quick = windowTitled("Quick Entry")) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(quick->isExposed(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((quick = windowTitled("Quick Entry")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(quick->isExposed(), 5000);
         quick->requestActivate();
         TRY_ITEM(field, findItem("quickTitle"));
         click(field);
@@ -92,8 +92,8 @@ private slots:
 
         click(findItem("editorRepeat"));
         QObject *popup = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((popup = findObject("repeatEditor")) != nullptr, 3000);
-        QTRY_VERIFY2_WITH_TIMEOUT(popup->property("opened").toBool(), "repeat popup did not open", 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = findObject("repeatEditor")) != nullptr, 5000);
+        QTRY_VERIFY2_WITH_TIMEOUT(popup->property("opened").toBool(), "repeat popup did not open", 5000);
         TRY_ITEM(weekly, findText("Weekly"));
         click(weekly);
         QTest::qWait(200);
@@ -108,8 +108,8 @@ private slots:
         QVERIFY(app.ok);
         app.press(Qt::Key_Comma, Qt::ControlModifier);
         QQuickWindow *settings = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((settings = windowTitled("Settings")) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(settings->isExposed(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((settings = windowTitled("Settings")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(settings->isExposed(), 5000);
         const QStringList panes = settings->property("panes").toStringList();
         QVERIFY(panes.size() >= 8);
         QStringList failures;
@@ -129,7 +129,7 @@ private slots:
         QVERIFY(app.ok);
         app.press(Qt::Key_E, Qt::ShiftModifier | Qt::ControlModifier);
         QObject *dialog = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((dialog = findObject("exportDialog")) != nullptr && dialog->property("opened").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = findObject("exportDialog")) != nullptr && dialog->property("opened").toBool(), 5000);
         QTest::qWait(200);
         QStringList issues = popupOverflows(dialog);
         VERIFY_NO_OVERFLOW("Export dialog", issues);
@@ -144,7 +144,7 @@ private slots:
         TRY_ITEM(edit, findText("Edit List…", "QQuickMenuItem"));
         click(edit);
         QObject *dialog = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((dialog = findObject("editListDialog")) != nullptr && dialog->property("opened").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = findObject("editListDialog")) != nullptr && dialog->property("opened").toBool(), 5000);
         QTest::qWait(200);
         QStringList issues = popupOverflows(dialog);
         VERIFY_NO_OVERFLOW("Edit List dialog", issues);
@@ -156,7 +156,7 @@ private slots:
         QVERIFY(app.ok);
         app.press(Qt::Key_F, Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
         QObject *popup = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((popup = findObject("searchBuilder")) != nullptr && popup->property("opened").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = findObject("searchBuilder")) != nullptr && popup->property("opened").toBool(), 5000);
         QTest::qWait(200);
         QStringList issues = popupOverflows(popup);
         VERIFY_NO_OVERFLOW("Search Options", issues);

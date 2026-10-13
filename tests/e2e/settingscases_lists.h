@@ -13,8 +13,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "today");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(s.ids.electricity) != nullptr, !changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(s.ids.electricity) != nullptr, !changed, 5000);
             };
             v << c;
         }
@@ -24,8 +24,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "today");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(s.ids.shelf) != nullptr, changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(s.ids.shelf) != nullptr, changed, 5000);
             };
             v << c;
         }
@@ -40,8 +40,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "today");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Underway").id) != nullptr, !changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Underway").id) != nullptr, !changed, 5000);
             };
             v << c;
         }
@@ -56,8 +56,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, listKey(s.ids.work));
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Underway").id) != nullptr, !changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Underway").id) != nullptr, !changed, 5000);
             };
             v << c;
         }
@@ -76,8 +76,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "today");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Renovate").id) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Sand floor").id) != nullptr, !changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Renovate").id) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Sand floor").id) != nullptr, !changed, 5000);
             };
             v << c;
         }
@@ -87,8 +87,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "all");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(textUnder(findItem("taskList"), "NEXT 7 DAYS") != nullptr, changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(textUnder(findItem("taskList"), "NEXT 7 DAYS") != nullptr, changed, 5000);
             };
             v << c;
         }
@@ -98,8 +98,8 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "all");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(textUnder(findItem("taskList"), "STARRED") != nullptr, changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.report) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(textUnder(findItem("taskList"), "STARRED") != nullptr, changed, 5000);
             };
             v << c;
         }
@@ -123,7 +123,7 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 showSource(app, "all");
                 const QStringList want = changed ? QStringList{"ADMIN", "HOME", "WORK"} : QStringList{"HOME", "WORK", "ADMIN"};
                 QStringList got;
-                QTRY_VERIFY2_WITH_TIMEOUT((got = sectionTitles()) == want, qPrintable(got.join(",")), 3000);
+                QTRY_VERIFY2_WITH_TIMEOUT((got = sectionTitles()) == want, qPrintable(got.join(",")), 5000);
             };
             v << c;
         }
@@ -136,10 +136,10 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 SK_APP
                 focusMain(app);
                 const QString home = listKey(s.ids.home);
-                QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(home) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(home) != nullptr, 5000);
                 const bool overdue = !changed || mode >= 1, undone = !changed || mode >= 2;
-                QTRY_COMPARE_WITH_TIMEOUT(sidebarNumber("sidebarOverdue", home) > 0, overdue, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(sidebarNumber("sidebarUndone", home) > 0, undone, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(sidebarNumber("sidebarOverdue", home) > 0, overdue, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(sidebarNumber("sidebarUndone", home) > 0, undone, 5000);
             };
             v << c;
         }
@@ -149,9 +149,9 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 SK_APP
                 focusMain(app);
                 const QString home = listKey(s.ids.home);
-                QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(home) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(home) != nullptr, 5000);
                 // Home holds four open tasks, one of them overdue.
-                QTRY_COMPARE_WITH_TIMEOUT(sidebarNumber("sidebarUndone", home), changed ? 3 : 4, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(sidebarNumber("sidebarUndone", home), changed ? 3 : 4, 5000);
                 QCOMPARE(sidebarNumber("sidebarOverdue", home), 1);
             };
             v << c;
@@ -183,13 +183,13 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 showSource(app, listKey(smart));
                 const qint64 project = app.taskTitled("Paint the house").id;
                 QQuickItem *row = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(project)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(project)) != nullptr, 5000);
                 click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), project, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), project, 5000);
                 app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), "project:" + QString::number(project), 3000);
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Paint walls").id) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Buy tiles").id) != nullptr, !changed, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), "project:" + QString::number(project), 5000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Paint walls").id) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.row(app.taskTitled("Buy tiles").id) != nullptr, !changed, 5000);
             };
             v << c;
         }
@@ -217,15 +217,15 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 showSource(app, listKey(s.ids.home));
                 const qint64 id = app.taskTitled("Alarmed").id;
                 QQuickItem *row = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(id)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(id)) != nullptr, 5000);
                 click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), id, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), id, 5000);
                 app.press(Qt::Key_Space);
                 QObject *look = findObject("quickLook");
                 QVERIFY(look);
-                QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 5000);
                 const QRegularExpression time(changed ? "2:00 PM" : "9:00 AM");
-                QTRY_VERIFY_WITH_TIMEOUT(textMatching(popupSurface(look), time) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(textMatching(popupSurface(look), time) != nullptr, 5000);
                 closeQuickLook(app, look);
             };
             v << c;

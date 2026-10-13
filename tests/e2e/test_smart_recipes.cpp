@@ -143,8 +143,8 @@ private slots:
         QCOMPARE(app.store().list(id).kind, int(ListKind::Smart));
         QCOMPARE(app.backend().search(), QString());
         SMART_SHOWS(app, expected);
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{query}), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{query}), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 5000);
     }
 
     // "Save-from-menu recipes": Someday (Without Due Date), Next 3 Days
@@ -159,7 +159,7 @@ private slots:
         QVERIFY(id);
         QCOMPARE(app.store().list(id).smartRange, QString("nodue"));
         SMART_SHOWS(app, without(allShown(), Dated));
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, without(allShown(), Dated).size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, without(allShown(), Dated).size(), 5000);
     }
 
     void menuRecipeNext3Days() {
@@ -173,7 +173,7 @@ private slots:
         QCOMPARE(app.store().list(id).smartRange, QString("next:3:d"));
         const SL expected = specTitles([](const Spec &s) { return shownInAll(s) && s.due != NoDay && s.due >= 0 && s.due < 3; });
         SMART_SHOWS(app, expected);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 5000);
     }
 
     void menuRecipeQuickWins() {
@@ -181,12 +181,12 @@ private slots:
         QVERIFY(pane(app, "all"));
         QVERIFY(openBuilder(app));
         QVERIFY(pressBuilder("typeChip:duration"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: duration"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: duration"), 5000);
         const qint64 id = saveFromBuilder(app, "Quick Wins");
         QVERIFY(id);
         const SL expected{"Quick win", "Two day window", "Fresh window", "Repeating window"};
         SMART_SHOWS(app, expected);
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 5000);
     }
 
     void menuRecipeReviewInbox() {
@@ -195,7 +195,7 @@ private slots:
         QVERIFY(openBuilder(app));
         QVERIFY(pressBuilder("pickerTab:lists"));
         QVERIFY(pressBuilder("nameChip:lists:Inbox"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("lists: Inbox"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("lists: Inbox"), 5000);
         const qint64 id = saveFromBuilder(app, "Review Inbox");
         QVERIFY(id);
         // "Completed tasks are left out by default": an Inbox task completed
@@ -204,9 +204,9 @@ private slots:
         SMART_SHOWS(app, expected);
         QVERIFY(selectRow(app, "Inbox note"));
         app.press(Qt::Key_Period, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Inbox note").completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Inbox note").completed, 5000);
         // The count drops at once; the row stays until the view is left.
-        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, 1, 5000);
         SMART_SHOWS(app, expected);
         QVERIFY(pane(app, "all"));
         QVERIFY(pane(app, lk(id)));

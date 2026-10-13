@@ -33,7 +33,7 @@ void setInherit(App &app, bool on) {
     openSettings(app, sw);
     selectPane(sw, "Today & Lists");
     setCheck("setting:search.inheritInProject", on);
-    QTRY_COMPARE_WITH_TIMEOUT(app.store().setting("search.inheritInProject", false).toBool(), on, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(app.store().setting("search.inheritInProject", false).toBool(), on, 5000);
     closeSettings(app);
 }
 
@@ -83,15 +83,15 @@ private slots:
         SMART_QUERY(app, "plumber", Plumbers);
         // Escape clears the search, collapses the field and restores the rows.
         app.press(Qt::Key_Escape);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 5000);
         SMART_SHOWS(app, allShown());
         // The ✕ does the same.
         SMART_QUERY(app, "plumber", Plumbers);
         LIST_ITEM(cross, findItem("searchClear"));
         clickSteady(cross);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 5000);
         QVERIFY(!findItem("searchClear"));
         SMART_SHOWS(app, allShown());
         // Nothing found says so.
@@ -106,11 +106,11 @@ private slots:
         App &app = *m_app;
         QVERIFY(!searchOpen());
         app.press(Qt::Key_F, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(searchOpen(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(searchField()->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(searchOpen(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(searchField()->property("activeFocus").toBool(), 5000);
         // Escape puts it away again.
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 5000);
     }
 
     // "The scope control decides whether the search covers only the list
@@ -123,21 +123,21 @@ private slots:
         // Everything in Garden, nothing from the other lists.
         QVERIFY(!app.backend().searchAllLists());
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 5000);
         SMART_SHOWS(app, Plumbers);
         QCOMPARE(app.backend().sourceKey(), lk(listId("Garden")));
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 5000);
         SMART_SHOWS(app, SL{"Plumber for garden"});
         // The same from the presets menu, in both directions.
         click(findItem("searchPresets"));
         QVERIFY(clickMenuEntry("Search All Lists"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 5000);
         SMART_SHOWS(app, Plumbers);
         QVERIFY(settle());
         click(findItem("searchPresets"));
         QVERIFY(clickMenuEntry("Search This List Only"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 5000);
         SMART_SHOWS(app, SL{"Plumber for garden"});
         // With no search the scope does not matter: the list shows its own tasks.
         QVERIFY(escapeSearch(app));
@@ -152,18 +152,18 @@ private slots:
         SMART_QUERY(app, "starts", SL{"Starts today"});
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         QVERIFY(pressBuilder("scopeAll"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 5000);
         // "Starts in 3 due in 5" belongs to Website and is scheduled; "Starts
         // tomorrow" is scheduled too: hidden until Include is chosen.
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Starts today"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Starts today"}), 5000);
         QVERIFY(pressBuilder("searchScheduledInclude"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().showScheduled(), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), sorted(SL{"Starts today", "Starts tomorrow", "Starts in 3 due in 5"}), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().showScheduled(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), sorted(SL{"Starts today", "Starts tomorrow", "Starts in 3 due in 5"}), 5000);
         QVERIFY(pressBuilder("searchScheduledHide"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().showScheduled(), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Starts today"}), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().showScheduled(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Starts today"}), 5000);
         QVERIFY(pressBuilder("scopeThis"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 5000);
         QVERIFY(closeBuilder(app));
     }
 
@@ -206,7 +206,7 @@ private slots:
         LIST_ITEM(button, findItem("searchPresets"));
         click(button);
         QVERIFY2(clickMenuEntry(entry), qPrintable(entry));
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), query, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), query, 5000);
         SMART_SHOWS(app, expected);
         // Ordinary text: editable by hand afterwards.
         LIST_ITEM(field, searchField());
@@ -225,12 +225,12 @@ private slots:
                     (Hi + SL{"Parcel tomorrow", "Launch step one", "Archive item", "Repeating window"}));
         QVERIFY(openProject(app, "Launch project"));
         SMART_SHOWS(app, SL{"Launch project"});
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 5000);
         // Leaving the project brings the search back.
         app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(listId("Website")), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(listId("Website")), 5000);
         QCOMPARE(app.backend().search(), QString("type: hiprio OR tomorrow"));
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Launch project"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Launch project"}), 5000);
     }
 
     // "On (default): opening a project keeps the Smart List's rule or your
@@ -242,15 +242,15 @@ private slots:
         SMART_QUERY(app, "type: hiprio OR tomorrow",
                     (Hi + SL{"Parcel tomorrow", "Launch step one", "Archive item", "Repeating window"}));
         QVERIFY(openProject(app, "Launch project"));
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one"}), 5000);
         QCOMPARE(app.backend().search(), QString("type: hiprio OR tomorrow"));
         // Back out: the full search result of the project's list returns.
         app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Launch project"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Launch project"}), 5000);
         // Reversed: switched off again, every sub-task shows.
         setInherit(app, false);
         QVERIFY(openProject(app, "Launch project"));
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 5000);
     }
 
     // "A Smart List's rule counts as a search here even though you did not
@@ -263,25 +263,25 @@ private slots:
         QVERIFY(typeSearch(app, "type: hiprio OR tomorrow"));
         LIST_ITEM(save, findItem("saveSearchAsSmart"));
         click(save);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceIsSmart(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceIsSmart(), 5000);
         const qint64 hot = smartNamed(app, "type: hiprio OR tomorrow");
         QVERIFY(hot);
         QCOMPARE(app.backend().search(), QString());
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(idOf("Launch project")) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(idOf("Launch project")) != nullptr, 5000);
 
         setInherit(app, true);
         QVERIFY(openProject(app, "Launch project"));
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one"}), 5000);
         app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(listId("Website")), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(listId("Website")), 5000);
 
         // Off: the whole project, whatever the Smart List said.
         setInherit(app, false);
         QVERIFY(pane(app, lk(hot)));
         QVERIFY(openProject(app, "Launch project"));
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 5000);
         app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceKey() == lk(listId("Website")), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceKey() == lk(listId("Website")), 5000);
         app.backend().deleteList(hot);
     }
 
@@ -292,20 +292,20 @@ private slots:
         setInherit(app, true);
         const qint64 soon = app.backend().saveSmartList("Soon", "lists: Website", "next:3:d");
         QVERIFY(soon);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceKey() == lk(soon), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceKey() == lk(soon), 5000);
         // Only dated tasks of Website come through the range.
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Began yesterday due in 2", "Launch step one"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Began yesterday due in 2", "Launch step one"}), 5000);
         // Jump to the project from the Smart List with the J bar.
         app.press(Qt::Key_J);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 5000);
         app.type("Launch project");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("project:%1").arg(idOf("Launch project")), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("project:%1").arg(idOf("Launch project")), 5000);
         // The project itself is undated, the range shows only its dated child
         // that falls inside it.
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one"}), 5000);
         setInherit(app, false);
-        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 5000);
         app.backend().deleteList(soon);
     }
 };

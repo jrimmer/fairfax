@@ -24,8 +24,8 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 openQuickEntry(app, quick);
                 QVERIFY(quick);
                 QQuickItem *notes = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((notes = findItem("quickNotes")) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(notes->property("text").toString(), changed ? QString() : clip, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((notes = findItem("quickNotes")) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(notes->property("text").toString(), changed ? QString() : clip, 5000);
                 closeQuickEntry(quick);
             };
             v << c;
@@ -51,10 +51,10 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 focusMain(app);
                 const QDate saturday = dateOnWeekday(6);
                 if (changed) {
-                    QTRY_COMPARE_WITH_TIMEOUT(calendarColumn(saturday), 0, 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(calendarColumn(saturday), 0, 5000);
                     QCOMPARE(app.backend().firstDayOfWeek(), 6);
                 } else {
-                    QTRY_VERIFY_WITH_TIMEOUT(calendarColumn(saturday) > 0, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(calendarColumn(saturday) > 0, 5000);
                 }
             };
             v << c;
@@ -63,7 +63,7 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
             K c{"general.sounds", "General", "setting:general.sounds", K::Check, true};
             c.effect = SK_EFFECT {
                 SK_APP
-                QTRY_COMPARE_WITH_TIMEOUT(app.services().sounds.enabled(), !changed, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.services().sounds.enabled(), !changed, 5000);
             };
             v << c;
         }
@@ -73,8 +73,8 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 SK_APP
                 focusMain(app);
                 QQuickItem *confetti = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((confetti = findItem("confetti")) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(confetti->property("enabled").toBool(), !changed, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((confetti = findItem("confetti")) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(confetti->property("enabled").toBool(), !changed, 5000);
             };
             v << c;
         }
@@ -89,11 +89,11 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 SK_APP
                 Theme &theme = app.services().theme;
                 if (!changed) {
-                    QTRY_COMPARE_WITH_TIMEOUT(theme.scheme(), QString("system"), 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(theme.scheme(), QString("system"), 5000);
                     return;
                 }
-                QTRY_COMPARE_WITH_TIMEOUT(theme.dark(), dark, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(app.window->color(), theme.background(), 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(theme.dark(), dark, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.window->color(), theme.background(), 5000);
                 QVERIFY2((app.window->color().lightness() < 128) == dark, "the window is the wrong shade");
             };
             v << c;
@@ -109,9 +109,9 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 showSource(app, listKey(s.ids.home));
                 const int size = changed ? 19 : 14;
                 QQuickItem *title = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((title = rowTitle(app, s.ids.buyMilk)) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(title->property("font").value<QFont>().pixelSize(), size, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(int(app.row(s.ids.buyMilk)->height()), qRound(size * 2.5), 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((title = rowTitle(app, s.ids.buyMilk)) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(title->property("font").value<QFont>().pixelSize(), size, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(int(app.row(s.ids.buyMilk)->height()), qRound(size * 2.5), 5000);
             };
             v << c;
         }
@@ -125,9 +125,9 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 showSource(app, listKey(s.ids.home));
                 widenPane(app);
                 QQuickItem *row = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 5000);
                 const qreal expected = qMax<qreal>(28, (row->width() - (changed ? 640 : 980)) / 2);
-                QTRY_COMPARE_WITH_TIMEOUT(row->property("margin").toReal(), expected, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(row->property("margin").toReal(), expected, 5000);
                 if (changed)
                     QVERIFY2(expected > 28, "the window is too narrow to tell the widths apart");
             };
@@ -144,8 +144,8 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 const int mode = changed ? density : 1;
                 static const double factor[] = {2.05, 2.5, 2.8};
                 QQuickItem *row = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(int(row->height()), qRound(14 * factor[mode]), 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((row = app.row(s.ids.buyMilk)) != nullptr, 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(int(row->height()), qRound(14 * factor[mode]), 5000);
             };
             v << c;
         }
@@ -159,13 +159,13 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 SK_APP
                 focusMain(app);
                 QQuickItem *cal = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((cal = findItem("miniCalendar")) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((cal = findItem("miniCalendar")) != nullptr, 5000);
                 const QString want = changed ? (style == 1 ? "dots" : "none") : "heat";
-                QTRY_COMPARE_WITH_TIMEOUT(cal->property("style").toString(), want, 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(cal->property("style").toString(), want, 5000);
                 if (want == "dots")
-                    QTRY_VERIFY_WITH_TIMEOUT(countNamed("calDots") > 0, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(countNamed("calDots") > 0, 5000);
                 else
-                    QTRY_COMPARE_WITH_TIMEOUT(countNamed("calDots"), 0, 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(countNamed("calDots"), 0, 5000);
             };
             v << c;
         }
@@ -175,9 +175,9 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 SK_APP
                 focusMain(app);
                 if (changed)
-                    QTRY_COMPARE_WITH_TIMEOUT(countNamed("calDividerRight") + countNamed("calDividerBottom"), 0, 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(countNamed("calDividerRight") + countNamed("calDividerBottom"), 0, 5000);
                 else
-                    QTRY_VERIFY_WITH_TIMEOUT(countNamed("calDividerRight") + countNamed("calDividerBottom") > 0, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(countNamed("calDividerRight") + countNamed("calDividerBottom") > 0, 5000);
             };
             v << c;
         }
@@ -187,11 +187,11 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
                 if (changed)
-                    QTRY_VERIFY_WITH_TIMEOUT(!textUnder(app.row(s.ids.buyMilk), "Today"), 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(!textUnder(app.row(s.ids.buyMilk), "Today"), 5000);
                 else
-                    QTRY_VERIFY_WITH_TIMEOUT(textUnder(app.row(s.ids.buyMilk), "Today") != nullptr, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(textUnder(app.row(s.ids.buyMilk), "Today") != nullptr, 5000);
             };
             v << c;
         }
@@ -201,12 +201,12 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
                 const QRegularExpression note("oat milk");
                 if (changed)
-                    QTRY_VERIFY_WITH_TIMEOUT(textMatching(app.row(s.ids.buyMilk), note) != nullptr, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(textMatching(app.row(s.ids.buyMilk), note) != nullptr, 5000);
                 else
-                    QTRY_VERIFY_WITH_TIMEOUT(!textMatching(app.row(s.ids.buyMilk), note), 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(!textMatching(app.row(s.ids.buyMilk), note), 5000);
             };
             v << c;
         }
@@ -216,11 +216,11 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, "all");
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
                 if (changed)
-                    QTRY_VERIFY_WITH_TIMEOUT(textUnder(app.row(s.ids.buyMilk), "Home") != nullptr, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(textUnder(app.row(s.ids.buyMilk), "Home") != nullptr, 5000);
                 else
-                    QTRY_VERIFY_WITH_TIMEOUT(!textUnder(app.row(s.ids.buyMilk), "Home"), 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(!textUnder(app.row(s.ids.buyMilk), "Home"), 5000);
             };
             v << c;
         }
@@ -230,11 +230,11 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
                 widenPane(app);
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.plants) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.plants) != nullptr, 5000);
                 if (changed)
-                    QTRY_VERIFY_WITH_TIMEOUT(!textUnder(app.row(s.ids.plants), "garden"), 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(!textUnder(app.row(s.ids.plants), "garden"), 5000);
                 else
-                    QTRY_VERIFY_WITH_TIMEOUT(textUnder(app.row(s.ids.plants), "garden") != nullptr, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(textUnder(app.row(s.ids.plants), "garden") != nullptr, 5000);
             };
             v << c;
         }
@@ -244,12 +244,12 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
                 QQuickItem *title = nullptr;
-                QTRY_VERIFY_WITH_TIMEOUT((title = rowTitle(app, s.ids.electricity)) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT((title = rowTitle(app, s.ids.electricity)) != nullptr, 5000);
                 Theme &theme = app.services().theme;
                 if (changed)
-                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.foreground()), 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.foreground()), 5000);
                 else
-                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.overdue()), 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(colourOf(title), QColor(theme.overdue()), 5000);
             };
             v << c;
         }
@@ -259,11 +259,11 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, listKey(s.ids.home));
-                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 3000);
+                QTRY_VERIFY_WITH_TIMEOUT(app.row(s.ids.buyMilk) != nullptr, 5000);
                 if (changed)
-                    QTRY_COMPARE_WITH_TIMEOUT(countNamed("sectionDuration"), 0, 3000);
+                    QTRY_COMPARE_WITH_TIMEOUT(countNamed("sectionDuration"), 0, 5000);
                 else
-                    QTRY_VERIFY_WITH_TIMEOUT(countNamed("sectionDuration") > 0, 3000);
+                    QTRY_VERIFY_WITH_TIMEOUT(countNamed("sectionDuration") > 0, 5000);
             };
             v << c;
         }

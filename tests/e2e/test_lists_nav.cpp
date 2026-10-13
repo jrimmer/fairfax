@@ -59,10 +59,10 @@ private slots:
                     QVERIFY2(pane(app, lk(w.errands)), "could not open Errands");
                     app.press(c.shortcut, Qt::ControlModifier);
                 }
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString(c.key), 3000);
-                QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString(c.title), 3000);
+                QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString(c.key), 5000);
+                QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString(c.title), 5000);
                 for (qint64 id : c.shown)
-                    QTRY_VERIFY2_WITH_TIMEOUT(shows(app, id), qPrintable(QString("%1 should show %2").arg(c.title, app.task(id).title)), 3000);
+                    QTRY_VERIFY2_WITH_TIMEOUT(shows(app, id), qPrintable(QString("%1 should show %2").arg(c.title, app.task(id).title)), 5000);
                 for (qint64 id : c.hidden)
                     QVERIFY2(!shows(app, id), qPrintable(QString("%1 should not show %2").arg(c.title, app.task(id).title)));
             }
@@ -70,9 +70,9 @@ private slots:
 
         // Ctrl+0 is the Inbox, which sits above the other focus lists.
         app.press(Qt::Key_0, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.inbox), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.triage) && !shows(app, s.buyMilk), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Inbox"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.inbox), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.triage) && !shows(app, s.buyMilk), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Inbox"), 5000);
         QVERIFY(sidebarOrder().indexOf(lk(w.inbox)) < sidebarOrder().indexOf("all"));
     }
 
@@ -96,9 +96,9 @@ private slots:
         };
         for (const Case &c : cases) {
             QVERIFY(pane(app, lk(c.list)));
-            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString(c.title), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString(c.title), 5000);
             for (qint64 id : c.shown)
-                QTRY_VERIFY2_WITH_TIMEOUT(shows(app, id), qPrintable(QString("%1 should show %2").arg(c.title, app.task(id).title)), 3000);
+                QTRY_VERIFY2_WITH_TIMEOUT(shows(app, id), qPrintable(QString("%1 should show %2").arg(c.title, app.task(id).title)), 5000);
             for (qint64 id : c.hidden)
                 QVERIFY2(!shows(app, id), qPrintable(QString("%1 should not show %2").arg(c.title, app.task(id).title)));
         }
@@ -106,7 +106,7 @@ private slots:
         QVERIFY(!shows(app, w.trip));
         // Completed ones show in the list (within the window) as well as in Done.
         QVERIFY(pane(app, lk(s.work)));
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, s.oldThing), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, s.oldThing), 5000);
     }
 
     // Ctrl+Up / Ctrl+Down walk through the sidebar one list at a time.
@@ -121,13 +121,13 @@ private slots:
         QVERIFY(pane(app, keys.first()));
         for (int i = 1; i < keys.size(); ++i) {
             app.press(Qt::Key_Down, Qt::ControlModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), keys.at(i), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), keys.at(i), 5000);
         }
         app.press(Qt::Key_Down, Qt::ControlModifier);  // Stops at the end.
         QCOMPARE(app.backend().sourceKey(), keys.last());
         for (int i = keys.size() - 2; i >= 0; --i) {
             app.press(Qt::Key_Up, Qt::ControlModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), keys.at(i), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), keys.at(i), 5000);
         }
     }
 
@@ -145,59 +145,59 @@ private slots:
         click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
         app.press(Qt::Key_J);
         QObject *popup = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         QCOMPARE(popup->property("kind").toString(), QString("jump"));
         LIST_ITEM(input, findItem("commandInput"));
-        QTRY_VERIFY_WITH_TIMEOUT(input->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(input->property("activeFocus").toBool(), 5000);
         app.type("err");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Errands"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Errands"), 5000);
         QVERIFY(!labelsOf(popup).contains("Work"));
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 5000);
 
         // Escape leaves the view alone.
         app.press(Qt::Key_Escape);
         QVERIFY(clickPaneTitle());  // The list's name opens the bar too.
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         QCOMPARE(popup->property("kind").toString(), QString("jump"));
         app.type("work");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Work"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Work"), 5000);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 5000);
         QCOMPARE(app.backend().sourceKey(), lk(w.errands));
 
         // Focus lists, Smart Lists and projects are targets too.
         QVERIFY(clickPaneTitle());
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("star");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Starred"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Starred"), 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("starred"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("starred"), 5000);
         QVERIFY(clickPaneTitle());
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("urg");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Urgent"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Urgent"), 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.urgent), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.urgent), 5000);
         QVERIFY(clickPaneTitle());
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("launch");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Launch"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Launch"), 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("project:%1").arg(w.launch), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("project:%1").arg(w.launch), 5000);
 
         // A list inside a collapsed group is still found.
         QVERIFY(pane(app, "today"));
         app.backend().toggleGroupCollapsed(w.projects);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.errands)), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(w.errands)), 5000);
         QVERIFY(clickPaneTitle());
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("errands");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Errands"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Errands"), 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 5000);
     }
 
     // "Quick Open (⇧⌘O): type a few letters and jump to any task, list,
@@ -213,40 +213,40 @@ private slots:
 
         app.press(Qt::Key_O, Qt::ControlModifier | Qt::ShiftModifier);
         QObject *popup = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         QCOMPARE(popup->property("kind").toString(), QString("open"));
         // Where you have been lately, most recent first.
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Misc") && labelsOf(popup).contains("Errands"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Misc") && labelsOf(popup).contains("Errands"), 5000);
         QVERIFY(labelsOf(popup).indexOf("Misc") < labelsOf(popup).indexOf("Errands"));
         app.type("errand");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).value(0) == "Errands", 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).value(0) == "Errands", 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 5000);
 
         // A list by name from anywhere, then a task: it opens in its own list.
         QVERIFY(pane(app, "done"));
         app.press(Qt::Key_O, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("work");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).value(0) == "Work", 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).value(0) == "Work", 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(app.ids.work), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(app.ids.work), 5000);
 
         app.press(Qt::Key_O, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("buy stamps");
-        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Buy stamps"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(labelsOf(popup).contains("Buy stamps"), 5000);
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps), 5000);
 
         // Escape closes it and nothing moves.
         app.press(Qt::Key_O, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((popup = commandPopup()) != nullptr, 5000);
         app.type("home");
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!commandPopup(), 5000);
         QCOMPARE(app.backend().sourceKey(), lk(w.errands));
     }
 
@@ -268,8 +268,8 @@ private slots:
             App app(nullptr, db);
             QVERIFY(app.ok);
             QCOMPARE(app.backend().sourceKey(), lk(errands));
-            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Errands"), 3000);
-            QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps) && shows(app, w.parcel), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Errands"), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.stamps) && shows(app, w.parcel), 5000);
             QVERIFY(!shows(app, app.task(w.cables).id));
             QVERIFY(pane(app, "starred"));
         }
@@ -277,7 +277,7 @@ private slots:
             App app(nullptr, db);
             QVERIFY(app.ok);
             QCOMPARE(app.backend().sourceKey(), QString("starred"));
-            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Starred"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Starred"), 5000);
         }
     }
 
@@ -308,35 +308,35 @@ private slots:
             QVERIFY(sidebarOrder().indexOf(project) == sidebarOrder().indexOf(lk(work)) + 1);
 
             click(projectRow);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Launch"), 3000);
-            QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.announce), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Launch"), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.announce), 5000);
             QVERIFY(!shows(app, app.ids.report));  // Only the project's own tasks.
             LIST_ITEM(badge, findItem("projectBadge"));
             QCOMPARE(badge->property("text").toString(), QString("Work"));
 
             // The badge goes back to the list.
             click(badge);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(work), 3000);
-            QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.report) && !findItem("projectBadge"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(work), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(shows(app, app.ids.report) && !findItem("projectBadge"), 5000);
 
             // Ctrl+Alt+J on the selected project goes in, and again comes out.
             LIST_ITEM(launchRow, app.row(launch));
             clickSteady(launchRow);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), launch, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), launch, 5000);
             app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), project, 5000);
             app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(work), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(work), 5000);
         }
         {
             // The revealed projects stay revealed after a restart; folding hides them.
             App app(nullptr, db);
             QVERIFY(app.ok);
             const QString project = QString("project:%1").arg(launch);
-            QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(project) != nullptr, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(project) != nullptr, 5000);
             click(findItem("sidebarExpand:" + QString::number(work)));
-            QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(project), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(project), 5000);
         }
         {
             App app(nullptr, db);

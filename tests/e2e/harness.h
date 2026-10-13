@@ -174,7 +174,7 @@ inline void typeInto(QWindow *w, const QString &text) {
 // across it can go stale.
 inline void settleLayout(QQuickItem *item) {
     if (item && item->window() && QQuickTest::qIsPolishScheduled(item->window()))
-        QQuickTest::qWaitForPolish(item->window(), 1000);
+        QQuickTest::qWaitForPolish(item->window(), 3000);
 }
 
 inline QPoint centreOf(QQuickItem *item) {

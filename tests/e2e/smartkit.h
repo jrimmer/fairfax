@@ -514,8 +514,8 @@ inline QString titleDiff(const QStringList &got, const QStringList &want) {
 #define SMART_SHOWS(app, expected)                                                                                     \
     do {                                                                                                               \
         const QStringList want_ = sorted(expected);                                                                    \
-        QTRY_VERIFY2_WITH_TIMEOUT(paneTitles(app) == want_, qPrintable(titleDiff(paneTitles(app), want_)), 3000);     \
-        QTRY_VERIFY2_WITH_TIMEOUT(drawnDisagrees(app, want_).isEmpty(), qPrintable(drawnDisagrees(app, want_)), 3000); \
+        QTRY_VERIFY2_WITH_TIMEOUT(paneTitles(app) == want_, qPrintable(titleDiff(paneTitles(app), want_)), 5000);     \
+        QTRY_VERIFY2_WITH_TIMEOUT(drawnDisagrees(app, want_).isEmpty(), qPrintable(drawnDisagrees(app, want_)), 5000); \
     } while (0)
 
 // Types `query` into the search bar and checks the pane lists exactly

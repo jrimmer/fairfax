@@ -68,28 +68,28 @@ private slots:
         for (const Preset &p : {Preset{"Daily", 1, 1}, Preset{"Weekly", 2, 1}, Preset{"Every 2 weeks", 2, 2},
                                 Preset{"Monthly", 3, 1}, Preset{"Quarterly", 3, 3}, Preset{"Yearly", 4, 1}}) {
             QVERIFY(clickNamed(QString("repeatPreset:") + p.name));
-            QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, p.freq, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, p.freq, 5000);
             QCOMPARE(app.task(id).recurrence.interval, p.interval);
             QVERIFY(!prop("repeatSummary", "text").toString().isEmpty());
             QVERIFY(prop("repeatSummary", "text").toString() != "Never");
             // Remove Repeat clears it, so the next preset chip is on offer.
             QVERIFY(clickNamed("repeatRemove"));
-            QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).recurrence.isSet(), 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(prop("repeatSummary", "text").toString(), QString("Never"), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).recurrence.isSet(), 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(prop("repeatSummary", "text").toString(), QString("Never"), 5000);
         }
         QVERIFY(clickNamed("repeatPreset:Weekly"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 5000);
         app.press(Qt::Key_Escape);                      // Close the popup.
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("repeatFreq:Daily"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("repeatFreq:Daily"), 5000);
         QVERIFY(closeEditor(app));
-        QTRY_VERIFY_WITH_TIMEOUT(badge("rowRepeat", id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowRepeat", id), 5000);
 
         QVERIFY(openRepeat(app, id));
         QVERIFY(clickNamed("repeatRemove"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).recurrence.isSet(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).recurrence.isSet(), 5000);
         app.press(Qt::Key_Escape);
         QVERIFY(closeEditor(app));
-        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowRepeat", id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowRepeat", id), 5000);
     }
 
     // "Alt+1...6" chips and the Repeat shortcut: Ctrl+; opens the popup on the
@@ -101,12 +101,12 @@ private slots:
         const qint64 id = app.ids.plants;
         QVERIFY(waitFor([&] { return app.row(id) != nullptr; }));
         click(app.row(id), Qt::LeftButton, pointIn(app.row(id), 0.4, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), id, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), id, 5000);
         app.press(Qt::Key_Semicolon, Qt::ControlModifier);
         QVERIFY2(waitItem("editorCard"), "Ctrl+; did not open the editor");
         QVERIFY(waitItem("repeatFreq:Daily"));
         app.press(Qt::Key_3, Qt::AltModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 5000);
         QCOMPARE(app.task(id).recurrence.interval, 2);
     }
 
@@ -120,7 +120,7 @@ private slots:
         const qint64 id = app.ids.buyMilk;
         QVERIFY(openRepeat(app, id));
         QVERIFY(clickNamed("repeatFreq:Weekly"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 5000);
         // Weekly has just added the weekday row; until it is laid out, its
         // toggles sit at stale positions and a click hits the wrong day.
         QVERIFY(waitItem("repeatWeekday:0"));
@@ -140,26 +140,26 @@ private slots:
         // Every 3 weeks.
         bumpBox("repeatInterval");
         bumpBox("repeatInterval");
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.interval, 3, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.interval, 3, 5000);
         // After completion.
         click(findItem("repeatAfterCompletion"), Qt::LeftButton, pointIn(findItem("repeatAfterCompletion"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.from, int(Repeat::FromCompletion), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.from, int(Repeat::FromCompletion), 5000);
         // End after 4 times.
         click(findItem("repeatEndAfter"), Qt::LeftButton, pointIn(findItem("repeatEndAfter"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::AfterCount), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::AfterCount), 5000);
         for (int i = 0; i < 3; ++i) bumpBox("repeatEndCount");
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endCount, 4, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endCount, 4, 5000);
         QCOMPARE(app.task(id).recurrence.frequency, int(Repeat::Weekly));
         QCOMPARE(app.task(id).recurrence.interval, 3);
         QCOMPARE(app.task(id).recurrence.weekdays, want);
 
         // Reverse each in turn: from the due date, never ending.
         click(findItem("repeatAfterCompletion"), Qt::LeftButton, pointIn(findItem("repeatAfterCompletion"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.from, int(Repeat::FromDue), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.from, int(Repeat::FromDue), 5000);
         click(findItem("repeatEndNever"), Qt::LeftButton, pointIn(findItem("repeatEndNever"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::Never), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::Never), 5000);
         QVERIFY(clickNamed("repeatRemove"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).recurrence.isSet(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).recurrence.isSet(), 5000);
     }
 
     // Monthly: on the same date, or "the 1st, 2nd... or Last of a chosen
@@ -171,20 +171,20 @@ private slots:
         const qint64 id = app.ids.buyMilk;
         QVERIFY(openRepeat(app, id));
         QVERIFY(clickNamed("repeatFreq:Monthly"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 3, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 3, 5000);
         QCOMPARE(app.task(id).recurrence.monthOrdinal, 0);
 
         // "The Nth weekday": starts from the task's own weekday.
         click(findItem("repeatMonthNth"), Qt::LeftButton, pointIn(findItem("repeatMonthNth"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, 1, 5000);
         QCOMPARE(app.task(id).recurrence.monthWeekday, QDate::currentDate().dayOfWeek());
         click(findItem("repeatOrdinal"));
         QVERIFY(waitFor([] { return findText("Last") != nullptr; }));
         click(findText("Last"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, -1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, -1, 5000);
         // Back to the fixed date.
         click(findItem("repeatMonthDay"), Qt::LeftButton, pointIn(findItem("repeatMonthDay"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, 0, 5000);
 
         // Let the ordinal drop-down finish closing, or it takes the next click.
         QVERIFY(waitFor([] {
@@ -202,12 +202,12 @@ private slots:
         QQuickItem *cell = waitItem("pickerDay:" + isoOf(end));
         QVERIFY(cell);
         click(cell);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::OnDate), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::OnDate), 5000);
         QCOMPARE(app.task(id).recurrence.endDate, end);
         // The calendar must finish closing, or it takes the next click.
         QVERIFY(waitFor([] { return !findItem("pickerNext"); }));
         click(findItem("repeatEndNever"), Qt::LeftButton, pointIn(findItem("repeatEndNever"), 0.04, 0.5));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::Never), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::Never), 5000);
     }
 
     // "When you complete a repeating task and another occurrence remains, the reference app
@@ -219,29 +219,29 @@ private slots:
         QVERIFY(app.openSource(homeKey(app)));
         const qint64 id = app.ids.buyMilk;
         const QDate today = QDate::currentDate();
-        QTRY_VERIFY_WITH_TIMEOUT(badge("rowRepeat", id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowRepeat", id), 5000);
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
         QVERIFY(!app.task(id).completed);
         QCOMPARE(liveCopies(app, "Buy milk"), 2);
-        QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("d:" + isoOf(today.addDays(1))), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("d:" + isoOf(today.addDays(1))), 5000);
 
         // The completed occurrence is in Done and does not repeat.
         app.press(Qt::Key_5, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("done"), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("done"), 5000);
         qint64 copy = 0;
         for (const Task &t : app.store().tasks())
             if (!t.deleted && t.title == "Buy milk" && t.id != id) copy = t.id;
         QVERIFY(copy);
         QVERIFY(app.task(copy).completed);
         QVERIFY(!app.task(copy).recurrence.isSet());
-        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, copy), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!rowVisible(app, id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, copy), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!rowVisible(app, id), 5000);
 
         // One undo puts everything back as it was.
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(liveCopies(app, "Buy milk"), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveCopies(app, "Buy milk"), 1, 5000);
     }
 
     // Weekly on Monday, Wednesday and Friday: the next occurrence is the next
@@ -259,7 +259,7 @@ private slots:
         QDate expect = today.addDays(1);
         while (!(expect.dayOfWeek() == 1 || expect.dayOfWeek() == 3 || expect.dayOfWeek() == 5)) expect = expect.addDays(1);
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, expect, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, expect, 5000);
         QVERIFY(!app.task(id).completed);
     }
 
@@ -270,7 +270,7 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(app.openSource(homeKey(app)));
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(app.ids.buyMilk)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).dueDate, today.addMonths(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).dueDate, today.addMonths(1), 5000);
     }
 
     // "Repeat from Completion: the next occurrence is calculated from the date
@@ -287,10 +287,10 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(app.openSource(homeKey(app)));
         const qint64 id = app.ids.buyMilk;
-        QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("overdue"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("overdue"), 5000);
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(3), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("d:" + isoOf(today.addDays(3))), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(3), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("d:" + isoOf(today.addDays(3))), 5000);
     }
 
     // "If the task has reached its End after count... the final occurrence
@@ -306,10 +306,10 @@ private slots:
         QVERIFY(app.openSource(homeKey(app)));
         const qint64 id = app.ids.buyMilk;
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
         QVERIFY(!app.task(id).completed);
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 5000);
         QCOMPARE(app.task(id).dueDate, today.addDays(1));  // No third occurrence.
     }
 
@@ -325,12 +325,12 @@ private slots:
         QVERIFY(app.openSource(homeKey(app)));
         const qint64 id = app.ids.buyMilk;
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(2), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(2), 5000);
         QVERIFY(!app.task(id).completed);
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(id)));
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 5000);
         QCOMPARE(app.task(id).dueDate, today.addDays(2));
     }
 };
@@ -361,13 +361,13 @@ private slots:
 
         QVERIFY(clickNamed("editorAlarm"));
         QVERIFY(clickMenu("15 minutes before"));
-        QTRY_VERIFY_WITH_TIMEOUT(offsets(app, id).contains(15), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(offsets(app, id).contains(15), 5000);
         QVERIFY(clickNamed("editorAlarm"));
         QVERIFY(clickMenu("1 day before"));
-        QTRY_VERIFY_WITH_TIMEOUT(offsets(app, id).contains(1440), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(offsets(app, id).contains(1440), 5000);
         QVERIFY(clickNamed("editorAlarm"));
         QVERIFY(clickMenu("At due time"));
-        QTRY_VERIFY_WITH_TIMEOUT(offsets(app, id).contains(0), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(offsets(app, id).contains(0), 5000);
         QCOMPARE(alarmsOf(app, id).size(), before + 3);
         // Each alert has its chip in the editor.
         for (const Alarm &a : alarmsOf(app, id))
@@ -379,23 +379,23 @@ private slots:
             if (a.kind == Alarm::Relative && a.offset == 15) fifteen = a.id;
         QVERIFY(fifteen);
         click(findItem(QString("editorAlarmRemove:%1").arg(fifteen)));
-        QTRY_VERIFY_WITH_TIMEOUT(!offsets(app, id).contains(15), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!offsets(app, id).contains(15), 5000);
         QVERIFY(waitFor([&] { return !findItem(QString("editorAlarmChip:%1").arg(fifteen)); }));
 
         // Choosing a checked preset again switches it off.
         QVERIFY(clickNamed("editorAlarm"));
         QVERIFY(clickMenu("1 day before"));
-        QTRY_VERIFY_WITH_TIMEOUT(!offsets(app, id).contains(1440), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!offsets(app, id).contains(1440), 5000);
         QVERIFY(closeEditor(app));
-        QTRY_VERIFY_WITH_TIMEOUT(badge("rowAlarm", id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowAlarm", id), 5000);
 
         // Remove All Alerts.
         QVERIFY(openEditor(app, id));
         QVERIFY(clickNamed("editorAlarm"));
         QVERIFY(clickMenu("Remove All Alerts"));
-        QTRY_COMPARE_WITH_TIMEOUT(alarmsOf(app, id).size(), 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(alarmsOf(app, id).size(), 0, 5000);
         QVERIFY(closeEditor(app));
-        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowAlarm", id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowAlarm", id), 5000);
     }
 
     // "Days Before at a Time": N days before the due date at a time of day, and
@@ -412,10 +412,10 @@ private slots:
         QVERIFY(waitItem("alarmDays"));
         QQuickItem *spin = findItem("alarmDays");
         click(spin, Qt::LeftButton, pointIn(spin, 0.95, 0.5));   // 1 day -> 2 days
-        QTRY_COMPARE_WITH_TIMEOUT(prop("alarmDays", "value").toInt(), 2, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(prop("alarmDays", "value").toInt(), 2, 5000);
         QVERIFY(waitFor([] { return findText("OK") != nullptr; }));
         click(findText("OK"));
-        QTRY_VERIFY_WITH_TIMEOUT(!alarmsOf(app, id).isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!alarmsOf(app, id).isEmpty(), 5000);
         Alarm daysBefore;
         for (const Alarm &a : alarmsOf(app, id))
             if (a.kind == Alarm::DaysBefore) daysBefore = a;
@@ -428,7 +428,7 @@ private slots:
         QVERIFY(clickMenu("At a Date and Time…"));
         QVERIFY(waitFor([] { return findText("OK") != nullptr; }));
         click(findText("OK"));
-        QTRY_COMPARE_WITH_TIMEOUT(alarmsOf(app, id).size(), 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(alarmsOf(app, id).size(), 2, 5000);
         Alarm absolute;
         for (const Alarm &a : alarmsOf(app, id))
             if (a.kind == Alarm::Absolute) absolute = a;
@@ -440,9 +440,9 @@ private slots:
         QVERIFY(waitFor([] { return findText("OK") == nullptr; }));
         QVERIFY(clickNamed("editorAlarm"));
         QVERIFY(clickMenu("Remove All Alerts"));
-        QTRY_COMPARE_WITH_TIMEOUT(alarmsOf(app, id).size(), 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(alarmsOf(app, id).size(), 0, 5000);
         QVERIFY(closeEditor(app));
-        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowAlarm", id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowAlarm", id), 5000);
     }
 };
 

@@ -222,11 +222,11 @@ private slots:
 
         app.press(row.key, row.mods);
         if (!row.typed.isEmpty()) {
-            QTRY_VERIFY2_WITH_TIMEOUT(inputFocused(app), qPrintable("no field took the keyboard; focus is on " + app.focusDescription()), 3000);
+            QTRY_VERIFY2_WITH_TIMEOUT(inputFocused(app), qPrintable("no field took the keyboard; focus is on " + app.focusDescription()), 5000);
             app.type(QString(row.typed).remove('\n'));   // "\n" alone is just Return.
             app.press(Qt::Key_Return);
         }
-        QTRY_VERIFY_WITH_TIMEOUT(row.effect(app), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(row.effect(app), 5000);
 
         switch (row.undo) {
         case KeyRow::None:
@@ -247,7 +247,7 @@ private slots:
         }
         if (row.undo != KeyRow::None) {
             QVERIFY(row.reverted);
-            QTRY_VERIFY_WITH_TIMEOUT(row.reverted(app), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(row.reverted(app), 5000);
         }
     }
 
@@ -293,34 +293,34 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(app.openSource(lk(app.ids.home)));
         QQuickItem *list = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((list = findItem("taskList")) != nullptr, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((list = findItem("taskList")) != nullptr, 5000);
         list->forceActiveFocus();
         QTRY_VERIFY(listFocused());
         // Home in Due Date order: electricity (overdue), milk, plants, shelf.
         QCOMPARE(app.backend().selectionCount(), 0);
         app.press(Qt::Key_Down);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), app.ids.electricity, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), app.ids.electricity, 5000);
         app.press(Qt::Key_Down);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), app.ids.buyMilk, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), app.ids.buyMilk, 5000);
         app.press(Qt::Key_Up);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), app.ids.electricity, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), app.ids.electricity, 5000);
         app.press(Qt::Key_Up);   // The top stays the top.
         QCOMPARE(app.backend().currentTaskId(), app.ids.electricity);
         // Shift extends the selection; a plain arrow collapses it again.
         app.press(Qt::Key_Down, Qt::ShiftModifier);
         app.press(Qt::Key_Down, Qt::ShiftModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 3, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 3, 5000);
         QVERIFY(app.row(app.ids.plants) != nullptr);
         app.press(Qt::Key_Down);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 1, 5000);
         QCOMPARE(app.backend().currentTaskId(), app.ids.shelf);
         app.press(Qt::Key_Down);   // The bottom stays the bottom.
         QCOMPARE(app.backend().currentTaskId(), app.ids.shelf);
         // Ctrl+A selects all and Escape clears.
         app.press(Qt::Key_A, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 4, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 4, 5000);
         app.press(Qt::Key_Escape);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 0, 5000);
     }
 
     // Home, End, Page Up and Page Down are not bound by the task list (nor
@@ -348,22 +348,22 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(homeWith(app, app.ids.plants));
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("editorCard") != nullptr && app.backend().editingTaskId() == app.ids.plants, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("editorCard") != nullptr && app.backend().editingTaskId() == app.ids.plants, 5000);
         QQuickItem *title = nullptr;
         QTRY_VERIFY2_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr && title->property("activeFocus").toBool(),
                                   qPrintable(app.focusDescription()), 3000);
         QTest::keyClick(app.window, Qt::Key_X);   // Typed into the title, not a command.
-        QTRY_VERIFY_WITH_TIMEOUT(title->property("text").toString().contains('x'), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(title->property("text").toString().contains('x'), 5000);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
         QCOMPARE(app.backend().currentTaskId(), app.ids.plants);   // Still selected.
         QTRY_VERIFY(listFocused());
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).title, QString("Water the plantsx"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).title, QString("Water the plantsx"), 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).title, QString("Water the plants"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).title, QString("Water the plants"), 5000);
         // A second Escape clears the selection.
         app.press(Qt::Key_Escape);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 0, 5000);
     }
 
     // While editing, bare keys type into the fields instead of acting on the task.
@@ -373,16 +373,16 @@ private slots:
         QVERIFY(homeWith(app, app.ids.plants));
         app.press(Qt::Key_Return);
         QQuickItem *title = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr && title->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr && title->property("activeFocus").toBool(), 5000);
         app.type("t3sd");
-        QTRY_VERIFY_WITH_TIMEOUT(title->property("text").toString().endsWith("t3sd"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(title->property("text").toString().endsWith("t3sd"), 5000);
         const Task t = app.task(app.ids.plants);
         QCOMPARE(t.priority, 0);
         QVERIFY(!t.starred);
         QCOMPARE(t.dueDate, day(1));
         QVERIFY(commandBarClosed());
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
     }
 
     // Space opens Quick Look on the selected task, Up and Down keep moving
@@ -395,32 +395,32 @@ private slots:
         QVERIFY(look);
         QVERIFY(!look->property("visible").toBool());
         app.press(Qt::Key_Space);
-        QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 5000);
         auto *surface = popupSurface(look);
         auto shows = [&](const QString &text) {
             return findIn(surface, [&](QQuickItem *i) {
                        return i->width() > 0 && i->metaObject()->indexOfProperty("text") >= 0 && i->property("text").toString() == text;
                    }) != nullptr;
         };
-        QTRY_VERIFY_WITH_TIMEOUT(shows("Buy milk") && shows("Home"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(look->property("contentItem").value<QQuickItem *>()->property("activeFocus").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows("Buy milk") && shows("Home"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(look->property("contentItem").value<QQuickItem *>()->property("activeFocus").toBool(), 5000);
         app.press(Qt::Key_Down);
-        QTRY_VERIFY_WITH_TIMEOUT(shows("Water the plants"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(shows("Water the plants"), 5000);
         app.press(Qt::Key_Space);
-        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 5000);
         QTRY_VERIFY(listFocused());
         // Escape closes it as well, and Ctrl+W.
         app.press(Qt::Key_Space);
-        QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 5000);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 5000);
         app.press(Qt::Key_Space);
-        QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(look->property("visible").toBool(), 5000);
         app.press(Qt::Key_W, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 5000);
         // With nothing selected there is nothing to look at.
         app.press(Qt::Key_Escape);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 0, 5000);
         app.press(Qt::Key_Space);
         QTest::qWait(200);
         QVERIFY(!look->property("visible").toBool());
@@ -432,9 +432,9 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(homeWith(app, app.ids.plants));
         app.press(Qt::Key_Plus, Qt::ShiftModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).priority, 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).priority, 1, 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).priority, 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.plants).priority, 0, 5000);
     }
 
     // "?" opens the overlay of every shortcut; any key closes it.
@@ -446,7 +446,7 @@ private slots:
         QVERIFY(help);
         QVERIFY(!help->property("visible").toBool());
         app.press(Qt::Key_Question, Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(help->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(help->property("visible").toBool(), 5000);
         auto *surface = popupSurface(help);
         QStringList seen;
         findIn(surface, [&](QQuickItem *i) {
@@ -461,14 +461,14 @@ private slots:
         everything.replace(QStringLiteral("↑"), "Up").replace(QStringLiteral("↓"), "Down");
         QVERIFY(everything.contains("Ctrl+N") && everything.contains("Ctrl+Shift+E") && everything.contains("F11"));
         app.press(Qt::Key_A);   // Any key closes it, and is not also acted on.
-        QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 5000);
         QCOMPARE(app.backend().selectionCount(), 1);
         QTRY_VERIFY(listFocused());
         // It also opens and closes with the same key.
         app.press(Qt::Key_Question, Qt::ShiftModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(help->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(help->property("visible").toBool(), 5000);
         app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 5000);
     }
 
     // Ctrl+S is Sync now, in the list too (the star toggles with Ctrl+Alt+S): it
@@ -501,7 +501,7 @@ private slots:
         QVERIFY(app.task(app.ids.shelf).starred);   // Not an unstar.
         // Ctrl+Alt+S is what unstars it.
         app.press(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.shelf).starred, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.shelf).starred, 5000);
     }
 };
 

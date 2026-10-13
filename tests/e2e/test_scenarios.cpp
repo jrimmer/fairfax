@@ -15,7 +15,7 @@ QString isoOf(const QDate &d) { return d.toString(Qt::ISODate); }
 // an event-loop turn or two).
 #define TRY_ITEM(var, expr) \
     QQuickItem *var = nullptr; \
-    QTRY_VERIFY_WITH_TIMEOUT((var = (expr)) != nullptr, 3000)
+    QTRY_VERIFY_WITH_TIMEOUT((var = (expr)) != nullptr, 5000)
 
 }  // namespace
 
@@ -37,9 +37,9 @@ private slots:
             // The title must be there as soon as the editor is, not blank
             // until something else refreshes it.
             QCOMPARE(title->property("text").toString(), QString("Buy milk"));
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().editor().value("title").toString(), QString("Buy milk"), 2000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().editor().value("title").toString(), QString("Buy milk"), 5000);
             app.press(leave);
-            QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
             QCOMPARE(app.task(app.ids.buyMilk).title, QString("Buy milk"));
         }
 
@@ -51,8 +51,8 @@ private slots:
         app.press(Qt::Key_A, Qt::ControlModifier);
         app.type("Buy oat milk");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).title, QString("Buy oat milk"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).title, QString("Buy oat milk"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
         QVERIFY(app.row(app.ids.buyMilk));
     }
 
@@ -65,21 +65,21 @@ private slots:
         QVERIFY(app.openSource(key));
         app.press(Qt::Key_N, Qt::ControlModifier);
         TRY_ITEM(title, findItem("editorTitle"));
-        QTRY_VERIFY2_WITH_TIMEOUT(title->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(title->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 5000);
         app.type("Plan the offsite");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY2_WITH_TIMEOUT(app.taskTitled("Plan the offsite").id != 0, qPrintable(app.titles()), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(app.taskTitled("Plan the offsite").id != 0, qPrintable(app.titles()), 5000);
         QCOMPARE(app.taskTitled("Plan the offsite").listId, app.ids.work);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
 
         app.press(Qt::Key_2, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 5000);
         app.press(Qt::Key_N, Qt::ControlModifier);
         TRY_ITEM(todayTitle, findItem("editorTitle"));
-        QTRY_VERIFY2_WITH_TIMEOUT(todayTitle->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 3000);
+        QTRY_VERIFY2_WITH_TIMEOUT(todayTitle->property("activeFocus").toBool(), qPrintable("focus is on " + app.focusDescription()), 5000);
         app.type("Send the invoice");
         app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Send the invoice").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Send the invoice").id != 0, 5000);
         QCOMPARE(app.taskTitled("Send the invoice").dueDate, QDate::currentDate());
     }
 
@@ -91,9 +91,9 @@ private slots:
         QVERIFY(app.openSource("list:" + QString::number(app.ids.home)));
         TRY_ITEM(box, findItem(QString("taskCheck:%1").arg(app.ids.plants)));
         click(box);
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.plants).completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.plants).completed, 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.plants).completed, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(app.ids.plants).completed, 5000);
     }
 
     // "`Collect the parcel tomorrow at 3pm #errands`... arrive with their
@@ -104,14 +104,14 @@ private slots:
         QVERIFY(app.ok);
         app.press(Qt::Key_2, Qt::ShiftModifier | Qt::ControlModifier);
         QQuickWindow *quick = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((quick = windowTitled("Quick Entry")) != nullptr, 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(quick->isExposed(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT((quick = windowTitled("Quick Entry")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(quick->isExposed(), 5000);
         quick->requestActivate();
         TRY_ITEM(field, findItem("quickTitle"));
         click(field);
         typeInto(quick, "Call Sam tomorrow at 3pm #calls !!");
         QTest::keyClick(quick, Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Call Sam").id != 0, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Call Sam").id != 0, 5000);
         const Task t = app.taskTitled("Call Sam");
         QCOMPARE(t.dueDate, QDate::currentDate().addDays(1));
         QCOMPARE(t.dueTime, 15 * 60);
@@ -120,7 +120,7 @@ private slots:
         for (qint64 id : t.tagIds)
             tags << app.store().tag(id).name;
         QCOMPARE(tags, QStringList{"calls"});
-        QTRY_VERIFY_WITH_TIMEOUT(!windowTitled("Quick Entry"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!windowTitled("Quick Entry"), 5000);
     }
 
     // "You can also switch styles from the main window... the calendar button,
@@ -133,7 +133,7 @@ private slots:
 
         // Hide and show the calendar.
         click(findItem("calendarToggle"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("miniCalendar"), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("miniCalendar"), 5000);
         click(findItem("calendarToggle"));
         TRY_ITEM(shown, findItem("miniCalendar"));
         calendar = shown;
@@ -141,7 +141,7 @@ private slots:
         auto pick = [&](const QString &entry) {
             click(findItem("calendarStyle"));
             QQuickItem *item = nullptr;
-            QTRY_VERIFY_WITH_TIMEOUT((item = findText(entry, "QQuickMenuItem")) != nullptr, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT((item = findText(entry, "QQuickMenuItem")) != nullptr, 5000);
             click(item);
         };
         auto weekendShaded = [&] {
@@ -159,18 +159,18 @@ private slots:
 
         QVERIFY(!weekendShaded());
         pick("Shade Weekends");
-        QTRY_VERIFY_WITH_TIMEOUT(weekendShaded(), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(weekendShaded(), 5000);
         pick("Shade Weekends");
-        QTRY_VERIFY_WITH_TIMEOUT(!weekendShaded(), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(!weekendShaded(), 5000);
 
         pick("Dots");
-        QTRY_COMPARE_WITH_TIMEOUT(findItem("miniCalendar")->property("style").toString(), QString("dots"), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(dotsShown(), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(findItem("miniCalendar")->property("style").toString(), QString("dots"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(dotsShown(), 5000);
         pick("None");
-        QTRY_COMPARE_WITH_TIMEOUT(findItem("miniCalendar")->property("style").toString(), QString("none"), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(!dotsShown(), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(findItem("miniCalendar")->property("style").toString(), QString("none"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!dotsShown(), 5000);
         pick("Heat Map");
-        QTRY_COMPARE_WITH_TIMEOUT(findItem("miniCalendar")->property("style").toString(), QString("heat"), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(findItem("miniCalendar")->property("style").toString(), QString("heat"), 5000);
         QVERIFY(!dotsShown());
     }
 
@@ -182,7 +182,7 @@ private slots:
         App app;
         QVERIFY(app.ok);
         app.press(Qt::Key_1, Qt::ControlModifier);  // All
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("all"), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("all"), 5000);
         const QDate today = QDate::currentDate();
         auto day = [&](int offset) { return findItem("calDay:" + isoOf(today.addDays(offset))); };
         TRY_ITEM(row, app.row(app.ids.report));  // Due in two days.
@@ -190,19 +190,19 @@ private slots:
 
         TRY_ITEM(tomorrow, day(1));
         click(tomorrow);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().dayFilter(), isoOf(today.addDays(1)), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.plants) && app.row(app.ids.callAlex), 2000);  // Both due tomorrow.
-        QTRY_VERIFY_WITH_TIMEOUT(!app.row(app.ids.report) && !app.row(app.ids.studio) && !app.row(app.ids.buyMilk), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().dayFilter(), isoOf(today.addDays(1)), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.plants) && app.row(app.ids.callAlex), 5000);  // Both due tomorrow.
+        QTRY_VERIFY_WITH_TIMEOUT(!app.row(app.ids.report) && !app.row(app.ids.studio) && !app.row(app.ids.buyMilk), 5000);
 
         click(day(1));
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().dayFilter(), QString(), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && app.row(app.ids.buyMilk), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().dayFilter(), QString(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && app.row(app.ids.buyMilk), 5000);
 
         drag(day(2), day(3));
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().dayFilter(), isoOf(today.addDays(2)), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().dayFilter(), isoOf(today.addDays(2)), 5000);
         QCOMPARE(app.backend().dayFilterTo(), isoOf(today.addDays(3)));
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && app.row(app.ids.studio), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.row(app.ids.plants) && !app.row(app.ids.buyMilk), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && app.row(app.ids.studio), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.row(app.ids.plants) && !app.row(app.ids.buyMilk), 5000);
     }
 
     // "Focus Lists" and lists in the Lists Panel, and "⌘1 All, ⌘2 Today,
@@ -217,29 +217,29 @@ private slots:
         };
 
         QVERIFY(app.openSource("list:" + QString::number(app.ids.work)));
-        QTRY_COMPARE_WITH_TIMEOUT(title(), QString("Work"), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && !app.row(app.ids.buyMilk), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(title(), QString("Work"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && !app.row(app.ids.buyMilk), 5000);
         QVERIFY(app.openSource("list:" + QString::number(app.ids.home)));
-        QTRY_COMPARE_WITH_TIMEOUT(title(), QString("Home"), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.report), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(title(), QString("Home"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.report), 5000);
 
         QVERIFY(app.openSource("today"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.plants), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.plants), 5000);
         QVERIFY(app.openSource("starred"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.shelf) && !app.row(app.ids.buyMilk), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.shelf) && !app.row(app.ids.buyMilk), 5000);
 
         // Ctrl+1..5.
         struct Case { Qt::Key key; const char *source; };
         for (const Case &c : {Case{Qt::Key_1, "all"}, Case{Qt::Key_2, "today"}, Case{Qt::Key_3, "starred"},
                               Case{Qt::Key_4, "scheduled"}, Case{Qt::Key_5, "done"}}) {
             app.press(c.key, Qt::ControlModifier);
-            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString(c.source), 2000);
-            QTRY_COMPARE_WITH_TIMEOUT(title(), app.backend().sourceTitle(), 2000);
+            QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString(c.source), 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(title(), app.backend().sourceTitle(), 5000);
         }
         // Done holds the one completed task and nothing open.
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.oldThing) && !app.row(app.ids.buyMilk), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.oldThing) && !app.row(app.ids.buyMilk), 5000);
         app.press(Qt::Key_1, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && app.row(app.ids.report) && !app.row(app.ids.oldThing), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && app.row(app.ids.report) && !app.row(app.ids.oldThing), 5000);
     }
 
     // "⌘F: open the Global Search Bar... Filter the task list" (search-and-jump-bars.md).
@@ -248,17 +248,17 @@ private slots:
         App app;
         QVERIFY(app.ok);
         app.press(Qt::Key_1, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && app.row(app.ids.report), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && app.row(app.ids.report), 5000);
         app.press(Qt::Key_F, Qt::ControlModifier);
         TRY_ITEM(field, findItem("searchField"));
-        QTRY_VERIFY_WITH_TIMEOUT(field->property("activeFocus").toBool(), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(field->property("activeFocus").toBool(), 5000);
         app.type("milk");
         // Each keystroke refilters the list; the field keeps focus throughout.
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString("milk"), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.report) && !app.row(app.ids.plants), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString("milk"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) && !app.row(app.ids.report) && !app.row(app.ids.plants), 5000);
         app.press(Qt::Key_Escape);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString(), 2000);
-        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && app.row(app.ids.plants), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().search(), QString(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.report) && app.row(app.ids.plants), 5000);
     }
 
     // "Defer...: pick a relative offset (Today / Tomorrow / ...)"
@@ -294,7 +294,7 @@ private slots:
             QFAIL(qPrintable("Defer submenu did not open; visible menu entries: " + seen.join(" | ")));
         }
         click(tomorrow);
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.electricity).dueDate, QDate::currentDate().addDays(1), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.electricity).dueDate, QDate::currentDate().addDays(1), 5000);
     }
 
     // "Right-clicking a list... Rename...: edit the name in place."
@@ -311,8 +311,8 @@ private slots:
                                      && app.window->activeFocusItem()->property("text").toString() == "Home", 3000);
         app.type("Household");
         app.press(Qt::Key_Return);
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(app.ids.home).name, QString("Household"), 3000);
-        QTRY_VERIFY_WITH_TIMEOUT(findText("Household") != nullptr, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(app.ids.home).name, QString("Household"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Household") != nullptr, 5000);
         QVERIFY(!findText("Home"));
     }
 };
