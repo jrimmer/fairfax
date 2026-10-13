@@ -35,14 +35,19 @@ Plain.TextField {
         radius: 5
         color: root.activeFocus || root.boxed ? theme.background : "transparent"
         border.color: root.activeFocus ? theme.accent : root.boxed ? theme.divider : "transparent"
-        Icon {
-            visible: root.clearable && !root.activeFocus
-            anchors.right: parent.right
-            anchors.rightMargin: 5
-            anchors.verticalCenter: parent.verticalCenter
-            name: "clear"; size: 12; color: theme.faint
-            MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.cleared() }
-        }
+    }
+
+    // The clear button is a child of the field itself, above its text, because a
+    // child of the background sits beneath the field, which would take the click.
+    Icon {
+        objectName: root.objectName + "Clear"
+        z: 2
+        visible: root.clearable && !root.activeFocus
+        anchors.right: parent.right
+        anchors.rightMargin: 5
+        anchors.verticalCenter: parent.verticalCenter
+        name: "clear"; size: 12; color: theme.faint
+        MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.cleared() }
     }
 
     Component.onCompleted: text = value
@@ -106,6 +111,7 @@ Plain.TextField {
                 Rectangle {
                     required property var modelData
                     required property int index
+                    objectName: "dateSuggestion:" + modelData.label
                     width: 202
                     height: 26
                     radius: 5
