@@ -44,7 +44,9 @@ Rectangle {
     property bool limitHit: false
 
     color: theme.notes
-    implicitHeight: Math.max(84, (preview ? previewText.implicitHeight : area.implicitHeight) + 16)
+    // The chip column sits below the first line, so it also sets the least height:
+    // otherwise the open-links chip is cut off by the editor card on short notes.
+    implicitHeight: Math.max(84, chips.y + chips.height + 8, (preview ? previewText.implicitHeight : area.implicitHeight) + 16)
 
     function commit() { if (area.text !== root.text) committed(area.text) }
     function insert(position, string) { area.insert(position, string) }
