@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QSaveFile>
+#include <QStringDecoder>
 #include <QSet>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -2145,7 +2146,11 @@ QString dateText(const QDate &d, int minutes) {
     return text;
 }
 
-// Header names are case-insensitive; folded lines continue with whitespace.
+}  // namespace
+
+namespace Exchange {
+
+// RFC 2047 encoded words (=?charset?B/Q?text?=) in a header value.
 QString decodeMimeWords(const QString &raw) {
     static const QRegularExpression word("=\\?([^?]+)\\?([bBqQ])\\?([^?]*)\\?=");
     QString out;
@@ -2170,16 +2175,14 @@ QString decodeMimeWords(const QString &raw) {
                     bytes.append(q[i]);
                 }
         }
-        const QString charset = m.captured(1).toLower();
-        out += charset.contains("8859-1") || charset == "latin1" ? QString::fromLatin1(bytes) : QString::fromUtf8(bytes);
+        // The language suffix of RFC 2231 ("utf-8*en") is not part of the charset.
+        const QByteArray charset = m.captured(1).section('*', 0, 0).toLatin1();
+        QStringDecoder decoder(charset.constData());
+        out += decoder.isValid() ? QString(decoder.decode(bytes)) : QString::fromUtf8(bytes);
         last = m.capturedEnd();
     }
     return out + raw.mid(last);
 }
-
-}  // namespace
-
-namespace Exchange {
 
 QString printHtml(const QString &title, const QVector<PrintSection> &sections, bool includeNotes) {
     QString html = "<html><body style=\"font-family: sans-serif; font-size: 10pt;\">";

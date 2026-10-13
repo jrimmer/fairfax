@@ -26,6 +26,10 @@ struct ImportResult {
 
 namespace Exchange {
 
+// Decodes RFC 2047 encoded words in a mail header value; plain text passes
+// through. Shared by the .eml reader and Mail to Precrime.
+QString decodeMimeWords(const QString &raw);
+
 // Which tasks an export includes, as in the reference app's "Tasks to export:" popup.
 enum class Scope { All, NotDone, Done };
 
