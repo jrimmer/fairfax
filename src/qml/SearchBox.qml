@@ -50,6 +50,9 @@ Item {
         Keys.onReturnPressed: root.finished()
         Keys.onDownPressed: root.finished()
         onActiveFocusChanged: if (!activeFocus && text === "") root.opened = false
+        // A search cleared while the field is not being typed in (saving it as a Smart
+        // List does) leaves nothing to show: the empty field would otherwise stay open.
+        onTextChanged: if (text === "" && !activeFocus) root.opened = false
         Text {
             visible: !input.text
             text: "Search"
