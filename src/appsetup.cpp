@@ -50,9 +50,17 @@ void AppServices::startSync(bool opened, bool offscreen)
         QTimer::singleShot(3000, todoist.get(), &TodoistSync::syncNow);
     folderSync = std::make_unique<FolderSync>(&store);
     webDavSync = std::make_unique<WebDavSync>(&store);
+    // The launch sync asks again when it fires, in case automatic sync was
+    // switched off in the first few seconds.
     if (SyncTree::autoSyncEnabled(store)) {
-        QTimer::singleShot(4000, folderSync.get(), &TreeProvider::syncNow);
-        QTimer::singleShot(5000, webDavSync.get(), &TreeProvider::syncNow);
+        QTimer::singleShot(4000, folderSync.get(), [this] {
+            if (SyncTree::autoSyncEnabled(store))
+                folderSync->syncNow();
+        });
+        QTimer::singleShot(5000, webDavSync.get(), [this] {
+            if (SyncTree::autoSyncEnabled(store))
+                webDavSync->syncNow();
+        });
     }
     syncHub.add(gitSync.get(), "Git");
     syncHub.add(todoist.get(), "Todoist");
