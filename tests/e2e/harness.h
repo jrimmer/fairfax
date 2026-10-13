@@ -333,6 +333,7 @@ public:
     AppServices &services() { return *m_services; }
     QString dir() const { return QFileInfo(m_store.path()).absolutePath(); }
     Store &store() { return m_store; }
+    QQmlApplicationEngine &engine() { return m_engine; }
     QString dbPath() const { return m_dbPath; }
 
     // The task a user would see by this title, straight from the store.

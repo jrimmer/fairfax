@@ -1,0 +1,12 @@
+[
+  {"type": "project", "uuid": "PRJ-STUDIO", "title": "Studio move", "area": "Work", "notes": "Crates first",
+   "deadline": "2027-04-02",
+   "items": [
+     {"type": "to-do", "uuid": "TD-CRATES", "title": "Order crates", "tags": ["boxes", "urgent"], "when": "2027-03-20"},
+     {"type": "to-do", "uuid": "TD-LEASE", "title": "Cancel the lease", "status": "completed",
+      "completion_date": "2027-01-05T09:00:00Z"}
+   ]},
+  {"type": "to-do", "uuid": "TD-KIT", "title": "Pack the kit",
+   "checklist": [{"title": "Cables"}, {"title": "Microphones", "completed": true}]},
+  {"type": "to-do", "attributes": {"title": "Wrapped entry", "deadline": "2027-05-01", "tags": ["misc"], "notes": "Wrapped notes"}}
+]

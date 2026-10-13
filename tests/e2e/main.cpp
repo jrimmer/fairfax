@@ -11,6 +11,9 @@ QList<TestFactory> &testRegistry() {
 }
 
 int main(int argc, char *argv[]) {
+    // No session bus: the file chooser portal would otherwise put a real dialog on the
+    // desktop of whoever runs the tests; with none, FilePicker reports that it failed.
+    qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/precrime-e2e");
     QQuickStyle::setStyle("Material");
     QApplication app(argc, argv);
     int failures = 0;

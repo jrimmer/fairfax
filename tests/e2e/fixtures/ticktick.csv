@@ -1,0 +1,13 @@
+"Date: 2027-01-12+0000"
+"Version: 7.2"
+"Status:
+0 Normal
+-1 Abandoned
+2 Completed"
+"Folder Name","List Name","Title","Kind","Tags","Content","Is Check list","Start Date","Due Date","Reminder","Repeat","Priority","Status","Created Time","Completed Time","Order","Timezone","Is All Day","Is Floating","Column Name","Column Order","View Mode","taskId","parentId","projectKind"
+"Studio","Sessions","Tune the drums","TEXT","audio","Skins first","N","2027-03-01T10:00:00+0000","2027-03-01T10:00:00+0000","PT0S","FREQ=WEEKLY;INTERVAL=2","5","0","2027-01-02T09:00:00+0000","","-10","Europe/London","false","false",,,"list","e1","","TASK"
+"","Inbox","Email the label","TEXT","","","N","","2027-03-02T08:00:00+0000","","","3","0","2027-01-02T09:00:00+0000","","-9","America/Los_Angeles","true","false",,,"list","e2","","TASK"
+"Studio","Sessions","Load-in","CHECKLIST","","Gear:▪Amps
+▫Cables
+","Y","","","","","0","0","2027-01-02T09:00:00+0000","","-8","","true","false",,,"list","e3","","TASK"
+"","Inbox","Old idea","TEXT","","","N","","","","","0","2","2027-01-02T09:00:00+0000","2027-02-01T10:00:00+0000","-7","","true","false",,,"list","e4","","TASK"

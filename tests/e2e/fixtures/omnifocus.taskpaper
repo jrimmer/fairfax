@@ -1,0 +1,9 @@
+- Renew passport @flagged
+Studio:
+	Album:
+		- Mix track four @due(2027-03-05 18:30) @tags(audio, deadline) @estimate(2h)
+			Check the low end.
+			- Bounce stems @desk
+		- Master the record @defer(2027-02-01) @done(2027-02-10)
+Errands:
+	- Post the parcel @due(2027-03-09)
