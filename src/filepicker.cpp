@@ -23,6 +23,7 @@ constexpr auto Chooser = "org.freedesktop.portal.FileChooser";
 FilePicker::FilePicker(QObject *parent) : QObject(parent) {}
 
 void FilePicker::open(const QString &title, const QString &purpose) {
+    m_suggestedName.clear();
 #if defined(Q_OS_LINUX)
     request("OpenFile", title, {}, purpose);
 #else
@@ -34,6 +35,7 @@ void FilePicker::open(const QString &title, const QString &purpose) {
 }
 
 void FilePicker::openFolder(const QString &title, const QString &purpose) {
+    m_suggestedName.clear();
 #if defined(Q_OS_LINUX)
     request("OpenFile", title, {{"directory", true}}, purpose);
 #else
@@ -44,6 +46,7 @@ void FilePicker::openFolder(const QString &title, const QString &purpose) {
 }
 
 void FilePicker::save(const QString &title, const QString &suggestedName, const QString &purpose) {
+    m_suggestedName = suggestedName;
 #if defined(Q_OS_LINUX)
     request("SaveFile", title, {{"current_name", suggestedName}}, purpose);
 #else

@@ -18,6 +18,11 @@ public:
     Q_INVOKABLE void openFolder(const QString &title, const QString &purpose);
     Q_INVOKABLE void save(const QString &title, const QString &suggestedName, const QString &purpose);
 
+    // What the last request was for and, for a save, the file name it suggested;
+    // the end-to-end tests read them in place of answering a portal dialog.
+    QString lastPurpose() const { return m_purpose; }
+    QString lastSuggestedName() const { return m_suggestedName; }
+
 signals:
     void picked(const QString &path, const QString &purpose);
     void failed(const QString &message);
@@ -29,5 +34,6 @@ private:
     void request(const QString &method, const QString &title, const QVariantMap &options, const QString &purpose);
 
     QString m_purpose;
+    QString m_suggestedName;
     QString m_handle;
 };
