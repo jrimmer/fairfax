@@ -640,6 +640,7 @@ QString Backend::takePendingField() {
 void Backend::endEdit() {
     if (!m_editing)
         return;
+    emit editEnding();
     const qint64 id = m_editing;
     m_editing = 0;
     // A new task left without a title never happened.

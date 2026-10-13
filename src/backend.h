@@ -510,6 +510,7 @@ signals:
     void panelRequested(const QString &panel);  // "open" (Quick Open) or "settings".
     void recordingChanged();
     void quickEntryTextRequested(const QString &text);
+    void editEnding();  // The editor is about to close: it saves what is still in its fields.
     void editFieldRequested();  // The editor is open; takePendingField() says where to go.
     void windowRequested();
 
