@@ -64,6 +64,7 @@ ThemedDialog {
 
         TextField {
             id: nameInput
+            objectName: "editListName"
             Layout.fillWidth: true
             placeholderText: "Name"
             maximumLength: 200
@@ -78,6 +79,7 @@ ThemedDialog {
                 model: theme.listPalette
                 Rectangle {
                     required property int index
+                    objectName: "editListSwatch:" + index
                     width: 22; height: 22; radius: 11
                     color: theme.listColor(index)
                     border.width: root.chosenColor === index ? 3 : 0
@@ -86,6 +88,7 @@ ThemedDialog {
                 }
             }
             Rectangle {
+                objectName: "editListCustom"
                 readonly property bool custom: root.chosenColor >= 0x1000000
                 width: 22; height: 22; radius: 11
                 color: custom ? theme.listColor(root.chosenColor) : "transparent"
@@ -107,6 +110,7 @@ ThemedDialog {
             Label { text: "Group"; Layout.preferredWidth: 90 }
             ComboBox {
                 id: groupBox
+                objectName: "editListGroup"
                 Layout.fillWidth: true
                 model: [{ name: "None" }].concat(root.groups)
                 textRole: "name"
@@ -117,6 +121,7 @@ ThemedDialog {
             Label { text: "Completed"; Layout.preferredWidth: 90 }
             ComboBox {
                 id: completedBox
+                objectName: "editListCompleted"
                 Layout.fillWidth: true
                 model: ["Follow the default", "Always include", "Always exclude"]
             }
@@ -124,10 +129,10 @@ ThemedDialog {
         ColumnLayout {
             visible: !root.isSmart
             spacing: 0
-            CheckBox { id: allBox; text: "Include in All" }
-            CheckBox { id: todayBox; text: "Include in Today" }
-            CheckBox { id: doneBox; text: "Include in Done" }
-            CheckBox { id: muteBox; text: "Mute alerts" }
+            CheckBox { id: allBox; objectName: "editListAll"; text: "Include in All" }
+            CheckBox { id: todayBox; objectName: "editListToday"; text: "Include in Today" }
+            CheckBox { id: doneBox; objectName: "editListDone"; text: "Include in Done" }
+            CheckBox { id: muteBox; objectName: "editListMute"; text: "Mute alerts" }
         }
     }
 }

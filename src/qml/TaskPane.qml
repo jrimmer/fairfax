@@ -115,6 +115,7 @@ Item {
 
             // In a project the list name becomes an arrow-shaped badge.
             ListBadge {
+                objectName: "projectBadge"
                 visible: backend.sourceKey.startsWith("project:")
                 text: backend.sourceSubtitle
                 color: theme.listColor(backend.sourceColor)

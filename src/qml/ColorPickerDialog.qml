@@ -129,6 +129,7 @@ ThemedDialog {
             }
             TextField {
                 id: hexInput
+                objectName: "colorHex"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 38
                 maximumLength: 7

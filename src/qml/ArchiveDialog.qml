@@ -26,7 +26,7 @@ ThemedDialog {
                 spacing: 8
                 Rectangle { width: 7; height: 20; radius: 3.5; color: theme.listColor(modelData.color || 0) }
                 Label { text: modelData.name; elide: Text.ElideRight; Layout.fillWidth: true }
-                Button { text: "Restore"; onClicked: backend.setListFlag(modelData.id, "archived", false) }
+                Button { objectName: "archiveRestore:" + modelData.id; text: "Restore"; onClicked: backend.setListFlag(modelData.id, "archived", false) }
             }
         }
     }

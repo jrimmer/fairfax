@@ -9,6 +9,7 @@ import QtQuick.Layouts
 // does.
 Popup {
     id: root
+    objectName: "commandPopup"
 
     property string kind
     property var items: []
@@ -210,6 +211,7 @@ Popup {
 
         TextField {
             id: input
+            objectName: "commandInput"
             Layout.fillWidth: true
             Layout.margins: 10
             Layout.topMargin: 4

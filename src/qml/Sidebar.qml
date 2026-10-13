@@ -161,6 +161,7 @@ Rectangle {
                 height: root.dragListId ? 44 : (root.archived.length > 0 ? 44 : 12)
                 DropArea {
                     id: tailDrop
+                    objectName: "sidebarTailDrop"
                     anchors.fill: parent
                     keys: ["precrime-list"]
                     onDropped: if (root.dragListId) backend.moveList(root.dragListId, 0, 0)
@@ -173,6 +174,7 @@ Rectangle {
                     }
                 }
                 Rectangle {
+                    objectName: "sidebarArchived"
                     visible: root.archived.length > 0
                     anchors.fill: parent
                     anchors.topMargin: 8
@@ -284,6 +286,7 @@ Rectangle {
                 onClicked: root.settingsRequested()
             }
             IconButton {
+                objectName: "sidebarAdd"
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
@@ -395,10 +398,12 @@ Rectangle {
         id: headerRow
         Item {
             id: header
+            objectName: "sidebarGroup:" + (row.groupId || 0)
             height: 34
             property var row: parent && parent.model ? parent.model : ({})
             Text {
                 id: headerTitle
+                objectName: "sidebarGroupTitle"
                 anchors.left: parent.left
                 anchors.leftMargin: 18
                 anchors.bottom: parent.bottom
@@ -411,6 +416,7 @@ Rectangle {
             }
             // A colour-coded group shows its colour beside the name.
             Rectangle {
+                objectName: "sidebarGroupDot"
                 visible: header.isGroup && typeof header.row.color === "number" && header.row.color >= 0 && root.renamingGroupId !== header.row.groupId
                 x: 18 + headerTitle.implicitWidth + 8
                 anchors.bottom: parent.bottom
@@ -514,6 +520,7 @@ Rectangle {
                 }
             }
             InlineEditor {
+                objectName: "sidebarGroupRename"
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.right: parent.right
@@ -557,6 +564,7 @@ Rectangle {
 
             // The list's colour band.
             Rectangle {
+                objectName: "sidebarBand"
                 visible: item.isList || item.row.kind === "project"
                 // the reference app's bands are wide pills that stack into one column.
                 x: 24
@@ -569,6 +577,7 @@ Rectangle {
                 Rectangle { visible: !item.runStart; width: parent.width; height: parent.radius; color: parent.color }
                 Rectangle { visible: !item.runEnd; width: parent.width; height: parent.radius; color: parent.color; anchors.bottom: parent.bottom }
                 Icon {
+                    objectName: "sidebarExcluded"
                     visible: !!item.row.excluded && item.isList
                     anchors.centerIn: parent
                     name: "eyeOff"
@@ -579,6 +588,7 @@ Rectangle {
             }
 
             Icon {
+                objectName: "sidebarExpand:" + (item.row.listId || 0)
                 visible: item.row.expandable === true
                 z: 5  // Above the row's own mouse area, which would otherwise take the click.
                 x: 9
@@ -649,6 +659,7 @@ Rectangle {
 
             Text {
                 id: label
+                objectName: "sidebarLabel"
                 visible: root.renamingListId !== item.row.listId || !item.isList
                 anchors.verticalCenter: parent.verticalCenter
                 x: item.row.kind === "focus" || item.row.kind === "smart" ? 52 : item.row.kind === "project" ? 74 : 54
@@ -697,6 +708,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 3
                 RollingNumber {
+                    objectName: "sidebarOverdue"
                     visible: (item.row.overdue || 0) > 0
                     value: item.row.overdue || 0
                     color: theme.overdue
@@ -709,6 +721,7 @@ Rectangle {
                     font.pixelSize: backend.fontSize - 2
                 }
                 RollingNumber {
+                    objectName: "sidebarUndone"
                     visible: (item.row.undone || 0) > 0
                     value: item.row.undone || 0
                     color: theme.muted
@@ -779,6 +792,7 @@ Rectangle {
             }
 
             InlineEditor {
+                objectName: "sidebarListRename"
                 anchors.left: label.left
                 anchors.right: parent.right
                 anchors.rightMargin: 14
