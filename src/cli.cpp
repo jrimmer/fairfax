@@ -1,6 +1,9 @@
 #include "cli.h"
 
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QProcess>
@@ -14,6 +17,7 @@
 #endif
 
 #include "automation.h"
+#include "mailtask.h"
 #include "query.h"
 #include "schedule.h"
 #include "store.h"
@@ -107,6 +111,110 @@ int add(Store &store, const QStringList &words, QTextStream &out, QTextStream &e
         << (details.isEmpty() ? "" : " · " + details.join(", ")) << paint("  (#" + task.value("id").toString() + ")", "2")
         << Qt::endl;
     return 0;
+}
+
+int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream &out, QTextStream &err) {
+    MailTask::Options options;
+    QString listName, maildir;
+    QStringList files;
+    for (int i = 0; i < args.size(); ++i) {
+        const QString &a = args.at(i);
+        if (a == "--natural-language") {
+            options.naturalLanguage = true;
+        } else if (a == "--list" || a == "--maildir") {
+            if (i + 1 >= args.size()) {
+                err << "precrime import-mail: " << a << " needs a value" << Qt::endl;
+                return 2;
+            }
+            (a == "--list" ? listName : maildir) = args.at(++i);
+        } else if (a.startsWith("--") && a.size() > 2) {
+            err << "precrime import-mail: unknown option " << a << Qt::endl;
+            return 2;
+        } else {
+            files << a;
+        }
+    }
+    if (!maildir.isEmpty() && !files.isEmpty()) {
+        err << "precrime import-mail: give message files or --maildir, not both" << Qt::endl;
+        return 2;
+    }
+    if (!listName.isEmpty()) {
+        for (const auto &l : store.lists())
+            if (!l.deleted && !l.archived && l.kind != ListKind::Smart && l.name.compare(listName, Qt::CaseInsensitive) == 0)
+                options.listId = l.id;
+        if (!options.listId) {
+            err << "precrime import-mail: no list called \u201c" << listName << "\u201d" << Qt::endl;
+            return 2;
+        }
+    }
+
+    int status = 0;
+    // Imports one message and prints its line; false when it could not be read or stored.
+    const auto handle = [&](const QByteArray &bytes, const QString &source) {
+        const MailTask::Message message = MailTask::parse(bytes);
+        if (!message.valid) {
+            err << "precrime: " << source << ": not an email message" << Qt::endl;
+            return false;
+        }
+        const MailTask::Result r = MailTask::import(store, message, options);
+        if (r.ok()) {
+            const Task task = store.task(r.taskId);
+            out << "Added " << paint(task.title, "1") << " to " << store.list(task.listId).name << Qt::endl;
+        } else if (r.reason == "duplicate" || r.reason == "empty") {
+            out << "Skipped: " << r.reason << Qt::endl;
+        } else {
+            err << "precrime: " << source << ": " << r.reason << Qt::endl;
+            return false;
+        }
+        return true;
+    };
+
+    if (!maildir.isEmpty()) {
+        // A Maildir delivers into new/; reading a message moves it to cur/ with the Seen flag.
+        const QDir fresh(maildir + "/new");
+        if (!fresh.exists()) {
+            err << "precrime: " << maildir << " has no new/ folder" << Qt::endl;
+            return 1;
+        }
+        QDir().mkpath(maildir + "/cur");
+        for (const QString &name : fresh.entryList(QDir::Files, QDir::Name)) {
+            if (name.startsWith('.'))
+                continue;
+            QFile file(fresh.filePath(name));
+            if (!file.open(QIODevice::ReadOnly)) {
+                err << "precrime: can't read " << file.fileName() << Qt::endl;
+                status = 1;
+                continue;
+            }
+            const QByteArray bytes = file.readAll();
+            file.close();
+            if (!handle(bytes, file.fileName())) {
+                status = 1;
+                continue;
+            }
+            const QString seen = maildir + "/cur/" + name.section(':', 0, 0) + ":2,S";
+            if (!QFile::rename(file.fileName(), seen)) {
+                err << "precrime: can't move " << file.fileName() << " to " << seen << Qt::endl;
+                status = 1;
+            }
+        }
+        return status;
+    }
+    if (files.isEmpty()) {
+        if (!handle(in.readAll(), QStringLiteral("stdin")))
+            status = 1;
+        return status;
+    }
+    for (const QString &path : files) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            err << "precrime: can't read " << path << Qt::endl;
+            status = 1;
+        } else if (!handle(file.readAll(), path)) {
+            status = 1;
+        }
+    }
+    return status;
 }
 
 int pc(Store &store, const QStringList &args, QTextStream &out, QTextStream &err) {

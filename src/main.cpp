@@ -11,6 +11,7 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QGuiApplication>
+#include <QFile>
 #include <QFileInfo>
 #include <QIcon>
 #include <QKeyEvent>
@@ -203,6 +204,12 @@ int runHeadless(int argc, char *argv[]) {
         out << QJsonDocument(json).toJson(QJsonDocument::Compact) << Qt::endl;
         return 0;
     }
+    if (mode == "import-mail") {
+        // Mail to Precrime from a pipe: a message on stdin or in files, or a Maildir.
+        QFile in;
+        in.open(stdin, QIODevice::ReadOnly);
+        return Cli::importMail(store, args.mid(2), in, out, err);
+    }
     if (mode == "import") {
         // precrime import FILE: a the reference app database or .taskdb backup, or .ics.
         const QString file = args.value(2);
@@ -242,7 +249,7 @@ int main(int argc, char *argv[]) {
         // Invoked as `pc` (a symlink), everything is the terminal shorthand.
         const QString self = QString::fromLocal8Bit(argv[0]).section('/', -1);
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
-        if (self == "pc" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" ||
+        if (self == "pc" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" || first == "import-mail" ||
             first == "add" || first == "setup" || first == "--complete")
             return runHeadless(argc, argv);
     }
