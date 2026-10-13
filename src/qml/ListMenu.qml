@@ -10,7 +10,9 @@ Menu {
     signal rename()
     signal editList()
     signal customColor()
-    readonly property var info: listId ? backend.listInfo(listId) : ({})
+    // Read each time the menu opens, so its entries describe the list as it is now.
+    property var info: listId ? backend.listInfo(listId) : ({})
+    onAboutToShow: info = listId ? backend.listInfo(listId) : ({})
 
     MenuItem { text: "Edit List…"; onTriggered: root.editList() }
     MenuItem { text: "Rename…"; onTriggered: root.rename() }
