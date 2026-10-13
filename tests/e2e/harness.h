@@ -321,7 +321,8 @@ public:
         QVERIFY(QTest::qWaitForWindowExposed(window));
         window->requestActivate();
         QVERIFY(QTest::qWaitForWindowActive(window));
-        QTest::qWait(100);
+        settleLayout(window->contentItem());
+        QTest::qWait(20);
         // No frame is ever presented offscreen, so QML animations never advance; a
         // row transition stuck half way would leave the rows below an opening
         // editor where they were, under it. The list is told to move rows at once.
