@@ -268,6 +268,7 @@ Rectangle {
             }
             IconButton {
                 id: syncButton
+                objectName: "syncButton"
                 visible: !!syncHub && syncHub.active
                 anchors.right: parent.right
                 anchors.rightMargin: 44
@@ -677,6 +678,7 @@ Rectangle {
 
             // Done carries a warning once completed tasks pile up.
             Rectangle {
+                objectName: "sidebarDoneWarning"
                 visible: !!item.row.warn
                 z: 5
                 x: Math.min(label.x + label.contentWidth + 8, counts.x - 18)
@@ -692,6 +694,7 @@ Rectangle {
             // Hover [+]: a new task straight into this list.
             IconButton {
                 id: addTask
+                objectName: "sidebarAddTask"
                 readonly property bool eligible: !!item.row.listId && (item.isList || item.row.icon === "inbox")
                 visible: eligible && hover.hovered
                 z: 5
