@@ -667,10 +667,12 @@ Popup {
                     wrapMode: Text.Wrap
                 }
                 Repeater {
-                    model: root.groups
+                    // One row per group; the rows read their group by index, so
+                    // typing in one does not rebuild it and lose the cursor.
+                    model: root.groups.length
                     RowLayout {
-                        required property var modelData
                         required property int index
+                        readonly property var modelData: root.groups[index] || ({ join: "and", text: "" })
                         Layout.fillWidth: true
                         spacing: 6
                         Segment { objectName: "groupJoin:" + index + ":and"; label: "And"; active: modelData.join === "and"; onClicked: root.setGroup(index, { join: "and" }) }

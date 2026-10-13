@@ -186,13 +186,16 @@ private slots:
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         LIST_ITEM(box, findItem("soundexBox"));
         QTRY_VERIFY_WITH_TIMEOUT(!box->property("checked").toBool(), 2000);
-        click(box);
+        clickSteady(box);
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().soundex(), 3000);
         SMART_SHOWS(app, SL{"Pay Stephen"});
-        click(findItem("soundexBox"));
+        clickSteady(findItem("soundexBox"));
         QTRY_VERIFY_WITH_TIMEOUT(!app.backend().soundex(), 3000);
         SMART_SHOWS(app, SL{});
-        QVERIFY(closeBuilder(app));
+        // (Toggling the switch hands the keyboard back to the list, so close
+        // the sheet with its own button.)
+        QVERIFY(pressBuilder("searchButton"));
+        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
     }
 
     // "Quick Find (F while focused on the Task List): jumps the selection to
@@ -313,8 +316,10 @@ private:
     static bool selectRowText(App &app, const QString &title) {
         const qint64 id = textTask(app, title);
         QQuickItem *row = nullptr;
-        if (!waitUntil([&] { return (row = app.row(id)) != nullptr; }))
+        if (!waitUntil([&] { return (row = app.row(id)) != nullptr; })) {
+            qWarning() << "no row for" << title << id << "in" << app.backend().sourceKey() << paneTitles(app, true);
             return false;
+        }
         click(row, Qt::LeftButton, pointIn(row, 0.5, 0.5));
         return waitUntil([&] { return app.backend().currentTaskId() == id; });
     }

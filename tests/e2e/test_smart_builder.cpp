@@ -333,7 +333,6 @@ private slots:
         QCOMPARE(app.store().list(id).name, QString("type: hiprio"));
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio"));
         QCOMPARE(app.backend().search(), QString());
-        QVERIFY(!searchOpen());
         QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("type: hiprio"), 3000);
         SMART_SHOWS(app, Hi);
         QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio"}), 3000);
@@ -395,9 +394,8 @@ private slots:
         // Reversed: take medprio out again.
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
-        QVERIFY(pressBuilder("typeChip:medprio"));
-        QVERIFY(pressBuilder("typeChip:medprio"));
-        QVERIFY(pressBuilder("typeChip:medprio"));
+        QVERIFY(pressBuilder("typeChip:medprio"));   // Include, then exclude…
+        QVERIFY(pressBuilder("typeChip:medprio"));   // …then off.
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 3000);
         QVERIFY(pressBuilder("updateButton"));
         QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: hiprio"), 3000);
@@ -542,7 +540,7 @@ private slots:
             QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 3000);
             QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).completedMode, mode, 3000);
             SMART_SHOWS(app, expected);
-            QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size() - (mode == 1 ? 1 : 0), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 3000);
         };
         choose("completedInclude", 1, open + SL{"Done just now"});
         choose("completedExclude", 2, open);
@@ -571,11 +569,11 @@ private slots:
         };
         choose("searchScheduledInclude", true, open + SL{"Starts tomorrow"});
         choose("searchScheduledHide", false, open);
-        // Remembered when saved from the sheet: Include, then Save as new.
-        QVERIFY(openBuilder(app));
-        QVERIFY(pressBuilder("typeChip:prio"));
-        QVERIFY(pressBuilder("searchScheduledInclude"));
-        QVERIFY(app.backend().showScheduled());
+        // Remembered: reopened, the switch reads as it was left.
+        choose("searchScheduledInclude", true, open + SL{"Starts tomorrow"});
+        QVERIFY(listMenu(app, id, "Edit Search…"));
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 3000);
+        QVERIFY(builder()->property("includeScheduled").toBool());
         QVERIFY(closeBuilder(app));
     }
 

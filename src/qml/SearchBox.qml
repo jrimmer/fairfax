@@ -6,7 +6,10 @@ import QtQuick.Controls
 Item {
     id: root
 
-    property bool expanded: backend.search !== ""
+    // Opened by the user (Ctrl+F, the magnifier); a search that is set some
+    // other way, such as from the presets menu, shows the field too.
+    property bool opened: false
+    readonly property bool expanded: opened || backend.search !== ""
     property alias field: input
     signal finished()
 
@@ -26,7 +29,7 @@ Item {
         name: "search"
         size: 16
         color: theme.muted
-        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { root.expanded = true; input.forceActiveFocus() } }
+        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { root.opened = true; input.forceActiveFocus() } }
     }
     TextInput {
         id: input
@@ -43,10 +46,10 @@ Item {
         clip: true
         text: backend.search
         onTextEdited: backend.search = text
-        Keys.onEscapePressed: { backend.search = ""; root.expanded = false; root.finished() }
+        Keys.onEscapePressed: { backend.search = ""; root.opened = false; root.finished() }
         Keys.onReturnPressed: root.finished()
         Keys.onDownPressed: root.finished()
-        onActiveFocusChanged: if (!activeFocus && text === "") root.expanded = false
+        onActiveFocusChanged: if (!activeFocus && text === "") root.opened = false
         Text {
             visible: !input.text
             text: "Search"
@@ -64,6 +67,6 @@ Item {
         name: "close"
         size: 12
         color: theme.muted
-        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { backend.search = ""; root.expanded = false; root.finished() } }
+        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { backend.search = ""; root.opened = false; root.finished() } }
     }
 }

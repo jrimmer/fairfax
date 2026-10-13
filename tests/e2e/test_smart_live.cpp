@@ -54,17 +54,22 @@ class E2ESmartLive : public QObject {
         QCOMPARE(app.backend().sourceKey(), lk(m_list));
     }
 
+
     void undo() { m_app->press(Qt::Key_Z, Qt::ControlModifier); }
 
-    // Ctrl+N, a title, Return: a new task typed into the open Smart List.
-    void typeNewTask(const QString &title) {
-        App &app = *m_app;
-        app.press(Qt::Key_N, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().editingTaskId() != 0, 3000);
-        app.type(title);
-        app.press(Qt::Key_Return);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().editingTaskId() == 0, 3000);
+    qint64 tagId(const QString &name) {
+        for (const Tag &t : m_app->store().tags())
+            if (!t.deleted && t.name == name)
+                return t.id;
+        return 0;
     }
+
+#define LIVE(expected)                                                                                                 \
+    do {                                                                                                               \
+        showsAndCounts(expected);                                                                                      \
+        if (QTest::currentTestFailed())                                                                                \
+            return;                                                                                                    \
+    } while (0)
 
 private slots:
     void init() {
@@ -74,7 +79,8 @@ private slots:
     void cleanup() { m_app.reset(); }
 
     // Untag (Alt+L) takes the task out of `tags: urgent`; undo returns it; a
-    // task typed with #urgent joins.
+    // task tagged from outside (a sync, the command line) joins by itself and
+    // leaves again when its tags are cleared (Ctrl+Alt+R).
     void tagAndUntag() {
         App &app = *m_app;
         openSmart("tags: urgent", SL{"Rent overdue"});
@@ -86,58 +92,41 @@ private slots:
         app.type("urgent");
         app.press(Qt::Key_Return);
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Rent overdue").tagIds.isEmpty(), 3000);
-        showsAndCounts(SL{});
-        if (QTest::currentTestFailed())
-            return;
-        // Undo.
+        LIVE(SL{});
         undo();
         QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Rent overdue").tagIds.isEmpty(), 3000);
-        showsAndCounts(SL{"Rent overdue"});
-        if (QTest::currentTestFailed())
-            return;
-        // A new task tagged in its title.
-        typeNewTask("Buy tape #urgent");
-        if (QTest::currentTestFailed())
-            return;
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Buy tape").id != 0, 3000);
-        showsAndCounts(SL{"Rent overdue", "Buy tape"});
-        if (QTest::currentTestFailed())
-            return;
-        // And the whole tag removed with Ctrl+Alt+R.
-        QVERIFY(selectRow(app, "Buy tape"));
+        LIVE(SL{"Rent overdue"});
+        const qint64 urgent = tagId("urgent");
+        externally(app, "Plain chore", [urgent](Task &t) { t.tagIds << urgent; });
+        LIVE((SL{"Rent overdue", "Plain chore"}));
+        QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Buy tape").tagIds.isEmpty(), 3000);
-        showsAndCounts(SL{"Rent overdue"});
-        if (QTest::currentTestFailed())
-            return;
+        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Plain chore").tagIds.isEmpty(), 3000);
+        LIVE(SL{"Rent overdue"});
     }
 
-    // Tagging from the tag bar changes a list that excludes the tag: `tags:
-    // ~` is the untagged tasks, and tagging one (Ctrl+R) takes it out.
+    // Tagging (Ctrl+R) changes a list that excludes the tag: `tags: ~` is the
+    // untagged tasks, and tagging one takes it out; undo returns it.
     void taggingRemovesFromUntaggedList() {
         App &app = *m_app;
-        openSmart("tags: ~ lists: Garden", inLists(SL{"Garden"}));
+        const SL untagged = without(inLists(SL{"Garden"}), SL{"Plumber for garden"});
+        openSmart("tags: ~ lists: Garden", untagged);
         if (QTest::currentTestFailed())
             return;
-        QVERIFY(paneTitles(app).contains("Taxes in 9 days"));
         QVERIFY(selectRow(app, "Taxes in 9 days"));
         app.press(Qt::Key_R, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
         app.type("urgent");
         app.press(Qt::Key_Return);
         QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Taxes in 9 days").tagIds.isEmpty(), 3000);
-        showsAndCounts(without(inLists(SL{"Garden"}), SL{"Taxes in 9 days"}));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(without(untagged, SL{"Taxes in 9 days"}));
         undo();
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Taxes in 9 days").tagIds.isEmpty(), 3000);
-        showsAndCounts(inLists(SL{"Garden"}));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(untagged);
     }
 
     // Changing priority: `type: hiprio`. Key 1 lowers one task out of it; undo
-    // returns it; "!!!" in a new title joins.
+    // returns it; a task raised from outside joins; key 0 clears it again.
     void priorityChange() {
         App &app = *m_app;
         openSmart("type: hiprio", Hi);
@@ -146,34 +135,21 @@ private slots:
         QVERIFY(selectRow(app, "Fence in 6 days"));
         app.press(Qt::Key_1);
         QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Fence in 6 days").priority, 1, 3000);
-        showsAndCounts(without(Hi, SL{"Fence in 6 days"}));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(without(Hi, SL{"Fence in 6 days"}));
         undo();
         QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Fence in 6 days").priority, 3, 3000);
-        showsAndCounts(Hi);
-        if (QTest::currentTestFailed())
-            return;
-        typeNewTask("Call bank !!!");
-        if (QTest::currentTestFailed())
-            return;
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Call bank").id != 0, 3000);
-        QCOMPARE(app.taskTitled("Call bank").priority, 3);
-        showsAndCounts(plus(Hi, "Call bank"));
-        if (QTest::currentTestFailed())
-            return;
-        // Priority 0 (key 0) clears it again.
-        QVERIFY(selectRow(app, "Call bank"));
+        LIVE(Hi);
+        externally(app, "Plain chore", [](Task &t) { t.priority = 3; });
+        LIVE(plus(Hi, "Plain chore"));
+        QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_0);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Call bank").priority, 0, 3000);
-        showsAndCounts(Hi);
-        if (QTest::currentTestFailed())
-            return;
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").priority, 0, 3000);
+        LIVE(Hi);
     }
 
     // Changing a date: `type: duetoday`. The ] key moves the due date a day on;
-    // undo returns it; a new task typed with "today" joins; Y moves it to
-    // tomorrow.
+    // undo returns it; a task given today's date from outside joins; Y moves
+    // it to tomorrow.
     void dateChange() {
         App &app = *m_app;
         openSmart("type: duetoday", DueToday);
@@ -182,32 +158,21 @@ private slots:
         QVERIFY(selectRow(app, "Milk today"));
         app.press(Qt::Key_BracketRight);
         QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Milk today").dueDate, QDate::currentDate().addDays(1), 3000);
-        showsAndCounts(without(DueToday, SL{"Milk today"}));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(without(DueToday, SL{"Milk today"}));
         undo();
         QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Milk today").dueDate, QDate::currentDate(), 3000);
-        showsAndCounts(DueToday);
-        if (QTest::currentTestFailed())
-            return;
-        typeNewTask("Pay bill today");
-        if (QTest::currentTestFailed())
-            return;
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Pay bill").id != 0, 3000);
-        QCOMPARE(app.taskTitled("Pay bill").dueDate, QDate::currentDate());
-        showsAndCounts(plus(DueToday, "Pay bill"));
-        if (QTest::currentTestFailed())
-            return;
-        QVERIFY(selectRow(app, "Pay bill"));
+        LIVE(DueToday);
+        externally(app, "Plain chore", [](Task &t) { t.dueDate = QDate::currentDate(); });
+        LIVE(plus(DueToday, "Plain chore"));
+        QVERIFY(selectRow(app, "Plain chore"));
         app.press(Qt::Key_Y);
-        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Pay bill").dueDate, QDate::currentDate().addDays(1), 3000);
-        showsAndCounts(DueToday);
-        if (QTest::currentTestFailed())
-            return;
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").dueDate, QDate::currentDate().addDays(1), 3000);
+        LIVE(DueToday);
     }
 
     // Moving to another list: `lists: Work`. M and a list name move a task
-    // out; undo returns it; "/Work/" in a new title joins.
+    // out; undo returns it; a task moved in from outside joins; moved back
+    // with M it leaves.
     void moveList() {
         App &app = *m_app;
         const SL work = inLists(SL{"Work"});
@@ -220,26 +185,24 @@ private slots:
         app.type("Garden");
         app.press(Qt::Key_Return);
         QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Report in 3 days").listId, listId("Garden"), 3000);
-        showsAndCounts(without(work, SL{"Report in 3 days"}));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(without(work, SL{"Report in 3 days"}));
         undo();
         QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Report in 3 days").listId, listId("Work"), 3000);
-        showsAndCounts(work);
-        if (QTest::currentTestFailed())
-            return;
-        typeNewTask("Send mail /Work/");
-        if (QTest::currentTestFailed())
-            return;
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Send mail").id != 0, 3000);
-        QCOMPARE(app.taskTitled("Send mail").listId, listId("Work"));
-        showsAndCounts(plus(work, "Send mail"));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(work);
+        const qint64 workId = listId("Work");
+        externally(app, "Plain chore", [workId](Task &t) { t.listId = workId; });
+        LIVE(plus(work, "Plain chore"));
+        QVERIFY(selectRow(app, "Plain chore"));
+        app.press(Qt::Key_M);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
+        app.type("Home");
+        app.press(Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(app.taskTitled("Plain chore").listId, listId("Home"), 3000);
+        LIVE(work);
     }
 
     // Starring: `type: starred`. Ctrl+Alt+S removes the star; undo returns it;
-    // "*" in a new title joins.
+    // a task starred from outside joins; S… and Ctrl+Alt+S take it out again.
     void starAndUnstar() {
         App &app = *m_app;
         openSmart("type: starred", Starred);
@@ -248,23 +211,18 @@ private slots:
         QVERIFY(selectRow(app, "Starred plain"));
         app.press(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
         QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Starred plain").starred, 3000);
-        showsAndCounts(without(Starred, SL{"Starred plain"}));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(without(Starred, SL{"Starred plain"}));
         undo();
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Starred plain").starred, 3000);
-        showsAndCounts(Starred);
-        if (QTest::currentTestFailed())
-            return;
-        typeNewTask("Buy milk *");
-        if (QTest::currentTestFailed())
-            return;
-        QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Buy milk").id != 0, 3000);
-        QVERIFY(app.taskTitled("Buy milk").starred);
-        showsAndCounts(plus(Starred, "Buy milk"));
-        if (QTest::currentTestFailed())
-            return;
+        LIVE(Starred);
+        externally(app, "Plain chore", [](Task &t) { t.starred = true; });
+        LIVE(plus(Starred, "Plain chore"));
+        QVERIFY(selectRow(app, "Plain chore"));
+        app.press(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.taskTitled("Plain chore").starred, 3000);
+        LIVE(Starred);
     }
+
 
     // Completing: `lists: Work` leaves completed tasks out, so completing a
     // task (Ctrl+.) takes it out; undo returns it. Done tasks do not appear

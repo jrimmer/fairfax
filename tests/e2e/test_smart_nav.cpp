@@ -72,7 +72,7 @@ private slots:
         QVERIFY(selectRowOf(app));
         app.press(Qt::Key_J);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
-        app.type("starred");
+        app.type("type: starred");
         QObject *bar = findObject("commandPopup");
         QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().size(), 1, 3000);
         const QVariantMap hit = bar->property("items").toList().first().toMap();
@@ -81,14 +81,17 @@ private slots:
         app.press(Qt::Key_Return);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(star), 3000);
         SMART_SHOWS(app, Starred);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 3000);
         // Jumping from one Smart List to the other works the same.
         app.press(Qt::Key_J);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
-        app.type("hiprio");
-        QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().size(), 1, 3000);
+        app.type("type: hiprio");
+        QTRY_COMPARE_WITH_TIMEOUT(bar->property("items").toList().value(0).toMap().value("label").toString(), QString("type: hiprio"), 3000);
+        QCOMPARE(bar->property("items").toList().size(), 1);
         app.press(Qt::Key_Return);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(hot), 3000);
         SMART_SHOWS(app, Hi);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") == nullptr, 3000);
         // Esc cancels the jump.
         app.press(Qt::Key_J);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("commandInput") != nullptr, 3000);
@@ -108,7 +111,9 @@ private slots:
         QVERIFY(pane(app, "all"));
         const qint64 b = saveSearchAsSmart(app, "type: starred");
         QVERIFY(a && b);
-        QVERIFY(pane(app, lk(listId("Archive"))));
+        const QStringList order = sidebarOrder();
+        const QString last = order.at(order.indexOf("g:-1") - 1);
+        QVERIFY(pane(app, last));
         app.press(Qt::Key_Down, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(a), 3000);
         app.press(Qt::Key_Down, Qt::ControlModifier);
@@ -117,7 +122,7 @@ private slots:
         app.press(Qt::Key_Up, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(a), 3000);
         app.press(Qt::Key_Up, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(listId("Archive")), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), last, 3000);
     }
 
     // Reordering Smart Lists among themselves: a drag of one onto another is

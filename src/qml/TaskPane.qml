@@ -24,7 +24,7 @@ Item {
         else searchBuilder.openAt(search)
     }
     function editSmartQuery() { searchBuilder.openForList(Number(backend.sourceKey.split(":")[1])) }
-    function focusSearch() { search.expanded = true; search.field.forceActiveFocus() }
+    function focusSearch() { search.opened = true; search.field.forceActiveFocus() }
     function toggleProjectView() {
         if (backend.sourceKey.startsWith("project:")) {
             backend.selectSource("list:" + backend.taskInfo(Number(backend.sourceKey.split(":")[1])).listId)

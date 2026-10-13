@@ -582,14 +582,38 @@ inline bool showScheduled(App &app, bool on) {
     return waitUntil([&] { return app.backend().showScheduled() == on; });
 }
 
+// Changes a task behind the window's back, as a sync or the command line
+// does; the open view has to notice by itself.
+inline void externally(App &app, const QString &title, const std::function<void(Task &)> &edit) {
+    Task t = app.taskTitled(title);
+    edit(t);
+    app.store().begin("External edit");
+    app.store().putTask(t);
+    app.store().commit();
+}
+
 // Selects a row by clicking it.
 inline bool selectRow(App &app, const QString &title) {
     const qint64 id = idOf(title);
     QQuickItem *row = nullptr;
-    if (!waitUntil([&] { return (row = app.row(id)) != nullptr; }))
+    if (!waitUntil([&] { return (row = app.row(id)) != nullptr; })) {
+        qWarning() << "selectRow: no row for" << title << "in" << app.backend().sourceKey() << "which lists" << paneTitles(app, true);
         return false;
-    click(row, Qt::LeftButton, pointIn(row, 0.5, 0.5));
-    return waitUntil([&] { return app.backend().currentTaskId() == id; });
+    }
+    // Rows slide into place when the list changes; aim again if a click landed
+    // on the neighbour that was there a moment ago.
+    bool ok = false;
+    for (int attempt = 0; attempt < 3 && !ok; ++attempt) {
+        QTest::qWait(150);
+        row = app.row(id);
+        if (!row)
+            break;
+        click(row, Qt::LeftButton, pointIn(row, 0.5, 0.5));
+        ok = waitUntil([&] { return app.backend().currentTaskId() == id; }, 700);
+    }
+    if (!ok)
+        qWarning() << "selectRow: clicking" << title << "selected" << app.backend().currentTaskId() << "not" << id;
+    return ok;
 }
 
 // ----------------------------------------------------------- the rule builder
@@ -643,7 +667,15 @@ inline bool pressBuilder(const QString &name, Qt::MouseButton button = Qt::LeftB
     QQuickItem *item = nullptr;
     if (!waitUntil([&] { return (item = findItem(name)) != nullptr; }))
         return false;
-    scrollAll(item);
+    // The sheet scrolls inside a scroll area; a click aimed before the view has
+    // settled can land outside the window, so aim until the item is inside it.
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        scrollAll(item);
+        QTest::qWait(60);
+        const QPoint c = centreOf(item);
+        if (c.y() > 0 && c.y() < item->window()->height() - 2 && c.x() > 0 && c.x() < item->window()->width() - 2)
+            break;
+    }
     clickSteady(item, button);
     return true;
 }
@@ -658,9 +690,15 @@ inline bool fillBuilder(App &app, const QString &name, const QString &text) {
     QQuickItem *field = nullptr;
     if (!waitUntil([&] { return (field = findItem(name)) != nullptr; }))
         return false;
-    scrollAll(field);
-    clickSteady(field);
-    if (!waitUntil([&] { return field->property("activeFocus").toBool(); }))
+    // A row that has only just appeared moves as the sheet lays out: aim
+    // again until the field takes focus.
+    for (int attempt = 0; attempt < 4 && !field->property("activeFocus").toBool(); ++attempt) {
+        QTest::qWait(100);
+        scrollAll(field);
+        clickSteady(field);
+        waitUntil([&] { return field->property("activeFocus").toBool(); }, 600);
+    }
+    if (!field->property("activeFocus").toBool())
         return false;
     app.press(Qt::Key_A, Qt::ControlModifier);
     if (text.isEmpty())
