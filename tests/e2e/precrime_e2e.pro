@@ -31,3 +31,7 @@ SOURCES += test_smart_presets.cpp test_smart_keywords.cpp test_smart_text.cpp te
 # Keyboard, sort, tags, import/export and window-feature end-to-end tests.
 HEADERS += misckit.h
 SOURCES += test_misc_sort.cpp test_misc_keys.cpp test_misc_tags.cpp test_misc_io.cpp test_misc_window.cpp
+
+# Gap tests: editor, Quick Look, notes, attachments, alerts and Settings leftovers.
+HEADERS += gapskit2.h
+SOURCES += test_gaps_editor.cpp test_gaps_notes.cpp test_gaps_settings.cpp
