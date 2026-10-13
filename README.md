@@ -93,11 +93,13 @@ offers your lists and `pc done <Tab>` your open tasks.
   (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) also sets a due-date range
   (between two dates, in the next N days to years, or no due date) and whether the list
   includes completed or scheduled tasks. `lists:`, `groups:` and `completed:` search every
-  list, and `completed:` or `type: donetoday` find finished tasks. Parentheses can group
+  list, and `completed:` or `type: donetoday` find finished tasks; `type: scheduled` and
+  `type: paused` find the tasks that are otherwise hidden. Parentheses can group
   whole filters, `tags: home OR (lists: Work type: starred)`, and Search Options has a
   group row, a This list / All lists scope, an Include Scheduled switch and a Sounds like
   switch that is remembered. The Find, Jump, Tag Search and Quick Open bars have an
-  Exact words switch (Alt+E), remembered per bar; Defer also takes an offset such as
+  Exact words switch (Alt+E), remembered per bar, and ↑ / ↓ wrap at the ends; the search
+  field's ✕ clears the search like Esc does; Defer also takes an offset such as
   `+3d`, `+1w` or `-2d` for the whole selection.
 - **List options.** Right-click a list for Exclude/Include Completed and Delete all Tasks;
   Settings → Today & Lists chooses the counts on lists and whether a project view inherits

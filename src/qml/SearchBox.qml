@@ -35,7 +35,7 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: 30
         anchors.right: parent.right
-        anchors.rightMargin: 8
+        anchors.rightMargin: input.text !== "" ? 26 : 8
         anchors.verticalCenter: parent.verticalCenter
         color: theme.foreground
         selectionColor: theme.selection
@@ -53,5 +53,17 @@ Item {
             color: theme.faint
             font: input.font
         }
+    }
+    // The ✕ at the field's end clears the search, as Escape does.
+    Icon {
+        objectName: "searchClear"
+        visible: root.expanded && input.text !== ""
+        anchors.right: parent.right
+        anchors.rightMargin: 8
+        anchors.verticalCenter: parent.verticalCenter
+        name: "close"
+        size: 12
+        color: theme.muted
+        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { backend.search = ""; root.expanded = false; root.finished() } }
     }
 }

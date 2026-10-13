@@ -83,6 +83,7 @@ Item {
             // the reference app's search menu: ready-made searches, and the full options.
             IconButton {
                 id: presetsButton
+                objectName: "searchPresets"
                 icon: "chevronDown"
                 size: 10
                 tip: "Search Presets"
@@ -179,6 +180,7 @@ Item {
             Icon { name: "search"; size: 14; color: theme.muted }
             TextInput {
                 id: smartQuery
+                objectName: "smartQueryField"
                 Layout.fillWidth: true
                 visible: backend.sourceIsSmart
                 text: backend.smartQuery
@@ -206,6 +208,7 @@ Item {
                 font.pixelSize: backend.fontSize - 2
             }
             CheckBox {
+                objectName: "searchSoundex"
                 text: "Sounds like"
                 checked: backend.soundex
                 font.pixelSize: backend.fontSize - 2
@@ -213,6 +216,7 @@ Item {
                 padding: 0
             }
             Button {
+                objectName: "saveSearchAsSmart"
                 visible: backend.search !== "" && !backend.sourceIsSmart
                 text: "Save as Smart List"
                 flat: true

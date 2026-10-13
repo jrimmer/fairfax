@@ -247,6 +247,7 @@ Popup {
         dates = { modified: { n: 0, unit: "d" }, created: { n: 0, unit: "d" }, completed: { n: 0, unit: "d" } }
         groups = []
         loading = false
+        rebuild()
     }
 
     // ---- parsing an existing query back into state --------------------
@@ -537,6 +538,7 @@ Popup {
                 Heading { text: "CONTAINS WORDS" }
                 TextField {
                     id: freeInput
+                    objectName: "freeInput"
                     Layout.fillWidth: true
                     font.pixelSize: backend.fontSize + 1
                     color: theme.foreground
@@ -558,8 +560,8 @@ Popup {
                     Layout.topMargin: 6
                     spacing: 6
                     Heading { text: "TASK TYPE"; Layout.rightMargin: 6 }
-                    Segment { label: "Any of these (OR)"; active: root.typeMode === "or"; onClicked: root.typeMode = "or" }
-                    Segment { label: "All of these (AND)"; active: root.typeMode === "and"; onClicked: root.typeMode = "and" }
+                    Segment { objectName: "typeModeOr"; label: "Any of these (OR)"; active: root.typeMode === "or"; onClicked: root.typeMode = "or" }
+                    Segment { objectName: "typeModeAnd"; label: "All of these (AND)"; active: root.typeMode === "and"; onClicked: root.typeMode = "and" }
                 }
 
                 Repeater {
@@ -583,6 +585,7 @@ Popup {
                                 model: modelData.items
                                 TriChip {
                                     required property var modelData
+                                    objectName: "typeChip:" + modelData[0]
                                     label: modelData[1]
                                     state: root.stateOf(root.types, modelData[0])
                                     onClicked: root.cycleType(modelData[0], false)
@@ -608,6 +611,7 @@ Popup {
                         Segment {
                             required property var modelData
                             required property int index
+                            objectName: "pickerTab:" + modelData.key
                             label: modelData.title + (root.pickerCount(index) ? " (" + root.pickerCount(index) + ")" : "")
                             active: root.pickerTab === index
                             onClicked: root.pickerTab = index
@@ -634,6 +638,7 @@ Popup {
                                 model: root.pickerItems(root.pickerTab)
                                 TriChip {
                                     required property var modelData
+                                    objectName: "nameChip:" + root.tabs[root.pickerTab].key + ":" + modelData.name
                                     label: modelData.name
                                     showDot: modelData.color !== undefined && modelData.color >= 0
                                     dot: showDot ? theme.listColor(modelData.color) : "transparent"
@@ -668,9 +673,9 @@ Popup {
                         required property int index
                         Layout.fillWidth: true
                         spacing: 6
-                        Segment { label: "And"; active: modelData.join === "and"; onClicked: root.setGroup(index, { join: "and" }) }
-                        Segment { label: "Or"; active: modelData.join === "or"; onClicked: root.setGroup(index, { join: "or" }) }
-                        Segment { label: "Not"; active: modelData.join === "not"; onClicked: root.setGroup(index, { join: "not" }) }
+                        Segment { objectName: "groupJoin:" + index + ":and"; label: "And"; active: modelData.join === "and"; onClicked: root.setGroup(index, { join: "and" }) }
+                        Segment { objectName: "groupJoin:" + index + ":or"; label: "Or"; active: modelData.join === "or"; onClicked: root.setGroup(index, { join: "or" }) }
+                        Segment { objectName: "groupJoin:" + index + ":not"; label: "Not"; active: modelData.join === "not"; onClicked: root.setGroup(index, { join: "not" }) }
                         TextField {
                             id: groupField
                             objectName: "groupField"
@@ -684,7 +689,7 @@ Popup {
                             onTextEdited: root.setGroup(index, { text: text })
                             Keys.onReturnPressed: root.doSearch()
                         }
-                        Segment { label: "\u00d7"; onClicked: root.removeGroup(index) }
+                        Segment { objectName: "removeGroup:" + index; label: "\u00d7"; onClicked: root.removeGroup(index) }
                     }
                 }
                 RowLayout {
@@ -730,6 +735,7 @@ Popup {
                         }
                         TextField {
                             id: nField
+                            objectName: "dateN:" + modelData.key
                             Layout.preferredWidth: 60
                             horizontalAlignment: Text.AlignHCenter
                             font.pixelSize: backend.fontSize
@@ -748,11 +754,13 @@ Popup {
                             onTextEdited: root.setDate(modelData.key, parseInt(text) || 0, root.dates[modelData.key].unit)
                         }
                         Segment {
+                            objectName: "dateUnit:" + modelData.key + ":d"
                             label: "days"
                             active: root.dates[modelData.key].unit === "d"
                             onClicked: root.setDate(modelData.key, root.dates[modelData.key].n, "d")
                         }
                         Segment {
+                            objectName: "dateUnit:" + modelData.key + ":w"
                             label: "weeks"
                             active: root.dates[modelData.key].unit === "w"
                             onClicked: root.setDate(modelData.key, root.dates[modelData.key].n, "w")
@@ -818,6 +826,7 @@ Popup {
                         model: [["d", "days"], ["w", "weeks"], ["m", "months"], ["y", "years"]]
                         Segment {
                             required property var modelData
+                            objectName: "rangeUnit:" + modelData[0]
                             label: modelData[1]
                             active: root.rangeUnit === modelData[0]
                             onClicked: root.rangeUnit = modelData[0]

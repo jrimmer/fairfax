@@ -224,8 +224,8 @@ Popup {
                                 repeat: "" })[root.kind] || ""
             background: Rectangle { radius: 8; color: theme.background; border.color: input.activeFocus ? theme.accent : theme.divider }
             onTextEdited: root.refresh()
-            Keys.onDownPressed: root.highlighted = Math.min(root.highlighted + 1, root.items.length - 1)
-            Keys.onUpPressed: root.highlighted = Math.max(root.highlighted - 1, 0)
+            Keys.onDownPressed: if (root.items.length) root.highlighted = (root.highlighted + 1) % root.items.length
+            Keys.onUpPressed: if (root.items.length) root.highlighted = (root.highlighted + root.items.length - 1) % root.items.length
             Keys.onReturnPressed: (e) => root.accept(root.highlighted, e.modifiers & Qt.ShiftModifier)
             Keys.onEnterPressed: (e) => root.accept(root.highlighted, e.modifiers & Qt.ShiftModifier)
             Keys.onEscapePressed: root.close()
