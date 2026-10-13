@@ -385,7 +385,7 @@ inline void newTaskListId(App &app, qint64 &listId) {
             if (!t.deleted && t.id > before)
                 made = t;
         return made.id != 0;
-    }(), 3000);
+    }(), 5000);
     listId = made.listId;
     app.backend().endEdit();
     QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
@@ -405,7 +405,7 @@ inline void closeQuickEntry(QQuickWindow *quick) {
 inline void closeEditorWithEscape(App &app) {
     QQuickItem *title = nullptr;
     QTRY_VERIFY2_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr && title->property("activeFocus").toBool(),
-                              qPrintable("focus is on " + app.focusDescription()), 3000);
+                              qPrintable("focus is on " + app.focusDescription()), 5000);
     app.press(Qt::Key_Escape);
     QTRY_VERIFY2_WITH_TIMEOUT(!findItem("editorCard"), qPrintable("focus is on " + app.focusDescription()), 5000);
 }

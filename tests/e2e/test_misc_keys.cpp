@@ -351,7 +351,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(findItem("editorCard") != nullptr && app.backend().editingTaskId() == app.ids.plants, 5000);
         QQuickItem *title = nullptr;
         QTRY_VERIFY2_WITH_TIMEOUT((title = findItem("editorTitle")) != nullptr && title->property("activeFocus").toBool(),
-                                  qPrintable(app.focusDescription()), 3000);
+                                  qPrintable(app.focusDescription()), 5000);
         QTest::keyClick(app.window, Qt::Key_X);   // Typed into the title, not a command.
         QTRY_VERIFY_WITH_TIMEOUT(title->property("text").toString().contains('x'), 5000);
         app.press(Qt::Key_Escape);

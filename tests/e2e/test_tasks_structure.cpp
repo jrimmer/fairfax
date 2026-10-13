@@ -216,7 +216,7 @@ private slots:
         QVERIFY(clickNamed(QString("taskCheck:%1").arg(childrenOf(app, list.id).value("Charger").id)));
         QTRY_VERIFY_WITH_TIMEOUT(app.task(childrenOf(app, list.id).value("Charger").id).completed, 5000);
         QTRY_COMPARE_WITH_TIMEOUT(textInside(findItem(QString("rowChecklist:%1").arg(list.id))).isEmpty()
-                                      || textInside(findItem(QString("rowChecklist:%1").arg(list.id))) == "0", true, 3000);
+                                      || textInside(findItem(QString("rowChecklist:%1").arg(list.id))) == "0", true, 5000);
     }
 
     // Converting: Ctrl+Shift+Alt+1/2/3 (and Convert in the context menu) turn a

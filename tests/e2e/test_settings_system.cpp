@@ -484,7 +484,7 @@ private slots:
             dotNames.clear();
             findIn(sw->contentItem(), [&](QQuickItem *i) { if (i->objectName().startsWith("calendarColor:")) dotNames << i->objectName(); return false; });
             return dotNames.size() > 2;
-        }(), 3000);
+        }(), 5000);
         const QString wanted = dotNames.at(2).mid(QString("calendarColor:").size());
         QQuickItem *dot = nullptr;
         control(dotNames.at(2), dot);

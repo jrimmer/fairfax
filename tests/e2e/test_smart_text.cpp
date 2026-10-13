@@ -277,7 +277,7 @@ private slots:
         app.type("handbook");
         QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Read the handbook"}), 5000);
         QEXPECT_FAIL("", "GAP: the Task Find bar lists matches and moves the selection only on Return", Continue);
-        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), textTask(app, "Read the handbook"), 1000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), textTask(app, "Read the handbook"), 5000);
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
     }

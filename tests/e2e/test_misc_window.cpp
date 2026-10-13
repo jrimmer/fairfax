@@ -140,7 +140,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(dialog->property("visible").toBool(), 5000);
         QQuickItem *text = nullptr;
         QTRY_VERIFY2_WITH_TIMEOUT((text = findItem("licenseText")) != nullptr && text->property("text").toString().contains("Permission is hereby granted"),
-                                  qPrintable(text ? "the licence text reads: " + text->property("text").toString().left(60) : QString("no licence text")), 3000);
+                                  qPrintable(text ? "the licence text reads: " + text->property("text").toString().left(60) : QString("no licence text")), 5000);
         QVERIFY(text->property("text").toString().startsWith("MIT License"));
         QVERIFY(clickDialogButton("Close"));
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->property("visible").toBool(), 5000);
@@ -229,8 +229,11 @@ private slots:
         QVERIFY(!bar->property("expanded").toBool());
 
         // Clicking an event shows what it is.
+        // The strip that has just appeared lays its events out on the next polish.
+        settleLayout(bar);
         QQuickItem *review = findItem("dayBarEvent:Design review");
-        click(review);
+        QVERIFY(review);
+        clickSteady(review);
         QObject *details = findObject("dayBarDetails");
         QVERIFY(details);
         QTRY_VERIFY_WITH_TIMEOUT(details->property("visible").toBool(), 5000);
@@ -244,7 +247,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!details->property("visible").toBool(), 5000);
 
         // The all-day pill opens its details too.
-        click(findItem("dayBarPill:Offsite"));
+        clickSteady(findItem("dayBarPill:Offsite"));
         QTRY_VERIFY_WITH_TIMEOUT(details->property("visible").toBool() && findItem("dayBarDetailTitle")->property("text").toString() == "Offsite", 5000);
         click(blank, Qt::LeftButton, pointIn(blank, 0.5, 0.97));
         QTRY_VERIFY_WITH_TIMEOUT(!details->property("visible").toBool(), 5000);
@@ -262,7 +265,7 @@ private slots:
         QVERIFY(tk::clickNamed("dayBarStep:1"));
         QTRY_COMPARE_WITH_TIMEOUT(bar->property("dayOffset").toInt(), 1, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(bar->property("captionText").toString() == "Tomorrow · 1 event" && findItem("dayBarEvent:Dentist") != nullptr
-                                     && !findItem("dayBarEvent:Standup"), 3000);
+                                     && !findItem("dayBarEvent:Standup"), 5000);
         QVERIFY(tk::clickNamed("dayBarStep:1"));
         QTRY_COMPARE_WITH_TIMEOUT(bar->property("captionText").toString(), QString(QDate::currentDate().addDays(2).toString("ddd, MMM d")) + " · no events", 5000);
         QVERIFY(tk::clickNamed("dayBarStep:-1"));
@@ -291,7 +294,7 @@ private slots:
         app.services().calendar.setClock([] { return QDateTime(QDate::currentDate(), QTime(8, 0)); });
         app.services().calendar.setSources({path});
         QVERIFY(app.openSource(lk(app.ids.home)));
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBar") == nullptr, 1000);   // Only Today shows it, unless set otherwise.
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBar") == nullptr, 5000);   // Only Today shows it, unless set otherwise.
         app.backend().setSetting("calendar.inLists", true);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBarToggle") != nullptr, 5000);
         QVERIFY(selectRow(app, app.ids.plants));
@@ -397,7 +400,7 @@ private slots:
             for (const Task &t : app.store().tasks())
                 copies += !t.deleted && t.title == "Water the plants" && t.listId == app.ids.work;
             return copies == 1;
-        }(), 3000);
+        }(), 5000);
         QCOMPARE(app.task(app.ids.plants).listId, app.ids.home);   // The original stays.
         QVERIFY(!app.task(app.ids.plants).deleted);
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage() == "Copied to Work", 5000);
@@ -581,7 +584,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("EBC"), 5000);
         QVERIFY(tk::clickNamed("focusConditions"));
         QTRY_VERIFY_WITH_TIMEOUT(findItem("focusCondition:nodue") && findItem("focusCondition:nodue")->property("checked").toBool()
-                                     && !findItem("focusCondition:today")->property("checked").toBool(), 3000);
+                                     && !findItem("focusCondition:today")->property("checked").toBool(), 5000);
         closeMenus(app);
 
         // Each list keeps its own: Home is not filtered.

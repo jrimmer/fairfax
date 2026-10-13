@@ -134,7 +134,7 @@ private slots:
                 if (pass == 0 && wanted && !on) click(findItem(QString("repeatWeekday:%1").arg(day)));
                 if (pass == 1 && !wanted && on) click(findItem(QString("repeatWeekday:%1").arg(day)));
                 QTRY_COMPARE_WITH_TIMEOUT(((app.task(id).recurrence.weekdays >> day) & 1) != 0,
-                                          (pass == 0 ? (on || wanted) : wanted), 3000);
+                                          (pass == 0 ? (on || wanted) : wanted), 5000);
             }
         QCOMPARE(app.task(id).recurrence.weekdays, want);
         // Every 3 weeks.

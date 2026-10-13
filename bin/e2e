@@ -2,9 +2,9 @@
 # Builds and runs the end-to-end UI tests: the real QML window, driven by
 # synthetic mouse and keyboard events, offscreen.
 #
-# The full suite is split over PRECRIME_E2E_SHARDS processes (default 3) that
-# run side by side, each taking every n-th test class, and their reports are
-# printed in order afterwards. A run of one class or one test (PRECRIME_E2E_CLASS
+# The full suite is shared by PRECRIME_E2E_SHARDS processes (default 3) that
+# run side by side, each taking the next test class nobody has started, and
+# their reports are printed one after another at the end. A run of one class or one test (PRECRIME_E2E_CLASS
 # set, or a test name given as an argument) is a single process.
 set -eu
 
@@ -17,16 +17,17 @@ make -j"${PRECRIME_JOBS:-$(nproc)}"
 
 export QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1
 SHARDS="${PRECRIME_E2E_SHARDS:-3}"
-if [ "$SHARDS" -le 1 ] || [ -n "${PRECRIME_E2E_SHARD:-}" ] || [ -n "${PRECRIME_E2E_CLASS:-}" ] || [ "$#" -gt 0 ]; then
+if [ "$SHARDS" -le 1 ] || [ -n "${PRECRIME_E2E_CLAIMDIR:-}" ] || [ -n "${PRECRIME_E2E_CLASS:-}" ] || [ "$#" -gt 0 ]; then
     exec ./precrime_e2e "$@"
 fi
 
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
+mkdir "$LOGS/claims"
 PIDS=""
 i=0
 while [ "$i" -lt "$SHARDS" ]; do
-    PRECRIME_E2E_SHARD="$i/$SHARDS" ./precrime_e2e > "$LOGS/$i.log" 2>&1 &
+    PRECRIME_E2E_CLAIMDIR="$LOGS/claims" ./precrime_e2e > "$LOGS/$i.log" 2>&1 &
     PIDS="$PIDS $!"
     i=$((i + 1))
 done

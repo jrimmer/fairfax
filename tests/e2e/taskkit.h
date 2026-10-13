@@ -178,23 +178,45 @@ inline bool contextMenuOn(App &app, qint64 id) {
     return waitFor([] { return findText("Duplicate", "QQuickMenuItem") != nullptr; });
 }
 
+// A menu entry once it has stopped moving: a popup that has just opened is
+// placed, resized and laid out over a few turns of the event loop (more under
+// load), and a click aimed at an entry before that lands beside it, which
+// closes the menu without choosing anything.
+inline QQuickItem *steadyMenuItem(const QString &text, int ms = 5000) {
+    QQuickItem *item = nullptr;
+    QPointF last(-1, -1);
+    int same = 0;
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < ms) {
+        if ((item = findText(text, "QQuickMenuItem"))) {
+            settleLayout(item);
+            if (!(item = findText(text, "QQuickMenuItem")))
+                continue;
+            const QPointF now = item->mapToScene(QPointF(0, 0));
+            same = now == last ? same + 1 : 0;
+            last = now;
+            if (same >= 4)
+                return item;
+        }
+        QTest::qWait(15);
+    }
+    return item;
+}
+
 // Picks an entry of the menu that is open and waits for the menu to close.
 inline bool clickMenu(const QString &text, int ms = 5000) {
-    QQuickItem *item = nullptr;
-    if (!waitFor([&] { return (item = findText(text, "QQuickMenuItem")) != nullptr; }, ms)) {
+    QQuickItem *item = steadyMenuItem(text, ms);
+    if (!item) {
         qWarning().noquote() << "no menu entry" << text << "among:" << menuEntries();
         return false;
     }
-    // The popup that has just opened is laid out on the next polish; until then
-    // its entries sit at stale positions.
-    settleLayout(item);
-    if (!(item = findText(text, "QQuickMenuItem"))) return false;
     scrollIntoView(item);
-    if (!(item = findText(text, "QQuickMenuItem"))) return false;
+    if (!(item = steadyMenuItem(text, ms))) return false;
     click(item);
     if (waitFor([&] { return noMenuOpen(); }, ms / 3)) return true;
-    // The click can land while the menu is still opening; once more.
-    if ((item = findText(text, "QQuickMenuItem"))) click(item);
+    // The menu is still up: the click was lost; once more.
+    if ((item = steadyMenuItem(text, ms))) click(item);
     return waitFor([&] { return noMenuOpen(); }, ms);
 }
 
@@ -224,11 +246,10 @@ inline bool clickSub(const QString &parentText, const QString &child, int ms = 5
             return false;
         }
     }
-    // The submenu that has just opened is laid out on the next polish.
-    settleLayout(target);
-    if (!found()) return false;
+    // The submenu that has just opened is placed and laid out over the next turns.
+    if (!(target = steadyMenuItem(child, ms))) return false;
     scrollIntoView(target);
-    if (!found()) return false;
+    if (!(target = steadyMenuItem(child, ms))) return false;
     click(target);
     return waitFor([&] { return noMenuOpen(); }, ms);
 }

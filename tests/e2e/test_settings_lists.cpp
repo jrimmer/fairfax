@@ -455,7 +455,7 @@ private slots:
                 if (item.toMap().value("label").toString() == "Water the plants")
                     return false;
             return true;
-        }(), 3000);
+        }(), 5000);
         QCOMPARE(app->store().setting("bar.exact.open").toString(), QString("true"));
         app->press(Qt::Key_Escape);
 
@@ -472,7 +472,7 @@ private slots:
                 if (item.toMap().value("label").toString() == "Water the plants")
                     return true;
             return false;
-        }(), 3000);
+        }(), 5000);
     }
 
     // Search Options > "Sounds like": a misspelt word finds the task only

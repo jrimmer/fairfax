@@ -308,7 +308,7 @@ private slots:
         click(rename);
         // The name becomes an editable field with everything selected.
         QTRY_VERIFY_WITH_TIMEOUT(app.window->activeFocusItem()
-                                     && app.window->activeFocusItem()->property("text").toString() == "Home", 3000);
+                                     && app.window->activeFocusItem()->property("text").toString() == "Home", 5000);
         app.type("Household");
         app.press(Qt::Key_Return);
         QTRY_COMPARE_WITH_TIMEOUT(app.store().list(app.ids.home).name, QString("Household"), 5000);

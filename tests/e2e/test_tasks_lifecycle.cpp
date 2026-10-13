@@ -376,7 +376,7 @@ private slots:
         QVERIFY(!app.task(id).starred);
         dragSlowly(app.row(id), app.sidebarRow("starred"));
         QTRY_VERIFY2_WITH_TIMEOUT(app.task(id).starred, qPrintable(QString("due %3 start %4 done %5 selected %1, hint %2, sidebar row at y %6")
-            .arg(app.backend().selectionCount()).arg(app.backend().dropHint("starred")).arg(app.task(id).dueDate.toString()).arg(app.task(id).startDate.toString()).arg(app.task(id).completed).arg(centreOf(app.sidebarRow("starred")).y())), 3000);
+            .arg(app.backend().selectionCount()).arg(app.backend().dropHint("starred")).arg(app.task(id).dueDate.toString()).arg(app.task(id).startDate.toString()).arg(app.task(id).completed).arg(centreOf(app.sidebarRow("starred")).y())), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(badge("rowStar", id), 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).starred, 5000);

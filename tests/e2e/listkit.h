@@ -357,7 +357,7 @@ inline void clickSteady(QQuickItem *item, Qt::MouseButton button = Qt::LeftButto
         const QPoint now = centreOf(guard);
         stable = now == last ? stable + 1 : 0;
         last = now;
-        return stable >= 3;
+        return stable >= 5;
     }, 2000);
     if (!guard)
         return;
@@ -380,7 +380,7 @@ inline bool clickMenuEntry(const QString &text, int ms = 5000) {
         const QPoint now = centreOf(entry);
         stable = now == last ? stable + 1 : 0;
         last = now;
-        return stable >= 3;
+        return stable >= 5;
     }, 1000);
     if (!entry)
         return false;
