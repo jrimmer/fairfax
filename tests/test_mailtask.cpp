@@ -182,6 +182,16 @@ private slots:
         QCOMPARE(m.attachments, QStringList{"report.pdf"});
     }
 
+    void parseTextAttachmentIsNotTheBody() {
+        // A text file attached to a message is an attachment, not part of what was written.
+        const MailTask::Message m = MailTask::parse(
+            "Subject: x\nContent-Type: multipart/mixed; boundary=B\n\n--B\nContent-Type: text/plain\n\nThe message\n--B\n"
+            "Content-Type: text/plain; name=\"=?UTF-8?Q?n=C3=B6tes?=.txt\"\nContent-Disposition: attachment; filename=\"notes.txt\"\n\n"
+            "SECRET FILE CONTENT\n--B\nContent-Type: text/html; name=\"page.html\"\n\n<p>HTML FILE</p>\n--B--\n");
+        QCOMPARE(m.body, "The message");
+        QCOMPARE(m.attachments, (QStringList{"notes.txt", "page.html"}));
+    }
+
     void parseForwardedMessageContributesItsText() {
         const MailTask::Message m = MailTask::parse(fixture("forwarded.eml"));
         QCOMPARE(m.body, "Can you check this in for me?\n\nFlight BA117 departs at 18:45 from gate 12.");
