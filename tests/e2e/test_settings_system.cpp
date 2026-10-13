@@ -463,8 +463,16 @@ private slots:
         QVERIFY(enabledNow());
         click(enabled);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("calendarEnabled:work") && !enabledNow(), 3000);
-        QCOMPARE(app->store().setting("calendar.disabled").toString(), path);
         QTRY_VERIFY_WITH_TIMEOUT(app->services().calendar.today().isEmpty(), 3000);
+
+        // Still switched off after a restart, then switched on again.
+        QVERIFY(s.restart());
+        app = s.app.get();
+        QCOMPARE(app->services().calendar.disabledSources(), QStringList{path});
+        QVERIFY(app->services().calendar.today().isEmpty());
+        openSettings(*app, sw);
+        selectPane(sw, "Calendar");
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("calendarEnabled:work") && !enabledNow(), 3000);
         control("calendarEnabled:work", enabled);
         click(enabled);
         QTRY_VERIFY_WITH_TIMEOUT(enabledNow(), 3000);

@@ -140,14 +140,15 @@ inline void control(const QString &name, QQuickItem *&out) {
     // A pane that has just been opened lays itself out over a few frames (its
     // fields start far too wide); wait until the control has stopped moving.
     QPoint last(-1, -1);
+    bool needInside = false;   // Only once scrolled into view.
     auto settled = [&] {
         const QPoint now = centreOf(out);
         const bool still = now == last;
         const bool inside = now.x() >= 0 && now.y() >= 0 && now.x() < out->window()->width() && now.y() < out->window()->height();
         last = now;
-        return still && inside;
+        return still && (inside || !needInside);
     };
-    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never settled inside its window"), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never stopped moving"), 3000);
     for (QQuickItem *p = out->parentItem(); p; p = p->parentItem()) {
         if (!p->inherits("QQuickFlickable"))
             continue;
@@ -159,6 +160,7 @@ inline void control(const QString &name, QQuickItem *&out) {
             p->setProperty("contentY", r.bottom() - p->height() + 8);
         break;
     }
+    needInside = true;
     QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never settled inside its window"), 3000);
 }
 
