@@ -504,7 +504,9 @@ private slots:
         QCOMPARE(made.listId, app.ids.home);
         QVERIFY(made.notes.contains("Ideas for later.txt"));
         app.press(Qt::Key_Z, Qt::ControlModifier);
-        QTRY_VERIFY_WITH_TIMEOUT(app.task(made.id).deleted, 5000);
+        // Undo takes the task away altogether (its record is gone, not just marked).
+        QTRY_VERIFY_WITH_TIMEOUT(!app.store().tasks().contains(made.id) || app.task(made.id).deleted, 5000);
+        QVERIFY(app.taskTitled("Ideas for later").id == 0);
 
         // The editor's Attach button.
         QVERIFY(openEditor(app, app.ids.shelf));
@@ -563,7 +565,13 @@ private slots:
             clickSteady(item);
             return tk::waitFor([&] { return findItem("focusCondition:" + key) == nullptr; });
         };
+        // The sun off keeps the ticks, so a new one adds to Overdue and Today; those
+        // two are unticked to leave Tomorrow alone.
+        QCOMPARE(app.backend().focusConditions(), (QStringList{"overdue", "today"}));
         QVERIFY(condition("tomorrow"));
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().focusConditions(), (QStringList{"overdue", "today", "tomorrow"}), 5000);
+        QVERIFY(condition("overdue"));
+        QVERIFY(condition("today"));
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().focusOn() && app.backend().focusConditions() == QStringList{"tomorrow"}, 5000);
         QTRY_COMPARE_WITH_TIMEOUT(orderNow(), QString("B"), 5000);
         QVERIFY(condition("hiprio"));
