@@ -622,13 +622,16 @@ void Backend::beginEdit(qint64 id) {
 
 void Backend::editField(const QString &kind) {
     const bool wasEditing = m_editing != 0;
+    // A freshly opened editor reads the request as it is created, which can be
+    // within beginEdit(), so the request is made first; one that is already
+    // open hears about it.
+    m_pendingField = kind;
     if (!wasEditing)
         beginEdit();
-    if (!m_editing)
+    if (!m_editing) {
+        m_pendingField.clear();
         return;
-    // A freshly opened editor reads the request as it is created; one that is
-    // already open hears about it.
-    m_pendingField = kind;
+    }
     if (wasEditing)
         emit editFieldRequested();
 }
