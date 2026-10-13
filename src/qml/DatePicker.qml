@@ -103,10 +103,16 @@ Popup {
     }
 
     contentItem: ColumnLayout {
+        id: content
         spacing: 8
 
+        // A fixed width from the start: left to the layout, the Flow first lays
+        // its chips out in one row past the popup's edge, where an early click
+        // lands outside and closes the picker.
         Flow {
-            Layout.fillWidth: true
+            id: chipFlow
+            Layout.preferredWidth: 7 * root.cellSize
+            width: 7 * root.cellSize
             spacing: 5
             Repeater {
                 model: root.chips

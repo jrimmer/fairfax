@@ -113,15 +113,7 @@ private slots:
         // "None" in the quick picks clears it again.
         QVERIFY(openEditor(app, id));
         QVERIFY(pickChip("editorDue", "None"));
-        // BUG: "None" in the calendar's quick picks leaves the date as it was
-        // (the clear button, which makes the same change, does clear it).
-        QEXPECT_FAIL("", "BUG: the calendar's None quick pick does not clear the due date", Continue);
-        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).dueDate.isValid(), 1000);
-        if (app.task(id).dueDate.isValid()) {
-            click(findItem("editorTitle"));
-            QVERIFY(clickNamed("editorDueClear"));
-            QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).dueDate.isValid(), 3000);
-        }
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).dueDate.isValid(), 3000);
         QVERIFY(closeEditor(app));
         QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("nodue"), 3000);
     }

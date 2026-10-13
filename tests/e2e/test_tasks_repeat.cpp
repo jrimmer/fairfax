@@ -182,13 +182,17 @@ private slots:
         click(findItem("repeatMonthDay"), Qt::LeftButton, pointIn(findItem("repeatMonthDay"), 0.04, 0.5));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.monthOrdinal, 0, 3000);
 
+        // Let the ordinal drop-down finish closing, or it takes the next click.
+        QVERIFY(waitFor([] {
+            QObject *popup = findItem("repeatOrdinal")->property("popup").value<QObject *>();
+            return popup && !popup->property("visible").toBool();
+        }));
+
         // End on a date chosen in the calendar.
         // The calendar opens on this month; the 10th of next month is one click on.
         const QDate nextMonth = QDate::currentDate().addMonths(1);
         const QDate end(nextMonth.year(), nextMonth.month(), 10);
         QVERIFY(clickNamed("repeatEndDate"));
-        // BUG: the "Choose date" button of End > On opens no calendar here.
-        QEXPECT_FAIL("", "BUG: the Repeat popup's End on date calendar does not open", Abort);
         QVERIFY(waitItem("pickerNext"));
         click(findItem("pickerNext"));
         QQuickItem *cell = waitItem("pickerDay:" + isoOf(end));
@@ -196,6 +200,8 @@ private slots:
         click(cell);
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::OnDate), 3000);
         QCOMPARE(app.task(id).recurrence.endDate, end);
+        // The calendar must finish closing, or it takes the next click.
+        QVERIFY(waitFor([] { return !findItem("pickerNext"); }));
         click(findItem("repeatEndNever"), Qt::LeftButton, pointIn(findItem("repeatEndNever"), 0.04, 0.5));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::Never), 3000);
     }

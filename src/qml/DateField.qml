@@ -94,7 +94,8 @@ Plain.TextField {
 
     DatePicker {
         id: picker
-        onPicked: (iso) => { root.dirty = false; root.picked(iso, -1) }
+        // "None" (Alt+0) clears the date exactly as the field's own clear button does.
+        onPicked: (iso) => { root.dirty = false; if (iso) root.picked(iso, -1); else root.cleared() }
     }
 
     Popup {
