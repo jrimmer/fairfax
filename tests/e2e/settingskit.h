@@ -173,8 +173,19 @@ inline void setCheck(const QString &name, bool on) {
     control(name, box);
     if (!box)
         return;
-    if (isChecked(box) != on)
-        click(box);
+    // A click that lands while the pane is still settling can be lost; it is
+    // repeated if the box has not changed, after a wait long enough that a slow
+    // answer is not mistaken for a lost click.
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        QQuickItem *now = findItem(name);
+        if (!now)
+            break;
+        if (isChecked(now) == on)
+            break;
+        click(now);
+        const QString n = name;
+        QTest::qWaitFor([&] { QQuickItem *i = findItem(n); return i && isChecked(i) == on; }, 2000);
+    }
     // Panes rebuild their controls on a change, so look the box up afresh
     // rather than trust a pointer that may now be dangling.
     QTRY_VERIFY_WITH_TIMEOUT(findItem(name) && isChecked(findItem(name)) == on, 5000);

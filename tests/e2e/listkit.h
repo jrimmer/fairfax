@@ -9,14 +9,17 @@
 namespace e2e {
 
 template <class F>
-bool waitUntil(F ready, int ms = 5000) {
+bool waitUntil(F ready, int ms = 5000, const char *file = __builtin_FILE(), int line = __builtin_LINE()) {
     QElapsedTimer timer;
     timer.start();
     while (!ready()) {
-        if (timer.elapsed() >= ms)
+        if (timer.elapsed() >= ms) {
+            reportSlowWait(timer.elapsed(), false, file, line);
             return false;
+        }
         QTest::qWait(10);
     }
+    reportSlowWait(timer.elapsed(), true, file, line);
     return true;
 }
 

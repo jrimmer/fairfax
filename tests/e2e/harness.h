@@ -167,6 +167,15 @@ inline void typeInto(QWindow *w, const QString &text) {
     }
 }
 
+// PRECRIME_E2E_SLOW=500 reports every wait that took that many milliseconds or
+// more (and whether it succeeded): a wait that only ever ends by timing out is
+// a wrong condition, and shows up here.
+inline void reportSlowWait(qint64 took, bool ok, const char *file, int line) {
+    static const int threshold = qEnvironmentVariableIntValue("PRECRIME_E2E_SLOW");
+    if (threshold > 0 && took >= threshold)
+        qWarning("SLOWWAIT %lld ms %s %s:%d", static_cast<long long>(took), ok ? "ok" : "TIMEOUT", file, line);
+}
+
 // Lets pending layout in an item's window finish. A row that has just
 // appeared is laid out on the next polish, and until then its children sit at
 // stale positions, so a click would land on the wrong item. Call it before

@@ -11,7 +11,13 @@
 namespace e2e {
 namespace tk {
 
-inline bool waitFor(const std::function<bool()> &pred, int ms = 5000) { return QTest::qWaitFor(pred, ms); }
+inline bool waitFor(const std::function<bool()> &pred, int ms = 5000, const char *file = __builtin_FILE(), int line = __builtin_LINE()) {
+    QElapsedTimer timer;
+    timer.start();
+    const bool ok = QTest::qWaitFor(pred, ms);
+    e2e::reportSlowWait(timer.elapsed(), ok, file, line);
+    return ok;
+}
 
 // A property of a named item, or an invalid variant when the item is not on screen.
 inline QVariant prop(const QString &name, const char *property) {
