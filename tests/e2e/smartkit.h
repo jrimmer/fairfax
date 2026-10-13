@@ -624,17 +624,23 @@ inline void scrollAll(QQuickItem *item) {
     for (QQuickItem *up = item->parentItem(); up; up = up->parentItem()) {
         if (!up->inherits("QQuickFlickable"))
             continue;
-        auto *content = up->property("contentItem").value<QQuickItem *>();
-        const QRectF r = item->mapRectToItem(content, QRectF(0, 0, item->width(), item->height()));
-        qreal y = up->property("contentY").toReal();
-        const qreal view = up->height();
-        if (r.bottom() > y + view)
-            y = r.bottom() - view + 8;
-        if (r.top() < y)
-            y = r.top() - 8;
-        if (y < 0)
-            y = 0;
-        up->setProperty("contentY", y);
+        // Move the view until the item's centre is well inside the part of the
+        // view that shows on screen. The sheet's footer sits over the lower edge
+        // of the scroll area, so an item near it takes no clicks.
+        for (int step = 0; step < 8; ++step) {
+            const QRectF view = up->mapRectToScene(QRectF(0, 0, up->width(), up->height()));
+            const qreal cy = item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).y();
+            const qreal want = view.center().y();
+            if (qAbs(cy - want) < view.height() * 0.3)
+                break;
+            const qreal total = up->property("contentHeight").toReal();
+            qreal y = up->property("contentY").toReal() + (cy - want);
+            y = qMax<qreal>(0, qMin(y, total - up->height()));
+            if (qFuzzyCompare(y + 1, up->property("contentY").toReal() + 1))
+                break;
+            up->setProperty("contentY", y);
+            QTest::qWait(20);
+        }
     }
     QTest::qWait(30);
 }
@@ -676,7 +682,19 @@ inline bool pressBuilder(const QString &name, Qt::MouseButton button = Qt::LeftB
         if (c.y() > 0 && c.y() < item->window()->height() - 2 && c.x() > 0 && c.x() < item->window()->width() - 2)
             break;
     }
-    clickSteady(item, button);
+    // A chip answers a click by changing state; a click that the opening sheet
+    // swallowed is repeated.
+    const bool chip = name.contains("Chip:");
+    const int before = chip ? item->property("state").toInt() : 0;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        if (attempt) {
+            scrollAll(item);
+            QTest::qWait(60);
+        }
+        clickSteady(item, button);
+        if (!chip || waitUntil([&] { return item->property("state").toInt() != before; }, 500))
+            break;
+    }
     return true;
 }
 
@@ -750,8 +768,8 @@ inline qint64 smartNamed(App &app, const QString &name) {
 
 // Types `query` into the search bar and presses "Save as Smart List". The
 // list is named after the query and opens; returns its id (0 on failure).
-inline qint64 saveSearchAsSmart(App &app, const QString &query) {
-    if (!typeSearch(app, query))
+inline qint64 saveSearchAsSmart(App &app, const QString &query, bool alreadyTyped = false) {
+    if (!alreadyTyped && !typeSearch(app, query))
         return 0;
     QQuickItem *save = nullptr;
     if (!waitUntil([&] { return (save = findItem("saveSearchAsSmart")) != nullptr; }))

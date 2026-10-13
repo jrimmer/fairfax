@@ -47,9 +47,11 @@ private slots:
     void cleanupTestCase() { m_app.reset(); }
     void cleanup() {
         if (m_app) {
-            escapeSearch(*m_app);
             showScheduled(*m_app, false);
-            m_app->openSource("all");
+            if (m_app->backend().sourceKey() != "all") {
+                escapeSearch(*m_app);
+                m_app->openSource("all");
+            }
         }
     }
 

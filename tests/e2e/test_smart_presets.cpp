@@ -63,9 +63,13 @@ private slots:
     void cleanup() {
         if (!m_app)
             return;
-        escapeSearch(*m_app);
+        // The next row types over this one's query; the list is only rebuilt
+        // when something else (Include Scheduled, another list) was changed.
         showScheduled(*m_app, false);
-        m_app->openSource("all");
+        if (m_app->backend().sourceKey() != "all") {
+            escapeSearch(*m_app);
+            m_app->openSource("all");
+        }
     }
 
     // The fixture itself: with nothing typed, All lists what the spec table says.

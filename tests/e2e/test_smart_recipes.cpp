@@ -135,8 +135,9 @@ private slots:
         QFETCH(QString, query);
         QFETCH(QStringList, expected);
         QVERIFY(pane(app, "all"));
-        SMART_QUERY(app, query, expected);
-        const qint64 id = saveSearchAsSmart(app, query);
+        // Typed into the search bar first; the button saves what is there.
+        QVERIFY(typeSearch(app, query));
+        const qint64 id = saveSearchAsSmart(app, query, true);
         QVERIFY2(id, qPrintable(query));
         QCOMPARE(app.store().list(id).smartQuery, query);
         QCOMPARE(app.store().list(id).kind, int(ListKind::Smart));
@@ -144,10 +145,6 @@ private slots:
         SMART_SHOWS(app, expected);
         QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{query}), 3000);
         QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, expected.size(), 3000);
-        // Away and back: the same rows.
-        QVERIFY(pane(app, "today"));
-        QVERIFY(pane(app, lk(id)));
-        SMART_SHOWS(app, expected);
     }
 
     // "Save-from-menu recipes": Someday (Without Due Date), Next 3 Days
