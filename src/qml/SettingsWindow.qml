@@ -22,15 +22,17 @@ Window {
 
     property int pane: 0
     property var hideable: backend.hideableLists()
+    property bool inboxOn: backend.inboxEnabled()
     Connections {
         target: backend
-        function onDataChanged() { root.hideable = backend.hideableLists() }
+        function onDataChanged() { root.hideable = backend.hideableLists(); root.inboxOn = backend.inboxEnabled() }
         function onSettingsChanged() { root.hideable = backend.hideableLists() }
     }
     property string copySource
     readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"]
 
     function value(key, fallback) {
+        backend.settingsRevision  // Re-evaluate the caller's binding whenever any setting changes.
         const v = backend.setting(key).value
         return v === undefined || v === null || v === "" ? fallback : v
     }
@@ -279,9 +281,9 @@ Window {
                     CheckBox {
                         objectName: "setting:inbox"
                         text: "Getting Things Done® Inbox"
-                        checked: backend.inboxEnabled()
+                        checked: root.inboxOn
                         onToggled: {
-                            if (!checked && !confirmInbox.visible) { checked = true; confirmInbox.open(); return }
+                            if (!checked && !confirmInbox.visible) { checked = Qt.binding(() => root.inboxOn); confirmInbox.open(); return }
                             backend.setInboxEnabled(checked)
                         }
                     }
@@ -307,7 +309,7 @@ Window {
                             // 0 is the first list and -1 the list used last.
                             model: [{ name: "First list", id: 0 }, { name: "Last used", id: -1 }].concat(backend.listChoices)
                             textRole: "name"
-                            enabled: !backend.inboxEnabled()
+                            enabled: !root.inboxOn
                             currentIndex: Math.max(0, model.findIndex(l => l.id === Number(root.value("tasks.defaultList", 0))))
                             onActivated: (i) => backend.setSetting("tasks.defaultList", model[i].id)
                         }
@@ -385,7 +387,7 @@ Window {
                             objectName: "setting:tasks.dueTimeChips"
                             Layout.fillWidth: true
                             placeholderText: "9am, 12pm, 3pm, 6pm"
-                            text: root.value("tasks.dueTimeChips", "")
+                            text: String(backend.setting("tasks.dueTimeChips").value || "")
                             onEditingFinished: backend.setSetting("tasks.dueTimeChips", text.trim())
                         }
                     }
@@ -553,7 +555,7 @@ Window {
                         wrapMode: Text.Wrap
                         Layout.fillWidth: true
                     }
-                    Hint { visible: !!gitSync; text: gitSync ? "Working copy: " + gitSync.directory : "" }
+                    Hint { objectName: "gitWorkingCopy"; visible: !!gitSync; text: gitSync ? "Working copy: " + gitSync.directory : "" }
                     Hint { visible: !gitSync; text: "Sync is off in demo mode." }
                     Label { text: "Todoist"; font.bold: true; Layout.topMargin: 16 }
                     Hint {
@@ -706,7 +708,7 @@ Window {
                         TextArea {
                             id: calendarSources
                             objectName: "setting:calendar.sources"
-                            text: String(root.value("calendar.sources", ""))
+                            text: String(backend.setting("calendar.sources").value || "")
                             placeholderText: "https://calendar.example.com/private.ics"
                             wrapMode: TextEdit.NoWrap
                             font.family: theme.monoFont
@@ -773,7 +775,7 @@ Window {
                     TextField {
                         objectName: "setting:calendar.emails"
                         Layout.fillWidth: true
-                        text: String(root.value("calendar.emails", ""))
+                        text: String(backend.setting("calendar.emails").value || "")
                         placeholderText: "me@example.com, me@work.example"
                         onEditingFinished: {
                             backend.setSetting("calendar.emails", text.trim())

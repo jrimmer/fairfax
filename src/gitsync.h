@@ -47,6 +47,7 @@ class GitSync : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
     Q_PROPERTY(QString status READ status NOTIFY stateChanged)
     Q_PROPERTY(QString remote READ remote NOTIFY stateChanged)
+    Q_PROPERTY(QString directory READ directory CONSTANT)
     Q_PROPERTY(QDateTime lastSync READ lastSync NOTIFY stateChanged)
 
 public:
