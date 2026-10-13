@@ -126,6 +126,14 @@ Popup {
         }
         items = list.slice(0, 12)
         highlighted = 0
+        follow()
+    }
+
+    // Task Find moves the selection to the focused match as you type and step
+    // through the matches, unfolding its projects; Return or Esc leave it there.
+    function follow() {
+        if (kind === "find" && input.text.trim() && items[highlighted])
+            backend.revealHere(items[highlighted].id)
     }
 
     function toggleExact() {
@@ -224,8 +232,8 @@ Popup {
                                 repeat: "" })[root.kind] || ""
             background: Rectangle { radius: 8; color: theme.background; border.color: input.activeFocus ? theme.accent : theme.divider }
             onTextEdited: root.refresh()
-            Keys.onDownPressed: if (root.items.length) root.highlighted = (root.highlighted + 1) % root.items.length
-            Keys.onUpPressed: if (root.items.length) root.highlighted = (root.highlighted + root.items.length - 1) % root.items.length
+            Keys.onDownPressed: if (root.items.length) { root.highlighted = (root.highlighted + 1) % root.items.length; root.follow() }
+            Keys.onUpPressed: if (root.items.length) { root.highlighted = (root.highlighted + root.items.length - 1) % root.items.length; root.follow() }
             Keys.onReturnPressed: (e) => root.accept(root.highlighted, e.modifiers & Qt.ShiftModifier)
             Keys.onEnterPressed: (e) => root.accept(root.highlighted, e.modifiers & Qt.ShiftModifier)
             Keys.onEscapePressed: root.close()

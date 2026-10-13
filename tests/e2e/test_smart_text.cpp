@@ -226,9 +226,11 @@ private slots:
         SMART_SHOWS(app, Everything);
     }
 
-    // Task Find bar: "Type and matching items highlight as you go; the first
-    // match is focused right away. ↑ / ↓ move between matches, wrapping at the
-    // ends. Return commits the focused match and closes the bar. Esc cancels."
+    // Task Find bar: "Type any part of the task title. Matching tasks highlight,
+    // and the selection moves to the first match right away. ↑ / ↓ step through
+    // the other matches, wrapping around at the ends. Press Return to land on the
+    // focused match and close the bar, or Esc to close it where you are; either
+    // way the selection stays put."
     void taskFindBarKeys() {
         App &app = *m_app;
         QVERIFY(selectRowText(app, "Call: Tim"));
@@ -242,8 +244,10 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 3, 5000);
         QCOMPARE(sorted(barItems()), sorted(SL{"Find a new job", "Call: Mum, tell about my new job", "Elsewhere job offer"}));
         QCOMPARE(commandBar()->property("highlighted").toInt(), 0);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, barItems().at(0), 5000);
         app.press(Qt::Key_Down);
         QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, barItems().at(1), 5000);
         app.press(Qt::Key_Down);
         QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 2, 5000);
         // Wrapping: down from the last match goes to the first, up from the
@@ -252,23 +256,24 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 0, 5000);
         app.press(Qt::Key_Up);
         QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 2, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, barItems().at(2), 5000);
         app.press(Qt::Key_Up);
         QTRY_COMPARE_WITH_TIMEOUT(commandBar()->property("highlighted").toInt(), 1, 5000);
         const QString second = barItems().at(1);
         app.press(Qt::Key_Return);
         QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
         QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, second, 5000);
-        // Esc cancels: the selection stays where it was.
-        const qint64 before = app.backend().currentTaskId();
-        QVERIFY(before != start);
+        // Esc closes the bar where you are: the selection stays on the match.
+        QVERIFY(app.backend().currentTaskId() != start);
         parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("tim");
         QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Call: Tim"}), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), start, 5000);
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
-        QCOMPARE(app.backend().currentTaskId(), before);
+        QCOMPARE(app.backend().currentTaskId(), start);
         QCOMPARE(paneTitles(app), sorted(Everything));
     }
 
@@ -282,10 +287,10 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("handbook");
         QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Read the handbook"}), 5000);
-        QEXPECT_FAIL("", "GAP: the Task Find bar lists matches and moves the selection only on Return", Continue);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), textTask(app, "Read the handbook"), 5000);
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
+        QCOMPARE(app.backend().currentTaskId(), textTask(app, "Read the handbook"));
     }
 
     // "An exact-match toggle on the bar switches between loose and exact word
