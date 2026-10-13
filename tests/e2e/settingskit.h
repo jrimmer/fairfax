@@ -201,28 +201,50 @@ inline void chooseCombo(const QString &name, int index) {
     QVERIFY2(index >= 0 && index < combo->property("count").toInt(), qPrintable(name + ": no such entry"));
     QString label;
     QMetaObject::invokeMethod(combo, "textAt", Q_RETURN_ARG(QString, label), Q_ARG(int, index));
-    click(combo);
+    QPointer<QQuickItem> guard(combo);
     QObject *popup = combo->property("popup").value<QObject *>();
     QVERIFY(popup);
-    QTRY_VERIFY_WITH_TIMEOUT(popup->property("visible").toBool(), 5000);
-    auto *view = popup->property("contentItem").value<QQuickItem *>();
-    QVERIFY(view);
-    QMetaObject::invokeMethod(view, "positionViewAtIndex", Q_ARG(int, index), Q_ARG(int, 2));
-    QQuickItem *entry = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((entry = findIn(view, [&](QQuickItem *i) {
-        return i->width() > 0 && i->inherits("QQuickAbstractButton") && i->property("text").toString() == label;
-    })) != nullptr, 3000);
-    // The drop-down slides open and the list scrolls; click once it is still.
-    QPoint last(-1, -1);
-    QTRY_VERIFY_WITH_TIMEOUT([&] {
-        const QPoint now = centreOf(entry);
-        const bool still = now == last;
-        last = now;
-        return still;
-    }(), 3000);
-    click(entry);
+    // A click on an entry of a drop-down that is still sliding open or scrolling
+    // can land on its neighbour or be lost; the drop-down is opened again then.
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        if (!guard || guard->property("currentIndex").toInt() == index)
+            break;
+        click(guard);
+        QTRY_VERIFY_WITH_TIMEOUT(popup->property("visible").toBool(), 5000);
+        auto *view = popup->property("contentItem").value<QQuickItem *>();
+        QVERIFY(view);
+        settleLayout(view);
+        QMetaObject::invokeMethod(view, "positionViewAtIndex", Q_ARG(int, index), Q_ARG(int, 2));
+        auto entryOf = [&]() -> QQuickItem * {
+            return findIn(view, [&](QQuickItem *i) {
+                return i->width() > 0 && i->inherits("QQuickAbstractButton") && i->property("text").toString() == label;
+            });
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(entryOf() != nullptr, 5000);
+        // The drop-down slides open and the list scrolls; click once it is still.
+        QPoint last(-1, -1);
+        int still = 0;
+        QTRY_VERIFY_WITH_TIMEOUT([&] {
+            QQuickItem *e = entryOf();
+            if (!e)
+                return false;
+            const QPoint now = centreOf(e);
+            still = now == last ? still + 1 : 0;
+            last = now;
+            return still >= 3;
+        }(), 5000);
+        click(entryOf());
+        QTest::qWaitFor([&] { return !popup->property("visible").toBool(); }, 2500);
+        QTest::qWaitFor([&] { return guard && guard->property("currentIndex").toInt() == index; }, 1500);
+        if (popup->property("visible").toBool()) {
+            // The click went nowhere: close the drop-down before trying again.
+            QTest::keyClick(guard->window(), Qt::Key_Escape);
+            QTest::qWaitFor([&] { return !popup->property("visible").toBool(); }, 2500);
+        }
+    }
+    QVERIFY(guard);
     QTRY_VERIFY_WITH_TIMEOUT(!popup->property("visible").toBool(), 5000);
-    QTRY_COMPARE_WITH_TIMEOUT(combo->property("currentIndex").toInt(), index, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(guard->property("currentIndex").toInt(), index, 5000);
 }
 
 // Moves a slider to `target` with the arrow keys after clicking it for focus.
