@@ -83,11 +83,13 @@ Rectangle {
     }
 
     Column {
+        id: chips
         x: 12
         y: 10
         spacing: 10
         Icon { name: "note"; size: 15; color: theme.faint }
         Icon {
+            objectName: "notesPreviewToggle"
             name: "markdown"
             size: 15
             color: root.preview ? theme.accent : theme.faint
@@ -103,6 +105,7 @@ Rectangle {
             }
         }
         Icon {
+            objectName: "notesStamp"
             name: "insertDate"
             size: 15
             color: theme.faint
@@ -116,6 +119,7 @@ Rectangle {
             }
         }
         Icon {
+            objectName: "notesLinks"
             name: "url"
             size: 15
             color: theme.faint
@@ -133,6 +137,7 @@ Rectangle {
 
     Plain.TextArea {
         id: area
+        objectName: "notesText"
         x: 40
         y: 2
         width: parent.width - 52
@@ -231,6 +236,7 @@ Rectangle {
     // The task-link picker: recent tasks, narrowed by the title typed after "@{".
     Popup {
         id: linkPicker
+        objectName: "linkPicker"
         property int anchorAt: -1
         property var hits: []
         property int index: 0
@@ -278,6 +284,7 @@ Rectangle {
             delegate: Rectangle {
                 required property var modelData
                 required property int index
+                objectName: "linkPickerRow:" + index
                 width: ListView.view.width
                 height: 30
                 radius: 4

@@ -572,8 +572,8 @@ Window {
                     }
                     RowLayout {
                         visible: !!todoist && todoist.connected
-                        Button { text: todoist && todoist.busy ? "Syncing…" : "Sync Now"; enabled: !!todoist && !todoist.busy; onClicked: todoist.syncNow() }
-                        Button { text: "Disconnect"; flat: true; onClicked: todoist.disconnectAccount() }
+                        Button { objectName: "todoistSyncNow"; text: todoist && todoist.busy ? "Syncing…" : "Sync Now"; enabled: !!todoist && !todoist.busy; onClicked: todoist.syncNow() }
+                        Button { objectName: "todoistDisconnect"; text: "Disconnect"; flat: true; onClicked: todoist.disconnectAccount() }
                     }
                     Text { visible: !!todoist; text: todoist ? todoist.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
 
@@ -978,6 +978,7 @@ Window {
     // The question a folder or WebDAV sync asks when both sides already hold tasks.
     component FirstSyncChoice: ColumnLayout {
         property var provider
+        objectName: "firstSyncChoice"
         visible: !!provider && provider.needsChoice
         Layout.fillWidth: true
         Text {
@@ -988,9 +989,9 @@ Window {
             Layout.fillWidth: true
         }
         RowLayout {
-            Button { text: "Merge"; onClicked: provider.chooseFirstSync("merge") }
-            Button { text: "Replace Local"; onClicked: provider.chooseFirstSync("local") }
-            Button { text: "Replace Server"; onClicked: provider.chooseFirstSync("server") }
+            Button { objectName: "firstSyncMerge"; text: "Merge"; onClicked: provider.chooseFirstSync("merge") }
+            Button { objectName: "firstSyncReplaceLocal"; text: "Replace Local"; onClicked: provider.chooseFirstSync("local") }
+            Button { objectName: "firstSyncReplaceServer"; text: "Replace Server"; onClicked: provider.chooseFirstSync("server") }
         }
         Text {
             text: "Merge keeps the newest version of every task. Replace Local discards this machine's tasks for the remote's (a backup is made first). Replace Server overwrites the remote with this machine's tasks."

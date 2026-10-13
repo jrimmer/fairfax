@@ -114,7 +114,7 @@ Item {
             Text { text: root.e.created || ""; color: theme.muted; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
             Item { Layout.fillWidth: true }
             IconButton {
-                icon: "copy"; size: 14; tip: "Copy"
+                objectName: "editorCopy"; icon: "copy"; size: 14; tip: "Copy"
                 onClicked: copyMenu.popup()
                 Menu {
                     id: copyMenu
@@ -338,7 +338,7 @@ Item {
                             name: Icons.actionIcons[root.e.actionType || 0]
                             size: 15
                             color: theme.today
-                            MouseArea { anchors.fill: parent; onClicked: backend.performAction(root.e.id) }
+                            MouseArea { objectName: "editorActionRun"; anchors.fill: parent; onClicked: backend.performAction(root.e.id) }
                         }
                         Text {
                             visible: (root.e.actionType || 0) > 0 && !!root.e.hint
@@ -364,6 +364,7 @@ Item {
                         }
                         RibbonButton { id: actionButton; objectName: "editorAction"; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; menu: actionMenu }
                         RibbonButton {
+                            objectName: "editorRecord"
                             icon: "mic"
                             tip: backend.recordingTaskId === root.e.id ? "Stop Recording" : "Record an Audio Note"
                             active: backend.recordingTaskId === root.e.id
@@ -614,6 +615,7 @@ Item {
                         model: root.e.attachments || []
                         Rectangle {
                             required property var modelData
+                            objectName: "editorAttachment:" + modelData.id
                             width: modelData.kind === 0 ? 84 : attachLabel.implicitWidth + 44
                             height: modelData.kind === 0 ? 60 : 26
                             radius: 6
@@ -637,6 +639,7 @@ Item {
                             }
                             MouseArea { anchors.fill: parent; onClicked: backend.openAttachment(modelData.id) }
                             Rectangle {
+                                objectName: "editorAttachmentRemove:" + modelData.id
                                 anchors.right: parent.right
                                 anchors.top: parent.top
                                 anchors.margins: 3

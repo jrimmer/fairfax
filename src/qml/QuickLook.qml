@@ -68,6 +68,7 @@ Popup {
                 // Copy the task out in the forms the reference app's Quick Look offers.
                 IconButton {
                     id: copyButton
+                    objectName: "quickLookCopy"
                     icon: "copy"
                     size: 15
                     tip: "Copy"
@@ -133,7 +134,7 @@ Popup {
                     Icon { name: Icons.actionIcons[root.t.actionType || 0]; size: 16; color: theme.today }
                     Text { Layout.fillWidth: true; text: Icons.actionNames[root.t.actionType || 0] + "  " + (root.t.actionValue || ""); color: theme.today; elide: Text.ElideRight }
                 }
-                MouseArea { anchors.fill: parent; onClicked: backend.performAction(root.t.id) }
+                MouseArea { objectName: "quickLookAction"; anchors.fill: parent; onClicked: backend.performAction(root.t.id) }
             }
             GridLayout {
                 columns: 2
@@ -159,6 +160,7 @@ Popup {
                 model: root.t.audio || []
                 Rectangle {
                     required property var modelData
+                    objectName: "quickLookAudio:" + modelData.id
                     Layout.fillWidth: true
                     implicitHeight: 32
                     radius: 8
