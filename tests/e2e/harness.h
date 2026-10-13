@@ -248,11 +248,13 @@ inline QQuickItem *popupSurface(QObject *popup) {
 
 class App {
 public:
-    explicit App(const std::function<Seed(Store &)> &seed = seedWorld) {
+    // `reopen` boots on an existing database (a restart) instead of a new one.
+    explicit App(const std::function<Seed(Store &)> &seed = seedWorld, const QString &reopen = QString()) {
         QStandardPaths::setTestModeEnabled(true);
         QVERIFY2(m_dir.isValid(), "temporary directory");
         QString error;
-        QVERIFY2(m_store.open(m_dir.filePath("e2e.db"), &error), qPrintable(error));
+        m_dbPath = reopen.isEmpty() ? m_dir.filePath("e2e.db") : reopen;
+        QVERIFY2(m_store.open(m_dbPath, &error), qPrintable(error));
         if (seed)
             ids = seed(m_store);
         m_services = std::make_unique<AppServices>(m_store, QString());
@@ -280,6 +282,7 @@ public:
 
     Backend &backend() { return m_services->backend; }
     Store &store() { return m_store; }
+    QString dbPath() const { return m_dbPath; }
 
     // The task a user would see by this title, straight from the store.
     Task task(qint64 id) const { return m_store.task(id); }
@@ -324,6 +327,7 @@ public:
 
 private:
     QTemporaryDir m_dir;
+    QString m_dbPath;
     Store m_store;
     std::unique_ptr<AppServices> m_services;
     QQmlApplicationEngine m_engine;
