@@ -1813,6 +1813,9 @@ void Backend::setListFlag(qint64 id, const QString &flag, bool on) {
     else if (flag == "done") l.showInDone = on;
     else if (flag == "archived") l.archived = on;
     else if (flag == "muteAlerts") l.muteAlerts = on;
+    // An archived list can't stay open, like a hidden one.
+    if (flag == "archived" && on && m_source.kind == Source::List && m_source.id == id)
+        selectSource("today");
     m_store->begin("Change List");
     m_store->putList(l);
     m_store->commit();
