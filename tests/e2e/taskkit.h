@@ -216,7 +216,7 @@ inline bool clickSub(const QString &parentText, const QString &child, int ms = 5
     QTest::mouseMove(entry->window(), centreOf(entry));
     // Hovering does not always open it (offscreen there is no real pointer); a
     // click on the entry does, and does not close it if the hover was merely late.
-    if (!waitFor(found, 400)) {
+    if (!waitFor(found, 150)) {
         if (!parentEntry()) return false;
         click(entry);
         if (!waitFor(found, 3000)) {

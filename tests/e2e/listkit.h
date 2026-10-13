@@ -413,7 +413,8 @@ inline bool clickSubmenuEntry(const QString &submenu, const QString &entry) {
             else
                 click(parent);
         }
-        waitUntil([&] { return menuEntry(entry) != nullptr; }, 2000);
+        // Hovering opens nothing offscreen; give it a moment, and the click a proper wait.
+        waitUntil([&] { return menuEntry(entry) != nullptr; }, attempt == 0 ? 250 : 2000);
     }
     return false;
 }

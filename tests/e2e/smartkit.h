@@ -563,15 +563,19 @@ inline bool searchOpen() { return searchField() != nullptr; }
 
 // Clears the search with Escape and waits for the pane to follow.
 inline bool escapeSearch(App &app) {
+    auto closed = [&] { return app.backend().search().isEmpty() && !searchOpen(); };
     if (!searchOpen())
         return app.backend().search().isEmpty();
-    app.press(Qt::Key_Escape);
-    if (!waitUntil([&] { return app.backend().search().isEmpty() && !searchOpen(); }, 2000)) {
-        // Escape went to the list (the field had lost focus): use the cross.
-        if (QQuickItem *cross = findItem("searchClear"))
-            clickSteady(cross);
+    // Escape only reaches the field while it has the keyboard; when the list has
+    // taken it (a row was clicked), the cross at the field's end clears it.
+    if (searchField()->property("activeFocus").toBool()) {
+        app.press(Qt::Key_Escape);
+        if (waitUntil(closed, 2000))
+            return true;
     }
-    return waitUntil([&] { return app.backend().search().isEmpty() && !searchOpen(); });
+    if (QQuickItem *cross = findItem("searchClear"))
+        clickSteady(cross);
+    return waitUntil(closed);
 }
 
 // Ctrl+K (View > Show Scheduled Tasks) until the pane shows, or hides,
