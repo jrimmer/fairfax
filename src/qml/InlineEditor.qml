@@ -18,7 +18,18 @@ TextField {
     selectByMouse: true
     background: Rectangle { color: theme.background; border.color: theme.accent; radius: 4 }
 
-    onActiveChanged: if (active) { text = initial; forceActiveFocus(); selectAll() }
+    onActiveChanged: {
+        if (active) {
+            text = initial
+            forceActiveFocus()
+            selectAll()
+        } else if (activeFocus) {
+            // A field that hides keeps the keyboard, which would swallow the
+            // window's shortcuts (Ctrl+Z) until something else is clicked.
+            const win = ApplicationWindow.window
+            if (win && win.focusList) win.focusList()
+        }
+    }
     Keys.onReturnPressed: committed(text)
     Keys.onEnterPressed: committed(text)
     Keys.onEscapePressed: cancelled()
