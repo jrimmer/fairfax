@@ -1,4 +1,4 @@
-QT += core gui widgets sql qml quick quickcontrols2 testlib network
+QT += core gui widgets sql qml quick quickcontrols2 testlib qmltest network
 linux: QT += dbus
 CONFIG += c++20
 TARGET = precrime_e2e

@@ -13,6 +13,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
+#include <QtQuickTest/quicktest.h>
 #include <QtTest>
 #include <functional>
 #include <memory>
@@ -164,6 +165,16 @@ inline void typeInto(QWindow *w, const QString &text) {
         const char ascii = c.toLatin1();
         QTest::keyClick(w, ascii);
     }
+}
+
+// Lets pending layout in an item's window finish. A row that has just
+// appeared is laid out on the next polish, and until then its children sit at
+// stale positions, so a click would land on the wrong item. Call it before
+// looking up the items to click; it runs the event loop, so a pointer held
+// across it can go stale.
+inline void settleLayout(QQuickItem *item) {
+    if (item && item->window() && QQuickTest::qIsPolishScheduled(item->window()))
+        QQuickTest::qWaitForPolish(item->window(), 1000);
 }
 
 inline QPoint centreOf(QQuickItem *item) {

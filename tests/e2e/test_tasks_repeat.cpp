@@ -121,6 +121,10 @@ private slots:
         QVERIFY(openRepeat(app, id));
         QVERIFY(clickNamed("repeatFreq:Weekly"));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.frequency, 2, 3000);
+        // Weekly has just added the weekday row; until it is laid out, its
+        // toggles sit at stale positions and a click hits the wrong day.
+        QVERIFY(waitItem("repeatWeekday:0"));
+        settleLayout(findItem("repeatWeekday:0"));
         // Exactly Mon, Wed, Fri: switch on what is missing, then off what is extra.
         const int want = 1 | 4 | 16;
         for (int pass = 0; pass < 2; ++pass)
