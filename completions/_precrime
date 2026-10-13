@@ -62,6 +62,7 @@ _precrime_main() {
         'ctl:run an automation command'
         'mcp:run the MCP server on stdio'
         'import:import a TickTick backup, the reference app database or iCalendar file'
+        'import-mail:turn emails into tasks (Mail to Precrime)'
         'setup:wire Precrime into Omarchy'
       )
       _describe -t commands 'precrime command' commands
@@ -71,6 +72,12 @@ _precrime_main() {
         ctl)
           ctl_commands=(help url ${(f)"$(precrime --complete ctl 2>/dev/null)"})
           (( CURRENT == 2 )) && _describe -t ctl 'automation command' ctl_commands
+          ;;
+        import-mail)
+          _arguments '--list[destination list]:list:' \
+            '--natural-language[read dates and tags from the subject]' \
+            '--maildir[import a Maildir]:directory:_files -/' \
+            '*:message:_files -g "*.eml"'
           ;;
         import) _files -g '*.(csv|ics|db|taskdb)' ;;
         setup)

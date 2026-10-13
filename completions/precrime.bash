@@ -31,12 +31,16 @@ _precrime() {
         --db|--theme-dir|--screenshot) COMPREPLY=($(compgen -f -- "$cur")); return ;;
         --source) COMPREPLY=($(compgen -W "all today starred scheduled done" -- "$cur")); return ;;
         import) COMPREPLY=($(compgen -f -X '!*.@(csv|ics|db|taskdb)' -- "$cur") $(compgen -d -- "$cur")); return ;;
+        --maildir) COMPREPLY=($(compgen -d -- "$cur")); return ;;
+        --list) local IFS=$'\n'; COMPREPLY=($(compgen -W "$(_precrime_values lists)" -- "$cur")); return ;;
         ctl) COMPREPLY=($(compgen -W "help url $(_precrime_values ctl)" -- "$cur")); return ;;
         setup) COMPREPLY=($(compgen -W "omarchy" -- "$cur")); return ;;
         omarchy) COMPREPLY=($(compgen -W "--remove --key --help" -- "$cur")); return ;;
     esac
     if (( COMP_CWORD == 1 )); then
-        COMPREPLY=($(compgen -W "add ctl mcp import setup $options" -- "$cur"))
+        COMPREPLY=($(compgen -W "add ctl mcp import import-mail setup $options" -- "$cur"))
+    elif [[ ${COMP_WORDS[1]} == import-mail ]]; then
+        COMPREPLY=($(compgen -W "--list --natural-language --maildir" -- "$cur") $(compgen -f -X '!*.eml' -- "$cur"))
     else
         COMPREPLY=($(compgen -W "$options" -- "$cur"))
     fi

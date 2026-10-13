@@ -1,14 +1,19 @@
 # fish completion for precrime.
 
-set -l commands add ctl mcp import setup
+set -l commands add ctl mcp import import-mail setup
 complete -c precrime -f
 complete -c precrime -n "not __fish_seen_subcommand_from $commands" -a add -d 'Add a task (natural language)'
 complete -c precrime -n "not __fish_seen_subcommand_from $commands" -a ctl -d 'Run an automation command'
 complete -c precrime -n "not __fish_seen_subcommand_from $commands" -a mcp -d 'Run the MCP server on stdio'
 complete -c precrime -n "not __fish_seen_subcommand_from $commands" -a import -d 'Import TickTick, the reference app or iCalendar'
+complete -c precrime -n "not __fish_seen_subcommand_from $commands" -a import-mail -d 'Turn emails into tasks (Mail to Precrime)'
 complete -c precrime -n "not __fish_seen_subcommand_from $commands" -a setup -d 'Wire Precrime into Omarchy'
 complete -c precrime -n "__fish_seen_subcommand_from ctl" -a "help url (precrime --complete ctl 2>/dev/null)"
 complete -c precrime -n "__fish_seen_subcommand_from import" -F -a "(__fish_complete_suffix .csv .ics .db .taskdb)"
+complete -c precrime -n "__fish_seen_subcommand_from import-mail" -l list -x -a "(precrime --complete lists 2>/dev/null)" -d 'Destination list'
+complete -c precrime -n "__fish_seen_subcommand_from import-mail" -l natural-language -d 'Read dates and tags from the subject'
+complete -c precrime -n "__fish_seen_subcommand_from import-mail" -l maildir -r -a "(__fish_complete_directories)" -d 'Import a Maildir'
+complete -c precrime -n "__fish_seen_subcommand_from import-mail" -F
 complete -c precrime -n "__fish_seen_subcommand_from setup; and not __fish_seen_subcommand_from omarchy" -a omarchy
 complete -c precrime -n "__fish_seen_subcommand_from omarchy" -l remove -d 'Undo the Omarchy setup'
 complete -c precrime -n "__fish_seen_subcommand_from omarchy" -l key -x -d 'Quick Entry key'

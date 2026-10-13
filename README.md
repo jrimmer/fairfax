@@ -236,6 +236,37 @@ list has focus. Press `?` in the app for the full list.
 
 Every import is one step that Ctrl+Z undoes, and a backup is taken first.
 
+## Mail to Precrime
+
+the reference app's "Mail to the reference app" turns email into tasks through a private hosted address. Precrime has no
+server, so mail reaches it from a mailbox you own, and the conversion is the same as the reference app's:
+
+- The subject is the title (leading `Re:`, `Fwd:`, `AW:` and friends are trimmed), the plain-text
+  body is the notes (up to 10,000 characters), and attachments and HTML formatting are dropped.
+  An HTML-only message is turned into text.
+- A body whose lines are numbered `1.` `2.` `3.` becomes a checklist. A signature ("-- ",
+  "Sent from my iPhone", "Get Outlook for …") ends it.
+- The subject can carry filing instructions, which are taken out of the title: `start(tomorrow)`,
+  `due(friday 3pm)`, `priority(!!!)`, `list(Work)`, `tag(home, diy)` and
+  `action(call, 0793273373)` (`call`, `message`, `url`, `visit`, `google`, `email`). A list that
+  doesn't exist leaves the task in the destination list; an instruction Precrime doesn't know
+  stays in the title.
+- A message becomes one task, once: its id is derived from the Message-ID, so the same message
+  fetched again, or fetched on two machines that sync, never makes a second task, even after you
+  delete the first. The search `type: capturedmail` finds tasks that arrived this way.
+
+From a script, `procmail`, Sieve, `fetchmail` or a ProtonMail Bridge setup:
+
+    precrime import-mail message.eml            # or several files
+    some-fetcher | precrime import-mail --list Work
+    precrime import-mail --maildir ~/Mail/precrime   # everything in new/, moved to cur/ as seen
+    precrime import-mail --natural-language ...      # also read "tomorrow 3pm #home !!" in the subject
+
+It prints a line per message (`Added "Title" to List` or `Skipped: duplicate`) and exits 0 when
+everything was added or was a duplicate, 1 for a message it couldn't read, and 2 for bad usage.
+Like the other terminal commands it works while the app is open, which shows the new tasks within
+a couple of seconds.
+
 ## Sync and backups
 
 Settings → Sync offers four ways to keep machines in step, all of which can run at once:
