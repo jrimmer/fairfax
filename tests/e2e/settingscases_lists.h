@@ -184,8 +184,13 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 const qint64 project = app.taskTitled("Paint the house").id;
                 QQuickItem *row = nullptr;
                 QTRY_VERIFY_WITH_TIMEOUT((row = app.row(project)) != nullptr, 5000);
-                click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
-                QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), project, 5000);
+                // A row still sliding into place can miss the click; aim again.
+                for (int i = 0; i < 3 && app.backend().currentTaskId() != project; ++i) {
+                    row = app.row(project);
+                    click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
+                    QTest::qWaitFor([&] { return app.backend().currentTaskId() == project; }, 1500);
+                }
+                QCOMPARE(app.backend().currentTaskId(), project);
                 app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
                 QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), "project:" + QString::number(project), 5000);
                 QTRY_VERIFY_WITH_TIMEOUT(app.row(app.taskTitled("Paint walls").id) != nullptr, 5000);
