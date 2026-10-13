@@ -231,6 +231,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
                 Text {
+                    objectName: "dayBarToday"
                     visible: root.dayOffset !== 0
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Today"
@@ -247,6 +248,7 @@ Item {
                     model: [{ icon: "chevronLeft", step: -1 }, { icon: "chevronRight", step: 1 }]
                     delegate: Item {
                         required property var modelData
+                        objectName: "dayBarStep:" + modelData.step
                         width: 20; height: 20
                         Icon { anchors.centerIn: parent; name: modelData.icon; size: 12; color: theme.muted }
                         MouseArea {
@@ -272,6 +274,7 @@ Item {
                     model: root.events.filter(e => e.allDay)
                     delegate: Rectangle {
                         required property var modelData
+                        objectName: "dayBarPill:" + modelData.title
                         anchors.verticalCenter: parent.verticalCenter
                         height: 16
                         radius: 8
@@ -299,6 +302,7 @@ Item {
 
             Rectangle {
                 id: timeline
+                objectName: "dayBarStrip"
                 x: pills.width > 0 ? pills.width + 6 : 0
                 width: parent.width - x
                 height: parent.height
@@ -321,6 +325,7 @@ Item {
                     model: root.events.filter(e => !e.allDay)
                     delegate: Rectangle {
                         required property var modelData
+                        objectName: "dayBarEvent:" + modelData.title
                         x: (modelData.start - root.firstMinute) / root.span * timeline.width
                         width: Math.max(3, (modelData.end - modelData.start) / root.span * timeline.width)
                         y: 3
@@ -434,6 +439,7 @@ Item {
                 model: root.layout(root.events)
                 delegate: Rectangle {
                     required property var modelData
+                    objectName: "dayBarGridEvent:" + modelData.e.title
                     readonly property real colWidth: (grid.width - grid.labelWidth - 6) / modelData.cols
                     x: grid.labelWidth + 2 + modelData.col * colWidth
                     y: grid.yFor(modelData.e.start)
@@ -517,6 +523,7 @@ Item {
     // Details of the clicked event. Events are read-only here, as in the reference app.
     Popup {
         id: details
+        objectName: "dayBarDetails"
         parent: root
         width: Math.min(320, root.width)
         padding: 12
@@ -530,6 +537,7 @@ Item {
             spacing: 4
             readonly property var e: root.detailEvent || ({ title: "", start: 0, end: 0, allDay: false, color: "transparent", location: "", calendar: "", description: "", url: "", declined: false })
             Text {
+                objectName: "dayBarDetailTitle"
                 width: parent.width
                 text: parent.e.title
                 wrapMode: Text.Wrap

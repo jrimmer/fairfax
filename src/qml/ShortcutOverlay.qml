@@ -23,7 +23,7 @@ Popup {
             ["t / y", "Due today / tomorrow"], ["Ctrl+T", "Start today"], ["d / k", "Defer / Schedule…"],
             ["e / x", "Due time / Duration…"], ["] [", "Due date ±1 day (Shift: week)"], [". ,", "Start date ±1 day (Shift: week)"],
             ["Alt+[ / Alt+,", "Remove due / start date"], ["0–3", "Priority none … high"], ["= / -", "Raise / lower priority"],
-            ["s / Ctrl+S", "Star / unstar"], ["l / Alt+L", "Tag… / Untag…"], ["m", "Move to list…"], ["c", "Collapse project"],
+            ["s / Ctrl+Alt+S", "Star / toggle star"], ["l / Alt+L", "Tag… / Untag…"], ["m", "Move to list…"], ["c", "Collapse project"],
             ["p / u", "Perform action / open links"], ["j / f / /", "Jump to list / find task / find tag"],
             ["Delete", "Delete"], ["?", "This overlay"], ["q", "Quit"] ] },
         { title: "New & edit", keys: [

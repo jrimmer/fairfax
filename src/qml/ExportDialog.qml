@@ -50,6 +50,7 @@ ThemedDialog {
         spacing: 8
         Label { text: "Select lists to export:"; color: theme.muted }
         CheckBox {
+            objectName: "exportSelectAll"
             text: "Select all"
             tristate: false
             checked: root.count === root.lists.length
@@ -69,6 +70,7 @@ ThemedDialog {
                     model: root.lists
                     delegate: CheckBox {
                         required property var modelData
+                        objectName: "exportList:" + modelData.id
                         text: modelData.name
                         checked: !!root.chosen[modelData.id]
                         onToggled: {
@@ -82,11 +84,11 @@ ThemedDialog {
         }
         RowLayout {
             Label { text: "Tasks to export"; Layout.preferredWidth: 130 }
-            ComboBox { id: scope; model: ["All", "Not Done", "Done"]; Layout.fillWidth: true }
+            ComboBox { id: scope; objectName: "exportScope"; model: ["All", "Not Done", "Done"]; Layout.fillWidth: true }
         }
         RowLayout {
             Label { text: "Format"; Layout.preferredWidth: 130 }
-            ComboBox { id: format; model: ["Spreadsheet (.csv)", "Calendar file (.ics)"]; Layout.fillWidth: true }
+            ComboBox { id: format; objectName: "exportFormat"; model: ["Spreadsheet (.csv)", "Calendar file (.ics)"]; Layout.fillWidth: true }
         }
     }
 }

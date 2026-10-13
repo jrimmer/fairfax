@@ -25,8 +25,11 @@ ApplicationWindow {
     font.pixelSize: backend.fontSize
 
     property alias dragProxy: dragProxy
-    property bool sidebarShown: true
-    property bool utilityShown: true
+    // Whether the Lists and Tags panels are shown is remembered across launches.
+    property bool sidebarShown: backend.settingFlag("window.sidebarShown", true)
+    property bool utilityShown: backend.settingFlag("window.utilityShown", true)
+    onSidebarShownChanged: backend.setSetting("window.sidebarShown", sidebarShown)
+    onUtilityShownChanged: backend.setSetting("window.utilityShown", utilityShown)
     // The lists panel tucks away in a narrow window and comes back with room,
     // unless it was hidden by hand.
     readonly property bool sidebarVisible: sidebarShown && width >= 820
@@ -87,7 +90,7 @@ ApplicationWindow {
         }
     }
 
-    DragProxy { id: dragProxy; parent: Overlay.overlay }
+    DragProxy { id: dragProxy; objectName: "dragProxy"; parent: Overlay.overlay }
     CommandPopup { id: command; objectName: "commandPopup"; onClosed: win.focusList() }
     QuickEntry { id: quickEntry }
     SettingsWindow { id: settings }
@@ -142,7 +145,7 @@ ApplicationWindow {
         function onWindowRequested() { win.show(); win.raise(); win.requestActivate() }
     }
     QuickLook { id: quickLook; objectName: "quickLook"; onClosed: win.focusList() }
-    ShortcutOverlay { id: help; onClosed: win.focusList() }
+    ShortcutOverlay { id: help; objectName: "shortcutOverlay"; onClosed: win.focusList() }
 
     // Errors and confirmations, e.g. "Undo Change Due Date".
     Rectangle {

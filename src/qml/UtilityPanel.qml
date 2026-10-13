@@ -6,9 +6,9 @@ import QtQuick.Layouts
 // searchable, draggable) and Locations (saved places). Clicking filters the
 // task list; right-click pauses, which hides matching tasks everywhere.
 //
-// Dragging a tag row onto a task: drag key "precrime-tag", mimeData
-// {"text/x-precrime-tag": "<tagId>"} (a string); drop on a DropArea with
-// keys ["precrime-tag"] and read drop.getDataAsString("text/x-precrime-tag").
+// Dragging a tag row onto a task: drag key "precrime-tag"; drop on a DropArea
+// with keys ["precrime-tag"] and read the tag from drop.source.tagId (the
+// source of the drag is the pill that follows the pointer).
 Rectangle {
     id: root
     color: theme.background
@@ -78,14 +78,15 @@ Rectangle {
             Layout.rightMargin: 16
             spacing: 6
             Item { Layout.fillWidth: true }
-            IconButton { icon: "tag"; checked: root.tab === 0; tip: "Tags"; onClicked: root.tab = 0 }
-            IconButton { icon: "pin"; checked: root.tab === 1; tip: "Locations"; onClicked: root.tab = 1 }
+            IconButton { objectName: "utilityTabTags"; icon: "tag"; checked: root.tab === 0; tip: "Tags"; onClicked: root.tab = 0 }
+            IconButton { objectName: "utilityTabLocations"; icon: "pin"; checked: root.tab === 1; tip: "Locations"; onClicked: root.tab = 1 }
             Item { Layout.fillWidth: true }
         }
 
         // Tag Search.
         TextField {
             id: search
+            objectName: "tagSearch"
             visible: root.searchActive && root.tab === 0
             Layout.fillWidth: true
             Layout.leftMargin: 12
@@ -111,6 +112,7 @@ Rectangle {
 
             delegate: Item {
                 id: row
+                objectName: isHeader ? "tagGroup:" + (model.groupId || 0) : "tagRow:" + model.tagId
                 required property var model
                 readonly property bool isHeader: model.kind === "header"
                 readonly property bool shown: root.tagShown(model)
@@ -164,6 +166,7 @@ Rectangle {
                     x: 42
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width - 100
+                    objectName: "tagTitle"
                     text: row.model.title || ""
                     elide: Text.ElideRight
                     color: row.model.paused ? theme.faint : theme.foreground
@@ -179,7 +182,7 @@ Rectangle {
                     height: 18
                     radius: 9
                     color: theme.mix(theme.background, theme.foreground, 0.13)
-                    Text { id: countText; anchors.centerIn: parent; text: row.model.count || ""; color: theme.muted; font.pixelSize: backend.fontSize - 4; font.bold: true }
+                    Text { id: countText; objectName: "tagCount"; anchors.centerIn: parent; text: row.model.count || ""; color: theme.muted; font.pixelSize: backend.fontSize - 4; font.bold: true }
                 }
 
                 // A tag dropped on another tag takes its place (manual order);
@@ -190,7 +193,7 @@ Rectangle {
                     keys: ["precrime-tag"]
                     enabled: row.shown
                     onDropped: (d) => {
-                        const id = Number(d.getDataAsString("text/x-precrime-tag"))
+                        const id = d.source.tagId
                         if (row.isHeader) backend.moveTag(id, 0, row.model.groupId || 0)
                         else backend.moveTag(id, row.model.tagId, 0)
                     }
@@ -308,6 +311,7 @@ Rectangle {
 
             delegate: Item {
                 id: prow
+                objectName: "placeRow:" + prow.model.locationId
                 required property var model
                 width: ListView.view.width
                 height: 44
@@ -358,7 +362,7 @@ Rectangle {
                     height: 18
                     radius: 9
                     color: theme.mix(theme.background, theme.foreground, 0.13)
-                    Text { id: pcount; anchors.centerIn: parent; text: prow.model.count || ""; color: theme.muted; font.pixelSize: backend.fontSize - 4; font.bold: true }
+                    Text { id: pcount; objectName: "placeCount"; anchors.centerIn: parent; text: prow.model.count || ""; color: theme.muted; font.pixelSize: backend.fontSize - 4; font.bold: true }
                 }
                 DropArea {
                     id: pdrop
@@ -407,6 +411,7 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
+                objectName: "utilityAdd"
                 icon: "plus"
                 tip: root.tab === 0 ? "New Tag or Tag Group" : "New Location"
                 onClicked: root.tab === 0 ? addMenu.popup() : root.editLocation(null)
@@ -418,6 +423,7 @@ Rectangle {
             }
             IconButton {
                 id: clearBtn
+                objectName: "tagFilterClear"
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
@@ -428,6 +434,7 @@ Rectangle {
             }
             IconButton {
                 id: pausedBtn
+                objectName: "tagShowPaused"
                 anchors.right: parent.right
                 anchors.rightMargin: clearBtn.visible ? 44 : 10
                 anchors.verticalCenter: parent.verticalCenter
@@ -438,6 +445,7 @@ Rectangle {
             }
             IconButton {
                 id: usedBtn
+                objectName: "tagUsedOnly"
                 anchors.right: pausedBtn.left
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
@@ -465,6 +473,7 @@ Rectangle {
     // What follows the pointer while dragging a tag onto a task.
     Rectangle {
         id: tagDrag
+        objectName: "tagDragProxy"
         parent: Overlay.overlay
         visible: Drag.active
         z: 1000
@@ -481,9 +490,10 @@ Rectangle {
             x = p.x - 10
             y = p.y - 13
         }
-        function begin(title, tagId) {
+        property int tagId: 0
+        function begin(title, id) {
             dragLabel.text = title
-            Drag.mimeData = { "text/x-precrime-tag": String(tagId) }
+            tagId = id
             Drag.active = true
         }
         function end() {
@@ -513,7 +523,7 @@ Rectangle {
         property string initial: ""
         title: mode === "newTag" ? "New Tag" : mode === "renameTag" ? "Rename Tag" : mode === "newGroup" ? "New Tag Group" : "Rename Tag Group"
         standardButtons: Dialog.Cancel | Dialog.Ok
-        TextField { id: nameField; width: 260; placeholderText: "Name"; onAccepted: nameDialog.accept() }
+        TextField { id: nameField; objectName: "tagNameField"; width: 260; placeholderText: "Name"; onAccepted: nameDialog.accept() }
         onOpened: { nameField.text = initial; nameField.forceActiveFocus(); nameField.selectAll() }
         onAccepted: {
             const n = nameField.text.trim()
@@ -561,8 +571,8 @@ Rectangle {
         standardButtons: Dialog.Cancel | Dialog.Ok
         ColumnLayout {
             spacing: 8
-            TextField { id: locName; Layout.preferredWidth: 280; placeholderText: "Name"; onAccepted: locAddress.forceActiveFocus() }
-            TextField { id: locAddress; Layout.preferredWidth: 280; placeholderText: "Address"; onAccepted: locDialog.accept() }
+            TextField { id: locName; objectName: "locationNameField"; Layout.preferredWidth: 280; placeholderText: "Name"; onAccepted: locAddress.forceActiveFocus() }
+            TextField { id: locAddress; objectName: "locationAddressField"; Layout.preferredWidth: 280; placeholderText: "Address"; onAccepted: locDialog.accept() }
         }
         onOpened: { locName.text = initialName; locAddress.text = initialAddress; locName.forceActiveFocus() }
         onAccepted: {

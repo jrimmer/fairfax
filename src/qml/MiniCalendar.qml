@@ -62,8 +62,9 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        IconButton { icon: "chevronLeft"; size: 12; onClicked: root.shown = new Date(root.year, root.month - 1, 1) }
+        IconButton { objectName: "calPrevious"; icon: "chevronLeft"; size: 12; onClicked: root.shown = new Date(root.year, root.month - 1, 1) }
         Text {
+            objectName: "calTitle"
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             text: Qt.locale("en_GB").monthName(root.month, Locale.LongFormat).toUpperCase() + ", " + root.year
@@ -74,6 +75,7 @@ ColumnLayout {
         }
         // Back to today, only once today's month is out of view.
         Text {
+            objectName: "calToday"
             visible: !root.showingToday
             text: "Today"
             color: theme.today
@@ -81,7 +83,7 @@ ColumnLayout {
             font.weight: Font.DemiBold
             MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: root.shown = new Date() }
         }
-        IconButton { icon: "chevronRight"; size: 12; onClicked: root.shown = new Date(root.year, root.month + 1, 1) }
+        IconButton { objectName: "calNext"; icon: "chevronRight"; size: 12; onClicked: root.shown = new Date(root.year, root.month + 1, 1) }
     }
 
     Item {

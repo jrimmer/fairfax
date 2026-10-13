@@ -50,7 +50,7 @@ Item {
             Layout.rightMargin: 10
             spacing: 2
 
-            IconButton { visible: !root.sidebarVisible; icon: "sidebar"; tip: "Show Lists (Ctrl+Alt+←)"; onClicked: root.toggleSidebar() }
+            IconButton { objectName: "showSidebar"; visible: !root.sidebarVisible; icon: "sidebar"; tip: "Show Lists (Ctrl+Alt+←)"; onClicked: root.toggleSidebar() }
             IconButton {
                 objectName: "newTaskButton"
                 icon: "plus"
@@ -106,7 +106,7 @@ Item {
                     MenuItem { text: backend.searchAllLists ? "Search This List Only" : "Search All Lists"; onTriggered: backend.toggleSearchScope() }
                 }
             }
-            IconButton { icon: "panel"; tip: root.utilityVisible ? "Hide Tags (Ctrl+Alt+→)" : "Show Tags (Ctrl+Alt+→)"; onClicked: root.toggleUtility() }
+            IconButton { objectName: "toggleUtility"; icon: "panel"; tip: root.utilityVisible ? "Hide Tags (Ctrl+Alt+→)" : "Show Tags (Ctrl+Alt+→)"; onClicked: root.toggleUtility() }
         }
 
         // Title and sort bar.
@@ -151,6 +151,7 @@ Item {
                 font.pixelSize: backend.fontSize - 1
             }
             IconButton {
+                objectName: "showScheduledButton"
                 visible: backend.hasHidden
                 icon: "clock"
                 checked: backend.showScheduled || backend.showPaused
@@ -160,6 +161,7 @@ Item {
             Rectangle { visible: backend.hasHidden; implicitWidth: 1; implicitHeight: 16; color: theme.divider }
             FocusButton {}
             IconButton {
+                objectName: "sortReverse"
                 icon: backend.sortAscending ? "arrowDown" : "arrowUp"
                 size: 15
                 tip: "Reverse Sort"
@@ -415,7 +417,6 @@ Item {
         if (ctrl && k === Qt.Key_X) { backend.cutSelection(); return done() }
         if (ctrl && k === Qt.Key_V) { backend.pasteTasks(); return done() }
         if (ctrl && k === Qt.Key_T) { backend.setStartInDays(0); return done() }
-        if (ctrl && k === Qt.Key_S) { backend.setStarred(0); return done() }
         // Ctrl+Shift+[ takes the time off the due date.
         if (ctrl && shift && (k === Qt.Key_BraceLeft || k === Qt.Key_BracketLeft)) { backend.setSelectionDueTime(-1); return done() }
         if (ctrl) return

@@ -28,19 +28,38 @@ Item {
     }
     MouseArea { id: mouse; anchors.fill: parent; hoverEnabled: true; onClicked: menu.popup(0, root.height) }
 
+    // The choices differ between the Done list, Smart Lists and lists with sections,
+    // so the menu is built each time it opens: a Repeater whose model changes
+    // after the menu exists puts its new entries after the static ones.
     Menu {
         id: menu
-        Repeater {
-            model: backend.sortChoices
-            MenuItem {
-                required property var modelData
-                text: modelData.name
-                checkable: true
-                checked: modelData.field === backend.sortField
-                onTriggered: backend.setSort(modelData.field)
-            }
+        onAboutToShow: {
+            while (count > 0) removeItem(itemAt(0))
+            for (const choice of backend.sortChoices)
+                addItem(choiceItem.createObject(null, { field: choice.field, text: choice.name }))
+            addItem(separator.createObject(null))
+            addItem(separatedItem.createObject(null))
         }
-        MenuSeparator {}
-        MenuItem { text: "Separated"; checkable: true; checked: backend.separated; onTriggered: backend.setSeparated(!backend.separated) }
+    }
+    Component {
+        id: choiceItem
+        MenuItem {
+            required property int field
+            objectName: "sortChoice:" + field
+            checkable: true
+            checked: field === backend.sortField
+            onTriggered: backend.setSort(field)
+        }
+    }
+    Component { id: separator; MenuSeparator {} }
+    Component {
+        id: separatedItem
+        MenuItem {
+            objectName: "sortSeparated"
+            text: "Separated"
+            checkable: true
+            checked: backend.separated
+            onTriggered: backend.setSeparated(!backend.separated)
+        }
     }
 }

@@ -110,11 +110,12 @@ Window {
                     Image { source: "qrc:/icon.svg"; width: 28; height: 28; sourceSize: Qt.size(56, 56); anchors.verticalCenter: parent.verticalCenter }
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        Text { text: "Precrime"; color: theme.foreground; font.pixelSize: backend.fontSize; font.bold: true }
-                        Text { text: "Version " + Qt.application.version; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
+                        Text { objectName: "aboutName"; text: "Precrime"; color: theme.foreground; font.pixelSize: backend.fontSize; font.bold: true }
+                        Text { objectName: "aboutVersion"; text: "Version " + Qt.application.version; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
                     }
                 }
                 Text {
+                    objectName: "aboutLink"
                     topPadding: 4
                     text: "github.com/jrimmer/precrime"
                     color: theme.today
@@ -130,6 +131,7 @@ Window {
                 }
                 Text { text: "© 2026 Jason Rimmer"; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
                 Text {
+                    objectName: "aboutLicense"
                     text: "MIT License"
                     color: theme.today
                     font.pixelSize: backend.fontSize - 3
@@ -662,7 +664,7 @@ Window {
                             Label { text: modelData.date; Layout.fillWidth: true }
                             Label { text: modelData.size; color: theme.muted }
                             Button { objectName: "backupRestore:" + modelData.name; text: "Restore"; flat: true; onClicked: { confirmRestore.path = modelData.path; confirmRestore.open() } }
-                            Button { text: "Lists…"; flat: true; onClicked: restoreLists.show(modelData.path, modelData.date) }
+                            Button { objectName: "backupLists:" + modelData.name; text: "Lists…"; flat: true; onClicked: restoreLists.show(modelData.path, modelData.date) }
                             Button { objectName: "backupCopy:" + modelData.name; text: "Save a Copy…"; flat: true; onClicked: { root.copySource = modelData.path; filePicker.save("Save a copy of this backup", modelData.name, "backup-copy") } }
                             Button { objectName: "backupDelete:" + modelData.name; text: "Delete"; flat: true; onClicked: { confirmDelete.path = modelData.path; confirmDelete.open() } }
                         }
@@ -850,6 +852,27 @@ Window {
         onAccepted: backend.setInboxEnabled(false)
     }
 
+    // The licence text behind the About block's "MIT License" link.
+    ThemedDialog {
+        id: licenseDialog
+        objectName: "licenseDialog"
+        property string text: ""
+        width: Math.min(520, (parent ? parent.width : 560) - 40)
+        anchors.centerIn: parent
+        modal: true
+        title: "MIT License"
+        standardButtons: Dialog.Close
+        onAboutToShow: if (!text) text = backend.licenseText()
+        Label {
+            objectName: "licenseText"
+            width: parent ? parent.width : 400
+            text: licenseDialog.text
+            wrapMode: Text.Wrap
+            color: theme.foreground
+            font.pixelSize: backend.fontSize - 1
+        }
+    }
+
     ThemedDialog {
 
         width: Math.min(440, (parent ? parent.width : 480) - 40)
@@ -907,13 +930,15 @@ Window {
                 model: restoreLists.lists
                 delegate: CheckBox {
                     required property var modelData
+                    objectName: "restoreList:" + modelData.name
                     width: ListView.view.width
                     text: modelData.name + "  (" + modelData.tasks + (modelData.tasks === 1 ? " task)" : " tasks)")
                     checked: !!restoreLists.chosen[modelData.uid]
-                    onToggled: { const c = restoreLists.chosen; c[modelData.uid] = checked; restoreLists.chosen = c }
+                    onToggled: { const c = Object.assign({}, restoreLists.chosen); c[modelData.uid] = checked; restoreLists.chosen = c }
                 }
             }
             Button {
+                objectName: "restoreSelected"
                 text: "Restore Selected Lists"
                 enabled: Object.keys(restoreLists.chosen).some(k => restoreLists.chosen[k])
                 onClicked: {

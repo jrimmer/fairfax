@@ -15,6 +15,7 @@ Row {
     ]
 
     IconButton {
+        objectName: "focusToggle"
         icon: "sun"
         size: 16
         checked: backend.focusOn
@@ -22,6 +23,7 @@ Row {
         onClicked: backend.toggleFocus()
     }
     IconButton {
+        objectName: "focusConditions"
         icon: "chevronDown"
         size: 10
         tip: "Focus conditions"
@@ -32,6 +34,7 @@ Row {
                 model: root.choices
                 MenuItem {
                     required property var modelData
+                    objectName: "focusCondition:" + modelData[0]
                     text: modelData[1]
                     checkable: true
                     checked: backend.focusConditions.indexOf(modelData[0]) >= 0

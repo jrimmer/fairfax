@@ -179,7 +179,7 @@ list has focus. Press `?` in the app for the full list.
 | `Alt+[` / `Alt+,` | Remove the due / start date |
 | `Ctrl+Shift+[` | Remove the due time |
 | `0`–`3`, `=` / `-` | Priority none…high, raise / lower |
-| `s` / `Ctrl+S` | Star / unstar |
+| `s` / `Ctrl+Alt+S` | Star / toggle the star |
 | `l` / `Alt+L` | Tag… / Untag… (choose which tags to remove) |
 | `m` | Move to list… |
 | `c` | Collapse a project or checklist |
@@ -198,7 +198,7 @@ list has focus. Press `?` in the app for the full list.
 | `Ctrl+F` / `Ctrl+Shift+O` | Search / Quick Open |
 | `Ctrl+K` / `Ctrl+U` / `Ctrl+O` | Show scheduled / show paused / hide completed |
 | `Ctrl+Alt+J` | Project view |
-| `Ctrl+Alt+←` / `Ctrl+Alt+→` | Show or hide the Lists / Tags panels |
+| `Ctrl+Alt+←` / `Ctrl+Alt+→` | Show or hide the Lists / Tags panels (remembered between launches) |
 | `Ctrl+=` / `Ctrl+-` | Text size |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo |
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / cut tasks; paste restores them, or turns pasted lines into tasks (indented lines or `-` bullets become sub-tasks; pasting onto a project nests under it) |

@@ -348,7 +348,7 @@ Item {
     DropArea {
         anchors.fill: parent
         keys: ["precrime-tag"]
-        onDropped: (drop) => backend.tagTask(root.r.taskId, Number(drop.getDataAsString("text/x-precrime-tag")))
+        onDropped: (drop) => backend.tagTask(root.r.taskId, drop.source.tagId)
         Rectangle { anchors.fill: parent; color: "transparent"; border.color: theme.accent; border.width: 2; radius: 6; visible: parent.containsDrag }
     }
     DropArea {
