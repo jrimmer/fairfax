@@ -28,35 +28,12 @@ Item {
     }
     MouseArea { id: mouse; anchors.fill: parent; hoverEnabled: true; onClicked: menu.popup(0, root.height) }
 
-    // The choices differ between the Done list, Smart Lists and lists with sections,
-    // so the menu is built each time it opens: a Repeater whose model changes
-    // after the menu exists puts its new entries after the static ones.
+    // The choices differ between the Done list, Smart Lists and lists with sections.
+    // A Repeater whose model changes after the menu exists puts its new entries after
+    // the static ones, so an Instantiator places each one at its own index instead.
     Menu {
         id: menu
-        onAboutToShow: {
-            for (let i = count - 1; i >= 0; --i) {
-                const old = itemAt(i)
-                if (old) removeItem(old)
-            }
-            for (const choice of backend.sortChoices)
-                addItem(choiceItem.createObject(null, { field: choice.field, text: choice.name }))
-            addItem(separator.createObject(null))
-            addItem(separatedItem.createObject(null))
-        }
-    }
-    Component {
-        id: choiceItem
-        MenuItem {
-            required property int field
-            objectName: "sortChoice:" + field
-            checkable: true
-            checked: field === backend.sortField
-            onTriggered: backend.setSort(field)
-        }
-    }
-    Component { id: separator; MenuSeparator {} }
-    Component {
-        id: separatedItem
+        MenuSeparator {}
         MenuItem {
             objectName: "sortSeparated"
             text: "Separated"
@@ -64,5 +41,18 @@ Item {
             checked: backend.separated
             onTriggered: backend.setSeparated(!backend.separated)
         }
+    }
+    Instantiator {
+        model: backend.sortChoices
+        delegate: MenuItem {
+            required property var modelData
+            objectName: "sortChoice:" + modelData.field
+            text: modelData.name
+            checkable: true
+            checked: modelData.field === backend.sortField
+            onTriggered: backend.setSort(modelData.field)
+        }
+        onObjectAdded: (index, object) => menu.insertItem(index, object)
+        onObjectRemoved: (index, object) => menu.removeItem(object)
     }
 }

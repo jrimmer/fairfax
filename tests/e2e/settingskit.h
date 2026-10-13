@@ -615,6 +615,7 @@ inline const QMap<QString, QString> &internalKeys() {
         {"ui.collapsedSections", "remembered view state, not a choice"},
         {"ui.expandedLists", "remembered view state, not a choice"},
         {"ui.source", "remembered view state, not a choice"},
+        {"window.", "remembered view state: whether the Lists and Tags panels are shown (E2EMiscWindow::panelTogglesHideShowAndPersist)"},
         {"tasks.lastList", "bookkeeping behind the \"Last used\" default list"},
         {"tasks.quickEntryList", "retired setting, migrated into tasks.defaultList on launch"},
         {"lists.doneWarned", "one-off warning flag"},
