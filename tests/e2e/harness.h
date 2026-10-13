@@ -9,6 +9,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
@@ -246,11 +247,40 @@ inline QQuickItem *popupSurface(QObject *popup) {
 
 // ----------------------------------------------------------------- the app
 
+// The offscreen platform activates every window it shows, so a Popup.Window
+// (the date suggestions, Quick Entry's menus and tag matches) would take the
+// keyboard from the field being typed in and make it lose focus after one
+// letter. On a real desktop a popup never takes the keyboard from its parent;
+// popup windows are marked as not accepting focus to behave the same here.
+class PopupFocusGuard : public QObject {
+public:
+    static bool isPopupWindow(const QObject *o) {
+        return qobject_cast<const QWindow *>(o) && QString(o->metaObject()->className()).contains("PopupWindow");
+    }
+    bool eventFilter(QObject *o, QEvent *e) override {
+        // The window the popup belongs to is told it lost the keyboard; leaving
+        // that unsaid keeps the field that was being typed in focused.
+        if (e->type() == QEvent::FocusOut && qobject_cast<QQuickWindow *>(o) && !isPopupWindow(o)
+            && isPopupWindow(QGuiApplication::focusWindow()))
+            return true;
+        return false;
+    }
+    static void install() {
+        static PopupFocusGuard guard;
+        static bool done = false;
+        if (!done) {
+            qApp->installEventFilter(&guard);
+            done = true;
+        }
+    }
+};
+
 class App {
 public:
     // `reopen` boots on an existing database (a restart) instead of a new one;
     // `withSync` starts the sync providers, which offscreen runs otherwise leave out.
     explicit App(const std::function<Seed(Store &)> &seed = seedWorld, const QString &reopen = QString(), bool withSync = false) {
+        PopupFocusGuard::install();
         QStandardPaths::setTestModeEnabled(true);
         QVERIFY2(m_dir.isValid(), "temporary directory");
         QString error;
@@ -272,6 +302,13 @@ public:
         window->requestActivate();
         QVERIFY(QTest::qWaitForWindowActive(window));
         QTest::qWait(100);
+        // No frame is ever presented offscreen, so QML animations never advance; a
+        // row transition stuck half way would leave the rows below an opening
+        // editor where they were, under it. The list is told to move rows at once.
+        if (QQuickItem *list = findItem("taskList")) {
+            QQmlProperty(list, "displaced").write(QVariant::fromValue<QObject *>(nullptr));
+            QQmlProperty(list, "add").write(QVariant::fromValue<QObject *>(nullptr));
+        }
         ok = true;
     }
 

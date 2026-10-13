@@ -14,6 +14,8 @@ SOURCES += ../../src/alarms.cpp ../../src/appsetup.cpp ../../src/backend.cpp ../
 SOURCES += main.cpp test_scenarios.cpp test_layout.cpp
 SOURCES += test_lists.cpp test_lists_groups.cpp test_lists_nav.cpp
 HEADERS += listkit.h
+SOURCES += test_tasks.cpp test_tasks_quick.cpp test_tasks_editor.cpp test_tasks_repeat.cpp test_tasks_lifecycle.cpp test_tasks_structure.cpp
+HEADERS += taskkit.h
 
 RESOURCES += ../../src/resources.qrc
 
