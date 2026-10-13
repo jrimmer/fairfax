@@ -201,15 +201,15 @@ inline void chooseCombo(const QString &name, int index) {
     QVERIFY2(index >= 0 && index < combo->property("count").toInt(), qPrintable(name + ": no such entry"));
     QString label;
     QMetaObject::invokeMethod(combo, "textAt", Q_RETURN_ARG(QString, label), Q_ARG(int, index));
-    QPointer<QQuickItem> guard(combo);
-    QObject *popup = combo->property("popup").value<QObject *>();
-    QVERIFY(popup);
     // A click on an entry of a drop-down that is still sliding open or scrolling
-    // can land on its neighbour or be lost; the drop-down is opened again then.
+    // can land on its neighbour or be lost; the whole pick is made again then.
     for (int attempt = 0; attempt < 3; ++attempt) {
-        if (!guard || guard->property("currentIndex").toInt() == index)
+        QQuickItem *c = findItem(name);
+        if (!c)
             break;
-        click(guard);
+        click(c);
+        QObject *popup = c->property("popup").value<QObject *>();
+        QVERIFY(popup);
         QTRY_VERIFY_WITH_TIMEOUT(popup->property("visible").toBool(), 5000);
         auto *view = popup->property("contentItem").value<QQuickItem *>();
         QVERIFY(view);
@@ -234,17 +234,13 @@ inline void chooseCombo(const QString &name, int index) {
             return still >= 3;
         }(), 5000);
         click(entryOf());
-        QTest::qWaitFor([&] { return !popup->property("visible").toBool(); }, 2500);
-        QTest::qWaitFor([&] { return guard && guard->property("currentIndex").toInt() == index; }, 1500);
-        if (popup->property("visible").toBool()) {
-            // The click went nowhere: close the drop-down before trying again.
-            QTest::keyClick(guard->window(), Qt::Key_Escape);
-            QTest::qWaitFor([&] { return !popup->property("visible").toBool(); }, 2500);
-        }
+        QTRY_VERIFY_WITH_TIMEOUT(!popup->property("visible").toBool(), 5000);
+        if (QTest::qWaitFor([&] { QQuickItem *x = findItem(name); return x && x->property("currentIndex").toInt() == index; }, 2000))
+            break;
     }
-    QVERIFY(guard);
-    QTRY_VERIFY_WITH_TIMEOUT(!popup->property("visible").toBool(), 5000);
-    QTRY_COMPARE_WITH_TIMEOUT(guard->property("currentIndex").toInt(), index, 5000);
+    QQuickItem *done = findItem(name);
+    QVERIFY(done);
+    QTRY_COMPARE_WITH_TIMEOUT(done->property("currentIndex").toInt(), index, 5000);
 }
 
 // Moves a slider to `target` with the arrow keys after clicking it for focus.
