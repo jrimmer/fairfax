@@ -2541,6 +2541,13 @@ void Backend::renameTag(qint64 tagId, const QString &name) {
     const QString clean = name.trimmed().remove(QRegularExpression("^#"));
     if (!t.id || clean.isEmpty() || clean == t.name)
         return;
+    // Tags stay unique, as in the reference app: a name another tag already has is refused.
+    for (const auto &other : m_store->tags()) {
+        if (!other.deleted && other.id != tagId && other.name.compare(clean, Qt::CaseInsensitive) == 0) {
+            setStatus(QStringLiteral("There is already a tag called %1.").arg(other.name));
+            return;
+        }
+    }
     t.name = clean;
     m_store->begin("Rename Tag");
     m_store->putTag(t);
