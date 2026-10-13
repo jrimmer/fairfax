@@ -216,6 +216,10 @@ private slots:
         QCOMPARE(m.body, "Deep plain text\n\nAfter");
         QCOMPARE(m.attachments, QStringList{"image/png"});
 
+        // A declared charset is honoured: 0xA4 is the euro sign in ISO-8859-15 (Latin-1 would read it as a currency sign).
+        QCOMPARE(MailTask::parse("Subject: x\nContent-Type: text/plain; charset=iso-8859-15\n\nprice \xa4" "5").body, QString::fromUtf8("price €5"));
+        QCOMPARE(MailTask::parse("Subject: x\nContent-Type: text/plain; charset=windows-1252\n\n\x93quoted\x94").body, QString::fromUtf8("“quoted”"));
+
         // An unknown charset falls back to UTF-8; undeclared invalid UTF-8 falls back to Latin-1.
         QCOMPARE(MailTask::parse("Subject: x\nContent-Type: text/plain; charset=x-no-such\n\nna\xc3\xafve").body, QString::fromUtf8("naïve"));
         QCOMPARE(MailTask::parse("Subject: x\n\nna\xefve").body, QString::fromUtf8("naïve"));
