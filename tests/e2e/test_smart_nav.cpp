@@ -172,8 +172,9 @@ private slots:
         QVERIFY(openBuilder(app));
         QVERIFY(pressBuilder("rangeNext"));
         QVERIFY(fillBuilder(app, "rangeN", "3"));
-        QVERIFY(pressBuilder("typeChip:hiprio"));
-        QVERIFY(pressBuilder("typeChip:medprio"));
+        QVERIFY(addRuleRow("Priority", "is", "High") == "0");
+        QVERIFY(addRuleRow("Priority", "is", "Medium") == "1");
+        QVERIFY(setMatch("", true));
         const qint64 soon = saveFromBuilder(app, "Soon and important");
         QVERIFY(soon);
         // And a plain one, renamed.

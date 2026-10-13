@@ -10,6 +10,8 @@
 // of the week (this week, next week) are derived from the same table, so a
 // test never hard-codes a weekday.
 
+#include <QJSValue>
+#include <QJsonDocument>
 #include <climits>
 
 #include "listkit.h"
@@ -705,6 +707,167 @@ inline bool pressBuilder(const QString &name, Qt::MouseButton button = Qt::LeftB
 inline int chipState(const QString &name) {
     QQuickItem *chip = findItem(name);
     return chip ? chip->property("state").toInt() : -1;
+}
+
+// ------------------------------------------------------- the rule rows
+
+// The rule tree the sheet holds, as the plain map the query is written from.
+inline QVariantMap builderRules() {
+    return builder() ? builder()->property("rules").value<QJSValue>().toVariant().toMap() : QVariantMap();
+}
+
+inline int topRuleCount() { return builderRules().value("items").toList().size(); }
+
+// Whether the sheet shows a rule row (a clause) at the index path.
+inline bool ruleRowShown(const QString &path) { return findItem("ruleProp:" + path) != nullptr; }
+
+// How many clause rows are on the sheet, sub-filters included.
+inline int ruleRowCount() {
+    int n = 0;
+    for (QQuickWindow *w : quickWindows())
+        findIn(w->contentItem(), [&](QQuickItem *i) {
+            if (i->objectName().startsWith("ruleProp:") && i->isVisible())
+                ++n;
+            return false;
+        });
+    return n;
+}
+
+// What a clause row reads, "Priority / is / High" (a single-valued property
+// has no value box: "Starred / is").
+inline QString ruleText(const QString &path) {
+    QStringList parts;
+    for (const char *kind : {"Prop", "Op", "Value"})
+        if (QQuickItem *c = findItem(QString("rule%1:%2").arg(kind, path)))
+            parts << c->property("currentText").toString();
+    return parts.join(" / ");
+}
+
+// Picks an entry of one of the sheet's drop-downs by its label, as a user
+// does: open it, scroll to the entry, click once the list has stopped moving.
+// Opening and clicking are repeated when a click is lost to the sliding
+// popup (the same care as the Settings combos).
+inline bool chooseInBuilder(const QString &name, const QString &label) {
+    auto current = [&] { QQuickItem *c = findItem(name); return c ? c->property("currentText").toString() : QString(); };
+    for (int attempt = 0; attempt < 4; ++attempt) {
+        if (current() == label)
+            return true;
+        QQuickItem *combo = nullptr;
+        if (!waitUntil([&] { return (combo = findItem(name)) != nullptr; }))
+            return false;
+        scrollAll(combo);
+        QTest::qWait(60);
+        clickSteady(combo);
+        // A pick rewrites the rows and the sheet builds them afresh, taking this
+        // drop-down with it; hold the popup and its list only through guards.
+        QPointer<QObject> popup = combo->property("popup").value<QObject *>();
+        if (!popup || !waitUntil([&] { return popup && popup->property("visible").toBool(); }, 2500))
+            continue;
+        QPointer<QQuickItem> view = popup->property("contentItem").value<QQuickItem *>();
+        if (!view)
+            continue;
+        settleLayout(view);
+        int index = -1;
+        for (int i = 0; i < combo->property("count").toInt(); ++i) {
+            QString text;
+            QMetaObject::invokeMethod(combo, "textAt", Q_RETURN_ARG(QString, text), Q_ARG(int, i));
+            if (text == label)
+                index = i;
+        }
+        if (index < 0)
+            return false;
+        QMetaObject::invokeMethod(view, "positionViewAtIndex", Q_ARG(int, index), Q_ARG(int, 2));
+        auto entryOf = [&]() -> QQuickItem * {
+            return !view ? nullptr : findIn(view, [&](QQuickItem *i) {
+                return i->width() > 0 && i->inherits("QQuickAbstractButton") && i->property("text").toString() == label;
+            });
+        };
+        // The drop-down slides open and the list scrolls; click once it is still.
+        QPoint last(-1, -1);
+        int still = 0;
+        if (!waitUntil([&] {
+                QQuickItem *e = entryOf();
+                if (!e)
+                    return false;
+                const QPoint now = centreOf(e);
+                still = now == last ? still + 1 : 0;
+                last = now;
+                return still >= 3;
+            }, 5000))
+            continue;
+        click(entryOf());
+        waitUntil([&] { return !popup || !popup->property("visible").toBool(); }, 2500);
+        if (waitUntil([&] { return current() == label; }, 2000))
+            return true;
+    }
+    return current() == label;
+}
+
+// Sets a clause row to Property / operator / value (the value only for a
+// property that has several).
+inline bool setRuleRow(const QString &path, const QString &prop, const QString &op, const QString &value = {}) {
+    return chooseInBuilder("ruleProp:" + path, prop) && chooseInBuilder("ruleOp:" + path, op)
+           && (value.isEmpty() || chooseInBuilder("ruleValue:" + path, value));
+}
+
+// Clicks a builder control with a keyboard modifier held (Alt+click on [+]).
+inline bool pressBuilderWith(const QString &name, Qt::KeyboardModifiers mods) {
+    QQuickItem *item = nullptr;
+    if (!waitUntil([&] { return (item = findItem(name)) != nullptr; }))
+        return false;
+    scrollAll(item);
+    QTest::qWait(60);
+    item = findItem(name);
+    if (!item)
+        return false;
+    settleLayout(item);
+    QQuickWindow *w = item->window();
+    const QPoint p = centreOf(item);
+    QTest::mouseMove(w, p);
+    QTest::mouseClick(w, Qt::LeftButton, mods, p);
+    return true;
+}
+
+// Presses a builder control until the rule tree has changed; a press the
+// sheet swallowed while it laid itself out is made again.
+inline bool pressBuilderForChange(const QString &name, Qt::KeyboardModifiers mods = Qt::NoModifier,
+                                  Qt::MouseButton button = Qt::LeftButton) {
+    auto shape = [] { return QString::fromUtf8(QJsonDocument::fromVariant(builderRules()).toJson(QJsonDocument::Compact)); };
+    const QString before = shape();
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        const bool ok = mods == Qt::NoModifier ? pressBuilder(name, button) : pressBuilderWith(name, mods);
+        if (!ok)
+            return false;
+        if (waitUntil([&] { return shape() != before; }, 2000))
+            return true;
+    }
+    return false;
+}
+
+// Adds a clause row at the end of the top group and sets it. Returns its path.
+inline QString addRuleRow(const QString &prop, const QString &op, const QString &value = {}) {
+    const QString path = QString::number(topRuleCount());
+    if (!pressBuilderForChange("ruleAdd") || !waitUntil([&] { return ruleRowShown(path); }))
+        return {};
+    return setRuleRow(path, prop, op, value) ? path : QString();
+}
+
+// Match All or Any for the group at the path ("" is the top one).
+inline bool setMatch(const QString &path, bool any) {
+    const QString want = any ? "any" : "all";
+    auto matches = [&] {
+        QVariantMap g = builderRules();
+        if (!path.isEmpty())
+            for (const QString &i : path.split('.'))
+                g = g.value("items").toList().value(i.toInt()).toMap();
+        return g.value("match").toString() == want;
+    };
+    for (int attempt = 0; attempt < 3 && !matches(); ++attempt) {
+        if (!pressBuilder((any ? "ruleMatchAny:" : "ruleMatchAll:") + path))
+            return false;
+        waitUntil(matches, 2000);
+    }
+    return matches();
 }
 
 // Types into a builder text field (replacing its text).

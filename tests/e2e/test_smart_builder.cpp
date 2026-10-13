@@ -4,11 +4,11 @@
 // from the search bar, editing, renaming, deleting with undo, the sheet's
 // options, and the Combine Today and Overdue walkthrough.
 //
-// Precrime's builder is made of chips rather than one row per clause: a chip
-// per `type:` preset (click to include, again to exclude, again to clear),
-// pickers for named tags, lists, tag groups, list groups and locations,
-// relative-time fields, and groups of whole filters. "Any" and "All" are the
-// two TASK TYPE modes.
+// Precrime's builder has a row per clause under SEARCH PRESETS (Property,
+// is / is not, value, with [-] and [+] and Match All / Any at the top), chips
+// for named tags, lists, tag groups, list groups and locations, relative-time
+// fields, and groups of whole filters. The row tests that go deeper (every
+// operator, sub-filters, loading back) are in test_smart_rules.cpp.
 
 #include "smartkit.h"
 #include "../testregistry.h"
@@ -74,17 +74,19 @@ private slots:
     void cleanup() { m_app.reset(); }
 
     // "Open the Search Options panel… click [+] to add a clause… Joined with
-    // all (AND) or any (OR) at the top." Two chips, Any mode, saved under a
+    // all (AND) or any (OR) at the top." Two rows, Any mode, saved under a
     // name: it appears in the sidebar's Smart Lists with its count, and opens.
-    void buildSmartListByClickingChips() {
+    void buildSmartListWithRuleRows() {
         App &app = *m_app;
         openFresh();
         if (QTest::currentTestFailed())
             return;
-        QVERIFY(pressBuilder("typeChip:hiprio"));
+        QVERIFY(!ruleRowShown("0"));
+        QVERIFY(addRuleRow("Priority", "is", "High") == "0");
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 5000);
-        QCOMPARE(chipState("typeChip:hiprio"), 1);
-        QVERIFY(pressBuilder("typeChip:medprio"));
+        QCOMPARE(ruleText("0"), QString("Priority / is / High"));
+        QVERIFY(addRuleRow("Priority", "is", "Medium") == "1");
+        QVERIFY(setMatch("", true));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio"), 5000);
         QCOMPARE(previewText(), QString("type: hiprio OR medprio"));
         QVERIFY(smartLists(app).isEmpty());
@@ -111,16 +113,16 @@ private slots:
         SMART_SHOWS(app, Hi + Med);
     }
 
-    // "Option … All": the other join. "Any of these (OR)" / "All of these
-    // (AND)" change the same chips' query live.
-    void allModeJoinsChipsWithAnd() {
+    // "Joined with all (AND) or any (OR) at the top": the other join. Match
+    // All / Any change the same rows' query live.
+    void allModeJoinsRowsWithAnd() {
         App &app = *m_app;
         openFresh();
         if (QTest::currentTestFailed())
             return;
-        QVERIFY(pressBuilder("typeChip:hiprio"));
-        QVERIFY(pressBuilder("typeChip:due"));
-        QVERIFY(pressBuilder("typeModeAnd"));
+        QVERIFY(addRuleRow("Priority", "is", "High") == "0");
+        QVERIFY(addRuleRow("Due Date", "is", "Any Date") == "1");
+        QVERIFY(setMatch("", false));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio AND due"), 5000);
         // "Search" applies it to the search bar.
         applyAndExpect("type: hiprio AND due", SL{"Rent overdue", "Fence in 6 days", "Starred urgent"});
@@ -128,9 +130,10 @@ private slots:
             return;
         // Back in the sheet the same rule is read back; flip to Any.
         QVERIFY(openBuilder(app));
-        QCOMPARE(chipState("typeChip:hiprio"), 1);
-        QCOMPARE(chipState("typeChip:due"), 1);
-        QVERIFY(pressBuilder("typeModeOr"));
+        QTRY_COMPARE_WITH_TIMEOUT(ruleText("0"), QString("Priority / is / High"), 5000);
+        QCOMPARE(ruleText("1"), QString("Due Date / is / Any Date"));
+        QCOMPARE(builderRules().value("match").toString(), QString("all"));
+        QVERIFY(setMatch("", true));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR due"), 5000);
         const SL dated{"Rent overdue", "Invoice overdue", "Milk today", "Dentist today", "Parcel tomorrow", "Report in 3 days",
                        "Fence in 6 days", "Taxes in 9 days", "Passport in 14 days", "Began yesterday due in 2", "Two day window",
@@ -141,37 +144,34 @@ private slots:
             return;
     }
 
-    // "Chip states: off -> include -> exclude (written as !value) -> off."
-    // Removing a rule is clicking it round to off; right-click excludes
-    // directly.
-    void chipsCycleAndRemoveRules() {
+    // "Click [-] to remove a clause." The operator "is not" writes !value; a
+    // removed row takes its rule out of the query.
+    void negateAndRemoveRules() {
         App &app = *m_app;
         openFresh();
         if (QTest::currentTestFailed())
             return;
-        QCOMPARE(chipState("typeChip:hiprio"), 0);
-        QVERIFY(pressBuilder("typeChip:hiprio"));
-        QCOMPARE(chipState("typeChip:hiprio"), 1);
-        QVERIFY(pressBuilder("typeChip:hiprio"));
-        QCOMPARE(chipState("typeChip:hiprio"), 2);
+        QVERIFY(addRuleRow("Priority", "is", "High") == "0");
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 5000);
+        QVERIFY(chooseInBuilder("ruleOp:0", "is not"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !hiprio"), 5000);
-        QVERIFY(pressBuilder("typeChip:hiprio"));
-        QCOMPARE(chipState("typeChip:hiprio"), 0);
+        QCOMPARE(ruleText("0"), QString("Priority / is not / High"));
+        QVERIFY(pressBuilderForChange("ruleRemove:0"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString(), 5000);
-        QVERIFY(pressBuilder("typeChip:starred", Qt::RightButton));
-        QCOMPARE(chipState("typeChip:starred"), 2);
+        QVERIFY(!ruleRowShown("0"));
+        QVERIFY(addRuleRow("Starred", "is not") == "0");
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !starred"), 5000);
-        // An include and an exclude together.
-        QVERIFY(pressBuilder("typeChip:prio"));
-        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: prio AND !starred"), 5000);
-        applyAndExpect("type: prio AND !starred", without(Hi + Med + SL{"Dentist today", "Weekly repeat", "Low plain"}, SL{"Starred urgent"}));
+        // An include and an exclude together (rows keep the order they were added in).
+        QVERIFY(addRuleRow("Priority", "is", "Any") == "1");
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !starred AND prio"), 5000);
+        applyAndExpect("type: !starred AND prio", without(Hi + Med + SL{"Dentist today", "Weekly repeat", "Low plain"}, SL{"Starred urgent"}));
         if (QTest::currentTestFailed())
             return;
         // Clear resets the whole sheet and the search bar.
         QVERIFY(openBuilder(app));
         QVERIFY(pressBuilder("clearButton"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString(), 5000);
-        QCOMPARE(chipState("typeChip:prio"), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!ruleRowShown("0"), 5000);
         QCOMPARE(app.backend().search(), QString());
         QVERIFY(closeBuilder(app));
         SMART_SHOWS(app, allShown());
@@ -254,7 +254,7 @@ private slots:
             return;
     }
 
-    // Free text, a type chip and a tag together: "build the structure
+    // Free text, a rule row and a tag together: "build the structure
     // visually, then add the text and named criteria in the field".
     void freeTextAndChipsTogether() {
         openFresh();
@@ -262,7 +262,7 @@ private slots:
             return;
         QVERIFY(fillBuilder(*m_app, "freeInput", "plumber"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("plumber"), 5000);
-        QVERIFY(pressBuilder("typeChip:starred"));
+        QVERIFY(addRuleRow("Starred", "is") == "0");
         QVERIFY(pressBuilder("pickerTab:tags"));
         QVERIFY(pressBuilder("nameChip:tags:builders"));
         QVERIFY(pressBuilder("pickerTab:groups"));
@@ -281,7 +281,7 @@ private slots:
         QVERIFY(pressBuilder("addGroup"));
         QVERIFY(fillBuilder(*m_app, "groupField", "tags: urgent OR tags: waiting"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("(tags: urgent OR tags: waiting)"), 5000);
-        QVERIFY(pressBuilder("typeChip:overdue"));
+        QVERIFY(addRuleRow("Due Date", "is", "Overdue") == "0");
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue (tags: urgent OR tags: waiting)"), 5000);
         QVERIFY(pressBuilder("groupJoin:0:not"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: overdue !(tags: urgent OR tags: waiting)"), 5000);
@@ -302,7 +302,7 @@ private slots:
     }
 
     // "The keyword syntax is most useful for refining a saved rule": the
-    // QUERY box can be typed into, and the chips follow.
+    // QUERY box can be typed into, and the rows follow.
     void queryBoxEditedByHand() {
         openFresh();
         if (QTest::currentTestFailed())
@@ -311,13 +311,14 @@ private slots:
         click(box);
         QTRY_VERIFY_WITH_TIMEOUT(box->property("activeFocus").toBool(), 5000);
         m_app->type("type: hiprio OR medprio tags: urgent");
-        QTRY_COMPARE_WITH_TIMEOUT(chipState("typeChip:hiprio"), 1, 5000);
-        QCOMPARE(chipState("typeChip:medprio"), 1);
-        QCOMPARE(chipState("typeChip:lowprio"), 0);
+        QTRY_COMPARE_WITH_TIMEOUT(ruleText("0"), QString("Priority / is / High"), 5000);
+        QCOMPARE(ruleText("1"), QString("Priority / is / Medium"));
+        QVERIFY(!ruleRowShown("2"));
+        QCOMPARE(builderRules().value("match").toString(), QString("any"));
         QVERIFY(pressBuilder("pickerTab:tags"));
         QTRY_COMPARE_WITH_TIMEOUT(chipState("nameChip:tags:urgent"), 1, 5000);
-        // Clicking a chip after hand-editing rewrites the box from the chips.
-        QVERIFY(pressBuilder("typeChip:lowprio"));
+        // Adding a row after hand-editing rewrites the box from the rows.
+        QVERIFY(addRuleRow("Priority", "is", "Low") == "2");
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio OR lowprio tags: urgent"), 5000);
         QVERIFY(closeBuilder(*m_app));
     }
@@ -358,8 +359,9 @@ private slots:
         QVERIFY(plusMenu("New Smart List…"));
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QCOMPARE(app.backend().sourceKey(), QString("all"));
-        QVERIFY(pressBuilder("typeChip:starred"));
-        QVERIFY(pressBuilder("typeChip:hiprio"));
+        QVERIFY(addRuleRow("Starred", "is") == "0");
+        QVERIFY(addRuleRow("Priority", "is", "High") == "1");
+        QVERIFY(setMatch("", true));
         const qint64 id = saveFromBuilder(app, "Stars");
         QVERIFY(id);
         QCOMPARE(app.store().list(id).smartQuery, QString("type: starred OR hiprio"));
@@ -379,9 +381,10 @@ private slots:
         QVERIFY(id);
         QVERIFY(listMenu(app, id, "Edit Search…"));
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
-        QCOMPARE(chipState("typeChip:hiprio"), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(ruleText("0"), QString("Priority / is / High"), 5000);
         QCOMPARE(builderQuery(), QString("type: hiprio"));
-        QVERIFY(pressBuilder("typeChip:medprio"));
+        QVERIFY(addRuleRow("Priority", "is", "Medium") == "1");
+        QVERIFY(setMatch("", true));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio OR medprio"), 5000);
         QVERIFY(pressBuilder("updateButton"));
         QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
@@ -391,11 +394,11 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (Hi + Med).size(), 5000);
         LIST_ITEM(rule, findItem("smartQueryField"));
         QCOMPARE(rule->property("text").toString(), QString("type: hiprio OR medprio"));
-        // Reversed: take medprio out again.
+        // Reversed: take the Medium row out again.
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
-        QVERIFY(pressBuilder("typeChip:medprio"));   // Include, then exclude…
-        QVERIFY(pressBuilder("typeChip:medprio"));   // …then off.
+        QTRY_COMPARE_WITH_TIMEOUT(ruleText("1"), QString("Priority / is / Medium"), 5000);
+        QVERIFY(pressBuilderForChange("ruleRemove:1"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: hiprio"), 5000);
         QVERIFY(pressBuilder("updateButton"));
         QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).smartQuery, QString("type: hiprio"), 5000);
@@ -437,7 +440,8 @@ private slots:
         QVERIFY(id);
         QVERIFY(listMenu(app, id, "Edit Search…"));
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
-        QVERIFY(pressBuilder("typeChip:medprio"));
+        QVERIFY(addRuleRow("Priority", "is", "Medium") == "1");
+        QVERIFY(setMatch("", true));
         const qint64 copy = saveFromBuilder(app, "Both");
         QVERIFY(copy && copy != id);
         QCOMPARE(app.store().list(id).smartQuery, QString("type: hiprio"));
@@ -631,7 +635,7 @@ private slots:
         QVERIFY(listMenu(app, fixed, "Edit Search…"));
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("rangeNone"));
-        QVERIFY(pressBuilder("typeChip:hiprio"));
+        QVERIFY(addRuleRow("Priority", "is", "High") == "0");
         QVERIFY(pressBuilder("updateButton"));
         QTRY_COMPARE_WITH_TIMEOUT(app.store().list(fixed).smartRange, QString(), 5000);
         SMART_SHOWS(app, Hi);
@@ -640,26 +644,28 @@ private slots:
     // "Combine Today and Overdue": `type: duetoday OR overdue`, built with the
     // controls: two clauses, Any, no other rules. "All requires each task to
     // meet both conditions… Any includes a task when either condition matches."
-    void combineTodayAndOverdueWithChips() {
+    void combineTodayAndOverdueWithRows() {
         App &app = *m_app;
         openFresh();
         if (QTest::currentTestFailed())
             return;
-        QVERIFY(pressBuilder("typeChip:duetoday"));
-        QVERIFY(pressBuilder("typeChip:overdue"));
-        // Any is the default.
+        QVERIFY(addRuleRow("Due Date", "is", "Today") == "0");
+        QVERIFY(addRuleRow("Due Date", "is", "Overdue") == "1");
+        QVERIFY(setMatch("", true));
         applyAndExpect("type: duetoday OR overdue", DueToday + Overdue);
         if (QTest::currentTestFailed())
             return;
         // All: nothing can be both.
         QVERIFY(openBuilder(app));
-        QVERIFY(pressBuilder("typeModeAnd"));
+        QTRY_COMPARE_WITH_TIMEOUT(ruleText("1"), QString("Due Date / is / Overdue"), 5000);
+        QVERIFY(setMatch("", false));
         applyAndExpect("type: duetoday AND overdue", SL{});
         if (QTest::currentTestFailed())
             return;
         // Back to Any, saved as a Smart List: the saved search keeps both.
         QVERIFY(openBuilder(app));
-        QVERIFY(pressBuilder("typeModeOr"));
+        QTRY_COMPARE_WITH_TIMEOUT(builderRules().value("match").toString(), QString("all"), 5000);
+        QVERIFY(setMatch("", true));
         const qint64 id = saveFromBuilder(app, "Today and overdue");
         QVERIFY(id);
         SMART_SHOWS(app, DueToday + Overdue);
@@ -698,8 +704,9 @@ private slots:
         openFresh();
         if (QTest::currentTestFailed())
             return;
-        QVERIFY(pressBuilder("typeChip:duetoday"));
-        QVERIFY(pressBuilder("typeChip:overdue"));
+        QVERIFY(addRuleRow("Due Date", "is", "Today") == "0");
+        QVERIFY(addRuleRow("Due Date", "is", "Overdue") == "1");
+        QVERIFY(setMatch("", true));
         QVERIFY(pressBuilder("rangeNext"));
         QVERIFY(fillBuilder(app, "rangeN", "1"));
         const qint64 id = saveFromBuilder(app, "Narrowed");
@@ -717,14 +724,27 @@ private slots:
         SMART_SHOWS(app, DueToday + Overdue);
     }
 
-    // The manual's rule builder has a row per clause (Property / is / value,
-    // with all-or-any at the top and + to add). Precrime's sheet is chip-based.
+    // "The rule builder has a row per clause: Property, is / is not, value, a
+    // [+] to add a clause and a [-] to remove one." A new sheet has only
+    // Add Rule; each press adds a row, which can be set to any property.
     void ruleRowsWithPropertyOperatorValue() {
         openFresh();
         if (QTest::currentTestFailed())
             return;
-        QEXPECT_FAIL("", "GAP: no row-per-clause builder (Property, is / is not, value; [+] to add); the sheet uses chips instead", Continue);
         QVERIFY(findItem("ruleAdd") != nullptr);
+        QCOMPARE(ruleRowCount(), 0);
+        QVERIFY(findText("SEARCH PRESETS") != nullptr);
+        QVERIFY(addRuleRow("Due Date", "is not", "Overdue") == "0");
+        QCOMPARE(ruleRowCount(), 1);
+        QVERIFY(findItem("ruleProp:0") && findItem("ruleOp:0") && findItem("ruleValue:0"));
+        QVERIFY(findItem("ruleRemove:0") && findItem("ruleAdd:0"));
+        QVERIFY(findItem("ruleMatchAll:") && findItem("ruleMatchAny:"));
+        QCOMPARE(ruleText("0"), QString("Due Date / is not / Overdue"));
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: !overdue"), 5000);
+        // [+] on a row adds one right below it.
+        QVERIFY(pressBuilderForChange("ruleAdd:0"));
+        QTRY_VERIFY_WITH_TIMEOUT(ruleRowShown("1"), 5000);
+        QCOMPARE(ruleRowCount(), 2);
         QVERIFY(closeBuilder(*m_app));
     }
 };

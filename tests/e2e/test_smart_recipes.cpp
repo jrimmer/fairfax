@@ -180,7 +180,7 @@ private slots:
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
         QVERIFY(openBuilder(app));
-        QVERIFY(pressBuilder("typeChip:duration"));
+        QVERIFY(addRuleRow("Duration", "has") == "0");
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: duration"), 5000);
         const qint64 id = saveFromBuilder(app, "Quick Wins");
         QVERIFY(id);
