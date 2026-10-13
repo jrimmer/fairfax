@@ -421,7 +421,19 @@ inline bool pickChip(const QString &fieldName, const QString &chip) {
 // may only close a popup that was open).
 inline bool clickUntilGone(const QString &control, const QString &gone) {
     for (int attempt = 0; attempt < 3 && findItem(gone); ++attempt) {
-        if (QQuickItem *c = findItem(control)) click(c);
+        QQuickWindow *w = nullptr;
+        // Chips that have just been added or removed stand at stale places until
+        // the layout has run, and a click aimed from them lands on the neighbour.
+        if (QQuickItem *c = findItem(control))
+            settleWindow(c->window());
+        if (QQuickItem *c = findItem(control)) {
+            w = c->window();
+            click(c);
+        }
+        // What the click removed is dropped, and the rest moved up, on the next
+        // layout. Clicking the same spot again before that would hit whatever
+        // moved into it.
+        settleWindow(w);
         waitFor([&] { return !findItem(gone); }, 2000);
     }
     return !findItem(gone);

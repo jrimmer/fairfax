@@ -448,7 +448,7 @@ private slots:
         QVERIFY(found);
         QObject *bar = findObject("commandPopup");
         QVERIFY(!bar->property("exact").toBool());
-        click(findText("Exact words  ⌥E"));
+        clickSteady(findText("Exact words  ⌥E"));
         QTRY_VERIFY_WITH_TIMEOUT(bar->property("exact").toBool(), 5000);
         QTRY_VERIFY_WITH_TIMEOUT([&] {
             for (const QVariant &item : bar->property("items").toList())
@@ -464,7 +464,7 @@ private slots:
         matches(found);
         QVERIFY(findObject("commandPopup")->property("exact").toBool());
         QVERIFY(!found);
-        click(findText("Exact words  ⌥E"));
+        clickSteady(findText("Exact words  ⌥E"));
         QTRY_VERIFY_WITH_TIMEOUT(!findObject("commandPopup")->property("exact").toBool(), 5000);
         QCOMPARE(app->store().setting("bar.exact.open").toString(), QString("false"));
         QTRY_VERIFY_WITH_TIMEOUT([&] {

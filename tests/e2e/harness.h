@@ -186,6 +186,13 @@ inline void settleLayout(QQuickItem *item) {
         QQuickTest::qWaitForPolish(item->window(), 3000);
 }
 
+// The same for a window, for a caller that will not touch an item afterwards (the
+// one it clicked may be gone by the time the layout has run).
+inline void settleWindow(QQuickWindow *w) {
+    if (w && QQuickTest::qIsPolishScheduled(w))
+        QQuickTest::qWaitForPolish(w, 3000);
+}
+
 // Leaves the pointer in a corner of the window that no list or popup reaches. A
 // pointer resting over a list that is rebuilt under it gets "hover" events, and
 // a menu that highlights what is under the pointer jumps there on its own.

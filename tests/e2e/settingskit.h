@@ -11,6 +11,7 @@
 #include <QRegularExpression>
 
 #include "harness.h"
+#include "listkit.h"
 #include "model.h"
 #include "schedule.h"
 #include "views.h"

@@ -64,7 +64,7 @@ private slots:
                 for (qint64 id : c.shown)
                     QTRY_VERIFY2_WITH_TIMEOUT(shows(app, id), qPrintable(QString("%1 should show %2").arg(c.title, app.task(id).title)), 5000);
                 for (qint64 id : c.hidden)
-                    QVERIFY2(!shows(app, id), qPrintable(QString("%1 should not show %2").arg(c.title, app.task(id).title)));
+                    QTRY_VERIFY2_WITH_TIMEOUT(!shows(app, id), qPrintable(QString("%1 should not show %2").arg(c.title, app.task(id).title)), 5000);
             }
         }
 
