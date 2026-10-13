@@ -41,6 +41,7 @@ Item {
     // for the notes, Ctrl+G for the location, and so on).
     function goTo(kind) {
         switch (kind) {
+        case "title": titleField.forceActiveFocus(); break
         case "notes": notesArea.forceEditorFocus(); break
         case "action": actionMenu.popup(actionButton, 0, actionButton.height + 4); break
         case "location": locationMenu.popup(locationButton, 0, locationButton.height + 4); break
@@ -53,6 +54,19 @@ Item {
     // The task whose title is in the field, so a late-arriving editor update
     // for a different task refills it rather than leaving it blank.
     property var loadedId: 0
+    // Renaming or deleting a sub-task rebuilds the list and with it the delegate
+    // that called, so what follows has to run from here, not from the delegate.
+    function renameSubtask(id, oldTitle, text) {
+        if (text !== oldTitle) backend.setTitle(id, text)
+        newSubtask.forceActiveFocus()
+    }
+    function deleteSubtask(id) {
+        const parentId = e.id
+        backend.selectTask(id)
+        backend.deleteSelection()
+        backend.beginEdit(parentId)
+    }
+
     function loadTitle() {
         if (loadedId === e.id) return
         loadedId = e.id
@@ -70,6 +84,13 @@ Item {
         })
         const pending = backend.takePendingField()
         if (pending) Qt.callLater(root.goTo, pending)
+    }
+
+    // Closing the editor by any route (Ctrl+Return, a click elsewhere, another
+    // task) must keep what was typed in the title and the notes.
+    Connections {
+        target: backend
+        function onEditEnding() { titleField.commit(); notesArea.commit() }
     }
 
     Connections {
@@ -106,7 +127,7 @@ Item {
                 }
             }
             IconButton { icon: "keyboard"; size: 14; tip: "Shortcuts (?)"; onClicked: shortcutsMenu.popup() }
-            IconButton { icon: "trash"; size: 14; color: theme.overdue; tip: "Delete"; onClicked: backend.deleteSelection() }
+            IconButton { objectName: "editorDelete"; icon: "trash"; size: 14; color: theme.overdue; tip: "Delete"; onClicked: backend.deleteSelection() }
             TextEdit { id: clip; visible: false }
             Menu {
                 id: shortcutsMenu
@@ -189,6 +210,7 @@ Item {
                     // set; it opens the priority and star menu.
                     IconButton {
                         id: prio
+                        objectName: "editorPriority"
                         icon: "starred"
                         size: 17
                         color: root.priorityColor || (root.e.starred ? theme.star : theme.faint)
@@ -289,6 +311,7 @@ Item {
                         anchors.rightMargin: 10
                         spacing: 8
                         ListBadge {
+                            objectName: "editorList"
                             text: root.e.listName || ""
                             color: root.listColor
                             chevrons: true
@@ -339,7 +362,7 @@ Item {
                             font.pixelSize: backend.fontSize - 2
                             Layout.rightMargin: 4
                         }
-                        RibbonButton { id: actionButton; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; menu: actionMenu }
+                        RibbonButton { id: actionButton; objectName: "editorAction"; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; menu: actionMenu }
                         RibbonButton {
                             icon: "mic"
                             tip: backend.recordingTaskId === root.e.id ? "Stop Recording" : "Record an Audio Note"
@@ -348,10 +371,10 @@ Item {
                             onClicked: backend.toggleRecording(root.e.id)
                         }
                         RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
-                        RibbonButton { id: locationButton; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; menu: locationMenu }
+                        RibbonButton { id: locationButton; objectName: "editorLocation"; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; menu: locationMenu }
                         RibbonButton { id: repeatButton; objectName: "editorRepeat"; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
-                        RibbonButton { id: alarmButton; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
-                        RibbonButton { id: durationButton; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; menu: durationMenu }
+                        RibbonButton { id: alarmButton; objectName: "editorAlarm"; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
+                        RibbonButton { id: durationButton; objectName: "editorDuration"; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; menu: durationMenu }
 
                         Menu {
                             id: alarmMenu
@@ -447,6 +470,7 @@ Item {
                     Layout.margins: 10
                     spacing: 12
                     TagField {
+                        objectName: "editorTags"
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignTop
                         taskId: root.e.id || 0
@@ -462,6 +486,7 @@ Item {
                         rowSpacing: 2
                         DateField {
                             id: startField
+                            objectName: "editorStart"
                             implicitWidth: 112
                             iso: root.e.startIso || ""
                             value: root.e.startDate || ""
@@ -472,6 +497,7 @@ Item {
                             onTyped: (text) => backend.setStartFromText(root.e.id, text)
                         }
                         DateField {
+                            objectName: "editorStartTime"
                             timeOnly: true
                             implicitWidth: 82
                             value: root.e.startTime || ""
@@ -484,6 +510,7 @@ Item {
 
                         DateField {
                             id: dueField
+                            objectName: "editorDue"
                             implicitWidth: 112
                             iso: root.e.dueIso || ""
                             value: root.e.dueDate || ""
@@ -495,6 +522,7 @@ Item {
                             onTyped: (text) => backend.setDueFromText(root.e.id, text)
                         }
                         DateField {
+                            objectName: "editorDueTime"
                             timeOnly: true
                             implicitWidth: 82
                             value: root.e.dueTime || ""
@@ -522,6 +550,7 @@ Item {
                             Layout.fillWidth: true
                             spacing: 8
                             Rectangle {
+                                objectName: "editorSubtaskCheck:" + modelData.id
                                 implicitWidth: 14
                                 implicitHeight: 14
                                 radius: root.e.type === 2 ? 3 : 7
@@ -532,6 +561,7 @@ Item {
                                 MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: backend.toggleComplete(modelData.id) }
                             }
                             Plain.TextField {
+                                objectName: "editorSubtask:" + modelData.id
                                 Layout.fillWidth: true
                                 padding: 1
                                 background: Item {}
@@ -542,12 +572,13 @@ Item {
                                 selectByMouse: true
                                 onEditingFinished: if (text !== modelData.title && text.trim() !== "") backend.setTitle(modelData.id, text)
                                 // Return on a sub-task starts the next one, as the reference app's setting does.
-                                Keys.onReturnPressed: { if (text !== modelData.title) backend.setTitle(modelData.id, text); newSubtask.forceActiveFocus() }
+                                Keys.onReturnPressed: root.renameSubtask(modelData.id, modelData.title, text)
                                 Keys.onEscapePressed: root.finish()
                             }
                             Icon {
+                                objectName: "editorSubtaskDelete:" + modelData.id
                                 name: "close"; size: 9; stroke: 2.2; color: theme.faint
-                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: { backend.selectTask(modelData.id); backend.deleteSelection(); backend.beginEdit(root.e.id) } }
+                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.deleteSubtask(modelData.id) }
                             }
                         }
                     }
@@ -557,6 +588,7 @@ Item {
                         Icon { name: "plus"; size: 13; color: theme.faint }
                         Plain.TextField {
                             id: newSubtask
+                            objectName: "editorNewSubtask"
                             Layout.fillWidth: true
                             padding: 1
                             background: Item {}
@@ -619,6 +651,7 @@ Item {
                         model: root.e.alarms || []
                         Rectangle {
                             required property var modelData
+                            objectName: "editorAlarmChip:" + modelData.id
                             width: alarmLabel.implicitWidth + 40
                             height: 24
                             radius: 12
@@ -636,6 +669,7 @@ Item {
                                 onClicked: { alarmStyleMenu.alarmId = modelData.id; alarmStyleMenu.sound = modelData.sound; alarmStyleMenu.popup() }
                             }
                             Icon {
+                                objectName: "editorAlarmRemove:" + modelData.id
                                 anchors.right: parent.right; anchors.rightMargin: 7; anchors.verticalCenter: parent.verticalCenter
                                 name: "close"; size: 8; stroke: 2.4; color: theme.priorityMedium
                                 MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: backend.removeAlarm(modelData.id) }
@@ -646,6 +680,7 @@ Item {
                         model: root.e.locations || []
                         Rectangle {
                             required property var modelData
+                            objectName: "editorLocationChip:" + modelData.name
                             width: placeLabel.implicitWidth + 40
                             height: 24
                             radius: 12
@@ -673,6 +708,7 @@ Item {
                     color: theme.notes
                     NotesArea {
                         id: notesArea
+                        objectName: "editorNotes"
                         anchors.fill: parent
                         anchors.margins: 4
                         text: root.e.notes || ""
@@ -702,6 +738,7 @@ Item {
         standardButtons: Dialog.Cancel | Dialog.Ok
         TextField {
             id: actionValue
+            objectName: "actionValue"
             width: 320
             placeholderText: ["", "Phone number", "Phone number", "Email address", "Address", "https://…", "Search for…"][actionDialog.kind]
             onAccepted: actionDialog.accept()
@@ -732,7 +769,7 @@ Item {
         property int minutes: 540
         Row {
             spacing: 8
-            SpinBox { id: daysBox; from: 0; to: 365; value: 1; editable: true }
+            SpinBox { id: daysBox; objectName: "alarmDays"; from: 0; to: 365; value: 1; editable: true }
             Label { text: daysBox.value === 1 ? "day before at" : "days before at"; anchors.verticalCenter: parent.verticalCenter }
             DateField { timeOnly: true; value: "9:00 AM"; placeholderText: "Time"; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].minutes >= 0) { daysBeforeAlarm.minutes = s[0].minutes; value = s[0].label } } }
         }
@@ -769,8 +806,8 @@ Item {
         standardButtons: Dialog.Cancel | Dialog.Ok
         Column {
             spacing: 8
-            TextField { id: locationName; width: 300; placeholderText: "Name (e.g. Home, Office)" }
-            TextField { id: locationAddress; width: 300; placeholderText: "Address (optional)" }
+            TextField { id: locationName; objectName: "locationName"; width: 300; placeholderText: "Name (e.g. Home, Office)" }
+            TextField { id: locationAddress; objectName: "locationAddress"; width: 300; placeholderText: "Address (optional)" }
         }
         onOpened: { locationName.text = ""; locationAddress.text = ""; locationName.forceActiveFocus() }
         onAccepted: {

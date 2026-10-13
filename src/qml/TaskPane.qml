@@ -52,6 +52,7 @@ Item {
 
             IconButton { visible: !root.sidebarVisible; icon: "sidebar"; tip: "Show Lists (Ctrl+Alt+←)"; onClicked: root.toggleSidebar() }
             IconButton {
+                objectName: "newTaskButton"
                 icon: "plus"
                 size: 18
                 tip: "New Task (Ctrl+N)"
@@ -63,6 +64,9 @@ Item {
                 }
                 Menu {
                     id: newMenu
+                    // A closing menu hands the keyboard back to what had it, which would take it
+                    // from the title of the task the menu just made.
+                    onClosed: if (backend.editingTaskId) Qt.callLater(() => backend.editField("title"))
                     MenuItem { text: "New Task"; onTriggered: backend.newTask(0) }
                     MenuItem { text: "New Project"; onTriggered: backend.newTask(1) }
                     MenuItem { text: "New Checklist"; onTriggered: backend.newTask(2) }

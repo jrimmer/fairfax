@@ -14,6 +14,7 @@ Item {
     onRowChanged: if (row) r = row
     property real margin: 40
 
+    objectName: "section:" + (r.sectionKey || "")
     height: r.isFirst ? 34 : 50
 
     Text {

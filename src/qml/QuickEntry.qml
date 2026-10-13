@@ -660,6 +660,7 @@ Window {
             // set; it opens the priority and star menu.
             IconButton {
                 id: prio
+                objectName: "quickPriority"
                 Layout.alignment: Qt.AlignVCenter
                 icon: "starred"
                 size: 18
@@ -696,6 +697,7 @@ Window {
                 anchors.rightMargin: 12
                 spacing: 8
                 ListBadge {
+                    objectName: "quickList"
                     Layout.leftMargin: 10
                     text: root.currentList ? root.currentList.name : "No list"
                     color: root.listColor
@@ -719,12 +721,14 @@ Window {
                     spacing: 0
                     RibbonButton {
                         id: attachButton
+                        objectName: "quickAttach"
                         icon: "image"; active: root.files.length > 0
                         tip: root.files.length ? root.files.map(root.fileName).join(", ") : "Attach a File"
                         menu: attachMenu
                     }
                     RibbonButton {
                         id: placeButton
+                        objectName: "quickLocation"
                         icon: "pin"; active: root.locationId > 0; tint: theme.start
                         tip: root.locationId ? "Location: " + root.placeName() : "Location"
                         menu: placeMenu
@@ -738,12 +742,14 @@ Window {
                     }
                     RibbonButton {
                         id: alarmButton
+                        objectName: "quickAlarm"
                         icon: "alarm"; active: root.alerts.length > 0; tint: theme.priorityMedium
                         tip: root.alarmTip()
                         menu: alarmMenu
                     }
                     RibbonButton {
                         id: durationButton
+                        objectName: "quickDuration"
                         icon: "duration"; active: root.duration > 0; tint: theme.duration
                         tip: root.duration ? "Duration " + root.durationText(root.duration) : "Duration"
                         menu: durationMenu
@@ -780,6 +786,7 @@ Window {
                 }
                 Plain.TextField {
                     id: numField
+                    objectName: "quickNumber"
                     implicitWidth: 52
                     implicitHeight: 26
                     padding: 4
@@ -812,7 +819,7 @@ Window {
                     }
                 }
                 Item { Layout.fillWidth: true }
-                Seg { text: "Done"; on: true; onClicked: root.applyCustom() }
+                Seg { objectName: "quickCustomDone"; text: "Done"; on: true; onClicked: root.applyCustom() }
             }
             RowLayout {
                 visible: root.customMode === "repeat" && root.recurrence.frequency === 2
@@ -871,12 +878,14 @@ Window {
                             model: root.tags
                             Rectangle {
                                 required property string modelData
+                                objectName: "quickTagChip:" + modelData
                                 height: 22
                                 width: chipText.implicitWidth + 30
                                 radius: 11
                                 color: theme.mix(theme.raised, theme.foreground, 0.28)
                                 Text { id: chipText; x: 9; anchors.verticalCenter: parent.verticalCenter; text: modelData; color: theme.background; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
                                 Icon {
+                                    objectName: "quickTagRemove:" + modelData
                                     anchors.right: parent.right; anchors.rightMargin: 5; anchors.verticalCenter: parent.verticalCenter
                                     name: "close"; size: 9; stroke: 2.4; color: theme.background
                                     MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: root.removeTag(modelData) }
@@ -885,6 +894,7 @@ Window {
                         }
                 TextInput {
                             id: tagInput
+                            objectName: "quickTagInput"
                             property var matches: []
                             width: Math.max(70, contentWidth + 10)
                             height: 24
@@ -931,6 +941,7 @@ Window {
                                         model: tagInput.matches
                                         Text {
                                             required property string modelData
+                                            objectName: "quickTagMatch:" + modelData
                                             text: modelData
                                             color: theme.foreground
                                             padding: 5
@@ -952,6 +963,7 @@ Window {
                 rowSpacing: 2
                 DateField {
                     id: startField
+                    objectName: "quickStart"
                     implicitWidth: 112
                     iso: root.startIso
                     value: root.fieldDate(root.startIso)
@@ -963,6 +975,7 @@ Window {
                 }
                 DateField {
                     id: startTimeField
+                    objectName: "quickStartTime"
                     timeOnly: true
                     implicitWidth: 82
                     value: root.startMinutes >= 0 ? root.timeText(root.startMinutes) : ""
@@ -975,6 +988,7 @@ Window {
 
                 DateField {
                     id: dueField
+                    objectName: "quickDue"
                     implicitWidth: 112
                     iso: root.dueIso
                     value: root.fieldDate(root.dueIso)
@@ -987,6 +1001,7 @@ Window {
                 }
                 DateField {
                     id: dueTimeField
+                    objectName: "quickDueTime"
                     timeOnly: true
                     implicitWidth: 82
                     value: root.dueMinutes >= 0 ? root.timeText(root.dueMinutes) : ""
@@ -1038,6 +1053,7 @@ Window {
 
             Rectangle {
                 id: typeButton
+                objectName: "quickType"
                 implicitWidth: typeRow.implicitWidth + 24; implicitHeight: 32; radius: 6
                 color: typeMenu.opened ? Qt.alpha(theme.accent, 0.22) : typeHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.14) : theme.mix(theme.raised, theme.foreground, 0.08)
                 border.width: 2
@@ -1056,6 +1072,7 @@ Window {
             }
             Item { Layout.fillWidth: true }
             Rectangle {
+                objectName: "quickCancel"
                 implicitWidth: cancelText.implicitWidth + 40; implicitHeight: 32; radius: 6
                 color: cancelHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.14) : theme.mix(theme.raised, theme.foreground, 0.08)
                 border.width: 2
@@ -1068,6 +1085,7 @@ Window {
             }
             Rectangle {
                 id: saveButton
+                objectName: "quickSave"
                 readonly property bool ready: title_.text.trim() !== ""
                 implicitWidth: saveText.implicitWidth + 48; implicitHeight: 32; radius: 6
                 color: theme.accent

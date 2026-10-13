@@ -57,6 +57,7 @@ Item {
 
     // Disclosure for projects and checklists.
     Icon {
+        objectName: "rowDisclosure:" + (root.r.taskId || 0)
         visible: root.r.hasChildren && (root.r.depth || 0) === 0
         x: root.margin + root.indent - 20
         y: (root.lineHeight - height) / 2
@@ -88,12 +89,14 @@ Item {
         }
         Icon {
             anchors.centerIn: parent
+            objectName: "rowRepeat:" + (root.r.taskId || 0)
             visible: root.r.type !== 2 && root.r.repeating
             name: root.r.completed ? "done" : "repeat"
             size: 19
             color: root.r.overdue ? root.overdueColor : theme.muted
         }
         Rectangle {
+            objectName: "rowChecklist:" + (root.r.taskId || 0)
             anchors.fill: parent
             visible: root.r.type === 2
             radius: 4
@@ -113,6 +116,7 @@ Item {
 
     Item {
         id: projectGlyph
+        objectName: "rowProject:" + (root.r.taskId || 0)
         visible: root.r.type === 1
         anchors.left: check.right
         anchors.leftMargin: 8
@@ -124,6 +128,7 @@ Item {
 
     Text {
         id: title
+        objectName: "taskTitle:" + (root.r.taskId || 0)
         anchors.left: projectGlyph.visible ? projectGlyph.right : check.right
         anchors.leftMargin: 10
         anchors.right: details.left
@@ -182,6 +187,7 @@ Item {
         }
         // Project progress pill.
         Rectangle {
+            objectName: "rowProgress:" + (root.r.taskId || 0)
             visible: root.r.type === 1 && root.r.childCount > 0
             anchors.verticalCenter: parent.verticalCenter
             width: pct.implicitWidth + 12
@@ -196,6 +202,7 @@ Item {
             model: (root.width > 760 && backend.showTagNames) || root.revealNames ? (root.r.tags || []).slice(0, 3) : []
             Rectangle {
                 required property string modelData
+                objectName: "rowTag:" + (root.r.taskId || 0) + ":" + modelData
                 anchors.verticalCenter: parent.verticalCenter
                 width: tagText.implicitWidth + 12
                 height: tagText.implicitHeight + 4
@@ -205,11 +212,13 @@ Item {
             }
         }
         Icon {
+            objectName: "rowTagIcon:" + (root.r.taskId || 0)
             visible: !((root.width > 760 && backend.showTagNames) || root.revealNames) && (root.r.tags || []).length > 0
             anchors.verticalCenter: parent.verticalCenter
             name: "tag"; size: 14; color: theme.faint
         }
         Icon {
+            objectName: "rowLocation:" + (root.r.taskId || 0)
             visible: !!root.r.hasLocation
             anchors.verticalCenter: parent.verticalCenter
             name: "pin"
@@ -224,6 +233,7 @@ Item {
             color: theme.faint
         }
         Icon {
+            objectName: "rowAlarm:" + (root.r.taskId || 0)
             visible: !!root.r.hasAlarm
             anchors.verticalCenter: parent.verticalCenter
             name: "alarm"
@@ -231,6 +241,7 @@ Item {
             color: theme.faint
         }
         Icon {
+            objectName: "rowAction:" + (root.r.taskId || 0)
             visible: (root.r.actionType || 0) > 0
             anchors.verticalCenter: parent.verticalCenter
             name: Icons.actionIcons[root.r.actionType || 0]
@@ -238,6 +249,7 @@ Item {
             color: theme.today
         }
         Row {
+            objectName: "rowDuration:" + (root.r.taskId || 0)
             visible: !!root.r.durationText
             anchors.verticalCenter: parent.verticalCenter
             spacing: 3
@@ -248,6 +260,7 @@ Item {
             visible: !!root.r.dueText || !!root.r.startText
             anchors.verticalCenter: parent.verticalCenter
             Text {
+                objectName: "rowStart:" + (root.r.taskId || 0)
                 visible: !!root.r.startText
                 anchors.right: parent.right
                 text: root.r.startText || ""
@@ -255,6 +268,7 @@ Item {
                 font.pixelSize: root.r.dueText ? backend.fontSize - 3 : backend.fontSize - 2
             }
             Text {
+                objectName: "rowDue:" + (root.r.taskId || 0)
                 visible: !!root.r.dueText
                 anchors.right: parent.right
                 text: root.r.dueText || ""
@@ -271,6 +285,7 @@ Item {
             height: 16
             Column {
                 anchors.centerIn: parent
+                objectName: "rowPriority:" + (root.r.taskId || 0)
                 spacing: 2.5
                 visible: (root.r.priority || 0) > 0 && !root.r.starred
                 Repeater {
@@ -286,6 +301,7 @@ Item {
                 }
             }
             Icon {
+                objectName: "rowStar:" + (root.r.taskId || 0)
                 anchors.centerIn: parent
                 visible: !!root.r.starred
                 name: "starred"
@@ -301,6 +317,7 @@ Item {
             // A click stars or unstars; the priority menu is for right-click
             // and long-press, so one stray tap no longer opens a menu.
             MouseArea {
+                objectName: "rowStarArea:" + (root.r.taskId || 0)
                 anchors.fill: parent
                 anchors.margins: -4
                 acceptedButtons: Qt.LeftButton | Qt.RightButton

@@ -225,6 +225,7 @@ Popup {
                 Pill {
                     required property var modelData
                     required property int index
+                    objectName: "repeatPreset:" + modelData.label
                     label: modelData.label + "  ⌥" + (index + 1)
                     onClicked: root.applyPreset(index)
                 }
@@ -239,6 +240,7 @@ Popup {
                 Pill {
                     required property string modelData
                     required property int index
+                    objectName: "repeatFreq:" + modelData
                     hPad: 14
                     label: modelData
                     on: root.frequency === index
@@ -253,6 +255,7 @@ Popup {
             spacing: 8
             Text { text: "Every"; color: theme.foreground; font.pixelSize: backend.fontSize }
             NumberBox {
+                objectName: "repeatInterval"
                 from: 1; to: 999
                 value: root.rule.interval || 1
                 onValueModified: root.update({ interval: value })
@@ -272,6 +275,7 @@ Popup {
                 model: 7
                 Pill {
                     required property int index
+                    objectName: "repeatWeekday:" + day
                     readonly property int day: (index + backend.firstDayOfWeek + 6) % 7  // Sunday-based locale index to Monday-based bit.
                     minWidth: 34
                     label: root.weekdayNames[day][0]
@@ -290,6 +294,7 @@ Popup {
             visible: root.frequency === 3
             spacing: 6
             RowLayout {
+                objectName: "repeatMonthDay"
                 spacing: 8
                 Radio { on: !root.rule.monthOrdinal }
                 Text {
@@ -300,16 +305,19 @@ Popup {
                 TapHandler { onTapped: root.update({ monthOrdinal: 0 }) }
             }
             RowLayout {
+                objectName: "repeatMonthNth"
                 spacing: 8
                 Radio { on: !!root.rule.monthOrdinal }
                 Text { text: "On the"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 Choice {
+                    objectName: "repeatOrdinal"
                     implicitWidth: 66
                     model: root.ordinals.map(o => o.t)
                     currentIndex: Math.max(0, root.ordinals.findIndex(o => o.v === root.rule.monthOrdinal))
                     onActivated: (i) => root.update({ monthOrdinal: root.ordinals[i].v })
                 }
                 Choice {
+                    objectName: "repeatMonthWeekday"
                     implicitWidth: 112
                     model: root.weekdayNames
                     currentIndex: Math.max(0, (root.rule.monthWeekday || 1) - 1)
@@ -321,6 +329,7 @@ Popup {
         }
 
         RowLayout {
+            objectName: "repeatAfterCompletion"
             visible: root.frequency !== 0
             spacing: 8
             Rectangle {
@@ -340,16 +349,19 @@ Popup {
             spacing: 6
             Text { text: "END"; color: theme.muted; font.pixelSize: backend.fontSize - 2; font.weight: Font.Bold; font.letterSpacing: 0.5 }
             RowLayout {
+                objectName: "repeatEndNever"
                 spacing: 8
                 Radio { on: !root.rule.endType }
                 Text { text: "Never"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 TapHandler { onTapped: root.update({ endType: 0 }) }
             }
             RowLayout {
+                objectName: "repeatEndAfter"
                 spacing: 8
                 Radio { on: root.rule.endType === 1 }
                 Text { text: "After"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 NumberBox {
+                    objectName: "repeatEndCount"
                     from: 1; to: 99
                     value: root.rule.endCount || 1
                     onValueModified: root.update({ endType: 1, endCount: value })
@@ -363,6 +375,7 @@ Popup {
                 Text { text: "On"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 Rectangle {
                     id: dateButton
+                    objectName: "repeatEndDate"
                     implicitWidth: 130
                     implicitHeight: 28
                     radius: 6
@@ -385,6 +398,7 @@ Popup {
             Layout.fillWidth: true
             Icon { name: "repeat"; size: 14; color: theme.muted }
             Text {
+                objectName: "repeatSummary"
                 Layout.fillWidth: true
                 text: root.summary
                 wrapMode: Text.WordWrap
@@ -392,6 +406,7 @@ Popup {
                 font.pixelSize: backend.fontSize - 1
             }
             Pill {
+                objectName: "repeatRemove"
                 visible: root.frequency !== 0
                 label: "Remove Repeat"
                 onClicked: root.update(root.blankRule())

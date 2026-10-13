@@ -43,12 +43,14 @@ RowLayout {
                 model: root.tags
                 Rectangle {
                     required property var modelData
+                    objectName: root.objectName + "Chip:" + modelData.name
                     height: 22
                     width: chip.implicitWidth + 30
                     radius: 11
                     color: theme.mix(theme.surface, theme.foreground, 0.28)
                     Text { id: chip; x: 9; anchors.verticalCenter: parent.verticalCenter; text: modelData.name; color: theme.background; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
                     Icon {
+                        objectName: root.objectName + "Remove:" + modelData.name
                         anchors.right: parent.right
                         anchors.rightMargin: 5
                         anchors.verticalCenter: parent.verticalCenter
@@ -60,6 +62,7 @@ RowLayout {
 
             TextInput {
                 id: input
+                objectName: root.objectName + "Input"
                 width: Math.max(70, contentWidth + 10)
                 height: 22
                 verticalAlignment: TextInput.AlignVCenter
@@ -103,6 +106,7 @@ RowLayout {
                             model: root.matches
                             Text {
                                 required property string modelData
+                                objectName: root.objectName + "Match:" + modelData
                                 text: modelData
                                 color: theme.foreground
                                 padding: 5

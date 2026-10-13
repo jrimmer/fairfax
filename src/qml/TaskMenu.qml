@@ -13,6 +13,9 @@ Menu {
     // A project's sort applies to the project itself, or the one a sub-task is in.
     readonly property int projectId: root.row.type === 1 || root.row.type === 2 ? root.row.taskId : (root.info.parentId || 0)
 
+    // Edit opens the editor while the menu is still up; the menu then returns the keyboard
+    // to the list, so the title is given it again.
+    onClosed: if (backend.editingTaskId) Qt.callLater(() => backend.editField("title"))
     onAboutToShow: {
         info = backend.taskInfo(row.taskId || 0)
         untagChoices = backend.selectionTags()

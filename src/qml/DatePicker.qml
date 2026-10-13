@@ -113,6 +113,7 @@ Popup {
                 Rectangle {
                     required property var modelData
                     required property int index
+                    objectName: "pickerChip:" + modelData.label
                     width: chipText.implicitWidth + 16
                     height: 24
                     radius: 12
@@ -132,7 +133,7 @@ Popup {
 
         RowLayout {
             Layout.fillWidth: true
-            IconButton { icon: "chevronLeft"; size: 12; onClicked: root.stepMonth(-1) }
+            IconButton { objectName: "pickerPrevious"; icon: "chevronLeft"; size: 12; onClicked: root.stepMonth(-1) }
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
@@ -143,7 +144,7 @@ Popup {
                 // Clicking the title jumps back to the current month, as in the sidebar calendar.
                 MouseArea { anchors.fill: parent; onClicked: root.moveCursor(root.todayDate) }
             }
-            IconButton { icon: "chevronRight"; size: 12; onClicked: root.stepMonth(1) }
+            IconButton { objectName: "pickerNext"; icon: "chevronRight"; size: 12; onClicked: root.stepMonth(1) }
         }
 
         Grid {
@@ -204,6 +205,7 @@ Popup {
                     readonly property bool isCursor: dayIso === root.iso(root.cursor)
                     readonly property bool weekend: day.getDay() === 0 || day.getDay() === 6
                     readonly property int busy: inMonth ? (root.counts[day.getDate() - 1] || 0) : 0
+                    objectName: "pickerDay:" + dayIso
 
                     // Weekend cells get a faint wash that fills the whole cell, so adjacent rows join into one column band.
                     Rectangle {
