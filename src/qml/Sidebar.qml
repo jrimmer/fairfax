@@ -401,7 +401,9 @@ Rectangle {
             id: header
             objectName: "sidebarGroup:" + (row.groupId || 0)
             height: 34
-            property var row: parent && parent.model ? parent.model : ({})
+            // The plain "row" copy, not the model object, which is destroyed
+            // before this delegate when its row is removed.
+            property var row: parent && parent.model && parent.model.row ? parent.model.row : ({})
             Text {
                 id: headerTitle
                 objectName: "sidebarGroupTitle"
@@ -541,7 +543,9 @@ Rectangle {
             id: item
             objectName: "sidebarRow:" + (row.sourceKey || "")
             height: row.kind === "project" ? 28 : 32
-            property var row: parent && parent.model ? parent.model : ({})
+            // The plain "row" copy, not the model object, which is destroyed
+            // before this delegate when its row is removed.
+            property var row: parent && parent.model && parent.model.row ? parent.model.row : ({})
             property int rowIndex: parent ? parent.index : 0
             readonly property bool isList: row.kind === "list"
             readonly property color band: theme.listColor(row.color || 0)
