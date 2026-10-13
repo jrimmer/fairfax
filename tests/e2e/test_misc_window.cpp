@@ -239,13 +239,14 @@ private slots:
         QVERIFY(findText("Room 4") != nullptr);
         QVERIFY(textMatching(popupSurface(details), QRegularExpression("2:00 PM . 3:30 PM")) != nullptr);
         QVERIFY(findText("Bring the mockups https://example.com/review") != nullptr);
-        app.press(Qt::Key_Escape);
+        QQuickItem *blank = findItem("taskList");   // A click elsewhere closes the details.
+        click(blank, Qt::LeftButton, pointIn(blank, 0.5, 0.97));
         QTRY_VERIFY_WITH_TIMEOUT(!details->property("visible").toBool(), 3000);
 
         // The all-day pill opens its details too.
         click(findItem("dayBarPill:Offsite"));
         QTRY_VERIFY_WITH_TIMEOUT(details->property("visible").toBool() && findItem("dayBarDetailTitle")->property("text").toString() == "Offsite", 3000);
-        app.press(Qt::Key_Escape);
+        click(blank, Qt::LeftButton, pointIn(blank, 0.5, 0.97));
         QTRY_VERIFY_WITH_TIMEOUT(!details->property("visible").toBool(), 3000);
 
         // Expand: the hour grid shows each event; collapse puts it away.
@@ -280,8 +281,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(dayBar() != nullptr, 3000);
     }
 
-    // "Drag a task onto the bar to block out time for it": dropped on the strip it
-    // gets that time of day today, and half an hour to run (less if the gap is smaller).
+    // "Drag a task onto the bar to block out time for it": dropped on the hour grid it
+    // is due when the block ends, takes the block's half hour, and is dated today.
     void dayBarTimeBlocksADroppedTask() {
         QTemporaryDir dir;
         App app;
@@ -292,19 +293,20 @@ private slots:
         QVERIFY(app.openSource(lk(app.ids.home)));
         QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBar") == nullptr, 1000);   // Only Today shows it, unless set otherwise.
         app.backend().setSetting("calendar.inLists", true);
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBarStrip") != nullptr, 3000);
-        QQuickItem *strip = findItem("dayBarStrip");
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBarToggle") != nullptr, 3000);
         QVERIFY(selectRow(app, app.ids.plants));
-        QVERIFY(tk::settled("dayBarStrip"));
-        qInfo() << "strip" << strip->mapToScene(QPointF(0, 0)) << strip->width() << strip->height() << "window" << app.window->size();
-        // 7:00 to 22:00 is the strip; seventy per cent along is 17:30.
-        QQuickItem *dropPoint = new QQuickItem(strip);   // A spot 70 per cent along the strip.
-        dropPoint->setPosition(QPointF(strip->width() * 0.7, strip->height() * 0.5));
+        QVERIFY(tk::clickNamed("dayBarToggle"));   // The hour grid, 7:00 to 22:00, 48 pixels an hour.
+        QQuickItem *standup = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((standup = findItem("dayBarGridEvent:Standup")) != nullptr, 3000);
+        QVERIFY(tk::settled("dayBarGridEvent:Standup"));
+        // A spot in the free time after the stand-up: about 12:30.
+        QQuickItem *dropPoint = new QQuickItem(standup);
+        dropPoint->setPosition(QPointF(standup->width() / 2, standup->height() + 100));
         QVERIFY2(dragShowingPill(app.row(app.ids.plants), dropPoint, "dragProxy"), "no pill followed the pointer");
         QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.plants).dueTime >= 0, 3000);
         const Task t = app.task(app.ids.plants);
         QCOMPARE(t.dueDate, QDate::currentDate());
-        QVERIFY2(qAbs(t.dueTime - (17 * 60 + 30)) <= 30 && t.dueTime % 15 == 0, qPrintable(QString::number(t.dueTime)));
+        QVERIFY2(qAbs(t.dueTime - (13 * 60)) <= 30 && t.dueTime % 15 == 0, qPrintable(QString::number(t.dueTime)));
         QCOMPARE(t.duration, 30);
         app.press(Qt::Key_Z, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.plants).dueTime == -1 && app.task(app.ids.plants).dueDate == QDate::currentDate().addDays(1), 3000);

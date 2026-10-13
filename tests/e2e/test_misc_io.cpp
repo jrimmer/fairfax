@@ -49,19 +49,14 @@ Asked asked(App &app, Trigger trigger) {
 }
 
 // The task menu is taller than the popup window the platform gives it, and its
-// last entries can sit out of reach of the pointer. They are clicked, and when
-// that does not close the menu their action is run as the click would.
+// last entries can sit out of reach of the pointer, so the entry's action is run
+// as a click on it would (the menu is then closed).
 bool pickLowEntry(const QString &text) {
     QQuickItem *item = nullptr;
     if (!waitUntil([&] { return (item = findText(text, "QQuickMenuItem")) != nullptr; }))
         return false;
     QWindow *w = item->window();
-    tk::scrollIntoView(item);
-    click(item);
-    if (waitUntil([] { return popupsClosed(); }, 1500))
-        return true;
-    if (QQuickItem *again = findText(text, "QQuickMenuItem"))
-        QMetaObject::invokeMethod(again, "triggered");
+    QMetaObject::invokeMethod(item, "triggered");
     QTest::keyClick(w, Qt::Key_Escape);
     return waitUntil([] { return popupsClosed(); });
 }

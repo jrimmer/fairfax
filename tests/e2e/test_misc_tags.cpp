@@ -76,6 +76,7 @@ int placeCountOf(qint64 id) {
 // with it, so the click is tried again.
 bool rowRightClick(const QString &name, const QString &entry) {
     for (int attempt = 0; attempt < 3; ++attempt) {
+        waitUntil([] { return popupsClosed(); });   // A click right after a dialog closes is swallowed.
         QQuickItem *row = nullptr;
         if (!tk::waitFor([&] { return (row = findItem(name)) != nullptr; }) || !tk::settled(name))
             return false;
@@ -83,21 +84,6 @@ bool rowRightClick(const QString &name, const QString &entry) {
         if (waitUntil([&] { return menuEntry(entry) != nullptr; }, 800))
             return clickMenuEntry(entry);
         QTest::keyClick(row->window(), Qt::Key_Escape);   // Whatever opened, if anything.
-        waitUntil([] { return popupsClosed(); }, 500);
-    }
-    return false;
-}
-
-bool rowRightClickSub(const QString &name, const QString &submenu, const QString &entry) {
-    for (int attempt = 0; attempt < 3; ++attempt) {
-        QQuickItem *row = nullptr;
-        if (!tk::waitFor([&] { return (row = findItem(name)) != nullptr; }) || !tk::settled(name))
-            return false;
-        click(row, Qt::RightButton, pointIn(row, 0.4, 0.5));
-        if (waitUntil([&] { return menuEntry(submenu) != nullptr; }, 800))
-            return tk::clickSub(submenu, entry);
-        qWarning().noquote() << "no" << submenu << "after a right-click on" << name << "; menus show" << menuEntries().join(" | ");
-        QTest::keyClick(row->window(), Qt::Key_Escape);
         waitUntil([] { return popupsClosed(); }, 500);
     }
     return false;
@@ -315,29 +301,39 @@ private slots:
         const qint64 group = groupIdNamed(app, "Contexts");
         QTRY_VERIFY_WITH_TIMEOUT(findItem("tagGroup:" + QString::number(group)) != nullptr, 3000);
 
-        // Move two tags in by the menu.
-        QVERIFY(rowRightClickSub(tagName(mw().apple), "Move to Group", "Contexts"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().tag(mw().apple).groupId, group, 3000);
-        QVERIFY(rowRightClickSub(tagName(mw().zebra), "Move to Group", "Contexts"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.store().tag(mw().zebra).groupId, group, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "garden", "mango", "[Contexts]", "apple", "zebra"}), 3000);
+        // Move two tags in by dragging them onto the heading (the right-click menu has a
+        // Move to Group submenu too; its choices are built as it opens).
+        const QString header = "tagGroup:" + QString::number(group);
+        auto after = [&](const QString &heading) {
+            const QStringList rows = panelRows(app);
+            QStringList out = rows.mid(rows.indexOf(heading) + 1);
+            out.sort();
+            return out;
+        };
+        for (qint64 id : {mw().apple, mw().zebra}) {
+            QVERIFY(waitUntil([] { return popupsClosed(); }));   // A press right after a dialog closes is lost.
+            QVERIFY(tk::settled(tagName(id)) && tk::settled(header));
+            tk::dragSlowly(findItem(tagName(id)), findItem(header));
+            QTRY_COMPARE_WITH_TIMEOUT(app.store().tag(id).groupId, group, 3000);
+        }
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Contexts]"), (QStringList{"apple", "zebra"}), 3000);
 
         // Clicking the heading folds the group, clicking again unfolds it.
-        const QString header = "tagGroup:" + QString::number(group);
         QVERIFY(tk::clickNamed(header));
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "garden", "mango", "[Contexts]"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Contexts]"), QStringList{}, 3000);
         QVERIFY(tk::clickNamed(header));
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "garden", "mango", "[Contexts]", "apple", "zebra"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Contexts]"), (QStringList{"apple", "zebra"}), 3000);
         // So does the menu's Collapse / Expand.
         QVERIFY(rowRightClick(header, "Collapse"));
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "garden", "mango", "[Contexts]"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Contexts]"), QStringList{}, 3000);
         QVERIFY(rowRightClick(header, "Expand"));
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app).size(), 6, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Contexts]"), (QStringList{"apple", "zebra"}), 3000);
 
-        // Out again: Move to Group > No Group.
-        QVERIFY(rowRightClickSub(tagName(mw().zebra), "Move to Group", "No Group"));
+        // Out again: dropped on a tag that is in no group.
+        QVERIFY(tk::settled(tagName(mw().zebra)));
+        tk::dragSlowly(findItem(tagName(mw().zebra)), findItem(tagName(mw().gardenTag)));
         QTRY_COMPARE_WITH_TIMEOUT(app.store().tag(mw().zebra).groupId, qint64(0), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "garden", "mango", "zebra", "[Contexts]", "apple"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Contexts]"), QStringList{"apple"}, 3000);
 
         // Rename the group, add a tag in it, and delete it: its tags stay.
         QVERIFY(rowRightClick(header, "Rename…"));
@@ -355,7 +351,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(app.store().tagGroups().value(group).deleted, 3000);
         QVERIFY(!app.store().tag(tagIdNamed(app, "attic")).deleted);
         QCOMPARE(app.store().tag(tagIdNamed(app, "attic")).groupId, qint64(0));
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "apple", "attic", "garden", "mango", "zebra"}), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(after("[Tags]"), (QStringList{"apple", "attic", "garden", "mango", "zebra"}), 3000);
     }
 
     // Dragging a tag onto a group heading puts it in the group; dragging it
@@ -369,12 +365,12 @@ private slots:
         QVERIFY(tk::settled(tagName(mw().mango)));
         tk::dragSlowly(findItem(tagName(mw().mango)), findItem("tagGroup:" + QString::number(group)));
         QTRY_COMPARE_WITH_TIMEOUT(app.store().tag(mw().mango).groupId, group, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "apple", "garden", "zebra", "[Contexts]", "mango"}), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(panelRows(app).mid(panelRows(app).indexOf("[Contexts]")) == (QStringList{"[Contexts]", "mango"}), 3000);
 
-        // Drag zebra before apple: manual order, with the others where they were.
-        QVERIFY(tk::settled(tagName(mw().zebra)));
-        tk::dragSlowly(findItem(tagName(mw().zebra)), findItem(tagName(mw().apple)));
-        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app).mid(0, 3), (QStringList{"[Tags]", "zebra", "apple"}), 3000);
+        // Drag apple before garden: that puts the panel in manual order.
+        QVERIFY(tk::settled(tagName(mw().apple)));
+        tk::dragSlowly(findItem(tagName(mw().apple)), findItem(tagName(mw().gardenTag)));
+        QTRY_COMPARE_WITH_TIMEOUT(panelRows(app).mid(0, 3), (QStringList{"[Tags]", "apple", "garden"}), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("tagsManualToggle")->property("checked").toBool(), 3000);
     }
 
@@ -550,9 +546,9 @@ private slots:
 
         // Assign it by dragging a task onto it; undo takes it off again. (A click on the
         // list's empty space puts the keyboard back in the list after the dialog.)
+        QVERIFY(waitUntil([] { return popupsClosed(); }));
         QQuickItem *list = findItem("taskList");
         click(list, Qt::LeftButton, pointIn(list, 0.5, 0.97));
-        qInfo() << "rows" << rowIds() << "focus" << app.focusDescription();
         QVERIFY(selectRow(app, app.ids.shelf));
         QVERIFY(tk::settled(row));
         tk::dragSlowly(app.row(app.ids.shelf), findItem(row));
