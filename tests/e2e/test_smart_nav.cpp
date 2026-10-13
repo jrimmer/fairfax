@@ -126,7 +126,8 @@ private slots:
     }
 
     // Reordering Smart Lists among themselves: a drag of one onto another is
-    // how regular lists reorder in the Lists Panel.
+    // how regular lists reorder in the Lists Panel, and a drop below the last
+    // one moves it to the end.
     void smartListsCanBeReordered() {
         App app(seedSmart);
         QVERIFY(app.ok);
@@ -137,8 +138,16 @@ private slots:
         QVERIFY(a && b);
         QCOMPARE(smartRowNames(app), (SL{"type: hiprio", "type: starred"}));
         dragOnto(app.sidebarRow(lk(b)), app.sidebarRow(lk(a)), 0.2);
-        QEXPECT_FAIL("", "GAP: Smart List rows cannot be dragged, so their order is fixed to creation order", Continue);
-        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: starred", "type: hiprio"}), 1500);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: starred", "type: hiprio"}), 5000);
+        QVERIFY(app.store().list(b).order < app.store().list(a).order);
+        QCOMPARE(app.store().list(b).kind, int(ListKind::Smart));
+        // Back again, through the drop strip under the last list (it answers
+        // about 13 px below where the pointer is drawn, so aim lower).
+        QQuickItem *tail = findItem("sidebarTailDrop");
+        QVERIFY(tail);
+        dragOnto(app.sidebarRow(lk(b)), tail, 0, 20);
+        QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(app), (SL{"type: hiprio", "type: starred"}), 5000);
+        QVERIFY(app.store().list(a).order < app.store().list(b).order);
     }
 
     // Smart Lists survive a restart: the same lists in the same order, their

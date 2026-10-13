@@ -960,6 +960,31 @@ private slots:
         QVERIFY(f.store.list(a).color != custom);
     }
 
+    void smartListsReorderAmongThemselves() {
+        Fixture f;
+        const qint64 group = f.backend->newGroup("Home");
+        const qint64 plain = f.backend->newList("Plain");
+        f.backend->moveList(plain, 0, group);
+        const qint64 a = f.backend->saveSmartList("A", "type: starred");
+        const qint64 b = f.backend->saveSmartList("B", "type: hiprio");
+        const qint64 c = f.backend->saveSmartList("C", "type: overdue");
+        auto order = [&] {
+            QList<qint64> ids{a, b, c};
+            std::sort(ids.begin(), ids.end(), [&](qint64 x, qint64 y) { return f.store.list(x).order < f.store.list(y).order; });
+            return ids;
+        };
+        QCOMPARE(order(), (QList<qint64>{a, b, c}));
+        f.backend->moveList(c, a, 0);
+        QCOMPARE(order(), (QList<qint64>{c, a, b}));
+        // The end of the Smart Lists, and the regular lists are left alone.
+        f.backend->moveList(c, 0, group);
+        QCOMPARE(order(), (QList<qint64>{a, b, c}));
+        QCOMPARE(f.store.list(c).groupId, qint64(0));
+        QCOMPARE(f.store.list(plain).groupId, group);
+        f.backend->undo();
+        QCOMPARE(order(), (QList<qint64>{c, a, b}));
+    }
+
     void expandAndCollapseAllGroups() {
         Fixture f;
         const qint64 g1 = f.backend->newGroup("One");

@@ -144,9 +144,10 @@ offers your lists and `pc done <Tab>` your open tasks.
   to filter to it, drag across days for a range, ⌥-click to add a task due that day, scroll
   to page through months, and drop tasks on a day to defer them (hold over the top or
   bottom week to page while dragging).
-- **Arrange freely.** Drag lists and groups to reorder them, drag tasks onto lists, Today,
-  Starred, Done, projects, tags, locations or calendar days, and between rows. Archived
-  lists wait under *Archived* in the sidebar; their tasks still show in Smart Lists and Done.
+- **Arrange freely.** Drag lists, groups and Smart Lists to reorder them, drag tasks onto
+  lists, Today, Starred, Done, projects, tags, locations or calendar days, and between rows.
+  Archived lists wait under *Archived* in the sidebar; their tasks still show in Smart Lists
+  and Done.
 - **List colours and groups.** Right-click a list, Smart List or group for a palette or a
   custom colour; *Color Grouped Lists* recolours a whole group. *Edit List…* sets name,
   colour, group, Focus List exclusions, completed tasks and muted alerts. Hover a list for a

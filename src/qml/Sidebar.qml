@@ -37,6 +37,8 @@ Rectangle {
         id: dragPill
         property string label
         property bool grouping: false
+        // Smart Lists drop only among themselves, so they carry their own key.
+        property bool smart: false
         parent: Overlay.overlay
         visible: Drag.active
         z: 1000
@@ -45,7 +47,7 @@ Rectangle {
         radius: 13
         color: theme.accent
         opacity: 0.94
-        Drag.keys: grouping ? ["precrime-group"] : ["precrime-list"]
+        Drag.keys: grouping ? ["precrime-group"] : smart ? ["precrime-smart"] : ["precrime-list"]
         Drag.hotSpot.x: 10
         Drag.hotSpot.y: 13
         Text {
@@ -57,7 +59,7 @@ Rectangle {
             font.weight: Font.DemiBold
         }
         function place(p) { if (!Drag.active) { x = p.x - 10; y = p.y - 13 } }
-        function begin(text, group) { label = text; grouping = group; Drag.active = true }
+        function begin(text, group, isSmart) { label = text; grouping = group; smart = !!isSmart; Drag.active = true }
         function end() {
             if (!Drag.active) return
             Drag.drop()
@@ -164,7 +166,7 @@ Rectangle {
                     id: tailDrop
                     objectName: "sidebarTailDrop"
                     anchors.fill: parent
-                    keys: ["precrime-list"]
+                    keys: ["precrime-list", "precrime-smart"]
                     onDropped: if (root.dragListId) backend.moveList(root.dragListId, 0, 0)
                     Rectangle {
                         visible: tailDrop.containsDrag
@@ -758,12 +760,13 @@ Rectangle {
                 }
             }
 
-            // Lists dropped on a list row land before it.
+            // Lists dropped on a list row land before it, and Smart Lists on a
+            // Smart List row.
             DropArea {
                 id: listDrop
                 anchors.fill: parent
-                keys: ["precrime-list"]
-                enabled: item.isList
+                keys: item.row.kind === "smart" ? ["precrime-smart"] : ["precrime-list"]
+                enabled: item.isList || item.row.kind === "smart"
                 onDropped: if (root.dragListId && root.dragListId !== item.row.listId)
                                backend.moveList(root.dragListId, item.row.listId, item.row.groupId || 0)
                 Rectangle {
@@ -780,12 +783,12 @@ Rectangle {
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
-                drag.target: item.isList ? dragPill : null
+                drag.target: item.isList || item.row.kind === "smart" ? dragPill : null
                 drag.threshold: 10
                 drag.onActiveChanged: {
                     if (drag.active) {
                         root.dragListId = item.row.listId
-                        dragPill.begin(item.row.title || "List", false)
+                        dragPill.begin(item.row.title || "List", false, item.row.kind === "smart")
                     } else {
                         dragPill.end()
                     }

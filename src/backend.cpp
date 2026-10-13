@@ -2461,15 +2461,18 @@ QVariantList Backend::sectionChoices(qint64 listId) const {
 
 void Backend::moveList(qint64 listId, qint64 beforeListId, qint64 groupId) {
     // Dropped before another list (or at the end of a group when 0): the
-    // whole group is renumbered so manual order stays dense.
+    // whole group is renumbered so manual order stays dense. Smart Lists have
+    // their own heading and reorder only among themselves.
     TaskList moving = m_store->list(listId);
     if (!moving.id || moving.kind == ListKind::Inbox)
         return;
-    if (beforeListId)
+    const bool smart = moving.kind == ListKind::Smart;
+    if (beforeListId && !smart)
         groupId = m_store->list(beforeListId).groupId;
     QVector<TaskList> members;
     for (const auto &l : m_store->lists())
-        if (!l.deleted && !l.archived && l.kind == ListKind::Normal && l.groupId == groupId && l.id != listId)
+        if (!l.deleted && !l.archived && l.id != listId
+            && (smart ? l.kind == ListKind::Smart : l.kind == ListKind::Normal && l.groupId == groupId))
             members.append(l);
     std::sort(members.begin(), members.end(), [](const TaskList &a, const TaskList &b) {
         return a.order != b.order ? a.order < b.order : a.id < b.id;
@@ -2477,7 +2480,8 @@ void Backend::moveList(qint64 listId, qint64 beforeListId, qint64 groupId) {
     int at = members.size();
     for (int i = 0; i < members.size(); ++i)
         if (members.at(i).id == beforeListId) at = i;
-    moving.groupId = groupId;
+    if (!smart)
+        moving.groupId = groupId;
     members.insert(at, moving);
     m_store->begin("Move List");
     for (int i = 0; i < members.size(); ++i) {
@@ -4178,7 +4182,9 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
     for (const auto &l : m_store->lists())
         if (!l.deleted && !l.archived && l.kind == ListKind::Smart)
             smart.append(l);
-    std::sort(smart.begin(), smart.end(), [](const TaskList &a, const TaskList &b) { return a.order < b.order; });
+    std::sort(smart.begin(), smart.end(), [](const TaskList &a, const TaskList &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
     if (!smart.isEmpty())
         rows.append({{"key", "h:smart"}, {"kind", "header"}, {"title", "Smart Lists"}, {"groupId", -1}, {"collapsed", false}});
     for (const auto &l : smart) {
