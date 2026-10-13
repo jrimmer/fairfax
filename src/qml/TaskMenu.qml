@@ -165,8 +165,9 @@ Menu {
     Menu {
         id: sectionMenu
         title: "Move to Section"
-        readonly property var info: backend.taskInfo(root.row.taskId || 0)
-        readonly property var choices: info.listId ? backend.sectionChoices(info.listId) : []
+        // Read as the menu opens (root.info), so a section added since the row was
+        // built is offered; a binding on the row alone never looked again.
+        readonly property var choices: root.info.listId ? backend.sectionChoices(root.info.listId) : []
         enabled: choices.length > 0
         Repeater {
             model: sectionMenu.choices
