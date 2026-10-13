@@ -210,7 +210,9 @@ inline void chooseCombo(const QString &name, int index) {
         click(c);
         QObject *popup = c->property("popup").value<QObject *>();
         QVERIFY(popup);
-        QTRY_VERIFY_WITH_TIMEOUT(popup->property("visible").toBool(), 5000);
+        // A click that closed a drop-down which was still shutting does not open this one.
+        if (!QTest::qWaitFor([&] { return popup->property("visible").toBool(); }, 2500))
+            continue;
         auto *view = popup->property("contentItem").value<QQuickItem *>();
         QVERIFY(view);
         settleLayout(view);

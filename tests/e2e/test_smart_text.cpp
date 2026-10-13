@@ -207,6 +207,7 @@ private slots:
         QVERIFY(selectRowText(app, "Call: Tim"));
         const qint64 tim = textTask(app, "Call: Tim");
         QCOMPARE(app.backend().currentTaskId(), tim);
+        parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         LIST_ITEM(input, findItem("commandInput"));
@@ -232,6 +233,9 @@ private slots:
         App &app = *m_app;
         QVERIFY(selectRowText(app, "Call: Tim"));
         const qint64 start = app.backend().currentTaskId();
+        // The keyboard moves the highlight here, so the pointer is out of the way:
+        // the bar highlights whatever it rests on.
+        parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("job");
@@ -257,6 +261,7 @@ private slots:
         // Esc cancels: the selection stays where it was.
         const qint64 before = app.backend().currentTaskId();
         QVERIFY(before != start);
+        parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("tim");
@@ -272,6 +277,7 @@ private slots:
     void taskFindMovesSelectionWhileTyping() {
         App &app = *m_app;
         QVERIFY(selectRowText(app, "Call: Tim"));
+        parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("handbook");
@@ -287,6 +293,7 @@ private slots:
     void findBarExactMatchToggle() {
         App &app = *m_app;
         QVERIFY(selectRowText(app, "Call: Tim"));
+        parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         app.type("ject");
@@ -298,6 +305,7 @@ private slots:
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
         // The bar remembers its own setting: reopened, it is still exact.
+        parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
         QVERIFY(commandBar()->property("exact").toBool());

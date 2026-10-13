@@ -186,6 +186,11 @@ inline void settleLayout(QQuickItem *item) {
         QQuickTest::qWaitForPolish(item->window(), 3000);
 }
 
+// Leaves the pointer in a corner of the window that no list or popup reaches. A
+// pointer resting over a list that is rebuilt under it gets "hover" events, and
+// a menu that highlights what is under the pointer jumps there on its own.
+inline void parkPointer(QQuickWindow *w) { QTest::mouseMove(w, QPoint(w->width() - 2, w->height() - 2)); }
+
 inline QPoint centreOf(QQuickItem *item) {
     return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
 }
