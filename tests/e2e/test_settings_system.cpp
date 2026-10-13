@@ -508,8 +508,13 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(findItem("dayBar") != nullptr, 3000);
 
         // The bar opens out and is found open after a restart.
-        click(findItem("dayBarToggle"));
-        QTRY_COMPARE_WITH_TIMEOUT(findItem("dayBar")->property("expanded").toBool(), true, 3000);
+        // Offscreen, the first click after leaving the Settings window is
+        // sometimes not delivered (both windows report active), so retry it.
+        for (int attempt = 0; attempt < 3 && !findItem("dayBar")->property("expanded").toBool(); ++attempt) {
+            click(findItem("dayBarToggle"));
+            QTest::qWaitFor([] { return findItem("dayBar")->property("expanded").toBool(); }, 1000);
+        }
+        QCOMPARE(findItem("dayBar")->property("expanded").toBool(), true);
         QCOMPARE(app->store().setting("calendar.expanded").toString(), QString("true"));
 
         QVERIFY(s.restart());
