@@ -4351,6 +4351,34 @@ void Backend::rebuildTags(const ViewBuilder &views) {
                      {"title", t.name}, {"count", counts.value(t.id)}, {"paused", t.paused},
                      {"filtered", m_options.tagFilter.contains(t.id)}});
     }
+    // A group with no tags yet still has its heading, so a new group shows up
+    // where its tags can be dragged or moved to. Groups go by order, after
+    // the ungrouped tags.
+    QVector<TagGroup> groups;
+    for (const auto &g : m_store->tagGroups())
+        if (!g.deleted)
+            groups.append(g);
+    std::sort(groups.begin(), groups.end(), [](const TagGroup &a, const TagGroup &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    for (const auto &g : groups) {
+        const QString key = QStringLiteral("g:%1").arg(g.id);
+        bool present = false;
+        for (const auto &r : rows)
+            present = present || r.value("key").toString() == key;
+        if (present)
+            continue;
+        // Before the first heading of a group that sorts after it, else last.
+        int at = rows.size();
+        for (int i = 0; i < rows.size() && at == rows.size(); ++i) {
+            if (rows.at(i).value("kind").toString() != "header" || rows.at(i).value("groupId").toLongLong() == 0)
+                continue;
+            const TagGroup other = m_store->tagGroups().value(rows.at(i).value("groupId").toLongLong());
+            if (other.order > g.order || (other.order == g.order && other.id > g.id))
+                at = i;
+        }
+        rows.insert(at, QVariantMap{{"key", key}, {"kind", "header"}, {"title", g.name}, {"groupId", g.id}});
+    }
     m_tags.setRows(rows);
 }
 
