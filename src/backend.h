@@ -540,6 +540,7 @@ private:
     QString focusSettingKey() const { return "focus." + m_source.key(); }
 
     void rebuild();
+    bool putManualSort();
     void rebuildSidebar(const ViewBuilder &views);
     bool doneWarningDue() const;
     void rebuildTasks(const ViewBuilder &views);

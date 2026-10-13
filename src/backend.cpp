@@ -1219,6 +1219,18 @@ void Backend::linkFile(qint64 taskId, const QString &path) {
     setNotes(taskId, t.notes.isEmpty() ? link : t.notes.trimmed() + "\n" + link);
 }
 
+// Moving tasks by hand puts the list in manual order, as dragging does in the reference app.
+// The switch joins the move's own change, so one Ctrl+Z undoes both. Returns
+// whether the list was switched.
+bool Backend::putManualSort() {
+    if (m_source.kind != Source::List || sortSpec().field == SortField::Manual)
+        return false;
+    TaskList l = m_store->list(m_source.id);
+    l.sortField = SortField::Manual;
+    m_store->putList(l);
+    return true;
+}
+
 void Backend::moveSelection(int delta) {
     // ⌃⌘↑/↓: manual reordering among siblings, which also switches the list
     // to manual order the way dragging does in the reference app.
@@ -1252,9 +1264,10 @@ void Backend::moveSelection(int delta) {
             m_store->putTask(s);
         }
     }
+    const bool switched = putManualSort();
     m_store->commit();
-    if (m_source.kind == Source::List && sortSpec().field != SortField::Manual)
-        setSort(SortField::Manual);
+    if (switched)
+        emit viewChanged();
 }
 
 QString Backend::dropHint(const QString &key) const {
@@ -1340,9 +1353,10 @@ void Backend::dropBefore(qint64 taskId) {
         t.parentId = anchor.parentId;
         m_store->putTask(t);
     }
+    const bool switched = putManualSort();
     m_store->commit();
-    if (m_source.kind == Source::List && sortSpec().field != SortField::Manual)
-        setSort(SortField::Manual);
+    if (switched)
+        emit viewChanged();
 }
 
 void Backend::toggleCollapsed(qint64 id) {
