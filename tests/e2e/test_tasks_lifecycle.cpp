@@ -348,28 +348,35 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!app.task(a).deleted && !app.task(b).deleted, 3000);
     }
 
-    // "Drag tasks onto a list in the sidebar to move them" and onto Starred to
-    // star them (the drop hint reads "Drop to Move" / "Drop to Star").
-    void dragOntoSidebar() {
+    // "Drag tasks onto a list in the sidebar to move them" (the drop hint reads
+    // "Drop to Move"); one undo puts the task back.
+    void dragOntoSidebarList() {
         App app;
         QVERIFY(app.ok);
         QVERIFY(app.openSource(homeKey(app)));
         const qint64 id = app.ids.plants;
         QVERIFY(waitFor([&] { return app.row(id) && app.sidebarRow("list:" + QString::number(app.ids.work)); }));
         QVERIFY(settled(QString("taskRow:%1").arg(id)));
-        drag(app.row(id), app.sidebarRow("list:" + QString::number(app.ids.work)));
+        dragSlowly(app.row(id), app.sidebarRow("list:" + QString::number(app.ids.work)));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).listId, app.ids.work, 3000);
         QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 3000);
-
-        // Back home by undo, then onto Starred.
         app.press(Qt::Key_Z, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).listId, app.ids.home, 3000);
         QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 3000);
-        QVERIFY(!app.task(id).starred);
+    }
+
+    // "...and onto Starred to star them" (the hint reads "Drop to Star").
+    void dragOntoStarred() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.plants;
+        QVERIFY(waitFor([&] { return app.row(id) && app.sidebarRow("starred"); }));
         QVERIFY(settled(QString("taskRow:%1").arg(id)));
-        drag(app.row(id), app.sidebarRow("starred"));
-        QTRY_VERIFY2_WITH_TIMEOUT(app.task(id).starred, qPrintable(QString("selected %1, hint %2")
-            .arg(app.backend().selectionCount()).arg(app.backend().dropHint("starred"))), 3000);
+        QVERIFY(!app.task(id).starred);
+        dragSlowly(app.row(id), app.sidebarRow("starred"));
+        QTRY_VERIFY2_WITH_TIMEOUT(app.task(id).starred, qPrintable(QString("due %3 start %4 done %5 selected %1, hint %2, sidebar row at y %6")
+            .arg(app.backend().selectionCount()).arg(app.backend().dropHint("starred")).arg(app.task(id).dueDate.toString()).arg(app.task(id).startDate.toString()).arg(app.task(id).completed).arg(centreOf(app.sidebarRow("starred")).y())), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(badge("rowStar", id), 3000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).starred, 3000);

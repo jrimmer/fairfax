@@ -210,12 +210,9 @@ private slots:
         QVERIFY(typeDate("quickStart", "in 3d"));
         click(findItem("quickTitle"));
         QVERIFY(waitItem("quickDueClear"));
-        click(findItem("quickDueTimeClear"));
-        QVERIFY(waitFor([] { return !findItem("quickDueTimeClear"); }));
-        click(findItem("quickDueClear"));
-        QVERIFY(waitFor([] { return !findItem("quickDueClear"); }));
-        click(findItem("quickStartClear"));
-        QVERIFY(waitFor([] { return !findItem("quickStartClear"); }));
+        QVERIFY(clickUntilGone("quickDueTimeClear", "quickDueTimeClear"));
+        QVERIFY(clickUntilGone("quickDueClear", "quickDueClear"));
+        QVERIFY(clickUntilGone("quickStartClear", "quickStartClear"));
         QVERIFY(saveQuick());
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Cleared dates").id != 0, 3000);
         t = app.taskTitled("Cleared dates");

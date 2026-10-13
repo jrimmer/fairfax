@@ -117,6 +117,25 @@ inline bool clickNamed(const QString &name, Qt::MouseButton b = Qt::LeftButton, 
     return true;
 }
 
+// A slower drag than the harness's: many small moves, then a few at the drop
+// point so the drag proxy has caught up with the pointer before the release.
+inline void dragSlowly(QQuickItem *from, QQuickItem *to) {
+    QQuickWindow *w = from->window();
+    const QPoint a = centreOf(from), b = centreOf(to);
+    QTest::mouseMove(w, a);
+    QTest::mousePress(w, Qt::LeftButton, Qt::NoModifier, a);
+    const int steps = 40;
+    for (int i = 1; i <= steps; ++i) {
+        QTest::mouseMove(w, a + (b - a) * i / steps);
+        QTest::qWait(5);
+    }
+    for (int i = 0; i < 3; ++i) {
+        QTest::mouseMove(w, b);
+        QTest::qWait(20);
+    }
+    QTest::mouseRelease(w, Qt::LeftButton, Qt::NoModifier, b);
+}
+
 // A click with a keyboard modifier held (Shift or Ctrl-click to extend a selection).
 inline void clickWith(QQuickItem *item, Qt::KeyboardModifiers mods, qreal fx = 0.4, qreal fy = 0.5) {
     QQuickWindow *w = item->window();
@@ -159,6 +178,9 @@ inline bool clickMenu(const QString &text, int ms = 3000) {
     }
     scrollIntoView(item);
     click(item);
+    if (waitFor([&] { return noMenuOpen(); }, ms / 3)) return true;
+    // The click can land while the menu is still opening; once more.
+    if ((item = findText(text, "QQuickMenuItem"))) click(item);
     return waitFor([&] { return noMenuOpen(); }, ms);
 }
 
