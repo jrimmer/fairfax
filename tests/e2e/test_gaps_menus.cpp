@@ -722,7 +722,14 @@ private slots:
     void syncButtonSyncsNow() {
         QTemporaryDir remote;
         QVERIFY(remote.isValid());
-        App app(seedWorld, QString(), true);
+        // Automatic sync is off from the start: with it on, the app syncs once by
+        // itself a few seconds after launch, which would hide a button that does nothing.
+        auto seed = [](Store &store) {
+            const Seed s = seedWorld(store);
+            store.setSetting("sync.auto", false);
+            return s;
+        };
+        App app(seed, QString(), true);
         QVERIFY(app.ok);
         QVERIFY(app.services().folderSync);
         // No provider yet: no button.
@@ -737,19 +744,21 @@ private slots:
         emit app.services().filePicker.picked(remote.path(), "sync-folder");
         QTRY_VERIFY_WITH_TIMEOUT(app.services().folderSync->configured() && !app.services().folderSync->busy() && folderHas("Buy milk"), 15000);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("syncButton") != nullptr, 5000);
-        app.store().setSetting("sync.auto", false);
         QVERIFY(app.openSource(lk(app.ids.home)));
         QVERIFY(selectRow(app, app.ids.shelf));
-        Task made;
         app.press(Qt::Key_N, Qt::ControlModifier);
         QVERIFY(tk::waitItem("editorTitle"));
         QTRY_VERIFY_WITH_TIMEOUT(tk::prop("editorTitle", "activeFocus").toBool(), 5000);
         app.type("Made before the button");
         app.press(Qt::Key_Return);
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Made before the button").id != 0, 5000);
-        QTest::qWait(500);
+        // Nothing syncs on its own while automatic sync is off.
+        QSignalSpy synced(app.services().folderSync.get(), &FolderSync::synced);
+        QTest::qWait(1500);
         QVERIFY(!folderHas("Made before the button"));
+        QCOMPARE(synced.count(), 0);
         QVERIFY(tk::clickNamed("syncButton"));
+        QTRY_VERIFY_WITH_TIMEOUT(synced.count() >= 1, 15000);
         QTRY_VERIFY_WITH_TIMEOUT(folderHas("Made before the button"), 15000);
     }
 
