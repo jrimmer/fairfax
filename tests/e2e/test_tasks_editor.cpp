@@ -128,14 +128,14 @@ private slots:
         const qint64 id = app.ids.plants;
         const QDate today = QDate::currentDate();
         QVERIFY(openEditor(app, id));
-        // The time first (it starts today); the date last, because a start in
+        // The time first (it starts today, early enough that it has begun at any hour of the day); the date last, because a start in
         // the future takes the task out of the list and the editor with it.
-        QVERIFY(typeDate("editorStartTime", "9am"));
-        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startTime, 9 * 60, 5000);
+        QVERIFY(typeDate("editorStartTime", "12:05am"));
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startTime, 5, 5000);
         QCOMPARE(app.task(id).startDate, today);
         QVERIFY(typeDate("editorStart", "in 2w"));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startDate, today.addDays(14), 5000);
-        QCOMPARE(app.task(id).startTime, 9 * 60);
+        QCOMPARE(app.task(id).startTime, 5);
         QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
 
