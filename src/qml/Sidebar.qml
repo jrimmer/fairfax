@@ -580,6 +580,7 @@ Rectangle {
 
             Icon {
                 visible: item.row.expandable === true
+                z: 5  // Above the row's own mouse area, which would otherwise take the click.
                 x: 9
                 anchors.verticalCenter: parent.verticalCenter
                 name: item.row.expanded ? "chevronDown" : "chevronRight"
