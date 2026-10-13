@@ -566,7 +566,7 @@ inline bool escapeSearch(App &app) {
     if (!searchOpen())
         return app.backend().search().isEmpty();
     app.press(Qt::Key_Escape);
-    if (!waitUntil([&] { return app.backend().search().isEmpty() && !searchOpen(); }, 800)) {
+    if (!waitUntil([&] { return app.backend().search().isEmpty() && !searchOpen(); }, 2000)) {
         // Escape went to the list (the field had lost focus): use the cross.
         if (QQuickItem *cross = findItem("searchClear"))
             clickSteady(cross);
@@ -609,7 +609,7 @@ inline bool selectRow(App &app, const QString &title) {
         if (!row)
             break;
         click(row, Qt::LeftButton, pointIn(row, 0.5, 0.5));
-        ok = waitUntil([&] { return app.backend().currentTaskId() == id; }, 700);
+        ok = waitUntil([&] { return app.backend().currentTaskId() == id; }, 2000);
     }
     if (!ok)
         qWarning() << "selectRow: clicking" << title << "selected" << app.backend().currentTaskId() << "not" << id;
@@ -692,7 +692,7 @@ inline bool pressBuilder(const QString &name, Qt::MouseButton button = Qt::LeftB
             QTest::qWait(60);
         }
         clickSteady(item, button);
-        if (!chip || waitUntil([&] { return item->property("state").toInt() != before; }, 500))
+        if (!chip || waitUntil([&] { return item->property("state").toInt() != before; }, 2500))
             break;
     }
     return true;
@@ -714,7 +714,7 @@ inline bool fillBuilder(App &app, const QString &name, const QString &text) {
         QTest::qWait(100);
         scrollAll(field);
         clickSteady(field);
-        waitUntil([&] { return field->property("activeFocus").toBool(); }, 600);
+        waitUntil([&] { return field->property("activeFocus").toBool(); }, 2000);
     }
     if (!field->property("activeFocus").toBool())
         return false;

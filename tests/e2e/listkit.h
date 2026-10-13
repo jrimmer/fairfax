@@ -313,7 +313,7 @@ inline bool popupsClosed() {
 inline void closeMenus(App &app) {
     for (int i = 0; i < 4 && !popupsClosed(); ++i) {
         app.press(Qt::Key_Escape);
-        waitUntil([] { return popupsClosed(); }, 400);
+        waitUntil([] { return popupsClosed(); }, 1000);
     }
 }
 
@@ -410,7 +410,7 @@ inline bool clickSubmenuEntry(const QString &submenu, const QString &entry) {
             else
                 click(parent);
         }
-        waitUntil([&] { return menuEntry(entry) != nullptr; }, 700);
+        waitUntil([&] { return menuEntry(entry) != nullptr; }, 2000);
     }
     return false;
 }

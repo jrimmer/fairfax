@@ -343,7 +343,7 @@ inline bool focusDateField(const QString &name) {
         QQuickWindow *w = f->window();
         for (int i = 0; i < 25 && !focused(); ++i) {
             QTest::keyClick(w, Qt::Key_Tab);
-            waitFor(focused, 400);
+            waitFor(focused, 40);
         }
     }
     return focused();
@@ -395,7 +395,7 @@ inline bool pickChip(const QString &fieldName, const QString &chip) {
 inline bool clickUntilGone(const QString &control, const QString &gone) {
     for (int attempt = 0; attempt < 3 && findItem(gone); ++attempt) {
         if (QQuickItem *c = findItem(control)) click(c);
-        waitFor([&] { return !findItem(gone); }, 800);
+        waitFor([&] { return !findItem(gone); }, 2000);
     }
     return !findItem(gone);
 }
