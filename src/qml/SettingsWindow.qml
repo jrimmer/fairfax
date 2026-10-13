@@ -740,10 +740,11 @@ Window {
                                 text: modelData.name
                                 Layout.fillWidth: true
                                 onToggled: {
-                                    const off = calendar.disabledSources.filter(s => s !== modelData.source)
+                                    // A plain array, so the list can be stored and then handed to the feed.
+                                    const off = Array.from(calendar.disabledSources).filter(s => s !== modelData.source)
                                     if (!checked) off.push(modelData.source)
-                                    calendar.disabledSources = off
                                     backend.setSetting("calendar.disabled", off.join("\n"))
+                                    calendar.disabledSources = off
                                 }
                             }
                             Repeater {
@@ -763,8 +764,8 @@ Window {
                                         onClicked: {
                                             const colors = Object.assign({}, calendar.sourceColors)
                                             colors[parent.info.source] = parent.modelData
-                                            calendar.sourceColors = colors
                                             backend.setSetting("calendar.colors", JSON.stringify(colors))
+                                            calendar.sourceColors = colors
                                         }
                                     }
                                 }
