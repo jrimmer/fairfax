@@ -23,3 +23,7 @@ RESOURCES += ../../src/resources.qrc
 HEADERS += settingskit.h settingscases_general.h settingscases_tasks.h settingscases_lists.h
 SOURCES += test_settings.cpp test_settings_lists.cpp test_settings_system.cpp
 DEFINES += SRCDIR=\\\"$$PWD/../../src\\\"
+
+# Smart List and search end-to-end tests.
+HEADERS += smartkit.h
+SOURCES += test_smart_presets.cpp test_smart_keywords.cpp test_smart_text.cpp test_smart_bar.cpp test_smart_builder.cpp test_smart_live.cpp test_smart_recipes.cpp test_smart_nav.cpp
