@@ -17,7 +17,17 @@ int main(int argc, char *argv[]) {
     QQuickStyle::setStyle("Material");
     QApplication app(argc, argv);
     int failures = 0;
+    // PRECRIME_E2E_SHARD=i/n runs every n-th test class starting at i; bin/e2e starts
+    // several of these side by side.
+    int shard = 0, shards = 1;
+    if (const QList<QByteArray> parts = qgetenv("PRECRIME_E2E_SHARD").split('/'); parts.size() == 2) {
+        shard = parts.at(0).toInt();
+        shards = qMax(1, parts.at(1).toInt());
+    }
+    int index = -1;
     for (const auto &factory : testRegistry()) {
+        if (++index % shards != shard)
+            continue;
         std::unique_ptr<QObject> test(factory());
         // PRECRIME_E2E_CLASS=Tasks runs only the test classes whose name contains it,
         // so a function name given as an argument is not looked up in the others.

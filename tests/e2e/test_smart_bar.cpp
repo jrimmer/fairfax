@@ -261,11 +261,10 @@ private slots:
         App &app = *m_app;
         // A Smart List whose rule the project and one of its sub-tasks meet.
         QVERIFY(typeSearch(app, "type: hiprio OR tomorrow"));
-        LIST_ITEM(save, findItem("saveSearchAsSmart"));
-        click(save);
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceIsSmart(), 5000);
-        const qint64 hot = smartNamed(app, "type: hiprio OR tomorrow");
+        // The button that has just appeared is clicked once it has stopped moving.
+        const qint64 hot = saveSearchAsSmart(app, "type: hiprio OR tomorrow", true);
         QVERIFY(hot);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceIsSmart(), 5000);
         QCOMPARE(app.backend().search(), QString());
         QTRY_VERIFY_WITH_TIMEOUT(app.row(idOf("Launch project")) != nullptr, 5000);
 

@@ -543,11 +543,13 @@ private slots:
         LIST_ITEM(archived, findItem("sidebarArchived"));
         QVERIFY(findText("Archived"));
 
-        click(archived);
+        clickSteady(archived);
         QTRY_VERIFY_WITH_TIMEOUT(findText("Archived Lists") != nullptr, 5000);
+        // The dialog that has just opened lays its rows out on the next polish.
+        settleLayout(findText("Archived Lists"));
         QVERIFY(findText("Errands"));
         LIST_ITEM(restore, findItem("archiveRestore:" + QString::number(w.errands)));
-        click(restore);
+        clickSteady(restore);
         QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, w.errands).archived, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.errands)) != nullptr, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(!findItem("sidebarArchived"), 5000);
