@@ -126,16 +126,16 @@ Item {
                     MenuItem { text: "Copy Shareable Link"; onTriggered: { clip.text = root.e.link; clip.selectAll(); clip.copy() } }
                 }
             }
-            IconButton { icon: "keyboard"; size: 14; tip: "Shortcuts (?)"; onClicked: shortcutsMenu.popup() }
+            IconButton { objectName: "editorKeyboard"; icon: "keyboard"; size: 14; tip: "Shortcuts (?)"; onClicked: shortcutsMenu.popup() }
             IconButton { objectName: "editorDelete"; icon: "trash"; size: 14; color: theme.overdue; tip: "Delete"; onClicked: backend.deleteSelection() }
             TextEdit { id: clip; visible: false }
             Menu {
                 id: shortcutsMenu
-                MenuItem { text: "Priority None\tCtrl+Alt+0"; onTriggered: backend.setPriority(0) }
-                MenuItem { text: "Priority Low\tCtrl+Alt+1"; onTriggered: backend.setPriority(1) }
-                MenuItem { text: "Priority Medium\tCtrl+Alt+2"; onTriggered: backend.setPriority(2) }
-                MenuItem { text: "Priority High\tCtrl+Alt+3"; onTriggered: backend.setPriority(3) }
-                MenuItem { text: "Toggle Starred\tCtrl+Alt+S"; onTriggered: backend.setStarred(-1) }
+                MenuItem { text: "Priority None\t" + (backend.shortcutMap, backend.shortcutText("edit.priorityNone")); onTriggered: backend.setPriority(0) }
+                MenuItem { text: "Priority Low\t" + (backend.shortcutMap, backend.shortcutText("edit.priorityLow")); onTriggered: backend.setPriority(1) }
+                MenuItem { text: "Priority Medium\t" + (backend.shortcutMap, backend.shortcutText("edit.priorityMedium")); onTriggered: backend.setPriority(2) }
+                MenuItem { text: "Priority High\t" + (backend.shortcutMap, backend.shortcutText("edit.priorityHigh")); onTriggered: backend.setPriority(3) }
+                MenuItem { text: "Toggle Starred\t" + (backend.shortcutMap, backend.shortcutText("edit.star")); onTriggered: backend.setStarred(-1) }
             }
         }
 

@@ -14,6 +14,7 @@
 #include "nlparse.h"
 #include "rowmodel.h"
 #include "schedule.h"
+#include "shortcuts.h"
 #include "store.h"
 #include "views.h"
 
@@ -48,6 +49,8 @@ class Backend : public QObject {
     Q_PROPERTY(bool showTagNames READ showTagNames NOTIFY settingsChanged)
     Q_PROPERTY(bool quickLookEnabled READ quickLookEnabled NOTIFY settingsChanged)
     Q_PROPERTY(bool monthDividers READ monthDividers NOTIFY settingsChanged)
+    Q_PROPERTY(QVariantMap shortcutMap READ shortcutMap NOTIFY shortcutsChanged)
+    Q_PROPERTY(bool recordingShortcut READ recordingShortcut WRITE setRecordingShortcut NOTIFY recordingShortcutChanged)
     // 0 for Sunday to 6 for Saturday, as in Qt Quick's Locale.
     Q_PROPERTY(int firstDayOfWeek READ firstDayOfWeek NOTIFY settingsChanged)
     Q_PROPERTY(bool focusOn READ focusOn NOTIFY viewChanged)
@@ -361,6 +364,24 @@ public:
     Q_INVOKABLE bool settingFlag(const QString &key, bool fallback) const;
     int settingsRevision() const { return m_settingsRevision; }
     Q_INVOKABLE void setSetting(const QString &key, const QVariant &value);
+
+    // Keyboard shortcuts: the id -> binding map QML binds its Shortcuts to,
+    // the command list the Settings pane and the overlay read, and the
+    // invokables that change a binding. Every change emits shortcutsChanged.
+    QVariantMap shortcutMap() const;
+    bool recordingShortcut() const { return m_recordingShortcut; }
+    Q_INVOKABLE QVariantList shortcutCommands() const;
+    Q_INVOKABLE void setShortcut(const QString &id, const QString &sequence);
+    Q_INVOKABLE void resetShortcut(const QString &id);
+    Q_INVOKABLE void resetAllShortcuts();
+    Q_INVOKABLE QString shortcutConflict(const QString &id, const QString &sequence) const;
+    Q_INVOKABLE QString shortcutProblem(const QString &id, const QString &sequence) const;
+    Q_INVOKABLE QString shortcutText(const QString &id) const;
+    Q_INVOKABLE QString shortcutFor(int key, int modifiers) const;
+    // The Settings pane starts and stops recording a key; while it records,
+    // the application shortcuts are held back so the key being pressed is
+    // seen by the pane, not acted on.
+    Q_INVOKABLE void setRecordingShortcut(bool on);
     Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
     void requestQuickEntryWith(const QString &text) { emit quickEntryTextRequested(text); }
     QList<qint64> selectedIds() const { return QList<qint64>(m_selected.cbegin(), m_selected.cend()); }
@@ -508,6 +529,8 @@ signals:
     void editorChanged();
     void dataChanged();
     void settingsChanged();
+    void shortcutsChanged();
+    void recordingShortcutChanged();
     void clockChanged();
     void statusChanged();
     void doneWarningRequested();  // Done holds 500+ completed tasks and auto-delete is off.
@@ -588,6 +611,7 @@ private:
     QVariantMap m_editor;
     QString m_pendingField;
     bool m_dragCopy = false;
+    bool m_recordingShortcut = false;
     // What the last Copy or Cut put on the clipboard, to restore on paste.
     QString m_clipText;
     QVector<Task> m_clipTasks;

@@ -337,7 +337,9 @@ Window {
         title_.forceActiveFocus()
     }
 
-    // Return on a field: save and hide; Shift keeps going; Ctrl opens the task.
+    // Return on a field: save and hide. Shift and Ctrl with Return are the
+    // save shortcuts below, which follow their bindings; only Enter lands here
+    // with a modifier.
     function submit(modifiers) {
         if (modifiers & Qt.ControlModifier) save(true)
         else if (modifiers & Qt.ShiftModifier) save(false)
@@ -355,9 +357,9 @@ Window {
 
     Item {
         anchors.fill: parent
-        Shortcut { sequence: "Ctrl+W"; context: Qt.WindowShortcut; onActivated: root.hide() }
-        Shortcut { sequence: "Ctrl+Return"; context: Qt.WindowShortcut; onActivated: root.save(true) }
-        Shortcut { sequence: "Shift+Return"; context: Qt.WindowShortcut; onActivated: root.save(false) }
+        Shortcut { sequences: backend.shortcutMap["quickEntry.hide"] || []; context: Qt.WindowShortcut; enabled: !backend.recordingShortcut; onActivated: root.hide() }
+        Shortcut { sequences: backend.shortcutMap["quickEntry.saveAndOpen"] || []; context: Qt.WindowShortcut; enabled: !backend.recordingShortcut; onActivated: root.save(true) }
+        Shortcut { sequences: backend.shortcutMap["quickEntry.save"] || []; context: Qt.WindowShortcut; enabled: !backend.recordingShortcut; onActivated: root.save(false) }
     }
 
     // ------------------------------------------------------------ small parts
@@ -651,7 +653,7 @@ Window {
                         }
                         e.accepted = true
                     }
-                    Keys.onReturnPressed: (e) => root.submit(e.modifiers)
+                    Keys.onReturnPressed: (e) => { if (!(e.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) root.submit(e.modifiers) }
                     Keys.onEnterPressed: (e) => root.submit(e.modifiers)
                     Keys.onEscapePressed: { if (root.customMode !== "") root.closeCustom(); else root.hide() }
                 }
@@ -918,7 +920,7 @@ Window {
                             }
                             Keys.onReturnPressed: (e) => {
                                 if (text.trim()) accept(matches.length && tagPopup.visible ? matches[0] : text)
-                                else root.submit(e.modifiers)
+                                else if (!(e.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) root.submit(e.modifiers)
                             }
                             Keys.onTabPressed: (e) => { if (text.trim()) { accept(matches.length && tagPopup.visible ? matches[0] : text); e.accepted = true } else e.accepted = false }
                             Keys.onPressed: (e) => {

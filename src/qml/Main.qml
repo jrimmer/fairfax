@@ -189,85 +189,85 @@ ApplicationWindow {
 
     component AppShortcut: Shortcut { context: Qt.ApplicationShortcut }
 
-    AppShortcut { sequence: "Ctrl+N"; onActivated: backend.newTask(0) }
-    AppShortcut { sequence: "Ctrl+Alt+N"; onActivated: backend.newTask(1) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+N"; onActivated: backend.newTask(2) }
-    AppShortcut { sequence: "Alt+N"; onActivated: backend.newTask(0, true) }
-    AppShortcut { sequence: "Ctrl+Shift+N"; onActivated: { backend.newList(); sidebar.renameSelected() } }
-    AppShortcut { sequence: "Ctrl+0"; onActivated: sidebar.selectInbox() }
-    AppShortcut { sequence: "Ctrl+1"; onActivated: backend.selectSource("all") }
-    AppShortcut { sequence: "Ctrl+2"; onActivated: backend.selectSource("today") }
-    AppShortcut { sequence: "Ctrl+3"; onActivated: backend.selectSource("starred") }
-    AppShortcut { sequence: "Ctrl+4"; onActivated: backend.selectSource("scheduled") }
-    AppShortcut { sequence: "Ctrl+5"; onActivated: backend.selectSource("done") }
-    AppShortcut { sequence: "Ctrl+Up"; onActivated: backend.selectAdjacentSource(-1) }
-    AppShortcut { sequence: "Ctrl+Down"; onActivated: backend.selectAdjacentSource(1) }
-    AppShortcut { sequence: "Ctrl+Shift+Up"; onActivated: backend.moveSelection(-1) }
-    AppShortcut { sequence: "Ctrl+Alt+Up"; onActivated: backend.setAllCollapsed(true) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+Up"; onActivated: backend.setAllGroupsCollapsed(true) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+Down"; onActivated: backend.setAllGroupsCollapsed(false) }
-    AppShortcut { sequence: "Ctrl+Shift+Down"; onActivated: backend.moveSelection(1) }
-    AppShortcut { sequence: "Ctrl+Alt+Down"; onActivated: backend.setAllCollapsed(false) }
-    AppShortcut { sequence: "Ctrl+."; onActivated: backend.toggleComplete() }
-    AppShortcut { sequence: "Ctrl+Alt+."; onActivated: backend.setCompleted(false) }
-    AppShortcut { sequence: "Ctrl+D"; onActivated: backend.duplicateSelection() }
-    AppShortcut { sequence: "Ctrl+Backspace"; onActivated: backend.deleteSelection() }
-    AppShortcut { sequence: "Ctrl+K"; onActivated: backend.showScheduled = !backend.showScheduled }
-    AppShortcut { sequence: "Ctrl+U"; onActivated: backend.showPaused = !backend.showPaused }
+    AppShortcut { sequences: backend.shortcutMap["task.new"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newTask(0) }
+    AppShortcut { sequences: backend.shortcutMap["task.newProject"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newTask(1) }
+    AppShortcut { sequences: backend.shortcutMap["task.newChecklist"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newTask(2) }
+    AppShortcut { sequences: backend.shortcutMap["task.newSubtask"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newTask(0, true) }
+    AppShortcut { sequences: backend.shortcutMap["task.newList"] || []; enabled: !backend.recordingShortcut; onActivated: { backend.newList(); sidebar.renameSelected() } }
+    AppShortcut { sequences: backend.shortcutMap["view.inbox"] || []; enabled: !backend.recordingShortcut; onActivated: sidebar.selectInbox() }
+    AppShortcut { sequences: backend.shortcutMap["view.all"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("all") }
+    AppShortcut { sequences: backend.shortcutMap["view.today"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("today") }
+    AppShortcut { sequences: backend.shortcutMap["view.starred"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("starred") }
+    AppShortcut { sequences: backend.shortcutMap["view.scheduled"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("scheduled") }
+    AppShortcut { sequences: backend.shortcutMap["view.done"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("done") }
+    AppShortcut { sequences: backend.shortcutMap["view.previousList"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectAdjacentSource(-1) }
+    AppShortcut { sequences: backend.shortcutMap["view.nextList"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectAdjacentSource(1) }
+    AppShortcut { sequences: backend.shortcutMap["task.moveUp"] || []; enabled: !backend.recordingShortcut; onActivated: backend.moveSelection(-1) }
+    AppShortcut { sequences: backend.shortcutMap["view.collapseProjects"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setAllCollapsed(true) }
+    AppShortcut { sequences: backend.shortcutMap["view.collapseGroups"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setAllGroupsCollapsed(true) }
+    AppShortcut { sequences: backend.shortcutMap["view.expandGroups"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setAllGroupsCollapsed(false) }
+    AppShortcut { sequences: backend.shortcutMap["task.moveDown"] || []; enabled: !backend.recordingShortcut; onActivated: backend.moveSelection(1) }
+    AppShortcut { sequences: backend.shortcutMap["view.expandProjects"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setAllCollapsed(false) }
+    AppShortcut { sequences: backend.shortcutMap["task.complete"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleComplete() }
+    AppShortcut { sequences: backend.shortcutMap["task.reopen"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setCompleted(false) }
+    AppShortcut { sequences: backend.shortcutMap["task.duplicate"] || []; enabled: !backend.recordingShortcut; onActivated: backend.duplicateSelection() }
+    AppShortcut { sequences: backend.shortcutMap["task.delete"] || []; enabled: !backend.recordingShortcut; onActivated: backend.deleteSelection() }
+    AppShortcut { sequences: backend.shortcutMap["view.showScheduled"] || []; enabled: !backend.recordingShortcut; onActivated: backend.showScheduled = !backend.showScheduled }
+    AppShortcut { sequences: backend.shortcutMap["view.showPaused"] || []; enabled: !backend.recordingShortcut; onActivated: backend.showPaused = !backend.showPaused }
     AppShortcut {
-        sequence: "Ctrl+Shift+K"
+        sequences: backend.shortcutMap["view.showScheduledAndPaused"] || []; enabled: !backend.recordingShortcut
         onActivated: { const on = !(backend.showScheduled && backend.showPaused); backend.showScheduled = on; backend.showPaused = on }
     }
-    AppShortcut { sequence: "Ctrl+O"; onActivated: backend.hideCompleted = !backend.hideCompleted }
-    AppShortcut { sequence: "Ctrl+F"; onActivated: pane.focusSearch() }
-    AppShortcut { sequence: "Ctrl+Shift+O"; onActivated: win.openCommand("open") }
-    AppShortcut { sequence: "Ctrl+Z"; onActivated: backend.undo() }
-    AppShortcut { sequence: "Ctrl+Shift+Z"; onActivated: backend.redo() }
-    AppShortcut { sequence: "Ctrl+="; onActivated: backend.textSize = backend.textSize + 1 }
-    AppShortcut { sequence: "Ctrl+-"; onActivated: backend.textSize = backend.textSize - 1 }
-    AppShortcut { sequence: "Ctrl+Alt+Left"; onActivated: win.sidebarShown = !win.sidebarVisible }
-    AppShortcut { sequence: "Ctrl+Alt+Right"; onActivated: win.utilityShown = !win.utilityVisible }
-    AppShortcut { sequence: "Ctrl+Alt+J"; onActivated: pane.toggleProjectView() }
-    AppShortcut { sequence: "Ctrl+Return"; onActivated: { backend.endEdit(); win.focusList() } }
-    AppShortcut { sequence: "Ctrl+Alt+0"; onActivated: backend.setPriority(0) }
-    AppShortcut { sequence: "Ctrl+Alt+1"; onActivated: backend.setPriority(1) }
-    AppShortcut { sequence: "Ctrl+Alt+2"; onActivated: backend.setPriority(2) }
-    AppShortcut { sequence: "Ctrl+Alt+3"; onActivated: backend.setPriority(3) }
-    AppShortcut { sequence: "Ctrl+Alt+S"; onActivated: backend.setStarred(-1) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+1"; onActivated: backend.convertSelection(0) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+2"; onActivated: backend.convertSelection(1) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+3"; onActivated: backend.convertSelection(2) }
-    AppShortcut { sequence: "Ctrl+L"; onActivated: win.openCommand("move") }
-    AppShortcut { sequence: "Ctrl+R"; onActivated: win.openCommand("tag") }
+    AppShortcut { sequences: backend.shortcutMap["view.hideCompleted"] || []; enabled: !backend.recordingShortcut; onActivated: backend.hideCompleted = !backend.hideCompleted }
+    AppShortcut { sequences: backend.shortcutMap["view.search"] || []; enabled: !backend.recordingShortcut; onActivated: pane.focusSearch() }
+    AppShortcut { sequences: backend.shortcutMap["view.quickOpen"] || []; enabled: !backend.recordingShortcut; onActivated: win.openCommand("open") }
+    AppShortcut { sequences: backend.shortcutMap["edit.undo"] || []; enabled: !backend.recordingShortcut; onActivated: backend.undo() }
+    AppShortcut { sequences: backend.shortcutMap["edit.redo"] || []; enabled: !backend.recordingShortcut; onActivated: backend.redo() }
+    AppShortcut { sequences: backend.shortcutMap["view.textLarger"] || []; enabled: !backend.recordingShortcut; onActivated: backend.textSize = backend.textSize + 1 }
+    AppShortcut { sequences: backend.shortcutMap["view.textSmaller"] || []; enabled: !backend.recordingShortcut; onActivated: backend.textSize = backend.textSize - 1 }
+    AppShortcut { sequences: backend.shortcutMap["view.listsPanel"] || []; enabled: !backend.recordingShortcut; onActivated: win.sidebarShown = !win.sidebarVisible }
+    AppShortcut { sequences: backend.shortcutMap["view.tagsPanel"] || []; enabled: !backend.recordingShortcut; onActivated: win.utilityShown = !win.utilityVisible }
+    AppShortcut { sequences: backend.shortcutMap["view.project"] || []; enabled: !backend.recordingShortcut; onActivated: pane.toggleProjectView() }
+    AppShortcut { sequences: backend.shortcutMap["edit.finish"] || []; enabled: !backend.recordingShortcut; onActivated: { backend.endEdit(); win.focusList() } }
+    AppShortcut { sequences: backend.shortcutMap["edit.priorityNone"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setPriority(0) }
+    AppShortcut { sequences: backend.shortcutMap["edit.priorityLow"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setPriority(1) }
+    AppShortcut { sequences: backend.shortcutMap["edit.priorityMedium"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setPriority(2) }
+    AppShortcut { sequences: backend.shortcutMap["edit.priorityHigh"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setPriority(3) }
+    AppShortcut { sequences: backend.shortcutMap["edit.star"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setStarred(-1) }
+    AppShortcut { sequences: backend.shortcutMap["task.convertTask"] || []; enabled: !backend.recordingShortcut; onActivated: backend.convertSelection(0) }
+    AppShortcut { sequences: backend.shortcutMap["task.convertProject"] || []; enabled: !backend.recordingShortcut; onActivated: backend.convertSelection(1) }
+    AppShortcut { sequences: backend.shortcutMap["task.convertChecklist"] || []; enabled: !backend.recordingShortcut; onActivated: backend.convertSelection(2) }
+    AppShortcut { sequences: backend.shortcutMap["task.move"] || []; enabled: !backend.recordingShortcut; onActivated: win.openCommand("move") }
+    AppShortcut { sequences: backend.shortcutMap["task.tag"] || []; enabled: !backend.recordingShortcut; onActivated: win.openCommand("tag") }
     // The editor quick-jumps: open the editor on the task, at one field.
-    AppShortcut { sequence: "Ctrl+E"; onActivated: backend.editField("notes") }
-    AppShortcut { sequence: "Ctrl+B"; onActivated: backend.editField("action") }
-    AppShortcut { sequence: "Ctrl+G"; onActivated: backend.editField("location") }
-    AppShortcut { sequence: "Ctrl+'"; onActivated: backend.editField("alerts") }
-    AppShortcut { sequence: "Ctrl+/"; onActivated: backend.editField("dates") }
-    AppShortcut { sequence: "Ctrl+;"; onActivated: backend.editField("repeat") }
-    AppShortcut { sequence: "Ctrl+J"; onActivated: backend.toggleFocus() }
-    AppShortcut { sequence: "Ctrl+Alt+R"; onActivated: backend.untagSelection() }
+    AppShortcut { sequences: backend.shortcutMap["edit.notes"] || []; enabled: !backend.recordingShortcut; onActivated: backend.editField("notes") }
+    AppShortcut { sequences: backend.shortcutMap["edit.action"] || []; enabled: !backend.recordingShortcut; onActivated: backend.editField("action") }
+    AppShortcut { sequences: backend.shortcutMap["edit.location"] || []; enabled: !backend.recordingShortcut; onActivated: backend.editField("location") }
+    AppShortcut { sequences: backend.shortcutMap["edit.alerts"] || []; enabled: !backend.recordingShortcut; onActivated: backend.editField("alerts") }
+    AppShortcut { sequences: backend.shortcutMap["edit.dates"] || []; enabled: !backend.recordingShortcut; onActivated: backend.editField("dates") }
+    AppShortcut { sequences: backend.shortcutMap["edit.repeat"] || []; enabled: !backend.recordingShortcut; onActivated: backend.editField("repeat") }
+    AppShortcut { sequences: backend.shortcutMap["view.focusFilter"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleFocus() }
+    AppShortcut { sequences: backend.shortcutMap["task.untag"] || []; enabled: !backend.recordingShortcut; onActivated: backend.untagSelection() }
     // Ctrl+T already starts tasks today, so tags take Alt with it.
-    AppShortcut { sequence: "Ctrl+Alt+T"; onActivated: win.newTag(false) }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+T"; onActivated: win.newTag(true) }
-    AppShortcut { sequence: "Ctrl+Alt+P"; onActivated: backend.newFromSelection(1) }
-    AppShortcut { sequence: "Ctrl+Alt+C"; onActivated: backend.newFromSelection(2) }
-    AppShortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
-    AppShortcut { sequence: "Ctrl+Shift+2"; onActivated: quickEntry.summon() }
-    AppShortcut { sequence: "Shift+F5"; onActivated: backend.showLastSelected() }
-    AppShortcut { sequence: "Ctrl+Alt+F"; onActivated: backend.toggleSearchScope() }
-    AppShortcut { sequence: "Ctrl+Alt+W"; onActivated: backend.requestNewWindow() }
-    AppShortcut { sequence: "Ctrl+P"; onActivated: filePicker.save("Save this list as a PDF", (backend.sourceTitle || "Tasks") + ".pdf", "print-pdf") }
+    AppShortcut { sequences: backend.shortcutMap["task.newTag"] || []; enabled: !backend.recordingShortcut; onActivated: win.newTag(false) }
+    AppShortcut { sequences: backend.shortcutMap["task.newTagGroup"] || []; enabled: !backend.recordingShortcut; onActivated: win.newTag(true) }
+    AppShortcut { sequences: backend.shortcutMap["task.projectFromSelection"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newFromSelection(1) }
+    AppShortcut { sequences: backend.shortcutMap["task.checklistFromSelection"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newFromSelection(2) }
+    AppShortcut { sequences: backend.shortcutMap["app.quit"] || []; enabled: !backend.recordingShortcut; onActivated: Qt.quit() }
+    AppShortcut { sequences: backend.shortcutMap["app.quickEntry"] || []; enabled: !backend.recordingShortcut; onActivated: quickEntry.summon() }
+    AppShortcut { sequences: backend.shortcutMap["view.previousTask"] || []; enabled: !backend.recordingShortcut; onActivated: backend.showLastSelected() }
+    AppShortcut { sequences: backend.shortcutMap["view.searchScope"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleSearchScope() }
+    AppShortcut { sequences: backend.shortcutMap["app.newWindow"] || []; enabled: !backend.recordingShortcut; onActivated: backend.requestNewWindow() }
+    AppShortcut { sequences: backend.shortcutMap["app.savePdf"] || []; enabled: !backend.recordingShortcut; onActivated: filePicker.save("Save this list as a PDF", (backend.sourceTitle || "Tasks") + ".pdf", "print-pdf") }
     // the reference app's Ctrl+Cmd+F; Ctrl+Alt+F is taken by the search scope.
-    AppShortcut { sequence: "F11"; onActivated: win.visibility = win.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
+    AppShortcut { sequences: backend.shortcutMap["view.fullScreen"] || []; enabled: !backend.recordingShortcut; onActivated: win.visibility = win.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
     AppShortcut {
-        sequence: "Ctrl+S"
+        sequences: backend.shortcutMap["app.sync"] || []; enabled: !backend.recordingShortcut
         onActivated: {
             if (syncHub) syncHub.syncAll()
         }
     }
-    AppShortcut { sequence: "Ctrl+Shift+Alt+F"; onActivated: pane.openSearchBuilder() }
-    AppShortcut { sequence: "Ctrl+,"; onActivated: { settings.show(); settings.raise() } }
-    AppShortcut { sequence: "Ctrl+Shift+E"; onActivated: exportDialog.show() }
+    AppShortcut { sequences: backend.shortcutMap["view.searchOptions"] || []; enabled: !backend.recordingShortcut; onActivated: pane.openSearchBuilder() }
+    AppShortcut { sequences: backend.shortcutMap["app.settings"] || []; enabled: !backend.recordingShortcut; onActivated: { settings.show(); settings.raise() } }
+    AppShortcut { sequences: backend.shortcutMap["app.export"] || []; enabled: !backend.recordingShortcut; onActivated: exportDialog.show() }
 }

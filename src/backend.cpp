@@ -6,6 +6,7 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QGuiApplication>
+#include <QKeySequence>
 #include <QMimeDatabase>
 #include <QProcess>
 #include <QDir>
@@ -3815,6 +3816,81 @@ void Backend::setSetting(const QString &key, const QVariant &value) {
     rebuild();
     emit settingsChanged();
     emit viewChanged();
+}
+
+// -------------------------------------------------------------- shortcuts
+
+QVariantMap Backend::shortcutMap() const {
+    QVariantMap out;
+    for (const Shortcuts::Command &c : Shortcuts::commands())
+        out.insert(c.id, Shortcuts::current(*m_store, c.id));
+    return out;
+}
+
+QVariantList Backend::shortcutCommands() const {
+    QVariantList out;
+    for (const Shortcuts::Command &c : Shortcuts::commands())
+        out.append(QVariantMap{{QStringLiteral("id"), c.id},
+                               {QStringLiteral("group"), c.group},
+                               {QStringLiteral("title"), c.title},
+                               {QStringLiteral("context"), Shortcuts::contextName(c.context)},
+                               {QStringLiteral("fixed"), c.fixed},
+                               {QStringLiteral("defaults"), c.defaults},
+                               {QStringLiteral("current"), Shortcuts::current(*m_store, c.id)}});
+    return out;
+}
+
+void Backend::setShortcut(const QString &id, const QString &sequence) {
+    if (!Shortcuts::command(id))
+        return;
+    const QStringList list = sequence.isEmpty() ? QStringList{} : QStringList{sequence};
+    Shortcuts::set(*m_store, id, list);
+    ++m_settingsRevision;
+    emit shortcutsChanged();
+}
+
+void Backend::resetShortcut(const QString &id) {
+    if (!Shortcuts::command(id))
+        return;
+    Shortcuts::reset(*m_store, id);
+    ++m_settingsRevision;
+    emit shortcutsChanged();
+}
+
+void Backend::resetAllShortcuts() {
+    Shortcuts::resetAll(*m_store);
+    ++m_settingsRevision;
+    emit shortcutsChanged();
+}
+
+QString Backend::shortcutConflict(const QString &id, const QString &sequence) const {
+    return Shortcuts::conflict(*m_store, id, sequence);
+}
+
+QString Backend::shortcutProblem(const QString &id, const QString &sequence) const {
+    const Shortcuts::Command *c = Shortcuts::command(id);
+    if (!c)
+        return {};
+    return Shortcuts::validate(c->context, sequence);
+}
+
+QString Backend::shortcutFor(int key, int modifiers) const { return Shortcuts::sequenceFor(key, modifiers); }
+
+QString Backend::shortcutText(const QString &id) const {
+    const QStringList list = Shortcuts::current(*m_store, id);
+    if (list.isEmpty())
+        return QStringLiteral("Not set");
+    QStringList pretty;
+    for (const QString &s : list)
+        pretty << QKeySequence::fromString(s, QKeySequence::PortableText).toString(QKeySequence::NativeText);
+    return pretty.join(QStringLiteral(" / "));
+}
+
+void Backend::setRecordingShortcut(bool on) {
+    if (m_recordingShortcut == on)
+        return;
+    m_recordingShortcut = on;
+    emit recordingShortcutChanged();
 }
 
 qint64 Backend::quickEntryListId() const {

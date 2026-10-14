@@ -18,6 +18,18 @@ Item {
     signal tagSearch()
     property bool altHeld: false
 
+    // The sequence -> command id map the bare-key handler looks a press up in,
+    // rebuilt whenever a binding changes. Fixed keys are handled below.
+    property var shortcutMap: shortcutsOf(backend.shortcutMap, backend.shortcutCommands())
+    function shortcutsOf(snapshot, commands) {
+        const map = ({})
+        for (const c of commands) {
+            if (c.fixed) continue
+            for (const s of c.current) map[s] = c.id
+        }
+        return map
+    }
+
     function focusList() { list.forceActiveFocus() }
     function openSearchBuilder() {
         if (backend.sourceIsSmart) editSmartQuery()
@@ -396,10 +408,10 @@ Item {
     function handleKey(e) {
         const shift = e.modifiers & Qt.ShiftModifier
         const ctrl = e.modifiers & Qt.ControlModifier
-        const alt = e.modifiers & Qt.AltModifier
         const k = e.key
         const done = () => { e.accepted = true }
 
+        // The fixed keys: navigation, editing, clipboard and the Alt reveal.
         if (k === Qt.Key_Down) { backend.moveCursor(1, shift); return done() }
         if (k === Qt.Key_Up) { backend.moveCursor(-1, shift); return done() }
         if (k === Qt.Key_Return || k === Qt.Key_Enter) {
@@ -409,48 +421,67 @@ Item {
             return done()
         }
         if (k === Qt.Key_Escape) { backend.clearSelection(); return done() }
-        if (k === Qt.Key_Space) { if (backend.quickLookEnabled) root.quickLook(); return done() }
-        if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && !ctrl)) { backend.deleteSelection(); return done() }
         if (k === Qt.Key_Alt) { root.altHeld = true; return }
         if (ctrl && k === Qt.Key_A) { backend.selectAll(); return done() }
         if (ctrl && k === Qt.Key_C) { backend.copySelection(); return done() }
         if (ctrl && k === Qt.Key_X) { backend.cutSelection(); return done() }
         if (ctrl && k === Qt.Key_V) { backend.pasteTasks(); return done() }
-        if (ctrl && k === Qt.Key_T) { backend.setStartInDays(0); return done() }
-        // Ctrl+Shift+[ takes the time off the due date.
-        if (ctrl && shift && (k === Qt.Key_BraceLeft || k === Qt.Key_BracketLeft)) { backend.setSelectionDueTime(-1); return done() }
-        if (ctrl) return
 
-        switch (k) {
-        case Qt.Key_T: backend.setDueInDays(0); return done()
-        case Qt.Key_Y: backend.setDueInDays(1); return done()
-        case Qt.Key_S: backend.setStarred(1); return done()
-        case Qt.Key_0: case Qt.Key_1: case Qt.Key_2: case Qt.Key_3:
-            backend.setPriority(k - Qt.Key_0); return done()
-        case Qt.Key_Equal: case Qt.Key_Plus: backend.bumpPriority(1); return done()
-        case Qt.Key_Minus: backend.bumpPriority(-1); return done()
-        case Qt.Key_BracketRight: backend.nudgeDue(1); return done()
-        case Qt.Key_BraceRight: backend.nudgeDue(7); return done()
-        case Qt.Key_BracketLeft: if (alt) backend.clearDue(); else backend.nudgeDue(-1); return done()
-        case Qt.Key_BraceLeft: backend.nudgeDue(-7); return done()
-        case Qt.Key_Period: backend.nudgeStart(1); return done()
-        case Qt.Key_Greater: backend.nudgeStart(7); return done()
-        case Qt.Key_Comma: if (alt) backend.clearStart(); else backend.nudgeStart(-1); return done()
-        case Qt.Key_Less: backend.nudgeStart(-7); return done()
-        case Qt.Key_C: backend.toggleCollapsed(); return done()
-        case Qt.Key_P: backend.performAction(); return done()
-        case Qt.Key_U: backend.openLinks(); return done()
-        case Qt.Key_D: root.command("defer"); return done()
-        case Qt.Key_K: root.command("schedule"); return done()
-        case Qt.Key_E: root.command("time"); return done()
-        case Qt.Key_X: root.command("duration"); return done()
-        case Qt.Key_L: root.command(alt ? "untag" : "tag"); return done()
-        case Qt.Key_M: root.command("move"); return done()
-        case Qt.Key_J: root.command("jump"); return done()
-        case Qt.Key_F: root.command("find"); return done()
-        case Qt.Key_Slash: root.tagSearch(); return done()
-        case Qt.Key_Question: root.help(); return done()
-        case Qt.Key_Q: Qt.quit(); return done()
+        // Everything else is a remappable command: look the key up in the
+        // registry. A Ctrl+Shift+[ sometimes arrives as Ctrl+Shift+{ (the
+        // shifted bracket); both spell the one binding.
+        let seq = backend.shortcutFor(e.key, e.modifiers)
+        if (seq === "Ctrl+Shift+{") seq = "Ctrl+Shift+["
+        const id = root.shortcutMap[seq]
+        if (!id) {
+            if (ctrl) return
+            return
         }
+        if (root.runCommand(id)) return done()
+    }
+
+    // One table for every remappable list command.
+    function runCommand(id) {
+        switch (id) {
+        case "list.quickLook": if (backend.quickLookEnabled) root.quickLook(); return true
+        case "list.delete": backend.deleteSelection(); return true
+        case "list.startToday": backend.setStartInDays(0); return true
+        case "list.clearDueTime": backend.setSelectionDueTime(-1); return true
+        case "list.dueToday": backend.setDueInDays(0); return true
+        case "list.dueTomorrow": backend.setDueInDays(1); return true
+        case "list.star": backend.setStarred(1); return true
+        case "list.priorityNone": backend.setPriority(0); return true
+        case "list.priorityLow": backend.setPriority(1); return true
+        case "list.priorityMedium": backend.setPriority(2); return true
+        case "list.priorityHigh": backend.setPriority(3); return true
+        case "list.priorityRaise": backend.bumpPriority(1); return true
+        case "list.priorityLower": backend.bumpPriority(-1); return true
+        case "list.nudgeDueDay": backend.nudgeDue(1); return true
+        case "list.nudgeDueWeek": backend.nudgeDue(7); return true
+        case "list.nudgeDueBackDay": backend.nudgeDue(-1); return true
+        case "list.nudgeDueBackWeek": backend.nudgeDue(-7); return true
+        case "list.clearDue": backend.clearDue(); return true
+        case "list.nudgeStartDay": backend.nudgeStart(1); return true
+        case "list.nudgeStartWeek": backend.nudgeStart(7); return true
+        case "list.nudgeStartBackDay": backend.nudgeStart(-1); return true
+        case "list.nudgeStartBackWeek": backend.nudgeStart(-7); return true
+        case "list.clearStart": backend.clearStart(); return true
+        case "list.collapse": backend.toggleCollapsed(); return true
+        case "list.performAction": backend.performAction(); return true
+        case "list.openLinks": backend.openLinks(); return true
+        case "list.defer": root.command("defer"); return true
+        case "list.schedule": root.command("schedule"); return true
+        case "list.time": root.command("time"); return true
+        case "list.duration": root.command("duration"); return true
+        case "list.tag": root.command("tag"); return true
+        case "list.untag": root.command("untag"); return true
+        case "list.move": root.command("move"); return true
+        case "list.jump": root.command("jump"); return true
+        case "list.find": root.command("find"); return true
+        case "list.tagSearch": root.tagSearch(); return true
+        case "list.overlay": root.help(); return true
+        case "list.quit": Qt.quit(); return true
+        }
+        return false
     }
 }
