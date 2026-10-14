@@ -29,7 +29,7 @@ Window {
         function onSettingsChanged() { root.hideable = backend.hideableLists() }
     }
     property string copySource
-    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Mail", "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"]
+    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Mail", "Backups", "Import & Export", "Calendar", "Automation", "Shortcuts", "Diagnostics"]
 
     function value(key, fallback) {
         backend.settingsRevision  // Re-evaluate the caller's binding whenever any setting changes.
@@ -66,7 +66,7 @@ Window {
 
     // Omarchy windows have no title bar, so Settings closes itself: Escape,
     // Ctrl+W, or the ✕ in the corner (Super+W works too, as for any window).
-    onVisibleChanged: if (visible) { requestActivate(); keyCatcher.forceActiveFocus() }
+    onVisibleChanged: { if (visible) { requestActivate(); keyCatcher.forceActiveFocus() } else shortcutPane.clearTransient() }
 
     Connections {
         target: filePicker
@@ -92,6 +92,14 @@ Window {
         focus: true
         Keys.onEscapePressed: root.close()
         Shortcut { sequences: ["Escape", "Ctrl+W"]; context: Qt.WindowShortcut; onActivated: root.close() }
+    }
+
+    // A click anywhere ends a shortcut recording; the key buttons start theirs
+    // after this runs.
+    TapHandler {
+        parent: root.contentItem
+        gesturePolicy: TapHandler.DragThreshold
+        onPressedChanged: if (pressed && shortcutPane.recordingId !== "") shortcutPane.stopRecording()
     }
 
     IconButton {
@@ -200,6 +208,13 @@ Window {
                 y: 20
                 spacing: 6
 
+                // The scrolling view takes presses first, so a click on the
+                // pane's own empty space ends a shortcut recording here.
+                TapHandler {
+                    gesturePolicy: TapHandler.DragThreshold
+                    onPressedChanged: if (pressed && shortcutPane.recordingId !== "") shortcutPane.stopRecording()
+                }
+
                 Text {
                     text: root.panes[root.pane]
                     color: theme.foreground
@@ -212,7 +227,7 @@ Window {
                 ColumnLayout {
                     visible: root.pane === 0
                     Layout.fillWidth: true
-                    Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Fairfax running. Q or Ctrl+Q quits for real." }
+                    Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Fairfax running. " + backend.shortcutText("app.quit") + " quits for real." }
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
                     Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Fairfax takes the free one. With tiled windows Hyprland places it as usual." }
                     Toggle { key: "general.trayIcon"; fallback: true; label: "Show Fairfax in the bar's tray"; note: "Its menu shows a quick view and commands; choose them below." }
@@ -1157,10 +1172,159 @@ Window {
                     }
                 }
 
+                // Shortcuts
+                ColumnLayout {
+                    id: shortcutPane
+                    visible: root.pane === 11
+                    Layout.fillWidth: true
+
+                    property string filter: ""
+                    // Which command is being recorded, where the recording is
+                    // held, and any complaint or unresolved conflict by id.
+                    property string recordingId: ""
+                    property var messages: ({})
+                    property var conflicts: ({})
+                    property string pendingId: ""
+                    property string pendingSeq: ""
+                    property string pendingOther: ""
+
+                    readonly property var allCommands: { backend.shortcutMap; return backend.shortcutCommands() }
+                    function differs(cmd) {
+                        const a = cmd.current, b = cmd.defaults
+                        return a.length !== b.length || a.some((v, i) => v !== b[i])
+                    }
+                    function matches(cmd) {
+                        const q = filter.trim().toLowerCase()
+                        return q === "" || cmd.title.toLowerCase().includes(q) || backend.shortcutText(cmd.id).toLowerCase().includes(q)
+                    }
+                    function beginRecording(id) {
+                        clearTransient()
+                        recordingId = id
+                        backend.recordingShortcut = true
+                        catcher.forceActiveFocus()
+                    }
+                    function stopRecording() {
+                        recordingId = ""
+                        backend.recordingShortcut = false
+                    }
+                    function clearTransient() {
+                        recordingId = ""; pendingId = ""; pendingSeq = ""; pendingOther = ""
+                        backend.recordingShortcut = false
+                    }
+                    function setMessage(id, text) {
+                        const m = Object.assign({}, messages); m[id] = text; messages = m
+                    }
+                    function capture(event) {
+                        if (!recordingId) return
+                        const k = event.key
+                        if (k === Qt.Key_Shift || k === Qt.Key_Control || k === Qt.Key_Alt || k === Qt.Key_Meta)
+                            return  // A bare modifier is not a shortcut.
+                        event.accepted = true
+                        if (k === Qt.Key_Escape) { stopRecording(); return }
+                        const id = recordingId
+                        const seq = backend.shortcutFor(k, event.modifiers)
+                        if (!seq) { stopRecording(); return }
+                        const problem = backend.shortcutProblem(id, seq)
+                        if (problem !== "") {
+                            setMessage(id, problem)
+                            stopRecording()
+                            return
+                        }
+                        const other = backend.shortcutConflict(id, seq)
+                        if (other !== "") {
+                            pendingId = id; pendingSeq = seq; pendingOther = other
+                            stopRecording()
+                            return
+                        }
+                        backend.setShortcut(id, seq)
+                        setMessage(id, "")
+                        stopRecording()
+                    }
+                    function resolveConflict(swap) {
+                        const id = pendingId, other = pendingOther, seq = pendingSeq
+                        const old = (backend.shortcutMap[id] || [])[0] || ""
+                        if (swap) backend.setShortcut(other, old)
+                        else backend.setShortcut(other, "")
+                        backend.setShortcut(id, seq)
+                        setMessage(id, "")
+                        clearTransient()
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.bottomMargin: 4
+                        TextField {
+                            objectName: "shortcutFilter"
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            placeholderText: "Filter shortcuts"
+                            selectByMouse: true
+                            text: shortcutPane.filter
+                            onTextEdited: shortcutPane.filter = text
+                        }
+                        Button { objectName: "shortcutResetAll"; text: "Reset All…"; flat: true; onClicked: confirmShortcuts.open() }
+                    }
+                    Hint {
+                        Layout.topMargin: 0
+                        Layout.minimumWidth: 0
+                        text: "Shortcuts in the task list work while the list has focus. The system-wide Quick Entry key is a Hyprland binding to `fairfax --quick`; see the README."
+                    }
+
+                    // Takes the keyboard while a shortcut is recorded, so the
+                    // next key is captured instead of acted on.
+                    Item {
+                        id: catcher
+                        objectName: "shortcutCatcher"
+                        width: 0
+                        height: 0
+                        Keys.onPressed: (event) => shortcutPane.capture(event)
+                        // Losing focus (a click elsewhere) ends the recording.
+                        onActiveFocusChanged: if (!activeFocus && shortcutPane.recordingId !== "") shortcutPane.stopRecording()
+                    }
+
+                    // Leaving the pane or closing the window ends it too.
+                    onVisibleChanged: if (!visible) clearTransient()
+                    Component.onDestruction: backend.recordingShortcut = false
+
+                    Repeater {
+                        model: shortcutPane.allCommands.map(c => c.group).filter((g, i, a) => a.indexOf(g) === i)
+                        ColumnLayout {
+                            id: groupBlock
+                            required property string modelData
+                            Layout.fillWidth: true
+                            Layout.topMargin: 10
+                            spacing: 4
+                            Text {
+                                text: groupBlock.modelData
+                                color: theme.accent
+                                font.pixelSize: backend.fontSize - 2
+                                font.weight: Font.Bold
+                                Layout.bottomMargin: 2
+                            }
+                            Repeater {
+                                model: shortcutPane.allCommands.filter(c => c.group === groupBlock.modelData && shortcutPane.matches(c))
+                                ShortcutRow { required property var modelData; cmd: modelData }
+                            }
+                        }
+                    }
+
+                    ThemedDialog {
+                        id: confirmShortcuts
+                        objectName: "shortcutResetAllConfirm"
+                        width: Math.min(440, (parent ? parent.width : 480) - 40)
+                        anchors.centerIn: parent
+                        modal: true
+                        title: "Reset all shortcuts?"
+                        Label { text: "Every shortcut goes back to its default key." }
+                        standardButtons: Dialog.Cancel | Dialog.Ok
+                        onAccepted: { backend.resetAllShortcuts(); shortcutPane.clearTransient() }
+                    }
+                }
+
                 // Diagnostics
                 ColumnLayout {
                     id: diag
-                    visible: root.pane === 11
+                    visible: root.pane === 12
                     Layout.fillWidth: true
                     // Rebuilt each time the pane opens, so the log is current.
                     property string report: ""
@@ -1435,6 +1599,115 @@ Window {
             color: theme.overdue
             font.pixelSize: backend.fontSize - 1
             text: mailFetch.oauthError
+        }
+    }
+
+    component ShortcutRow: ColumnLayout {
+        property var cmd
+        readonly property string id: cmd.id
+        objectName: "shortcutRow:" + id
+        Layout.fillWidth: true
+        spacing: 2
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: cmd.title
+                color: theme.foreground
+                font.pixelSize: backend.fontSize
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: 1
+            }
+            // Fixed commands are shown but not editable.
+            Text {
+                visible: cmd.fixed
+                text: backend.shortcutText(id)
+                color: theme.muted
+                font.family: theme.monoFont
+                font.pixelSize: backend.fontSize - 2
+                horizontalAlignment: Text.AlignHCenter
+                Layout.preferredWidth: 170
+                Layout.rightMargin: 148   // Lines the key up with the buttons of the editable rows.
+            }
+            Button {
+                objectName: "shortcut:" + id
+                visible: !cmd.fixed
+                Layout.preferredWidth: 170
+                Layout.minimumWidth: 0
+                topPadding: 2
+                bottomPadding: 2
+                font.family: theme.monoFont
+                font.pixelSize: backend.fontSize - 2
+                background: Rectangle {
+                    implicitHeight: 26
+                    radius: 6
+                    color: "transparent"
+                    border.color: shortcutPane.recordingId === id ? theme.accent : theme.divider
+                }
+                text: shortcutPane.recordingId === id ? "Press a shortcut…" : backend.shortcutText(id)
+                onClicked: shortcutPane.beginRecording(id)
+            }
+            // The slots keep the key buttons in line when a row has no Clear or Reset.
+            Item {
+                visible: !cmd.fixed
+                Layout.preferredWidth: 68
+                Layout.minimumWidth: 68
+                implicitHeight: 28
+                Button {
+                    id: clearButton
+                    objectName: "shortcutClear:" + id
+                    anchors.fill: parent
+                    visible: cmd.current.length > 0
+                    text: "Clear"
+                    topPadding: 2
+                    bottomPadding: 2
+                    flat: true
+                    onClicked: { backend.setShortcut(id, ""); shortcutPane.setMessage(id, "") }
+                }
+            }
+            Item {
+                visible: !cmd.fixed
+                Layout.preferredWidth: 68
+                Layout.minimumWidth: 68
+                implicitHeight: 28
+                Button {
+                    id: resetButton
+                    objectName: "shortcutReset:" + id
+                    anchors.fill: parent
+                    visible: shortcutPane.differs(cmd)
+                    text: "Reset"
+                    topPadding: 2
+                    bottomPadding: 2
+                    flat: true
+                    onClicked: { backend.resetShortcut(id); shortcutPane.setMessage(id, "") }
+                }
+            }
+        }
+        Text {
+            objectName: "shortcutMessage:" + id
+            visible: text !== ""
+            text: shortcutPane.messages[id] || ""
+            color: theme.overdue
+            font.pixelSize: backend.fontSize - 2
+            leftPadding: 8
+        }
+        RowLayout {
+            objectName: "shortcutConflict:" + id
+            visible: shortcutPane.pendingId === id
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+            Text {
+                color: theme.overdue
+                font.pixelSize: backend.fontSize - 2
+                text: {
+                    const other = backend.shortcutCommands().find(c => c.id === shortcutPane.pendingOther)
+                    return shortcutPane.pendingSeq + " is used by " + (other ? other.title : shortcutPane.pendingOther) + "."
+                }
+            }
+            Button { objectName: "shortcutSwap"; text: "Swap"; flat: true; onClicked: shortcutPane.resolveConflict(true) }
+            Button { objectName: "shortcutReplace"; text: "Replace"; flat: true; onClicked: shortcutPane.resolveConflict(false) }
+            Button { objectName: "shortcutCancel"; text: "Cancel"; flat: true; onClicked: shortcutPane.clearTransient() }
         }
     }
 
