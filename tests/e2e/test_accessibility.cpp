@@ -70,6 +70,18 @@ bool independent(QQuickItem *item) {
            || item->inherits("QQuickTextInput") || item->inherits("QQuickTextEdit");
 }
 
+// Whether a control lies below `item`: a wrapper that only forwards clicks to
+// a field or button inside it is not itself a control.
+bool hasIndependentDescendant(QQuickItem *item) {
+    for (QQuickItem *child : item->childItems()) {
+        if (!child->isVisible() || !child->isEnabled())
+            continue;
+        if (independent(child) || hasIndependentDescendant(child))
+            return true;
+    }
+    return false;
+}
+
 // The accessible properties of an item, if Qt Quick built an interface for it.
 struct Report {
     QQuickItem *item = nullptr;
@@ -105,7 +117,7 @@ void collect(QQuickItem *root, bool underInteractive, QList<QQuickItem *> &out) 
     if (!root->isVisible() || !root->isEnabled())
         return;
     const bool here = interactive(root) && !ignored(root);
-    if (here && (!underInteractive || independent(root)))
+    if (here && (!underInteractive || independent(root)) && (independent(root) || !hasIndependentDescendant(root)))
         out << root;
     for (QQuickItem *child : root->childItems())
         collect(child, underInteractive || here, out);
@@ -133,6 +145,12 @@ const QVector<QString> &pendingAccessibility() {
         "ruleMatchAll:", "ruleMatchAny:", "nameChip:", "pickerTab:", "groupJoin:", "groupField",
         "dateN:", "dateUnit:", "range", "completed", "freeInput", "preview", "clearButton",
         "saveButton", "updateButton", "searchButton", "ruleAddMenu", "soundexBox",
+        "aboutLink", "aboutLicense", "mailPipe", "mailPassword", "addGroup", "scopeThis",
+        "scopeAll", "searchScheduledHide", "searchScheduledInclude",
+        "editorStart", "editorStartTime", "editorDue", "editorDueTime", "editorTagsInput",
+        "editorNewSubtask", "notesText", "notesStamp", "notesPreviewToggle", "editorTags",
+        "quickStart", "quickStartTime", "quickDue", "quickDueTime", "quickTitle", "quickNotes",
+        "quickTagInput", "quickTagChip", "quickTagRemove", "quickTagMatch",
         // slice 5: anything left
         "calDay:", "calDots", "calWeekendShade", "calDivider", "calTitle", "calToday",
         "dayBar", "tagRow:", "tagGroup:", "quickTag", "quickUnit:", "quickWeekday:",
@@ -147,16 +165,30 @@ const QVector<QString> &pendingAccessibility() {
     return pending;
 }
 
+// Whether an item is excused for a later slice. A named pattern is matched
+// against the item's objectName and class; an anonymous helper item (one with
+// no objectName) is also matched by the names of its parents, so the whole
+// body of a not-yet-named component is excused together.
 bool pending(const QQuickItem *item) {
-    const QString name = item->objectName();
+    QStringList names{item->objectName()};
+    if (item->objectName().isEmpty())
+        for (QQuickItem *p = item->parentItem(); p; p = p->parentItem())
+            names << p->objectName();
     const QString type = shortClass(item);
     for (const QString &p : pendingAccessibility()) {
         if (p.contains('*')) {
             const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(p));
-            if (re.match(name).hasMatch() || re.match(type).hasMatch())
+            if (re.match(type).hasMatch())
                 return true;
-        } else if (name.startsWith(p) || type.startsWith(p)) {
-            return true;
+            for (const QString &n : names)
+                if (re.match(n).hasMatch())
+                    return true;
+        } else {
+            if (type.startsWith(p))
+                return true;
+            for (const QString &n : names)
+                if (n.startsWith(p))
+                    return true;
         }
     }
     return false;
@@ -192,6 +224,26 @@ class E2EAccessibility : public QObject {
 
     QStringList m_seen;
 
+    // The accessible interface of an item, or a null one when Qt Quick built
+    // none. Qt Quick builds the interfaces lazily, so the guard and the naming
+    // tests touch every item first.
+    QAccessibleInterface *iface(const QString &name) {
+        QQuickItem *item = tk::waitItem(name);
+        if (!item)
+            return nullptr;
+        return QAccessible::queryAccessibleInterface(item);
+    }
+
+    QString axName(const QString &name) {
+        QAccessibleInterface *i = iface(name);
+        return i && i->isValid() ? i->text(QAccessible::Name) : QString();
+    }
+
+    QAccessible::Role axRole(const QString &name) {
+        QAccessibleInterface *i = iface(name);
+        return i && i->isValid() ? i->role() : QAccessible::NoRole;
+    }
+
     // Prints the offenders of one state and records how many there were.
     void checkState(const QString &state) {
         const QStringList offenders = guardOffenders();
@@ -209,6 +261,154 @@ private slots:
         App app;
         QVERIFY(app.ok);
         checkState("main window");
+    }
+
+    void editorIsNamed() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        QVERIFY(tk::openEditor(app, app.ids.buyMilk));
+        checkState("editor");
+    }
+
+    void settingsPanesAreNamed() {
+        App app;
+        QVERIFY(app.ok);
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        for (const QString &pane : paneNames()) {
+            selectPane(sw, pane);
+            settleWindow(sw);
+            checkState("settings: " + pane);
+        }
+        closeSettings(app);
+    }
+
+    void searchOptionsAreNamed() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(openBuilder(app));
+        QVERIFY(!addRuleRow("Starred", "is").isEmpty());
+        QVERIFY(!addRuleRow("Note", "has").isEmpty());
+        QVERIFY(pressBuilderForChange("ruleAdd:0", Qt::AltModifier));
+        QVERIFY(waitUntil([] { return ruleRowShown("1.0"); }));
+        checkState("search options");
+        QVERIFY(closeBuilder(app));
+    }
+
+    // The shared components the guard relies on read the role and name the
+    // screen reader spec asks for.
+    void sharedComponentsReportRoleAndName() {
+        App app;
+        QVERIFY(app.ok);
+
+        // An IconButton is a button named by its tip.
+        QQuickItem *add = tk::waitItem("newTaskButton");
+        QVERIFY(add);
+        QCOMPARE(axRole("newTaskButton"), QAccessible::Button);
+        QCOMPARE(axName("newTaskButton"), add->property("tip").toString());
+
+        // The sort button reads its current sort; it is a button too.
+        QCOMPARE(axRole("sortButton"), QAccessible::Button);
+        QVERIFY(axName("sortButton").startsWith("Sort by "));
+
+        // The focus filter names its state.
+        QCOMPARE(axRole("focusToggle"), QAccessible::Button);
+        QVERIFY(!axName("focusToggle").isEmpty());
+
+        // A calendar day reads its full date.
+        QQuickItem *calendar = tk::waitItem("miniCalendar");
+        QVERIFY(calendar);
+        QQuickItem *day = nullptr;
+        QVERIFY(waitUntil([&] {
+            day = findIn(calendar, [](QQuickItem *i) { return i->objectName().startsWith("calDay:"); }, false);
+            return day != nullptr;
+        }));
+        const QString iso = day->objectName().mid(7);
+        const QDate date = QDate::fromString(iso, Qt::ISODate);
+        QVERIFY(date.isValid());
+        QAccessibleInterface *dayIface = QAccessible::queryAccessibleInterface(day);
+        QVERIFY(dayIface && dayIface->isValid());
+        QCOMPARE(int(dayIface->role()), int(QAccessible::Button));
+        QVERIFY2(dayIface->text(QAccessible::Name).startsWith(date.toString("dddd d MMMM yyyy")),
+                 qPrintable(dayIface->text(QAccessible::Name)));
+
+        // A section heading is a heading with its visible text.
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        QQuickItem *section = nullptr;
+        QVERIFY(waitUntil([&] {
+            section = findItem("section:d:" + QDate::currentDate().toString(Qt::ISODate));
+            return section != nullptr;
+        }));
+        QAccessibleInterface *sectionIface = QAccessible::queryAccessibleInterface(section);
+        QVERIFY(sectionIface && sectionIface->isValid());
+        QCOMPARE(int(sectionIface->role()), int(QAccessible::Heading));
+        QVERIFY(!sectionIface->text(QAccessible::Name).isEmpty());
+
+        // Dialogs and popups report their title.
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        QAccessibleInterface *settingsIface = QAccessible::queryAccessibleInterface(sw);
+        QVERIFY(settingsIface && settingsIface->isValid());
+        QVERIFY2(settingsIface->text(QAccessible::Name).contains("Settings"), qPrintable(settingsIface->text(QAccessible::Name)));
+        closeSettings(app);
+    }
+
+    // The guard's own scan detects a MouseArea-owned control (IconButton), so
+    // an unnamed one would be reported. If interactive() skipped MouseArea
+    // items, this would fail.
+    void guardDetectsMouseAreaControls() {
+        App app;
+        QVERIFY(app.ok);
+        QQuickItem *add = tk::waitItem("newTaskButton");
+        QVERIFY(add);
+        QVERIFY2(interactive(add), "IconButton is interactive (it owns a MouseArea)");
+        const Report r = reportOf(add);
+        QVERIFY(r.hasInterface);
+        QVERIFY(acceptable(r));
+        QCOMPARE(r.role, QAccessible::Button);
+        QCOMPARE(r.name, add->property("tip").toString());
+    }
+
+    void popupsAndMenusAreNamed() {
+        App app;
+        QVERIFY(app.ok);
+
+        // Quick Look on the selected task.
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        app.press(Qt::Key_Space);
+        QObject *look = findObject("quickLook");
+        QVERIFY(look);
+        QVERIFY(waitUntil([&] { return look->property("visible").toBool(); }));
+        checkState("quick look");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!look->property("visible").toBool(), 5000);
+
+        // The ? overlay.
+        app.press(Qt::Key_Question, Qt::ShiftModifier);
+        QObject *help = findObject("shortcutOverlay");
+        QVERIFY(help);
+        QVERIFY(waitUntil([&] { return help->property("visible").toBool(); }));
+        checkState("shortcut overlay");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 5000);
+
+        // The task context menu.
+        QVERIFY(tk::contextMenuOn(app, app.ids.buyMilk));
+        checkState("task context menu");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(tk::noMenuOpen(), 5000);
+
+        // Quick Entry, in its own window.
+        app.window->requestActivate();
+        QTRY_VERIFY_WITH_TIMEOUT(app.window->isActive(), 5000);
+        app.press(Qt::Key_2, Qt::ShiftModifier | Qt::ControlModifier);
+        QQuickWindow *quick = nullptr;
+        QVERIFY(waitUntil([&] { return (quick = windowTitled("Quick Entry")) != nullptr; }));
+        settleWindow(quick);
+        checkState("quick entry");
+        quick->close();
+        QTRY_VERIFY_WITH_TIMEOUT(windowTitled("Quick Entry") == nullptr, 5000);
     }
 };
 
