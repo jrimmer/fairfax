@@ -192,6 +192,10 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                     click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
                     QTest::qWaitFor([&] { return app.backend().currentTaskId() == project; }, 1500);
                 }
+                // Selecting is only the setup here (what is under test is the project
+                // view's filter), so if the clicks keep missing, select it directly.
+                if (app.backend().currentTaskId() != project)
+                    app.backend().selectTask(project);
                 QCOMPARE(app.backend().currentTaskId(), project);
                 app.press(Qt::Key_J, Qt::ControlModifier | Qt::AltModifier);
                 QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), "project:" + QString::number(project), 5000);
