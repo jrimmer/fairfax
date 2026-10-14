@@ -120,6 +120,9 @@ Popup {
                     required property var modelData
                     required property int index
                     objectName: "pickerChip:" + modelData.label
+                    Accessible.role: Accessible.Button
+                    Accessible.name: modelData.label
+                    Accessible.onPressAction: root.acceptChip(index)
                     width: chipText.implicitWidth + 16
                     height: 24
                     radius: 12
@@ -139,7 +142,7 @@ Popup {
 
         RowLayout {
             Layout.fillWidth: true
-            IconButton { objectName: "pickerPrevious"; icon: "chevronLeft"; size: 12; onClicked: root.stepMonth(-1) }
+            IconButton { objectName: "pickerPrevious"; icon: "chevronLeft"; size: 12; accessibleName: "Previous month"; onClicked: root.stepMonth(-1) }
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
@@ -147,15 +150,21 @@ Popup {
                 color: theme.foreground
                 font.pixelSize: backend.fontSize
                 font.weight: Font.DemiBold
+                Accessible.role: Accessible.Button
+                Accessible.name: text
+                Accessible.description: "Go to the current month"
+                Accessible.onPressAction: root.moveCursor(root.todayDate)
                 // Clicking the title jumps back to the current month, as in the sidebar calendar.
                 MouseArea { anchors.fill: parent; onClicked: root.moveCursor(root.todayDate) }
             }
-            IconButton { objectName: "pickerNext"; icon: "chevronRight"; size: 12; onClicked: root.stepMonth(1) }
+            IconButton { objectName: "pickerNext"; icon: "chevronRight"; size: 12; accessibleName: "Next month"; onClicked: root.stepMonth(1) }
         }
 
         Grid {
             id: grid
             columns: 7
+            Accessible.role: Accessible.Table
+            Accessible.name: "Calendar, " + Qt.locale().monthName(root.shownMonth, Locale.LongFormat) + " " + root.shownYear
             focus: true
             activeFocusOnTab: true
 
@@ -212,6 +221,12 @@ Popup {
                     readonly property bool weekend: day.getDay() === 0 || day.getDay() === 6
                     readonly property int busy: inMonth ? (root.counts[day.getDate() - 1] || 0) : 0
                     objectName: "pickerDay:" + dayIso
+                    Accessible.role: Accessible.Button
+                    Accessible.name: Qt.formatDate(day, "dddd d MMMM yyyy")
+                                     + (busy > 0 ? ", " + busy + (busy === 1 ? " task due" : " tasks due") : "")
+                    Accessible.selected: isSelected
+                    Accessible.description: isToday ? "Today" : ""
+                    Accessible.onPressAction: root.choose(day)
 
                     // Weekend cells get a faint wash that fills the whole cell, so adjacent rows join into one column band.
                     Rectangle {

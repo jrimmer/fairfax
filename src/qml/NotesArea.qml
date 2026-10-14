@@ -14,6 +14,8 @@ Rectangle {
     // binding is never broken.
     property string text
     property real fontSize: 14
+    // What a screen reader calls the notes field.
+    property string accessibleName: "Notes"
     // The task being edited: a link never resolves to its own task, and a task
     // in the same list is preferred when two share a title.
     property real taskId: 0
@@ -94,6 +96,12 @@ Rectangle {
             objectName: "notesPreviewToggle"
             name: "markdown"
             size: 15
+            Accessible.role: Accessible.Button
+            Accessible.name: root.preview ? "Edit notes" : "Preview notes"
+            Accessible.onPressAction: {
+                if (!root.preview) root.commit()
+                root.preview = !root.preview
+            }
             color: root.preview ? theme.accent : theme.faint
             MouseArea {
                 anchors.fill: parent
@@ -110,6 +118,9 @@ Rectangle {
             objectName: "notesStamp"
             name: "insertDate"
             size: 15
+            Accessible.role: Accessible.Button
+            Accessible.name: "Insert date or time"
+            Accessible.onPressAction: if (!root.preview) stampMenu.popup()
             color: theme.faint
             opacity: root.preview ? 0.35 : 1
             MouseArea {
@@ -140,6 +151,7 @@ Rectangle {
     Plain.TextArea {
         id: area
         objectName: "notesText"
+        Accessible.name: root.accessibleName
         x: 40
         y: 2
         width: parent.width - 52

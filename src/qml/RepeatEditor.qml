@@ -91,6 +91,8 @@ Popup {
     component Pill: Rectangle {
         id: pill
         property string label
+        // What a screen reader calls the pill, when the label alone is not enough.
+        property string axName: label
         property bool on: false
         property real minWidth: 0
         property real hPad: 18
@@ -98,6 +100,11 @@ Popup {
         implicitWidth: Math.max(minWidth, pillText.implicitWidth + hPad)
         implicitHeight: 26
         radius: height / 2
+        Accessible.role: Accessible.Button
+        Accessible.name: axName
+        Accessible.checkable: true
+        Accessible.checked: on
+        Accessible.onPressAction: pill.clicked()
         color: on ? theme.accent : pillMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07)
         Text {
             id: pillText
@@ -125,6 +132,8 @@ Popup {
         implicitWidth: 78
         implicitHeight: 28
         editable: true
+        // The number field inside the spin box is what a screen reader lands on.
+        Component.onCompleted: contentItem.Accessible.name = Accessible.name
         font.pixelSize: backend.fontSize
         leftPadding: 22
         rightPadding: 22
@@ -227,6 +236,7 @@ Popup {
                     required property int index
                     objectName: "repeatPreset:" + modelData.label
                     label: modelData.label + "  ⌥" + (index + 1)
+                    axName: modelData.label
                     onClicked: root.applyPreset(index)
                 }
             }
@@ -256,6 +266,7 @@ Popup {
             Text { text: "Every"; color: theme.foreground; font.pixelSize: backend.fontSize }
             NumberBox {
                 objectName: "repeatInterval"
+                Accessible.name: "Repeat every"
                 from: 1; to: 999
                 value: root.rule.interval || 1
                 onValueModified: root.update({ interval: value })
@@ -279,6 +290,7 @@ Popup {
                     readonly property int day: (index + backend.firstDayOfWeek + 6) % 7  // Sunday-based locale index to Monday-based bit.
                     minWidth: 34
                     label: root.weekdayNames[day][0]
+                    axName: root.weekdayNames[day]
                     on: ((root.rule.weekdays || 0) >> day) & 1
                     onClicked: {
                         const bits = (root.rule.weekdays || 0) ^ (1 << day)
@@ -295,6 +307,11 @@ Popup {
             spacing: 6
             RowLayout {
                 objectName: "repeatMonthDay"
+                Accessible.role: Accessible.RadioButton
+                Accessible.name: "On day " + root.anchorDate().getDate() + " of the month"
+                Accessible.checkable: true
+                Accessible.checked: !root.rule.monthOrdinal
+                Accessible.onPressAction: root.update({ monthOrdinal: 0 })
                 spacing: 8
                 Radio { on: !root.rule.monthOrdinal }
                 Text {
@@ -306,11 +323,17 @@ Popup {
             }
             RowLayout {
                 objectName: "repeatMonthNth"
+                Accessible.role: Accessible.RadioButton
+                Accessible.name: "On the nth weekday of the month"
+                Accessible.checkable: true
+                Accessible.checked: !!root.rule.monthOrdinal
+                Accessible.onPressAction: root.selectNth({})
                 spacing: 8
                 Radio { on: !!root.rule.monthOrdinal }
                 Text { text: "On the"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 Choice {
                     objectName: "repeatOrdinal"
+                    Accessible.name: "Which weekday of the month"
                     implicitWidth: 66
                     model: root.ordinals.map(o => o.t)
                     currentIndex: Math.max(0, root.ordinals.findIndex(o => o.v === root.rule.monthOrdinal))
@@ -318,6 +341,7 @@ Popup {
                 }
                 Choice {
                     objectName: "repeatMonthWeekday"
+                    Accessible.name: "Weekday"
                     implicitWidth: 112
                     model: root.weekdayNames
                     currentIndex: Math.max(0, (root.rule.monthWeekday || 1) - 1)
@@ -330,6 +354,11 @@ Popup {
 
         RowLayout {
             objectName: "repeatAfterCompletion"
+            Accessible.role: Accessible.CheckBox
+            Accessible.name: "After completion"
+            Accessible.checkable: true
+            Accessible.checked: root.rule.from === 1
+            Accessible.onPressAction: root.update({ from: root.rule.from === 1 ? 0 : 1 })
             visible: root.frequency !== 0
             spacing: 8
             Rectangle {
@@ -350,6 +379,11 @@ Popup {
             Text { text: "END"; color: theme.muted; font.pixelSize: backend.fontSize - 2; font.weight: Font.Bold; font.letterSpacing: 0.5 }
             RowLayout {
                 objectName: "repeatEndNever"
+                Accessible.role: Accessible.RadioButton
+                Accessible.name: "End never"
+                Accessible.checkable: true
+                Accessible.checked: !root.rule.endType
+                Accessible.onPressAction: root.update({ endType: 0 })
                 spacing: 8
                 Radio { on: !root.rule.endType }
                 Text { text: "Never"; color: theme.foreground; font.pixelSize: backend.fontSize }
@@ -357,11 +391,17 @@ Popup {
             }
             RowLayout {
                 objectName: "repeatEndAfter"
+                Accessible.role: Accessible.RadioButton
+                Accessible.name: "End after a number of times"
+                Accessible.checkable: true
+                Accessible.checked: root.rule.endType === 1
+                Accessible.onPressAction: root.update({ endType: 1 })
                 spacing: 8
                 Radio { on: root.rule.endType === 1 }
                 Text { text: "After"; color: theme.foreground; font.pixelSize: backend.fontSize }
                 NumberBox {
                     objectName: "repeatEndCount"
+                    Accessible.name: "End after this many times"
                     from: 1; to: 99
                     value: root.rule.endCount || 1
                     onValueModified: root.update({ endType: 1, endCount: value })
@@ -376,6 +416,9 @@ Popup {
                 Rectangle {
                     id: dateButton
                     objectName: "repeatEndDate"
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "End on, " + (root.rule.endDate ? Qt.formatDate(endPicker.parseIso(root.rule.endDate), "dddd d MMMM yyyy") : "no date chosen")
+                    Accessible.onPressAction: endPicker.openAt(dateButton, root.rule.endDate)
                     implicitWidth: 130
                     implicitHeight: 28
                     radius: 6

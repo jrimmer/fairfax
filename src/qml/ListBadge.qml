@@ -10,6 +10,8 @@ Item {
     property color color: theme.accent
     property bool chevrons: false
     property bool pressedDown: false  // Lighter while its menu is open.
+    // Overrides `text` for the accessible name.
+    property string accessibleName: ""
     signal clicked()
 
     implicitWidth: label.implicitWidth + 30 + (chevrons ? 16 : 0)
@@ -17,7 +19,7 @@ Item {
     activeFocusOnTab: true
 
     Accessible.role: Accessible.StaticText
-    Accessible.name: root.text
+    Accessible.name: accessibleName !== "" ? accessibleName : root.text
     Accessible.onPressAction: root.clicked()
 
     Keys.onSpacePressed: root.clicked()

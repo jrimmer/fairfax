@@ -12,6 +12,8 @@ RowLayout {
     property int taskId: 0
     property var tags: []
     property var matches: []
+    // What a screen reader calls the place you type a tag.
+    property string accessibleName: "Tags"
     // Tag matching ignores case and accents, so "cafe" finds "Café".
     function fold(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() }
     spacing: 10
@@ -72,6 +74,7 @@ RowLayout {
             TextInput {
                 id: input
                 objectName: root.objectName + "Input"
+                Accessible.name: root.accessibleName
                 width: Math.max(70, contentWidth + 10)
                 height: 22
                 verticalAlignment: TextInput.AlignVCenter
