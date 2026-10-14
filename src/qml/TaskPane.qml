@@ -259,8 +259,6 @@ Item {
             focus: true
             model: backend.tasks
             boundsBehavior: Flickable.StopAtBounds
-            // The rows are the accessible targets; the list is not.
-            Accessible.ignored: true
             reuseItems: false
             cacheBuffer: 800
             bottomMargin: 80

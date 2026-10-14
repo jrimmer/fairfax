@@ -42,8 +42,12 @@ bool ignored(QQuickItem *item) {
 // Whether an item is one a user can act on: it takes keyboard focus, it is a
 // button, it holds a mouse area or tap handler, or it is a text field. A bare
 // MouseArea or TapHandler is the click target of the item that owns it, not an
-// item in its own right, so it is not judged on its own.
+// item in its own right, so it is not judged on its own; a mouse area marked
+// Accessible.ignored is a gestural layer the slice has named its child for, so
+// it does not make its owner interactive either.
 bool interactive(QQuickItem *item) {
+    if (ignored(item))
+        return false;
     if (item->inherits("QQuickMouseArea") || item->inherits("QQuickTapHandler"))
         return false;
     if (item->property("activeFocusOnTab").toBool())
@@ -53,7 +57,7 @@ bool interactive(QQuickItem *item) {
     if (item->inherits("QQuickTextInput") || item->inherits("QQuickTextEdit"))
         return true;
     for (QQuickItem *child : item->childItems()) {
-        if (!child->isVisible() || !child->isEnabled())
+        if (!child->isVisible() || !child->isEnabled() || ignored(child))
             continue;
         if (child->inherits("QQuickMouseArea") && child->property("acceptedButtons").toInt() != Qt::NoButton)
             return true;
@@ -110,6 +114,12 @@ bool acceptable(const Report &r) {
     return r.role != QAccessible::NoRole && r.role != QAccessible::Client;
 }
 
+// Whether an item reports the given role and a name that starts with `name`.
+bool reports(QQuickItem *item, QAccessible::Role role, const QString &name) {
+    const Report r = reportOf(item);
+    return r.hasInterface && r.role == role && r.name.startsWith(name);
+}
+
 // Every visible interactive item under `root`, in any window. An item that
 // only owns a mouse area is skipped when an ancestor is also interactive: the
 // row or badge above it is the one control a screen reader should read.
@@ -139,6 +149,7 @@ const QVector<QString> &pendingAccessibility() {
         // slice 2: task and sidebar rows
         "taskRow:", "taskCheck:", "rowStarArea:", "paneTitle",
         "sidebarRow:", "sidebarGroup:", "sidebarAdd", "sidebarTailDrop", "sidebarArchived",
+        "tagRow:", "tagGroup:",
         // slice 3: editor, settings, search builder
         "editorTitle", "editorCard", "setting:", "settingsPane:", "settingsClose",
         "ruleProp:", "ruleOp:", "ruleValue:", "ruleAdd", "ruleRemove:", "ruleGroupRemove:",
@@ -151,16 +162,12 @@ const QVector<QString> &pendingAccessibility() {
         "editorNewSubtask", "notesText", "notesStamp", "notesPreviewToggle", "editorTags",
         "quickStart", "quickStartTime", "quickDue", "quickDueTime", "quickTitle", "quickNotes",
         "quickTagInput", "quickTagChip", "quickTagRemove", "quickTagMatch",
+        "quickType", "quickCancel", "quickSave",
         // slice 5: anything left
-        "calDay:", "calDots", "calWeekendShade", "calDivider", "calTitle", "calToday",
-        "dayBar", "tagRow:", "tagGroup:", "quickTag", "quickUnit:", "quickWeekday:",
-        "quickCustomDone", "quickType", "quickCancel", "quickSave", "quickPriority", "quickList",
+        "quickTag", "quickUnit:", "quickWeekday:",
+        "quickCustomDone", "quickPriority", "quickList",
         "quickAttach", "quickLocation", "quickRepeat", "quickAlarm", "quickDuration",
-        "utilityTab", "utilityAdd", "utility", "focusToggle", "focusConditions", "sortReverse",
-        "searchPresets", "newTaskButton", "toggleUtility", "searchClear", "hideSidebar",
-        "calendarToggle", "calendarStyle", "tagsManualToggle", "tagUsedOnly", "tagShowPaused",
-        "section:", "sectionTitle", "exportDialog", "quickLook", "shortcutOverlay", "dayBarDetails",
-        "archiveDialog", "editListDialog", "colorPickerDialog",
+        "utilityTab", "calTitle", "searchClear",
     };
     return pending;
 }
@@ -222,8 +229,6 @@ QStringList guardOffenders() {
 class E2EAccessibility : public QObject {
     Q_OBJECT
 
-    QStringList m_seen;
-
     // The accessible interface of an item, or a null one when Qt Quick built
     // none. Qt Quick builds the interfaces lazily, so the guard and the naming
     // tests touch every item first.
@@ -244,10 +249,9 @@ class E2EAccessibility : public QObject {
         return i && i->isValid() ? i->role() : QAccessible::NoRole;
     }
 
-    // Prints the offenders of one state and records how many there were.
+    // Prints the offenders of one state and fails with them all.
     void checkState(const QString &state) {
         const QStringList offenders = guardOffenders();
-        m_seen << QString("%1: %2").arg(state).arg(offenders.size());
         for (const QString &o : offenders)
             qInfo().noquote() << "AX" << state << o;
         QVERIFY2(offenders.isEmpty(), qPrintable(state + " has " + QString::number(offenders.size()) + " unnamed interactive items:\n"

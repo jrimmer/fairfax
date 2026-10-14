@@ -89,8 +89,6 @@ ColumnLayout {
     Item {
     Layout.fillWidth: true
     implicitHeight: grid.implicitHeight
-    // The cells are the accessible targets; the drag area over the grid is not.
-    Accessible.ignored: true
     Grid {
         id: grid
         width: parent.width
@@ -130,11 +128,13 @@ ColumnLayout {
                 readonly property bool filtered: dragged || (root.dragFrom < 0 && backend.dayFilter !== ""
                                                              && dayIso >= backend.dayFilter && dayIso <= (backend.dayFilterTo || backend.dayFilter))
 
+                activeFocusOnTab: true
                 Accessible.role: Accessible.Button
                 Accessible.name: Qt.formatDate(day, "dddd d MMMM yyyy")
                                  + (busy > 0 ? ", " + busy + (busy === 1 ? " task due" : " tasks due") : "")
                 Accessible.selected: filtered
                 Accessible.description: isToday ? "Today" : ""
+                Accessible.onPressAction: backend.setDayFilter(cell.dayIso)
 
                 Keys.onSpacePressed: backend.setDayFilter(cell.dayIso)
                 Keys.onReturnPressed: backend.setDayFilter(cell.dayIso)
@@ -217,9 +217,13 @@ ColumnLayout {
             }
         }
     }
-    // One mouse area over the whole grid so a press can drag across days.
+    // One mouse area over the whole grid so a press can drag across days. It
+    // is a gestural layer, not a control: the day cells are the accessible
+    // targets, so the guard treats it as ignored and does not judge the
+    // wrapper item that owns it.
     MouseArea {
         anchors.fill: grid
+        Accessible.ignored: true
         function cellAt(x, y) {
             const c = grid.childAt(x, y)
             return c && c.dayIso !== undefined ? c : null

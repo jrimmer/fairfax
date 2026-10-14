@@ -155,8 +155,6 @@ Rectangle {
             clip: true
             model: backend.sidebar
             boundsBehavior: Flickable.StopAtBounds
-            // The rows are the accessible targets; the list is not.
-            Accessible.ignored: true
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
             // Below the last list: drop a list here to ungroup it, and open
