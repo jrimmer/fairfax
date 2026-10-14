@@ -12,108 +12,12 @@
 #include <QDesktopServices>
 #include <QJsonObject>
 
-#include "../fakeimap.h"
-#include "keyring.h"
-#include "../loopback.h"
-#include "settingskit.h"
+#include "mailkit.h"
 #include "../testregistry.h"
 
 using namespace e2e;
 
 namespace {
-
-QString textOf(const QString &name) {
-    QQuickItem *i = findItem(name);
-    return i ? i->property("text").toString() : QString("<no such item: " + name + ">");
-}
-
-// Opens Settings on the Mail pane and waits until its scrolling area is as tall as its content: the
-// pane is long, and a control scrolled to while it is still growing ends up out of view.
-void openMailPane(App &app, QQuickWindow *&sw) {
-    openSettings(app, sw);
-    selectPane(sw, "Mail");
-    QQuickItem *last = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((last = findItem("mailPipe")) != nullptr, 5000);
-    QTRY_VERIFY_WITH_TIMEOUT([&] {
-        for (QQuickItem *p = last->parentItem(); p; p = p->parentItem())
-            if (p->inherits("QQuickFlickable")) {
-                auto *content = p->property("contentItem").value<QQuickItem *>();
-                const QRectF r = last->mapRectToItem(content, QRectF(0, 0, last->width(), last->height()));
-                return p->property("contentHeight").toReal() >= r.bottom();
-            }
-        return false;
-    }(), 5000);
-}
-
-// The index of the entry whose label is `label` in a combo box.
-int comboIndex(const QString &name, const QString &label) {
-    QQuickItem *combo = findItem(name);
-    if (!combo)
-        return -1;
-    for (int i = 0; i < combo->property("count").toInt(); ++i) {
-        QString text;
-        QMetaObject::invokeMethod(combo, "textAt", Q_RETURN_ARG(QString, text), Q_ARG(int, i));
-        if (text == label)
-            return i;
-    }
-    return -1;
-}
-
-void choose(const QString &name, const QString &label) {
-    QQuickItem *combo = nullptr;
-    control(name, combo);
-    const int index = comboIndex(name, label);
-    QVERIFY2(index >= 0, qPrintable(name + " has no entry " + label));
-    chooseCombo(name, index);
-}
-
-QString comboText(const QString &name) {
-    QQuickItem *c = findItem(name);
-    return c ? c->property("currentText").toString() : QString("<no such combo: " + name + ">");
-}
-
-// Empties a text field the way a user does (select all, delete, Return). A field whose empty
-// value shows a default (the folder) does not read back as empty, so nothing waits for that.
-void clearField(QQuickWindow *sw, const QString &name) {
-    QQuickItem *field = nullptr;
-    control(name, field);
-    click(field);
-    QTest::keyClick(sw, Qt::Key_A, Qt::ControlModifier);
-    QTest::keyClick(sw, Qt::Key_Delete);
-    QTest::keyClick(sw, Qt::Key_Return);
-}
-
-// Clicks Fetch Now once the pane has stopped moving (a click that lands on a pane still laying itself out is lost).
-void clickFetchNow() {
-    QQuickItem *button = nullptr;
-    control("mailFetchNow", button);
-    QVERIFY(button);
-    click(button);
-}
-
-// Types a password into the masked field and commits it; the field then empties itself.
-void typePassword(QQuickWindow *sw, const QString &password) {
-    QQuickItem *field = nullptr;
-    control("mailPassword", field);
-    QVERIFY(field);
-    click(field);
-    typeInto(sw, password);
-    QTest::keyClick(sw, Qt::Key_Return);
-}
-
-QByteArray plusMail(const QString &subject, const QString &id, const QString &to = "jane+precrime@example.org") {
-    return FakeImap::mail(to, subject, "Body of " + subject, id);
-}
-
-QString writeFile(const QString &dir, const QString &name, const QString &body) {
-    QFile f(dir + "/" + name);
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        f.write(body.toUtf8());
-    return f.fileName();
-}
-
-const char *GoogleClient = R"({"installed":{"client_id":"e2e-client.apps.example","client_secret":"e2e-secret",
-    "auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token"}})";
 
 class UrlSink : public QObject {
     Q_OBJECT
@@ -123,41 +27,10 @@ public slots:
     void opened(const QUrl &url) { urls << url; }
 };
 
-struct Http {
-    QList<QUrl> urls;
-    QList<QUrlQuery> forms;
-    QJsonObject reply{{"access_token", "e2e-at"}, {"refresh_token", "e2e-rt"}, {"expires_in", 3600}};
-};
-
-void fakeHttp(App &app, Http &http) {
-    app.services().mail->setHttpTransport([&http](const QUrl &url, const QUrlQuery &form, std::function<void(int, const QJsonObject &)> done) {
-        http.urls << url;
-        http.forms << form;
-        done(200, http.reply);
-    });
-}
-
-// Points the pane at the fake server as an Other account, through the controls.
-void fillServer(QQuickWindow *sw, FakeImap &server, const QString &toFilter) {
-    choose("setting:mail.account", "Other");
-    setText(sw, "setting:mail.address", "jane@example.org");
-    setText(sw, "setting:mail.host", "127.0.0.1");
-    setText(sw, "setting:mail.port", QString::number(server.port()));
-    choose("setting:mail.security", "None");
-    setText(sw, "setting:mail.user", "jane");
-    typePassword(sw, "app-password");
-    setText(sw, "setting:mail.toFilter", toFilter);
-}
-
 }  // namespace
 
 class E2EMail : public QObject {
     Q_OBJECT
-
-    // Waits for the status line to read this (a substring).
-    static void waitStatus(const QString &part, int timeout = 8000) {
-        QTRY_VERIFY2_WITH_TIMEOUT(textOf("mailStatus").contains(part), qPrintable("status is \"" + textOf("mailStatus") + "\", wanted " + part), timeout);
-    }
 
 private slots:
     void init() {
@@ -492,29 +365,37 @@ private slots:
     // The guard, as for the rest of Settings: every key the connector knows has a test here.
     void everyMailSettingHasACase() {
         const QMap<QString, QString> cases{
-            {"mail.enabled", "everyFieldPersistsAndComesBack"},
-            {"mail.account", "everyFieldPersistsAndComesBack"},
-            {"mail.address", "everyFieldPersistsAndComesBack"},
-            {"mail.host", "everyFieldPersistsAndComesBack"},
-            {"mail.port", "everyFieldPersistsAndComesBack"},
-            {"mail.security", "everyFieldPersistsAndComesBack"},
-            {"mail.user", "everyFieldPersistsAndComesBack"},
-            {"mail.folder", "everyFieldPersistsAndComesBack"},
-            {"mail.toFilter", "everyFieldPersistsAndComesBack"},
-            {"mail.labelFilter", "everyFieldPersistsAndComesBack"},
-            {"mail.after", "everyFieldPersistsAndComesBack"},
-            {"mail.moveTo", "everyFieldPersistsAndComesBack"},
-            {"mail.listId", "everyFieldPersistsAndComesBack"},
-            {"mail.naturalLanguage", "everyFieldPersistsAndComesBack"},
-            {"mail.interval", "everyFieldPersistsAndComesBack"},
-            {"mail.googleClientId", "importClientJsonThenSignInWithGoogle"},
-            {"mail.msClientId", "yourOwnClientIdThenSignInWithMicrosoft"},
-            {"mail.oauth", "importClientJsonThenSignInWithGoogle"},
+            {"mail.enabled", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.account", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.address", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.host", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.port", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.security", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.user", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.folder", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.toFilter", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.labelFilter", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.after", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.moveTo", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.listId", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.naturalLanguage", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.interval", "E2EMail::everyFieldPersistsAndComesBack"},
+            {"mail.googleClientId", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
+            {"mail.msClientId", "E2EMailOAuth::yourOwnClientIdThenSignInWithMicrosoft"},
+            {"mail.oauth", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
         };
         const QStringList keys = MailFetch::optionKeys();
         for (const QString &key : keys) {
             QVERIFY2(cases.contains(key), qPrintable("mail setting with no test: " + key));
-            QVERIFY2(metaObject()->indexOfSlot(cases.value(key).toLatin1() + "()") >= 0, qPrintable(cases.value(key) + " does not exist"));
+            // The test named must exist (in this class or the sign-in one).
+            const QString how = cases.value(key);
+            bool exists = false;
+            for (const auto &factory : testRegistry()) {
+                std::unique_ptr<QObject> test(factory());
+                if (how.section("::", 0, 0) == test->metaObject()->className() && test->metaObject()->indexOfSlot(qPrintable(how.section("::", 1) + "()")) >= 0)
+                    exists = true;
+            }
+            QVERIFY2(exists, qPrintable(how + " does not exist"));
         }
         for (const QString &key : cases.keys())
             QVERIFY2(keys.contains(key), qPrintable(key + " is tested but unknown to the connector"));
@@ -683,195 +564,6 @@ private slots:
         server.add("INBOX", plusMail("Arrived again", "s2"));
         click(findItem("syncButton"));
         QTRY_VERIFY_WITH_TIMEOUT(app.taskTitled("Arrived again").id != 0, 8000);
-    }
-
-    // ------------------------------------------------------------- own OAuth client
-
-    // Gmail, advanced: "Import client JSON…" through the file picker, then "Sign in with Google" through a
-    // browser, with Sign Out at the end. The HTTP calls and the browser are fakes.
-    void importClientJsonThenSignInWithGoogle() {
-        UrlSink browser;
-        QDesktopServices::setUrlHandler("https", &browser, "opened");
-        Http http;
-        FakeImap server;
-        server.user = "jane@gmail.com";
-        server.accessToken = "e2e-at";
-        server.add("INBOX", plusMail("Via Google", "g1", "jane+precrime@gmail.com"));
-        App app;
-        fakeHttp(app, http);
-        QQuickWindow *sw = nullptr;
-        openMailPane(app, sw);
-        setText(sw, "setting:mail.address", "jane@gmail.com");
-        // The advanced section starts folded.
-        QVERIFY(!findItem("mailImportClient"));
-        QQuickItem *advanced = nullptr;
-        control("mailGoogleAdvanced", advanced);
-        QVERIFY(advanced);
-        click(advanced);
-        QQuickItem *import = nullptr;
-        control("mailImportClient", import);
-        QVERIFY(import);
-        QCOMPARE(textOf("mailClientStatus"), QString("No client imported"));
-
-        // Signing in before there is a client says what to do.
-        QQuickItem *signIn = nullptr;
-        control("mailSignIn", signIn);
-        QVERIFY(signIn);
-        QCOMPARE(signIn->property("text").toString(), QString("Sign in with Google"));
-        click(signIn);
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailOAuthError").contains("Import your Google client JSON first"), 5000);
-        QVERIFY(browser.urls.isEmpty());
-
-        // A file that isn't a client is refused in words.
-        click(import);
-        QTRY_COMPARE_WITH_TIMEOUT(app.services().filePicker.lastPurpose(), QString("mail-client-json"), 5000);
-        const QString dir = QFileInfo(app.store().path()).absolutePath();
-        emit app.services().filePicker.picked(writeFile(dir, "bad.json", "{\"web\":{\"client_id\":\"x\",\"client_secret\":\"y\"}}"), "mail-client-json");
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailClientError").contains("Web client"), 5000);
-        QCOMPARE(textOf("mailClientStatus"), QString("No client imported"));
-
-        // The real thing.
-        click(findItem("mailImportClient"));
-        emit app.services().filePicker.picked(writeFile(dir, "client_secret.json", GoogleClient), "mail-client-json");
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailClientStatus").contains("e2e… imported"), 5000);
-        QVERIFY(!findItem("mailClientError"));
-        QCOMPARE(app.store().setting("mail.googleClientId").toString(), QString("e2e-client.apps.example"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-client"), QString("e2e-secret"));
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("mailOAuthError"), 5000);
-
-        click(findItem("mailSignIn"));
-        QTRY_VERIFY_WITH_TIMEOUT(!browser.urls.isEmpty(), 5000);
-        QCOMPARE(textOf("mailOAuthStatus"), QString("Waiting for the browser…"));
-        QVERIFY(findItem("mailCancelSignIn"));
-        QVERIFY(!findItem("mailSignIn"));
-        const QUrlQuery q(browser.urls.last());
-        QCOMPARE(q.queryItemValue("client_id"), QString("e2e-client.apps.example"));
-        const QUrl redirect(q.queryItemValue("redirect_uri", QUrl::FullyDecoded));
-        // Cancel, then try again: the first listener is gone.
-        click(findItem("mailCancelSignIn"));
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("mailSignIn") != nullptr, 5000);
-        QCOMPARE(httpGet(redirect.port(), "/?code=late&state=" + q.queryItemValue("state")), QString("no connection"));
-        click(findItem("mailSignIn"));
-        QTRY_COMPARE_WITH_TIMEOUT(browser.urls.size(), 2, 5000);
-        const QUrlQuery q2(browser.urls.last());
-        QVERIFY(q2.queryItemValue("state") != q.queryItemValue("state"));
-        httpGet(QUrl(q2.queryItemValue("redirect_uri", QUrl::FullyDecoded)).port(), "/?code=g-code&state=" + q2.queryItemValue("state"));
-        QTRY_COMPARE_WITH_TIMEOUT(textOf("mailOAuthStatus"), QString("Signed in as jane@gmail.com"), 5000);
-        QVERIFY(findItem("mailSignOut"));
-        QVERIFY(!findItem("mailSignIn"));
-        QCOMPARE(http.forms.size(), 1);
-        QCOMPARE(http.forms[0].queryItemValue("code"), QString("g-code"));
-        QCOMPARE(http.forms[0].queryItemValue("client_secret"), QString("e2e-secret"));
-        QCOMPARE(OAuth::challengeFor(http.forms[0].queryItemValue("code_verifier")), q2.queryItemValue("code_challenge"));
-        QCOMPARE(app.store().setting("mail.oauth").toString(), QString("google"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("e2e-rt"));
-
-        // Mail flows over XOAUTH2 with no app password.
-        // The server is the test's own, so it is set up directly rather than through the Other account's fields.
-        app.services().mail->setOption("mail.host", "127.0.0.1");
-        app.services().mail->setOption("mail.port", server.port());
-        app.services().mail->setOption("mail.security", "none");
-        choose("setting:mail.after", "Leave as is");
-        QVERIFY(!app.services().mail->hasPassword());
-        clickFetchNow();
-        waitStatus("Connected");
-        QVERIFY(app.taskTitled("Via Google").id);
-        QCOMPARE(server.mechanisms, QStringList{"XOAUTH2"});
-
-        // Sign Out clears the tokens.
-        click(findItem("mailSignOut"));
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("mailSignIn") != nullptr, 5000);
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
-        QVERIFY(app.store().setting("mail.oauth").toString().isEmpty());
-        QVERIFY(!findItem("mailSignOut"));
-        QCOMPARE(app.services().mail->oauthState(), QString("none"));
-    }
-
-    // A forged redirect (wrong state) does not sign anybody in, and the pane says why.
-    void aForgedRedirectIsRefusedInThePane() {
-        UrlSink browser;
-        QDesktopServices::setUrlHandler("https", &browser, "opened");
-        Http http;
-        App app;
-        fakeHttp(app, http);
-        QQuickWindow *sw = nullptr;
-        openMailPane(app, sw);
-        QQuickItem *advanced = nullptr;
-        control("mailGoogleAdvanced", advanced);
-        QVERIFY(advanced);
-        click(advanced);
-        // The client is set up directly: importing it is not what this test is about.
-        QCOMPARE(app.services().mail->importClientJson(writeFile(QFileInfo(app.store().path()).absolutePath(), "c.json", GoogleClient)), QString());
-        QQuickItem *signIn = nullptr;
-        control("mailSignIn", signIn);
-        QVERIFY(signIn);
-        click(signIn);
-        QTRY_VERIFY_WITH_TIMEOUT(!browser.urls.isEmpty(), 5000);
-        const QUrlQuery q(browser.urls.last());
-        httpGet(QUrl(q.queryItemValue("redirect_uri", QUrl::FullyDecoded)).port(), "/?code=evil&state=forged");
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailOAuthError").contains("state"), 5000);
-        QVERIFY(findItem("mailSignIn"));
-        QVERIFY(!findItem("mailSignOut"));
-        QVERIFY(http.forms.isEmpty());
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
-    }
-
-    // Outlook, advanced: paste your own client ID, then "Sign in with Microsoft".
-    void yourOwnClientIdThenSignInWithMicrosoft() {
-        UrlSink browser;
-        QDesktopServices::setUrlHandler("https", &browser, "opened");
-        Http http;
-        http.reply = QJsonObject{{"access_token", "ms-at"}, {"refresh_token", "ms-rt"}, {"expires_in", 3600}};
-        App app;
-        fakeHttp(app, http);
-        QQuickWindow *sw = nullptr;
-        openMailPane(app, sw);
-        choose("setting:mail.account", "Outlook");
-        setText(sw, "setting:mail.address", "jane@contoso.com");
-        QVERIFY(!findItem("setting:mail.msClientId"));   // Folded away until asked for.
-        QQuickItem *advanced = nullptr;
-        control("mailMsAdvanced", advanced);
-        QVERIFY(advanced);
-        click(advanced);
-        QQuickItem *idField = nullptr;
-        control("setting:mail.msClientId", idField);
-        QVERIFY(idField);
-
-        // No client ID yet: it says so.
-        QQuickItem *signIn = nullptr;
-        control("mailSignIn", signIn);
-        QVERIFY(signIn);
-        QCOMPARE(signIn->property("text").toString(), QString("Sign in with Microsoft"));
-        click(signIn);
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailOAuthError").contains("client) ID"), 5000);
-        QVERIFY(browser.urls.isEmpty());
-
-        setText(sw, "setting:mail.msClientId", "00000000-aaaa-bbbb-cccc-000000000000");
-        QCOMPARE(app.store().setting("mail.msClientId").toString(), QString("00000000-aaaa-bbbb-cccc-000000000000"));
-        click(findItem("mailSignIn"));
-        QTRY_VERIFY_WITH_TIMEOUT(!browser.urls.isEmpty(), 5000);
-        QCOMPARE(browser.urls.last().host(), QString("login.microsoftonline.com"));
-        const QUrlQuery q(browser.urls.last());
-        QCOMPARE(q.queryItemValue("client_id"), QString("00000000-aaaa-bbbb-cccc-000000000000"));
-        QVERIFY(q.queryItemValue("scope", QUrl::FullyDecoded).contains("IMAP.AccessAsUser.All"));
-        const QUrl redirect(q.queryItemValue("redirect_uri", QUrl::FullyDecoded));
-        QCOMPARE(redirect.host(), QString("localhost"));
-        QTRY_COMPARE_WITH_TIMEOUT(textOf("mailOAuthStatus"), QString("Waiting for the browser…"), 5000);
-        const QString page = httpGet(redirect.port(), "/?code=ms-code&state=" + q.queryItemValue("state"));
-        QVERIFY2(page.contains("You can close this tab"), qPrintable(page));
-        QTRY_COMPARE_WITH_TIMEOUT(textOf("mailOAuthStatus"), QString("Signed in as jane@contoso.com"), 5000);
-        QCOMPARE(http.urls.value(0), QUrl("https://login.microsoftonline.com/common/oauth2/v2.0/token"));
-        QVERIFY(!http.forms.value(0).hasQueryItem("client_secret"));
-        QCOMPARE(OAuth::challengeFor(http.forms.value(0).queryItemValue("code_verifier")), q.queryItemValue("code_challenge"));
-        QCOMPARE(app.store().setting("mail.oauth").toString(), QString("microsoft"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("ms-rt"));
-
-        click(findItem("mailSignOut"));
-        QTRY_VERIFY_WITH_TIMEOUT(findItem("mailSignIn") != nullptr, 5000);
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
-        QVERIFY(app.store().setting("mail.oauth").toString().isEmpty());
-        // The client ID is the user's own setting and stays after a sign-out.
-        QCOMPARE(textOf("setting:mail.msClientId"), QString("00000000-aaaa-bbbb-cccc-000000000000"));
     }
 };
 

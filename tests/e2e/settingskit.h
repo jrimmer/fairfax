@@ -649,9 +649,9 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"mail.listId", "E2EMail::everyFieldPersistsAndComesBack"},
         {"mail.naturalLanguage", "E2EMail::everyFieldPersistsAndComesBack"},
         {"mail.interval", "E2EMail::everyFieldPersistsAndComesBack"},
-        {"mail.googleClientId", "E2EMail::importClientJsonThenSignInWithGoogle"},
-        {"mail.msClientId", "E2EMail::yourOwnClientIdThenSignInWithMicrosoft"},
-        {"mail.oauth", "E2EMail::importClientJsonThenSignInWithGoogle"},
+        {"mail.googleClientId", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
+        {"mail.msClientId", "E2EMailOAuth::yourOwnClientIdThenSignInWithMicrosoft"},
+        {"mail.oauth", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
     };
     return m;
 }

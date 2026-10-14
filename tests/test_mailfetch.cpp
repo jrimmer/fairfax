@@ -635,6 +635,33 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(m_server->log.contains("LOGOUT"), 5000);
     }
 
+    // IDLE is re-issued on a timer (every 25 minutes in earnest) so the server never times it out, and
+    // each renewal looks at the mailbox, so mail whose announcement was lost still arrives.
+    void idleIsReissuedPeriodically() {
+        MailFetch::Timings t;
+        t.imapTimeout = 1500;
+        t.backoffBase = 80;
+        t.idleRenew = 150;
+        m_fetch->setTimings(t);
+        configure("jane+precrime@gmail.com");
+        enable();
+        waitIdle();
+        QTRY_VERIFY_WITH_TIMEOUT(m_server->log.filter(QRegularExpression("^IDLE$")).size() >= 3, 8000);
+        m_server->add("INBOX", plus("Announcement lost", "ri1"));   // No EXISTS sent.
+        QTRY_COMPARE_WITH_TIMEOUT(titles(), QStringList{"Announcement lost"}, 8000);
+        QCOMPARE(m_server->connections, 1);   // The same connection throughout.
+    }
+
+    // STARTTLS is for a server that offers it; one that does not is said so, not talked to in the clear.
+    void starttlsOnAServerWithoutItIsAnError() {
+        configure("jane+precrime@gmail.com");
+        m_fetch->setOption("mail.security", "starttls");
+        enable();
+        QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
+        QVERIFY2(m_fetch->lastError().contains("STARTTLS"), qPrintable(m_fetch->lastError()));
+        QCOMPARE(m_server->mechanisms.size(), 0);   // The password was never sent.
+    }
+
     void fetchNowWhileIdlingLooksAtOnce() {
         configure("jane+precrime@gmail.com");
         enable();
