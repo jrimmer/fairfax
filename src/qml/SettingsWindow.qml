@@ -646,9 +646,10 @@ Window {
                     readonly property string address: { mailFetch.revision; return mailFetch.option("mail.address") }
                     readonly property bool gmail: account === "gmail"
                     readonly property bool outlook: account === "outlook"
-                    property bool googleAdvanced: false
+                    // The advanced sections start open once there is something in them.
+                    property bool googleAdvanced: { mailFetch.revision; return mailFetch.hasGoogleClient || mailFetch.oauthState !== "none" }
                     property string clientError
-                    property bool msAdvanced: false
+                    property bool msAdvanced: { mailFetch.revision; return mailFetch.option("mail.msClientId") !== "" || mailFetch.oauthState !== "none" }
 
                     CheckBox {
                         objectName: "setting:mail.enabled"
@@ -797,7 +798,7 @@ Window {
                     }
 
                     Label { text: "Which mail"; font.bold: true; Layout.topMargin: 14 }
-                    MailField { key: "mail.toFilter"; label: "Only mail sent to"; placeholder: "An address, such as you+precrime@gmail.com" }
+                    MailField { key: "mail.toFilter"; label: "Only mail sent to"; placeholder: "address@example.com" }
                     MailField { key: "mail.labelFilter"; label: "Only mail labelled"; placeholder: "Gmail label or IMAP keyword (optional)" }
                     MailField { key: "mail.folder"; label: "Folder"; placeholder: "INBOX" }
                     Text {
