@@ -62,7 +62,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        IconButton { objectName: "calPrevious"; icon: "chevronLeft"; size: 12; onClicked: root.shown = new Date(root.year, root.month - 1, 1) }
+        IconButton { objectName: "calPrevious"; icon: "chevronLeft"; size: 12; accessibleName: "Previous month"; onClicked: root.shown = new Date(root.year, root.month - 1, 1) }
         Text {
             objectName: "calTitle"
             Layout.fillWidth: true
@@ -83,12 +83,14 @@ ColumnLayout {
             font.weight: Font.DemiBold
             MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: root.shown = new Date() }
         }
-        IconButton { objectName: "calNext"; icon: "chevronRight"; size: 12; onClicked: root.shown = new Date(root.year, root.month + 1, 1) }
+        IconButton { objectName: "calNext"; icon: "chevronRight"; size: 12; accessibleName: "Next month"; onClicked: root.shown = new Date(root.year, root.month + 1, 1) }
     }
 
     Item {
     Layout.fillWidth: true
     implicitHeight: grid.implicitHeight
+    // The cells are the accessible targets; the drag area over the grid is not.
+    Accessible.ignored: true
     Grid {
         id: grid
         width: parent.width
@@ -127,6 +129,16 @@ ColumnLayout {
                 readonly property bool dragged: root.dragFrom >= 0 && index >= Math.min(root.dragFrom, root.dragTo) && index <= Math.max(root.dragFrom, root.dragTo)
                 readonly property bool filtered: dragged || (root.dragFrom < 0 && backend.dayFilter !== ""
                                                              && dayIso >= backend.dayFilter && dayIso <= (backend.dayFilterTo || backend.dayFilter))
+
+                Accessible.role: Accessible.Button
+                Accessible.name: Qt.formatDate(day, "dddd d MMMM yyyy")
+                                 + (busy > 0 ? ", " + busy + (busy === 1 ? " task due" : " tasks due") : "")
+                Accessible.selected: filtered
+                Accessible.description: isToday ? "Today" : ""
+
+                Keys.onSpacePressed: backend.setDayFilter(cell.dayIso)
+                Keys.onReturnPressed: backend.setDayFilter(cell.dayIso)
+                Keys.onEnterPressed: backend.setDayFilter(cell.dayIso)
 
                 Rectangle {
                     objectName: "calWeekendShade"

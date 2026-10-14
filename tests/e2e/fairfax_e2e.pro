@@ -1,4 +1,6 @@
 QT += core gui widgets sql qml quick quickcontrols2 testlib qmltest network
+# qquickaccessibleattached_p.h names the Accessible.ignored marker the guard reads.
+QT += quick-private
 linux: QT += dbus
 CONFIG += c++20
 TARGET = fairfax_e2e
@@ -38,6 +40,9 @@ SOURCES += test_gaps_editor.cpp test_gaps_notes.cpp test_gaps_settings.cpp
 
 # Gap-filling end-to-end tests: menus, sections and sidebar buttons.
 SOURCES += test_gaps_menus.cpp
+
+# Screen reader guard and shared component naming.
+SOURCES += test_accessibility.cpp
 
 # Mail to Fairfax end-to-end tests: Settings > Mail and the connector against a fake IMAP server.
 SOURCES += test_shortcuts.cpp

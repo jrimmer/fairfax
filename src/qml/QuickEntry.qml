@@ -584,6 +584,8 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         spacing: 0
+        Accessible.role: Accessible.Dialog
+        Accessible.name: root.title
 
         // ---- title: circle, the line itself, priority and star
         RowLayout {

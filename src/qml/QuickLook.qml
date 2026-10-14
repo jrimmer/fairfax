@@ -28,6 +28,8 @@ Popup {
     contentItem: Item {
         implicitHeight: body.implicitHeight + 24
         focus: true
+        Accessible.role: Accessible.Dialog
+        Accessible.name: "Quick Look"
         Keys.onPressed: (e) => {
             if (e.key === Qt.Key_Down) { backend.moveCursor(1); e.accepted = true }
             else if (e.key === Qt.Key_Up) { backend.moveCursor(-1); e.accepted = true }

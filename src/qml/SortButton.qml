@@ -7,6 +7,7 @@ Item {
     objectName: "sortButton"
     implicitWidth: row.implicitWidth + 12
     implicitHeight: 28
+    activeFocusOnTab: true
 
     readonly property string current: {
         for (const choice of backend.sortChoices)
@@ -14,10 +15,20 @@ Item {
         return "Sort"
     }
 
+    Accessible.role: Accessible.Button
+    Accessible.name: "Sort by " + current
+    Accessible.onPressAction: menu.popup(0, root.height)
+
+    Keys.onSpacePressed: menu.popup(0, root.height)
+    Keys.onReturnPressed: menu.popup(0, root.height)
+    Keys.onEnterPressed: menu.popup(0, root.height)
+
     Rectangle {
         anchors.fill: parent
         radius: 6
         color: mouse.containsMouse ? theme.mix(theme.background, theme.foreground, 0.07) : "transparent"
+        border.width: root.activeFocus ? 2 : 0
+        border.color: theme.accent
     }
     Row {
         id: row

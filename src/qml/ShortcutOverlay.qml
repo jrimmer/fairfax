@@ -42,6 +42,8 @@ Popup {
         contentHeight: grid.implicitHeight
         clip: true
         focus: true
+        Accessible.role: Accessible.Dialog
+        Accessible.name: "Keyboard Shortcuts"
         Keys.onPressed: (e) => { root.close(); e.accepted = true }
         GridLayout {
             id: grid

@@ -29,6 +29,13 @@ Item {
         name: "search"
         size: 16
         color: theme.muted
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: "Search"
+        Accessible.onPressAction: { root.opened = true; input.forceActiveFocus() }
+        Keys.onSpacePressed: { root.opened = true; input.forceActiveFocus() }
+        Keys.onReturnPressed: { root.opened = true; input.forceActiveFocus() }
+        Keys.onEnterPressed: { root.opened = true; input.forceActiveFocus() }
         MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { root.opened = true; input.forceActiveFocus() } }
     }
     TextInput {

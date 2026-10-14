@@ -16,6 +16,11 @@ Item {
 
     objectName: "section:" + (r.sectionKey || "")
     height: r.isFirst ? 34 : 50
+    activeFocusOnTab: true
+
+    Accessible.role: Accessible.Heading
+    Accessible.name: [(root.r.title || ""), root.r.durationTotal || "", root.r.count || ""].filter(s => s !== "").join(", ")
+    Accessible.onPressAction: backend.toggleSection(root.r.sectionKey, false)
 
     Text {
         id: title
@@ -74,6 +79,9 @@ Item {
         }
         onDoubleClicked: if (root.isListSection) root.renaming = true
     }
+    Keys.onSpacePressed: backend.toggleSection(root.r.sectionKey, false)
+    Keys.onReturnPressed: backend.toggleSection(root.r.sectionKey, false)
+    Keys.onEnterPressed: backend.toggleSection(root.r.sectionKey, false)
 
     // Tasks dropped on a list section's heading move into it.
     DropArea {

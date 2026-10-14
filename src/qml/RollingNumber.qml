@@ -18,6 +18,11 @@ Item {
     property string shown: format(value)
     property int lastValue: value
 
+    // The count is what a screen reader reads; the rolling digits are only how
+    // it is drawn.
+    Accessible.role: Accessible.StaticText
+    Accessible.name: shown
+
     function format(v) { return v > 999 ? "999+" : String(Math.max(0, v)) }
 
     onValueChanged: {

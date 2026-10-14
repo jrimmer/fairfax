@@ -19,4 +19,5 @@ Dialog {
         font.pixelSize: backend.fontSize + 4
         font.weight: Font.DemiBold
     }
+    // A Dialog already reports Dialog with its title as the name.
 }

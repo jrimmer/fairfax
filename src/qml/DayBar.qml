@@ -250,6 +250,13 @@ Item {
                         required property var modelData
                         objectName: "dayBarStep:" + modelData.step
                         width: 20; height: 20
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.step < 0 ? "Previous day" : "Next day"
+                        Accessible.onPressAction: root.dayOffset += modelData.step
+                        Keys.onSpacePressed: root.dayOffset += modelData.step
+                        Keys.onReturnPressed: root.dayOffset += modelData.step
+                        Keys.onEnterPressed: root.dayOffset += modelData.step
                         Icon { anchors.centerIn: parent; name: modelData.icon; size: 12; color: theme.muted }
                         MouseArea {
                             anchors.fill: parent
@@ -281,6 +288,9 @@ Item {
                         width: Math.min(110, pillText.implicitWidth + 12)
                         color: Qt.alpha(modelData.color, 0.7)
                         opacity: modelData.declined ? 0.4 : 1
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: modelData.title + ", all day"
+                        Accessible.onPressAction: root.showDetails(modelData, parent)
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
@@ -333,6 +343,9 @@ Item {
                         radius: 2
                         color: Qt.alpha(modelData.color, 0.7)
                         opacity: modelData.declined ? 0.35 : 1
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: modelData.title + ", " + root.timeRange(modelData)
+                        Accessible.onPressAction: root.showDetails(modelData, parent)
                         MouseArea {
                             anchors.fill: parent
                             anchors.margins: -2
@@ -449,6 +462,9 @@ Item {
                     color: Qt.alpha(modelData.e.color, 0.7)
                     opacity: modelData.e.declined ? 0.4 : 1
                     clip: true
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: modelData.e.title + ", " + root.timeRange(modelData.e)
+                    Accessible.onPressAction: root.showDetails(modelData.e, parent)
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor

@@ -14,6 +14,15 @@ Item {
 
     implicitWidth: label.implicitWidth + 30 + (chevrons ? 16 : 0)
     implicitHeight: label.implicitHeight + 8
+    activeFocusOnTab: true
+
+    Accessible.role: Accessible.StaticText
+    Accessible.name: root.text
+    Accessible.onPressAction: root.clicked()
+
+    Keys.onSpacePressed: root.clicked()
+    Keys.onReturnPressed: root.clicked()
+    Keys.onEnterPressed: root.clicked()
 
     Shape {
         anchors.fill: parent
@@ -51,4 +60,12 @@ Item {
         color: "white"
     }
     MouseArea { anchors.fill: parent; onClicked: root.clicked() }
+    // A focus ring only for keyboard focus, so the mouse look is unchanged.
+    Rectangle {
+        anchors.fill: parent
+        color: "transparent"
+        visible: root.activeFocus
+        border.width: 2
+        border.color: theme.accent
+    }
 }

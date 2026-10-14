@@ -48,6 +48,8 @@ RowLayout {
                     width: chip.implicitWidth + 30
                     radius: 11
                     color: theme.mix(theme.surface, theme.foreground, 0.28)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: modelData.name
                     Text { id: chip; x: 9; anchors.verticalCenter: parent.verticalCenter; text: modelData.name; color: theme.background; font.pixelSize: backend.fontSize - 2; font.weight: Font.DemiBold }
                     Icon {
                         objectName: root.objectName + "Remove:" + modelData.name
@@ -55,6 +57,13 @@ RowLayout {
                         anchors.rightMargin: 5
                         anchors.verticalCenter: parent.verticalCenter
                         name: "close"; size: 9; stroke: 2.4; color: theme.background
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Remove tag " + modelData.name
+                        Accessible.onPressAction: backend.removeTag(root.taskId, modelData.id)
+                        Keys.onSpacePressed: backend.removeTag(root.taskId, modelData.id)
+                        Keys.onReturnPressed: backend.removeTag(root.taskId, modelData.id)
+                        Keys.onEnterPressed: backend.removeTag(root.taskId, modelData.id)
                         MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: backend.removeTag(root.taskId, modelData.id) }
                     }
                 }
