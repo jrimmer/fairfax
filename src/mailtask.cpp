@@ -102,6 +102,16 @@ QString headerText(const Part &part, const QString &name) {
     return Exchange::decodeMimeWords(text8(part.header(name))).trimmed();
 }
 
+// Every value of a header that can repeat, joined as one address list. Each
+// delivery hop adds its own Delivered-To, so the first is not always the one.
+QString allHeaderText(const Part &part, const QString &name) {
+    QStringList values;
+    for (const auto &h : part.headers)
+        if (h.name == name)
+            values << Exchange::decodeMimeWords(text8(h.value)).trimmed();
+    return values.join(", ");
+}
+
 // A Content-Type or Content-Disposition value: the main token and its
 // parameters, with quoted values unquoted and RFC 2231 extended ones decoded.
 struct Field {
@@ -376,8 +386,8 @@ Message parse(const QByteArray &rfc822) {
     m.from = headerText(top, "from");
     m.to = headerText(top, "to");
     m.cc = headerText(top, "cc");
-    m.deliveredTo = headerText(top, "delivered-to");
-    m.xOriginalTo = headerText(top, "x-original-to");
+    m.deliveredTo = allHeaderText(top, "delivered-to");
+    m.xOriginalTo = allHeaderText(top, "x-original-to");
     m.messageId = headerText(top, "message-id");
     m.dateHeader = headerText(top, "date");
     static const QRegularExpression comment("\\s*\\([^)]*\\)\\s*$");

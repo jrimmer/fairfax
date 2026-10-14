@@ -267,6 +267,17 @@ private slots:
         QVERIFY(lastSearch().contains("HEADER X-Original-To"));
     }
 
+    // Each hop adds a Delivered-To on top, so a forwarded message names the
+    // plus-address in a later one.
+    void everyDeliveredToHeaderCounts() {
+        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Forwarded", "b", "f1",
+                                              "Delivered-To: jane@gmail.com\r\nDelivered-To: jane+precrime@gmail.com\r\n"));
+        configure("jane+precrime@gmail.com");
+        enable();
+        waitIdle();
+        QCOMPARE(titles(), QStringList{"Forwarded"});
+    }
+
     void labelFilterUsesAKeywordOnOtherServers() {
         m_server->add("INBOX", plus("Tagged", "k1"), {}, {"precrime"});
         m_server->add("INBOX", plus("Plain", "k2"));
