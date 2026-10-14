@@ -22,6 +22,8 @@ bin/build && build/fairfax --demo
 
 Your tasks live in `~/.local/share/fairfax/fairfax.db`. `--db PATH` opens another file.
 
+macOS and Windows builds are best effort; see [docs/building-macos-windows.md](docs/building-macos-windows.md).
+
 ## On Omarchy
 
 After installing, wire Fairfax into Omarchy with one command (undo with `--remove`):
