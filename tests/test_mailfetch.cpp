@@ -85,6 +85,50 @@ class MailFetchTest : public QObject {
         return FakeImap::mail(to, subject, "Body of " + subject, id);
     }
 
+    // Helpers for the OAuth tests.
+    // Whether the database file (or its write-ahead log) holds this text anywhere.
+    bool databaseHolds(const QByteArray &needle) const {
+        for (const QString &suffix : {QString(), QString("-wal")}) {
+            QFile f(m_store->path() + suffix);
+            if (f.open(QIODevice::ReadOnly) && f.readAll().contains(needle))
+                return true;
+        }
+        return false;
+    }
+
+    QString writeClientJson(const QString &body) {
+        const QString path = m_dir.filePath("client_secret.json");
+        QFile f(path);
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+            return QString();
+        f.write(body.toUtf8());
+        return path;
+    }
+    static QString googleClientJson() {
+        return QStringLiteral("{\"installed\":{\"client_id\":\"test-id.apps.example\",\"project_id\":\"p\","
+                              "\"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\","
+                              "\"token_uri\":\"https://oauth2.googleapis.com/token\",\"client_secret\":\"test-secret\","
+                              "\"redirect_uris\":[\"http://localhost\"]}}");
+    }
+
+    struct Http {
+        QList<QUrl> urls;
+        QList<QUrlQuery> forms;
+        int status = 200;
+        QJsonObject reply{{"access_token", "at-1"}, {"refresh_token", "rt-1"}, {"expires_in", 3600}};
+        QList<QJsonObject> replies;   // Used in order before `reply`.
+    };
+    void fakeHttp(Http &http) {
+        m_fetch->setHttpTransport([&http](const QUrl &url, const QUrlQuery &form, std::function<void(int, const QJsonObject &)> done) {
+            http.urls << url;
+            http.forms << form;
+            const QJsonObject r = http.replies.isEmpty() ? http.reply : http.replies.takeFirst();
+            done(http.status, r);
+        });
+    }
+    QString param(const QString &name) const { return QUrlQuery(m_opened).queryItemValue(name, QUrl::FullyDecoded); }
+
+
 private slots:
     void opened(const QUrl &url) { m_opened = url; }
 
@@ -121,7 +165,7 @@ private slots:
         enable();
         waitIdle();
         QCOMPARE(titles(), (QStringList{"Buy milk", "Call Alex"}));
-        QCOMPARE(mailTasks()[0].listId, m_inbox);
+        QCOMPARE(mailTasks().value(0).listId, m_inbox);
         QCOMPARE(m_fetch->imported(), 2);
         QVERIFY(m_fetch->lastCheck().isValid());
         QVERIFY2(m_fetch->statusLine().startsWith("Connected · checked "), qPrintable(m_fetch->statusLine()));
@@ -141,7 +185,7 @@ private slots:
         enable();
         waitIdle();
         QCOMPARE(mailTasks().size(), 1);
-        QCOMPARE(mailTasks()[0].listId, m_work);
+        QCOMPARE(mailTasks().value(0).listId, m_work);
     }
 
     void naturalLanguageSwitch() {
@@ -149,8 +193,8 @@ private slots:
         configure("jane+precrime@gmail.com");
         enable();
         waitIdle();
-        QCOMPARE(mailTasks()[0].title, QString("Call Sam tomorrow"));
-        QVERIFY(!mailTasks()[0].dueDate.isValid());
+        QCOMPARE(mailTasks().value(0).title, QString("Call Sam tomorrow"));
+        QVERIFY(!mailTasks().value(0).dueDate.isValid());
     }
 
     void naturalLanguageOn() {
@@ -159,8 +203,8 @@ private slots:
         m_fetch->setOption("mail.naturalLanguage", true);
         enable();
         waitIdle();
-        QCOMPARE(mailTasks()[0].title, QString("Call Sam"));
-        QCOMPARE(mailTasks()[0].dueDate, QDate::currentDate().addDays(1));
+        QCOMPARE(mailTasks().value(0).title, QString("Call Sam"));
+        QCOMPARE(mailTasks().value(0).dueDate, QDate::currentDate().addDays(1));
     }
 
     void filingInstructionsAlwaysWork() {
@@ -431,7 +475,7 @@ private slots:
         MailTask::Options options;
         options.listId = m_inbox;
         QVERIFY(MailTask::import(*m_store, MailTask::parse(plus("Gone", "gone-id")), options).ok());
-        Task t = mailTasks()[0];
+        Task t = mailTasks().value(0);
         t.deleted = true;
         m_store->begin("delete");
         m_store->putTask(t);
@@ -801,6 +845,7 @@ private slots:
     }
 
     void gmailPlusAddressFollowsTheAddressUntilEdited() {
+        m_fetch->setAccount("gmail");   // Writes the preset, filter included, so the filter is a stored value that has to be moved.
         m_fetch->setOption("mail.address", "jane@gmail.com");
         QCOMPARE(m_fetch->option("mail.user"), QString("jane@gmail.com"));
         QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane+precrime@gmail.com"));
@@ -893,46 +938,6 @@ private slots:
 
     // --------------------------------------------------------------- OAuth
 
-    // Whether the database file (or its write-ahead log) holds this text anywhere.
-    bool databaseHolds(const QByteArray &needle) const {
-        for (const QString &suffix : {QString(), QString("-wal")}) {
-            QFile f(m_store->path() + suffix);
-            if (f.open(QIODevice::ReadOnly) && f.readAll().contains(needle))
-                return true;
-        }
-        return false;
-    }
-
-    QString writeClientJson(const QString &body) {
-        const QString path = m_dir.filePath("client_secret.json");
-        QFile f(path);
-        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-            return QString();
-        f.write(body.toUtf8());
-        return path;
-    }
-    static QString googleClientJson() {
-        return R"({"installed":{"client_id":"test-id.apps.example","project_id":"p","auth_uri":"https://accounts.google.com/o/oauth2/auth",
-            "token_uri":"https://oauth2.googleapis.com/token","client_secret":"test-secret","redirect_uris":["http://localhost"]}})";
-    }
-
-    struct Http {
-        QList<QUrl> urls;
-        QList<QUrlQuery> forms;
-        int status = 200;
-        QJsonObject reply{{"access_token", "at-1"}, {"refresh_token", "rt-1"}, {"expires_in", 3600}};
-        QList<QJsonObject> replies;   // Used in order before `reply`.
-    };
-    void fakeHttp(Http &http) {
-        m_fetch->setHttpTransport([&http](const QUrl &url, const QUrlQuery &form, std::function<void(int, const QJsonObject &)> done) {
-            http.urls << url;
-            http.forms << form;
-            const QJsonObject r = http.replies.isEmpty() ? http.reply : http.replies.takeFirst();
-            done(http.status, r);
-        });
-    }
-    QString param(const QString &name) const { return QUrlQuery(m_opened).queryItemValue(name, QUrl::FullyDecoded); }
-
     void importClientJsonStoresTheClient() {
         QCOMPARE(m_fetch->importClientJson(writeClientJson(googleClientJson())), QString());
         QVERIFY(m_fetch->hasGoogleClient());
@@ -945,8 +950,8 @@ private slots:
     void importClientJsonRejectsOtherFiles() {
         QVERIFY(!m_fetch->importClientJson(m_dir.filePath("missing.json")).isEmpty());
         QVERIFY(m_fetch->importClientJson(writeClientJson("not json")).contains("isn't a Google"));
-        QVERIFY(m_fetch->importClientJson(writeClientJson(R"({"web":{"client_id":"x","client_secret":"y"}})")).contains("Web client"));
-        QVERIFY(m_fetch->importClientJson(writeClientJson(R"({"installed":{"client_id":"x"}})")).contains("client_secret"));
+        QVERIFY(m_fetch->importClientJson(writeClientJson("{\"web\":{\"client_id\":\"x\",\"client_secret\":\"y\"}}")).contains("Web client"));
+        QVERIFY(m_fetch->importClientJson(writeClientJson("{\"installed\":{\"client_id\":\"x\"}}")).contains("client_secret"));
         QVERIFY(!m_fetch->hasGoogleClient());
         QVERIFY(Keyring::lookup("precrime", "mail-client").isEmpty());
     }
@@ -1183,8 +1188,8 @@ private slots:
     // registration for forks. Clients come from the user (an imported JSON, a pasted ID).
     void theSourceContainsNoOAuthClient() {
 #ifdef PRECRIME_ROOT
-        static const QRegularExpression google(R"([0-9]{6,}-[0-9a-z]{20,}\.apps\.googleusercontent\.com|GOCSPX-[A-Za-z0-9_-]{10,})");
-        static const QRegularExpression guid(R"(\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b)");
+        static const QRegularExpression google("[0-9]{6,}-[0-9a-z]{20,}\\.apps\\.googleusercontent\\.com|GOCSPX-[A-Za-z0-9_-]{10,}");
+        static const QRegularExpression guid("\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b");
         QStringList found;
         QStringList files{QStringLiteral(PRECRIME_ROOT "/README.md")};
         for (const QString &dir : {QStringLiteral(PRECRIME_ROOT "/src"), QStringLiteral(PRECRIME_ROOT "/completions")}) {

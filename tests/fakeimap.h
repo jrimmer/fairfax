@@ -384,8 +384,12 @@ private:
             }
             return;
         }
+        // After the error JSON the client must answer with an empty line; anything else is a protocol error.
         s->authStep = 0;
-        s->send(s->authTag + " NO [AUTHENTICATIONFAILED] bad token\r\n");
+        if (line.trimmed().isEmpty())
+            s->send(s->authTag + " NO [AUTHENTICATIONFAILED] bad token\r\n");
+        else
+            s->send(s->authTag + " BAD expected an empty response\r\n");
     }
 
     void handleUid(Session *s, const QByteArray &tag, const QStringList &t, const QString &rest) {

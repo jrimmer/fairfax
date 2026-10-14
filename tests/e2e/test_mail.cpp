@@ -87,6 +87,7 @@ void clearField(QQuickWindow *sw, const QString &name) {
 void clickFetchNow() {
     QQuickItem *button = nullptr;
     control("mailFetchNow", button);
+    QVERIFY(button);
     click(button);
 }
 
@@ -94,6 +95,7 @@ void clickFetchNow() {
 void typePassword(QQuickWindow *sw, const QString &password) {
     QQuickItem *field = nullptr;
     control("mailPassword", field);
+    QVERIFY(field);
     click(field);
     typeInto(sw, password);
     QTest::keyClick(sw, Qt::Key_Return);
@@ -178,6 +180,7 @@ private slots:
         selectPane(sw, "Mail");
         QQuickItem *account = nullptr;
         control("setting:mail.account", account);
+        QVERIFY(account);
         QCOMPARE(comboText("setting:mail.account"), QString("Gmail"));
         QVERIFY(!isChecked(findItem("setting:mail.enabled")));
         QCOMPARE(textOf("mailStatus"), QString("Off"));
@@ -203,6 +206,7 @@ private slots:
         openMailPane(app, sw);
         QQuickItem *guide = nullptr;
         control("mailPlusGuide", guide);
+        QVERIFY(guide);
         QVERIFY(guide->property("text").toString().contains("you+precrime@gmail.com"));   // The example until there is an address.
         setText(sw, "setting:mail.address", "jane@gmail.com");
         QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane+precrime@gmail.com</b>"), 5000);
@@ -225,6 +229,7 @@ private slots:
         openMailPane(app, sw);
         QQuickItem *copy = nullptr;
         control("mailCopyAddress", copy);
+        QVERIFY(copy);
         QVERIFY(!copy->isEnabled());   // Nothing to copy until there is an address.
         setText(sw, "setting:mail.address", "jane@gmail.com");
         QTRY_VERIFY_WITH_TIMEOUT(findItem("mailCopyAddress")->isEnabled(), 5000);
@@ -282,6 +287,7 @@ private slots:
         choose("setting:mail.account", "Outlook");
         QQuickItem *davmail = nullptr;
         control("mailUseDavMail", davmail);
+        QVERIFY(davmail);
         QVERIFY(textOf("mailOutlookDavmail").contains("DavMail"));
         click(davmail);
         QTRY_COMPARE_WITH_TIMEOUT(comboText("setting:mail.account"), QString("Other"), 5000);
@@ -306,6 +312,7 @@ private slots:
         openMailPane(app, sw);
         QQuickItem *pipe = nullptr;
         control("mailPipe", pipe);
+        QVERIFY(pipe);
         QVERIFY2(pipe->width() <= 700, qPrintable(QString("the command text is %1 px wide in a 720 px window").arg(pipe->width())));
         QVERIFY(pipe->property("text").toString().contains("precrime import-mail message.eml"));
         QVERIFY(pipe->property("text").toString().contains("precrime import-mail --maildir"));
@@ -322,6 +329,7 @@ private slots:
         choose("setting:mail.account", "Other");
         QQuickItem *warning = nullptr;
         control("mailUnfilteredWarning", warning);
+        QVERIFY(warning);
         QCOMPARE(warning->property("text").toString(), QString("Every message in INBOX will become a task."));
         setText(sw, "setting:mail.folder", "Orders");
         QTRY_COMPARE_WITH_TIMEOUT(textOf("mailUnfilteredWarning"), QString("Every message in Orders will become a task."), 5000);
@@ -344,18 +352,21 @@ private slots:
         openMailPane(app, sw);
         QQuickItem *help = nullptr;
         control("mailAppPasswordHelp", help);
+        QVERIFY(help);
         const QString text = help->property("text").toString();
         QVERIFY(text.contains("2-Step Verification"));
         QVERIFY(text.contains("myaccount.google.com/apppasswords"));
         QVERIFY(text.contains("IMAP"));
         QQuickItem *link = nullptr;
         control("mailAppPasswordLink", link);
+        QVERIFY(link);
         click(link);
         QTRY_VERIFY_WITH_TIMEOUT(!sink.urls.isEmpty(), 5000);
         QCOMPARE(sink.urls.last().toString(), QString("https://myaccount.google.com/apppasswords"));
 
         QQuickItem *field = nullptr;
         control("mailPassword", field);
+        QVERIFY(field);
         QCOMPARE(field->property("echoMode").toInt(), 2);   // TextInput.Password: masked.
         QCOMPARE(field->property("placeholderText").toString(), QString("Not set"));
         QVERIFY(!app.services().mail->hasPassword());
@@ -371,6 +382,7 @@ private slots:
         // Forget removes it.
         QQuickItem *forget = nullptr;
         control("mailPasswordClear", forget);
+        QVERIFY(forget);
         click(forget);
         QTRY_VERIFY_WITH_TIMEOUT(!app.services().mail->hasPassword(), 5000);
         QVERIFY(Keyring::lookup("precrime", "mail").isEmpty());
@@ -428,6 +440,7 @@ private slots:
         openMailPane(*s.app, sw);
         QQuickItem *probe = nullptr;
         control("setting:mail.host", probe);
+        QVERIFY(probe);
         QCOMPARE(comboText("setting:mail.account"), QString("Other"));
         QCOMPARE(textOf("setting:mail.address"), QString("jane@example.org"));
         QCOMPARE(textOf("setting:mail.host"), QString("127.0.0.1"));
@@ -693,14 +706,17 @@ private slots:
         QVERIFY(!findItem("mailImportClient"));
         QQuickItem *advanced = nullptr;
         control("mailGoogleAdvanced", advanced);
+        QVERIFY(advanced);
         click(advanced);
         QQuickItem *import = nullptr;
         control("mailImportClient", import);
+        QVERIFY(import);
         QCOMPARE(textOf("mailClientStatus"), QString("No client imported"));
 
         // Signing in before there is a client says what to do.
         QQuickItem *signIn = nullptr;
         control("mailSignIn", signIn);
+        QVERIFY(signIn);
         QCOMPARE(signIn->property("text").toString(), QString("Sign in with Google"));
         click(signIn);
         QTRY_VERIFY_WITH_TIMEOUT(textOf("mailOAuthError").contains("Import your Google client JSON first"), 5000);
@@ -782,11 +798,13 @@ private slots:
         openMailPane(app, sw);
         QQuickItem *advanced = nullptr;
         control("mailGoogleAdvanced", advanced);
+        QVERIFY(advanced);
         click(advanced);
         // The client is set up directly: importing it is not what this test is about.
         QCOMPARE(app.services().mail->importClientJson(writeFile(QFileInfo(app.store().path()).absolutePath(), "c.json", GoogleClient)), QString());
         QQuickItem *signIn = nullptr;
         control("mailSignIn", signIn);
+        QVERIFY(signIn);
         click(signIn);
         QTRY_VERIFY_WITH_TIMEOUT(!browser.urls.isEmpty(), 5000);
         const QUrlQuery q(browser.urls.last());
@@ -813,13 +831,16 @@ private slots:
         QVERIFY(!findItem("setting:mail.msClientId"));   // Folded away until asked for.
         QQuickItem *advanced = nullptr;
         control("mailMsAdvanced", advanced);
+        QVERIFY(advanced);
         click(advanced);
         QQuickItem *idField = nullptr;
         control("setting:mail.msClientId", idField);
+        QVERIFY(idField);
 
         // No client ID yet: it says so.
         QQuickItem *signIn = nullptr;
         control("mailSignIn", signIn);
+        QVERIFY(signIn);
         QCOMPARE(signIn->property("text").toString(), QString("Sign in with Microsoft"));
         click(signIn);
         QTRY_VERIFY_WITH_TIMEOUT(textOf("mailOAuthError").contains("client) ID"), 5000);
