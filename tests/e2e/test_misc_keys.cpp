@@ -10,6 +10,7 @@
 #include <QRegularExpression>
 
 #include "misckit.h"
+#include "shortcuts.h"
 #include "../testregistry.h"
 
 using namespace e2e;
@@ -44,13 +45,14 @@ QString canonical(QString token) {
     return (mods + QStringList{key}).join('+');
 }
 
-// The sequences Main.qml registers.
+// The default keys of the application shortcuts Main.qml registers, read from
+// the command registry.
 QSet<QString> mainShortcuts() {
     QSet<QString> out;
-    static const QRegularExpression re("sequence:\\s*\"([^\"]+)\"");
-    const QString text = slurp(QString(SRCDIR) + "/qml/Main.qml");
-    for (auto it = re.globalMatch(text); it.hasNext();)
-        out.insert(canonical(it.next().captured(1)));
+    for (const Shortcuts::Command &c : Shortcuts::commands())
+        if (c.context == Shortcuts::Context::App)
+            for (const QString &seq : c.defaults)
+                if (!seq.isEmpty()) out.insert(canonical(seq));
     return out;
 }
 
@@ -81,33 +83,23 @@ QSet<QString> readmeShortcuts() {
     return out;
 }
 
-// The keys TaskPane.qml's handleKey acts on, in the notation above.
+// The default keys of the task list's own commands, read from the command
+// registry, in the notation above (Shift+] rather than Shift+}).
 QSet<QString> listKeys() {
     QSet<QString> out;
-    const QString all = slurp(QString(SRCDIR) + "/qml/TaskPane.qml");
-    const QString text = all.mid(all.indexOf("function handleKey"));
-    static const QHash<QString, QString> named{
-        {"Equal", "="}, {"Plus", "+"}, {"Minus", "-"}, {"BracketRight", "]"}, {"BraceRight", "Shift+]"}, {"BracketLeft", "["},
-        {"BraceLeft", "Shift+["}, {"Period", "."}, {"Greater", "Shift+."}, {"Comma", ","}, {"Less", "Shift+,"}, {"Slash", "/"},
-        {"Question", "?"}, {"Down", "Down"}, {"Up", "Up"}, {"Return", "Return"}, {"Escape", "Escape"}, {"Space", "Space"},
-        {"Delete", "Delete"}, {"Backspace", "Backspace"}};
-    auto bare = [&](const QString &name) -> QString {
-        if (name == "Enter" || name == "Alt") return {};
-        if (named.contains(name)) return named.value(name);
-        return name.size() == 1 ? canonical(name) : QString("?" + name);
-    };
-    static const QRegularExpression ctrlKey("ctrl && k === Qt\\.Key_(\\w+)");
-    static const QRegularExpression key("Qt\\.Key_(\\w+)");
-    for (const QString &line : text.split('\n')) {
-        if (line.contains("ctrl && shift")) {
-            out.insert("Ctrl+Shift+[");
-        } else if (const auto c = ctrlKey.match(line); c.hasMatch()) {
-            out.insert(canonical("Ctrl+" + c.captured(1)));
-        } else if (line.contains("case Qt.Key_") || line.contains("k === Qt.Key_")) {
-            for (auto it = key.globalMatch(line); it.hasNext();) {
-                const QString token = bare(it.next().captured(1));
-                if (!token.isEmpty()) out.insert(token);
-            }
+    static const QHash<QString, QString> spelled{
+        {"Shift+}", "Shift+]"}, {"Shift+{", "Shift+["}, {"Shift+>", "Shift+."}, {"Shift+<", "Shift+,"}, {"Shift++", "+"},
+        {"Shift+?", "?"}, {"Del", "Delete"}};
+    for (const Shortcuts::Command &c : Shortcuts::commands()) {
+        if (c.context != Shortcuts::Context::List)
+            continue;
+        for (const QString &seq : c.defaults) {
+            // Enter is Return's twin, the Alt hold reveals names, and the shifted
+            // arrows extend the selection: none is a key of its own here.
+            if (seq.isEmpty() || seq == "Enter" || seq == "Alt" || seq == "Shift+Up" || seq == "Shift+Down")
+                continue;
+            const QString key = spelled.value(seq, seq);
+            out.insert(key == "+" ? key : canonical(key));
         }
     }
     return out;
@@ -454,8 +446,11 @@ private slots:
                 seen << i->property("text").toString();
             return false;
         });
-        for (const QString &want : {"TASK LIST (BARE KEYS)", "NEW & EDIT", "VIEW", "Quick Look", "Defer / Schedule…", "New task", "Settings"})
+        for (const QString &want : {"TASK LIST (BARE KEYS)", "NEW & EDIT", "VIEW", "Quick Look", "Defer…", "Schedule…", "New task", "Settings"})
             QVERIFY2(seen.contains(want), qPrintable(want + " not in the overlay"));
+        // Every command of the registry has its row.
+        for (const Shortcuts::Command &c : Shortcuts::commands())
+            QVERIFY2(seen.contains(c.title), qPrintable(c.title + " not in the overlay"));
         // Every sequence Main.qml registers is written somewhere on it.
         QString everything = seen.join('\n');
         everything.replace(QStringLiteral("↑"), "Up").replace(QStringLiteral("↓"), "Down");

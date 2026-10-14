@@ -116,7 +116,7 @@ inline void closeSettings(App &app) {
 
 inline const QStringList &paneNames() {
     static const QStringList names{"General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Mail",
-                                   "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"};
+                                   "Backups", "Import & Export", "Calendar", "Automation", "Shortcuts", "Diagnostics"};
     return names;
 }
 
@@ -664,6 +664,8 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"mail.googleClientId", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
         {"mail.msClientId", "E2EMailOAuth::yourOwnClientIdThenSignInWithMicrosoft"},
         {"mail.oauth", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
+        // The Shortcuts pane stores each remappable command under this prefix.
+        {"shortcuts.", "E2EShortcuts::rebindAppCommandPersists"},
     };
     return m;
 }
