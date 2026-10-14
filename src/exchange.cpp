@@ -28,8 +28,12 @@
 #include "model.h"
 #include "recurrence.h"
 #include "store.h"
+#include "vtodo.h"
 
 namespace {
+
+// The iCalendar helpers live in vtodo.cpp, shared with the CalDAV client.
+using namespace Vtodo;
 
 // ------------------------------------------------------------------ shared
 
@@ -103,371 +107,6 @@ QString typeName(int t) {
     return QStringLiteral("Task");
 }
 
-// ------------------------------------------------------------------- ICS
-
-const char *DayCodes[7] = {"MO", "TU", "WE", "TH", "FR", "SA", "SU"};
-constexpr int MonToFri = 0b0011111;
-
-QString escapeText(const QString &s) {
-    QString out;
-    out.reserve(s.size());
-    for (QChar c : s) {
-        if (c == '\\') out += "\\\\";
-        else if (c == ';') out += "\;";
-        else if (c == ',') out += "\\,";
-        else if (c == '\n') out += "\\n";
-        else if (c == '\r') continue;
-        else out += c;
-    }
-    return out;
-}
-
-QString unescapeText(const QString &s) {
-    QString out;
-    out.reserve(s.size());
-    for (int i = 0; i < s.size(); ++i) {
-        if (s[i] == '\\' && i + 1 < s.size()) {
-            const QChar n = s[++i];
-            out += (n == 'n' || n == 'N') ? QChar('\n') : n;
-        } else {
-            out += s[i];
-        }
-    }
-    return out;
-}
-
-// Folds to 75 octets per line, never splitting a UTF-8 sequence.
-void appendFolded(QByteArray &out, const QString &line) {
-    int used = 0;
-    const int limit = 75;
-    int cap = limit;
-    for (int i = 0; i < line.size();) {
-        int len = 1;
-        if (line[i].isHighSurrogate() && i + 1 < line.size())
-            len = 2;
-        const QByteArray bytes = line.mid(i, len).toUtf8();
-        if (used + bytes.size() > cap) {
-            out += "\r\n ";
-            used = 1;
-        }
-        out += bytes;
-        used += bytes.size();
-        i += len;
-    }
-    out += "\r\n";
-}
-
-QString icsDate(const QDate &d) { return d.toString("yyyyMMdd"); }
-
-QString icsLocal(const QDate &d, int minutes) {
-    return icsDate(d) + QStringLiteral("T%1%2").arg(minutes / 60, 2, 10, QChar('0')).arg(minutes % 60, 2, 10, QChar('0')) + QStringLiteral("00");
-}
-
-QString icsUtc(const QDateTime &dt) { return dt.toUTC().toString("yyyyMMdd'T'HHmmss'Z'"); }
-
-QString triggerText(int minutes) {
-    // `minutes` before the due moment.
-    const QString sign = minutes > 0 ? "-" : "";
-    const int m = qAbs(minutes);
-    if (m == 0)
-        return QStringLiteral("PT0S");
-    if (m % 1440 == 0)
-        return QStringLiteral("%1P%2D").arg(sign).arg(m / 1440);
-    if (m % 60 == 0)
-        return QStringLiteral("%1PT%2H").arg(sign).arg(m / 60);
-    return QStringLiteral("%1PT%2M").arg(sign).arg(m);
-}
-
-QString rruleText(const Recurrence &r) {
-    QString freq;
-    QString byday;
-    switch (r.frequency) {
-    case Repeat::Daily: freq = "DAILY"; break;
-    case Repeat::Weekly: freq = "WEEKLY"; break;
-    case Repeat::Weekdays: freq = "WEEKLY"; byday = "MO,TU,WE,TH,FR"; break;
-    case Repeat::Monthly: freq = "MONTHLY"; break;
-    case Repeat::Yearly: freq = "YEARLY"; break;
-    default: return {};
-    }
-    QString out = "FREQ=" + freq;
-    if (r.interval > 1)
-        out += QStringLiteral(";INTERVAL=%1").arg(r.interval);
-    if (r.frequency == Repeat::Weekly && r.weekdays) {
-        QStringList days;
-        for (int i = 0; i < 7; ++i)
-            if (r.weekdays & (1 << i))
-                days << DayCodes[i];
-        byday = days.join(',');
-    }
-    if (r.frequency == Repeat::Monthly && r.monthOrdinal && r.monthWeekday >= 1 && r.monthWeekday <= 7)
-        byday = QStringLiteral("%1%2").arg(r.monthOrdinal).arg(DayCodes[r.monthWeekday - 1]);
-    if (!byday.isEmpty())
-        out += ";BYDAY=" + byday;
-    if (r.endType == Repeat::AfterCount && r.endCount > 0)
-        out += QStringLiteral(";COUNT=%1").arg(r.endCount);
-    else if (r.endType == Repeat::OnDate && r.endDate.isValid())
-        out += ";UNTIL=" + icsDate(r.endDate);
-    return out;
-}
-
-struct Prop {
-    QString name;
-    QMap<QString, QString> params;
-    QString value;
-};
-
-struct Component {
-    QString kind;
-    QList<Prop> props;
-    QList<Component> children;
-    QString first(const QString &name) const {
-        for (const Prop &p : props)
-            if (p.name == name)
-                return p.value;
-        return {};
-    }
-    const Prop *find(const QString &name) const {
-        for (const Prop &p : props)
-            if (p.name == name)
-                return &p;
-        return nullptr;
-    }
-};
-
-QStringList splitUnescaped(const QString &s, QChar sep) {
-    QStringList parts;
-    QString cur;
-    for (int i = 0; i < s.size(); ++i) {
-        if (s[i] == '\\' && i + 1 < s.size()) {
-            cur += s[i];
-            cur += s[++i];
-        } else if (s[i] == sep) {
-            parts << cur;
-            cur.clear();
-        } else {
-            cur += s[i];
-        }
-    }
-    parts << cur;
-    return parts;
-}
-
-QStringList splitOutsideQuotes(const QString &s, QChar sep) {
-    QStringList parts;
-    QString cur;
-    bool quoted = false;
-    for (QChar c : s) {
-        if (c == '"') quoted = !quoted;
-        if (c == sep && !quoted) {
-            parts << cur;
-            cur.clear();
-        } else {
-            cur += c;
-        }
-    }
-    parts << cur;
-    return parts;
-}
-
-bool parseLine(const QString &line, Prop &prop) {
-    bool quoted = false;
-    int colon = -1;
-    for (int i = 0; i < line.size(); ++i) {
-        if (line[i] == '"') quoted = !quoted;
-        else if (line[i] == ':' && !quoted) { colon = i; break; }
-    }
-    if (colon <= 0)
-        return false;
-    const QStringList head = splitOutsideQuotes(line.left(colon), ';');
-    prop.name = head.first().trimmed().toUpper();
-    prop.params.clear();
-    for (int i = 1; i < head.size(); ++i) {
-        const int eq = head[i].indexOf('=');
-        if (eq > 0) {
-            QString v = head[i].mid(eq + 1);
-            if (v.size() >= 2 && v.startsWith('"') && v.endsWith('"'))
-                v = v.mid(1, v.size() - 2);
-            prop.params.insert(head[i].left(eq).toUpper(), v);
-        }
-    }
-    prop.value = line.mid(colon + 1);
-    return true;
-}
-
-// Reads the VTODO components (anywhere in the nesting) from unfolded text.
-QList<Component> parseTodos(const QString &text) {
-    QString norm = text;
-    norm.replace("\r\n", "\n").replace('\r', '\n');
-    QStringList lines;
-    for (const QString &raw : norm.split('\n')) {
-        if (!raw.isEmpty() && (raw[0] == ' ' || raw[0] == '\t') && !lines.isEmpty())
-            lines.last() += raw.mid(1);
-        else
-            lines << raw;
-    }
-    QList<Component> todos;
-    QList<Component> stack;  // Open components; popped ones attach to their parent.
-    for (const QString &line : lines) {
-        if (line.trimmed().isEmpty())
-            continue;
-        Prop p;
-        if (!parseLine(line, p))
-            continue;
-        if (p.name == "BEGIN") {
-            Component c;
-            c.kind = p.value.trimmed().toUpper();
-            stack.append(c);
-        } else if (p.name == "END") {
-            if (stack.isEmpty())
-                continue;
-            Component done = stack.takeLast();
-            if (done.kind == "VTODO")
-                todos.append(done);
-            else if (!stack.isEmpty() && stack.last().kind == "VTODO")
-                stack.last().children.append(done);
-        } else if (!stack.isEmpty()) {
-            stack.last().props.append(p);
-        }
-    }
-    return todos;
-}
-
-struct IcsDate {
-    QDate date;
-    int minutes = -1;
-    bool valid() const { return date.isValid(); }
-};
-
-IcsDate parseIcsDate(const QString &raw, const QString &valueParam = {}) {
-    IcsDate out;
-    const QString v = raw.trimmed();
-    if (v.size() >= 15 && valueParam != "DATE") {
-        QDateTime dt = QDateTime::fromString(v.left(15), "yyyyMMdd'T'HHmmss");
-        if (!dt.isValid())
-            return out;
-        if (v.endsWith('Z', Qt::CaseInsensitive)) {
-            dt.setTimeZone(QTimeZone::utc());
-            dt = dt.toLocalTime();
-        }
-        out.date = dt.date();
-        out.minutes = dt.time().hour() * 60 + dt.time().minute();
-    } else if (v.size() >= 8) {
-        out.date = QDate::fromString(v.left(8), "yyyyMMdd");
-    }
-    return out;
-}
-
-QDateTime parseIcsStamp(const QString &raw) {
-    const QString v = raw.trimmed();
-    if (v.size() < 15)
-        return {};
-    QDateTime dt = QDateTime::fromString(v.left(15), "yyyyMMdd'T'HHmmss");
-    if (v.endsWith('Z', Qt::CaseInsensitive)) {
-        dt.setTimeZone(QTimeZone::utc());
-        return dt.toLocalTime();
-    }
-    return dt;
-}
-
-// Seconds from an RFC 5545 duration (P1DT2H30M, -PT15M), signed.
-bool parseDurationSeconds(const QString &raw, qint64 *seconds) {
-    QString v = raw.trimmed();
-    int sign = 1;
-    if (v.startsWith('-')) { sign = -1; v = v.mid(1); }
-    else if (v.startsWith('+')) v = v.mid(1);
-    if (!v.startsWith('P'))
-        return false;
-    qint64 total = 0;
-    bool inTime = false;
-    QString num;
-    for (int i = 1; i < v.size(); ++i) {
-        const QChar c = v[i];
-        if (c == 'T') { inTime = true; continue; }
-        if (c.isDigit()) { num += c; continue; }
-        const qint64 n = num.toLongLong();
-        num.clear();
-        switch (c.toLatin1()) {
-        case 'W': total += n * 7 * 86400; break;
-        case 'D': total += n * 86400; break;
-        case 'H': total += n * 3600; break;
-        case 'M': total += inTime ? n * 60 : 0; break;
-        case 'S': total += n; break;
-        default: return false;
-        }
-    }
-    *seconds = sign * total;
-    return true;
-}
-
-int dayIndex(const QString &code) {
-    for (int i = 0; i < 7; ++i)
-        if (code.compare(DayCodes[i], Qt::CaseInsensitive) == 0)
-            return i;
-    return -1;
-}
-
-Recurrence parseRrule(const QString &rule) {
-    Recurrence r;
-    QMap<QString, QString> kv;
-    for (const QString &part : rule.split(';')) {
-        const int eq = part.indexOf('=');
-        if (eq > 0)
-            kv.insert(part.left(eq).trimmed().toUpper(), part.mid(eq + 1).trimmed());
-    }
-    const QString freq = kv.value("FREQ").toUpper();
-    if (freq == "DAILY") r.frequency = Repeat::Daily;
-    else if (freq == "WEEKLY") r.frequency = Repeat::Weekly;
-    else if (freq == "MONTHLY") r.frequency = Repeat::Monthly;
-    else if (freq == "YEARLY") r.frequency = Repeat::Yearly;
-    else return Recurrence{};
-    r.interval = qMax(1, kv.value("INTERVAL", "1").toInt());
-
-    int mask = 0;
-    for (const QString &d : kv.value("BYDAY").split(',', Qt::SkipEmptyParts)) {
-        QString code = d.trimmed();
-        QString ord;
-        while (!code.isEmpty() && (code[0].isDigit() || code[0] == '-' || code[0] == '+')) {
-            ord += code[0];
-            code.remove(0, 1);
-        }
-        const int idx = dayIndex(code);
-        if (idx < 0)
-            continue;
-        if (r.frequency == Repeat::Monthly || r.frequency == Repeat::Yearly) {
-            if (!ord.isEmpty() && r.frequency == Repeat::Monthly && r.monthOrdinal == 0) {
-                const int o = ord.toInt();
-                if ((o >= 1 && o <= 5) || o == -1) {
-                    r.monthOrdinal = o;
-                    r.monthWeekday = idx + 1;
-                }
-            }
-        } else {
-            mask |= 1 << idx;
-        }
-    }
-    if (r.frequency == Repeat::Weekly && mask) {
-        if (mask == MonToFri)
-            r.frequency = Repeat::Weekdays;
-        else
-            r.weekdays = mask;
-    }
-    if (kv.contains("COUNT") && kv.value("COUNT").toInt() > 0) {
-        r.endType = Repeat::AfterCount;
-        r.endCount = kv.value("COUNT").toInt();
-    } else if (kv.contains("UNTIL")) {
-        const IcsDate until = parseIcsDate(kv.value("UNTIL"));
-        if (until.valid()) {
-            r.endType = Repeat::OnDate;
-            r.endDate = until.date;
-        }
-    }
-    return r;
-}
-
-bool truthy(const QString &v) {
-    const QString s = v.trimmed().toUpper();
-    return s == "1" || s == "TRUE" || s == "YES";
-}
 
 // Finds or creates lists and tags within one import change, so repeated
 // names resolve to the same record.
@@ -912,7 +551,6 @@ bool exportCsv(const Store &store, const QString &path, const QList<qint64> &tas
 bool exportIcs(const Store &store, const QString &path, const QList<qint64> &taskIds, QString *error) {
     const QList<qint64> ids = exportIds(store, taskIds);
     const QSet<qint64> included(ids.begin(), ids.end());
-    const QString stamp = icsUtc(QDateTime::currentDateTime());
     QByteArray out;
     auto line = [&](const QString &l) { appendFolded(out, l); };
     line("BEGIN:VCALENDAR");
@@ -921,69 +559,10 @@ bool exportIcs(const Store &store, const QString &path, const QList<qint64> &tas
     line("CALSCALE:GREGORIAN");
     for (qint64 id : ids) {
         const Task t = store.task(id);
-        line("BEGIN:VTODO");
-        line("UID:" + (t.uid.isEmpty() ? QUuid::createUuid().toString(QUuid::WithoutBraces) : t.uid));
-        line("SUMMARY:" + escapeText(t.title));
-        if (!t.notes.isEmpty())
-            line("DESCRIPTION:" + escapeText(t.notes));
-        line("DTSTAMP:" + stamp);
-        if (t.created.isValid())
-            line("CREATED:" + icsUtc(t.created));
-        if (t.modified.isValid())
-            line("LAST-MODIFIED:" + icsUtc(t.modified));
-        if (t.startDate.isValid())
-            line(t.startTime >= 0 ? "DTSTART:" + icsLocal(t.startDate, t.startTime)
-                                  : "DTSTART;VALUE=DATE:" + icsDate(t.startDate));
-        if (t.dueDate.isValid())
-            line(t.dueTime >= 0 ? "DUE:" + icsLocal(t.dueDate, t.dueTime) : "DUE;VALUE=DATE:" + icsDate(t.dueDate));
-        switch (t.priority) {
-        case Priority::High: line("PRIORITY:1"); break;
-        case Priority::Medium: line("PRIORITY:5"); break;
-        case Priority::Low: line("PRIORITY:9"); break;
-        default: break;
-        }
-        if (t.completed) {
-            line("STATUS:COMPLETED");
-            if (t.completedAt.isValid())
-                line("COMPLETED:" + icsUtc(t.completedAt));
-        } else {
-            line("STATUS:NEEDS-ACTION");
-        }
-        QStringList cats;
-        for (qint64 tid : t.tagIds)
-            if (store.tags().contains(tid))
-                cats << escapeText(store.tag(tid).name);
-        if (!cats.isEmpty())
-            line("CATEGORIES:" + cats.join(','));
-        if (store.lists().contains(t.listId))
-            line("X-FAIRFAX-LIST:" + escapeText(store.list(t.listId).name));
-        line(QString("X-FAIRFAX-TYPE:") + (t.type == TaskType::Project ? "project" : t.type == TaskType::Checklist ? "checklist" : "task"));
-        if (t.starred)
-            line("X-FAIRFAX-STARRED:1");
-        if (t.duration > 0)
-            line(QStringLiteral("X-FAIRFAX-DURATION:%1").arg(t.duration));
-        if (t.parentId && included.contains(t.parentId) && store.tasks().contains(t.parentId))
-            line("RELATED-TO;RELTYPE=PARENT:" + store.task(t.parentId).uid);
-        if (t.recurrence.isSet()) {
-            line("RRULE:" + rruleText(t.recurrence));
-            if (t.recurrence.from == Repeat::FromCompletion)
-                line("X-FAIRFAX-REPEAT-FROM:COMPLETION");
-        }
-        for (const Alarm &a : store.alarmsFor(t.id)) {
-            if (a.deleted)
-                continue;
-            line("BEGIN:VALARM");
-            line("ACTION:DISPLAY");
-            line("DESCRIPTION:" + escapeText(t.title));
-            if (a.kind == Alarm::Absolute && a.at.isValid())
-                line("TRIGGER;VALUE=DATE-TIME:" + icsUtc(a.at));
-            else if (a.kind == Alarm::DaysBefore)  // Counted back from midnight of the date.
-                line("TRIGGER:" + triggerText(a.offset * 24 * 60 - (a.at.time().hour() * 60 + a.at.time().minute())));
-            else
-                line("TRIGGER:" + triggerText(a.offset));
-            line("END:VALARM");
-        }
-        line("END:VTODO");
+        WriteOptions options;
+        options.stamp = icsUtc(QDateTime::currentDateTime());
+        options.parentIncluded = included.contains(t.parentId);
+        appendTodo(out, store, t, options);
     }
     line("END:VCALENDAR");
     return writeFile(path, out, error);
@@ -1060,7 +639,7 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
         result.error = file.errorString();
         return result;
     }
-    const QList<Component> todos = parseTodos(QString::fromUtf8(file.readAll()));
+    const QList<Parsed> todos = allFromIcs(file.readAll());
     if (todos.isEmpty()) {
         result.error = QStringLiteral("The selected calendar file does not contain any tasks.");
         return result;
@@ -1081,97 +660,21 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
     QList<Pending> pending;
     QHash<QString, int> byUid;
 
-    for (const Component &c : todos) {
-        Pending p;
-        Task &t = p.task;
-        t.title = unescapeText(c.first("SUMMARY"));
-        t.notes = unescapeText(c.first("DESCRIPTION"));
-        p.uid = c.first("UID").trimmed();
-
-        if (const Prop *s = c.find("DTSTART")) {
-            const IcsDate d = parseIcsDate(s->value, s->params.value("VALUE").toUpper());
-            t.startDate = d.date;
-            t.startTime = d.minutes;
+    for (const Parsed &p : todos) {
+        Pending row;
+        row.task = p.task;
+        row.uid = p.uid;
+        row.parentUid = p.parentUid;
+        row.listName = p.listName;
+        row.alarms = p.alarms;
+        for (const QString &name : p.tagNames) {
+            const qint64 id = res.tagNamed(name);
+            if (!row.task.tagIds.contains(id))
+                row.task.tagIds << id;
         }
-        if (const Prop *s = c.find("DUE")) {
-            const IcsDate d = parseIcsDate(s->value, s->params.value("VALUE").toUpper());
-            t.dueDate = d.date;
-            t.dueTime = d.minutes;
-        }
-        qint64 seconds = 0;
-        const QString durationText = c.first("X-FAIRFAX-DURATION");
-        if (!durationText.isEmpty())
-            t.duration = qMax(0, durationText.trimmed().toInt());
-        else if (parseDurationSeconds(c.first("DURATION"), &seconds) && seconds > 0)
-            t.duration = int(seconds / 60);
-
-        const int prio = c.first("PRIORITY").trimmed().toInt();
-        t.priority = prio >= 1 && prio <= 4 ? Priority::High : prio == 5 ? Priority::Medium : prio >= 6 && prio <= 9 ? Priority::Low : Priority::None;
-
-        const QString status = c.first("STATUS").trimmed().toUpper();
-        t.completed = status == "COMPLETED" || status == "CANCELLED" || c.first("PERCENT-COMPLETE").trimmed() == "100" ||
-                      c.find("COMPLETED") != nullptr;
-        if (t.completed) {
-            t.completedAt = parseIcsStamp(c.first("COMPLETED"));
-            if (!t.completedAt.isValid())
-                t.completedAt = QDateTime::currentDateTime();
-        }
-        t.created = parseIcsStamp(c.first("CREATED"));
-
-        for (const Prop &prop : c.props) {
-            if (prop.name != "CATEGORIES")
-                continue;
-            for (const QString &raw : splitUnescaped(prop.value, ',')) {
-                const QString name = unescapeText(raw).trimmed();
-                if (name.isEmpty())
-                    continue;
-                const qint64 id = res.tagNamed(name);
-                if (!t.tagIds.contains(id))
-                    t.tagIds << id;
-            }
-        }
-        const QString type = c.first("X-FAIRFAX-TYPE").trimmed().toLower();
-        t.type = type == "project" ? TaskType::Project : type == "checklist" ? TaskType::Checklist : TaskType::Task;
-        t.starred = truthy(c.first("X-FAIRFAX-STARRED"));
-        p.listName = unescapeText(c.first("X-FAIRFAX-LIST")).trimmed();
-
-        for (const Prop &prop : c.props) {
-            if (prop.name == "RELATED-TO" && p.parentUid.isEmpty()) {
-                const QString rel = prop.params.value("RELTYPE", "PARENT").toUpper();
-                if (rel == "PARENT")
-                    p.parentUid = prop.value.trimmed();
-            }
-        }
-        if (const Prop *r = c.find("RRULE")) {
-            t.recurrence = parseRrule(r->value);
-            if (t.recurrence.isSet() && c.first("X-FAIRFAX-REPEAT-FROM").trimmed().toUpper() == "COMPLETION")
-                t.recurrence.from = Repeat::FromCompletion;
-        }
-
-        for (const Component &va : c.children) {
-            if (va.kind != "VALARM")
-                continue;
-            const Prop *trig = va.find("TRIGGER");
-            if (!trig)
-                continue;
-            Alarm a;
-            if (trig->params.value("VALUE").toUpper() == "DATE-TIME") {
-                a.kind = Alarm::Absolute;
-                a.at = parseIcsStamp(trig->value);
-                if (!a.at.isValid())
-                    continue;
-            } else {
-                qint64 secs = 0;
-                if (!parseDurationSeconds(trig->value, &secs))
-                    continue;
-                a.kind = Alarm::Relative;
-                a.offset = qMax(0, int(qRound(-secs / 60.0)));
-            }
-            p.alarms << a;
-        }
-        if (!p.uid.isEmpty())
-            byUid.insert(p.uid, int(pending.size()));
-        pending.append(p);
+        if (!row.uid.isEmpty())
+            byUid.insert(row.uid, int(pending.size()));
+        pending.append(row);
     }
 
     // Assign ids, rebuild the hierarchy now every task is known, then lists.
