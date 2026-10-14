@@ -64,6 +64,7 @@ class Backend : public QObject {
     Q_PROPERTY(qint64 editingTaskId READ editingTaskId NOTIFY selectionChanged)
     Q_PROPERTY(QVariantMap editor READ editor NOTIFY editorChanged)
     Q_PROPERTY(QVariantList listChoices READ listChoices NOTIFY dataChanged)
+    Q_PROPERTY(QVariantList traySourceChoices READ traySourceChoices NOTIFY dataChanged)
     Q_PROPERTY(QStringList tagNames READ tagNames NOTIFY dataChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY dataChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY dataChanged)
@@ -123,6 +124,9 @@ public:
     qint64 editingTaskId() const { return m_editing; }
     QVariantMap editor() const { return m_editor; }
     QVariantList listChoices() const;
+    // The "Quick view" choices in Settings > General: Today, Starred,
+    // Scheduled, every list and Smart List, then Commands only.
+    QVariantList traySourceChoices() const;
     QStringList tagNames() const;
     bool canUndo() const { return m_store->canUndo(); }
     bool canRedo() const { return m_store->canRedo(); }

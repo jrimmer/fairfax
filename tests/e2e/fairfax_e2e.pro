@@ -20,7 +20,7 @@ HEADERS += taskkit.h
 RESOURCES += ../../src/resources.qrc
 
 # Settings end-to-end tests.
-HEADERS += settingskit.h settingscases_general.h settingscases_tasks.h settingscases_lists.h
+HEADERS += settingskit.h settingscases_general.h settingscases_tasks.h settingscases_lists.h settingscases_tray.h
 SOURCES += test_settings.cpp test_settings_lists.cpp test_settings_system.cpp
 DEFINES += SRCDIR=\\\"$$PWD/../../src\\\"
 

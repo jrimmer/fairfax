@@ -275,6 +275,27 @@ QVariantList Backend::listChoices() const {
     return result;
 }
 
+QVariantList Backend::traySourceChoices() const {
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    QVariantList result;
+    result.append(QVariantMap{{"name", "Today"}, {"id", QStringLiteral("today")}});
+    result.append(QVariantMap{{"name", "Starred"}, {"id", QStringLiteral("starred")}});
+    result.append(QVariantMap{{"name", "Scheduled"}, {"id", QStringLiteral("scheduled")}});
+    QVector<TaskList> lists;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived)
+            lists.append(l);
+    std::sort(lists.begin(), lists.end(), [](const TaskList &a, const TaskList &b) {
+        if (a.kind != b.kind)
+            return a.kind < b.kind;
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    for (const auto &l : lists)
+        result.append(QVariantMap{{"name", l.name}, {"id", QStringLiteral("list:%1").arg(l.id)}});
+    result.append(QVariantMap{{"name", "Commands only"}, {"id", QStringLiteral("none")}});
+    return result;
+}
+
 QStringList Backend::tagNames() const {
     QStringList names;
     for (const auto &t : m_store->tags())

@@ -46,6 +46,23 @@ Window {
         const v = value(key, fallback)
         return v === true || v === "true" || v === 1 || v === "1"
     }
+    // The five commands the tray menu can keep, as the one "tray.commands"
+    // setting holds them.
+    readonly property var trayCommandNames: ["new", "open", "find", "sync", "settings"]
+    function commandOn(name) {
+        return String(value("tray.commands", "new,open,find,sync,settings")).split(",")
+            .map(c => c.trim()).indexOf(name) >= 0
+    }
+    function setCommand(name, on) {
+        const kept = String(value("tray.commands", "new,open,find,sync,settings")).split(",")
+            .map(c => c.trim()).filter(c => c.length && c !== name)
+        if (on) kept.push(name)
+        kept.sort((a, b) => trayCommandNames.indexOf(a) - trayCommandNames.indexOf(b))
+        backend.setSetting("tray.commands", kept.join(","))
+    }
+    function pickTrayBadgeColour() {
+        trayColourPicker.pick(String(value("tray.badgeColor", "#E5484D")))
+    }
 
     // Omarchy windows have no title bar, so Settings closes itself: Escape,
     // Ctrl+W, or the ✕ in the corner (Super+W works too, as for any window).
@@ -198,7 +215,76 @@ Window {
                     Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Fairfax running. Q or Ctrl+Q quits for real." }
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
                     Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Fairfax takes the free one. With tiled windows Hyprland places it as usual." }
-                    Toggle { key: "general.trayIcon"; fallback: true; label: "Show Fairfax in the bar's tray"; note: "Its menu lists today's tasks, with New Task, Find, Sync and Quit." }
+                    Toggle { key: "general.trayIcon"; fallback: true; label: "Show Fairfax in the bar's tray"; note: "Its menu shows a quick view and commands; choose them below." }
+                    ColumnLayout {
+                        // The tray menu's content, only while the tray icon is on.
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 24
+                        spacing: 6
+                        enabled: root.bool("general.trayIcon", true)
+                        opacity: enabled ? 1 : 0.5
+                        Label { text: "Tray menu"; font.bold: true }
+                        RowLayout {
+                            Label { text: "Quick view"; Layout.preferredWidth: 160 }
+                            ComboBox {
+                                objectName: "setting:tray.source"
+                                implicitContentWidthPolicy: ComboBox.WidestText
+                                textRole: "name"
+                                valueRole: "id"
+                                model: backend.traySourceChoices
+                                currentIndex: Math.max(0, model.findIndex(c => c.id === String(root.value("tray.source", "today"))))
+                                onActivated: (i) => backend.setSetting("tray.source", model[i].id)
+                            }
+                        }
+                        RowLayout {
+                            Label { text: "Tasks shown"; Layout.preferredWidth: 160 }
+                            SpinBox {
+                                objectName: "setting:tray.count"
+                                from: 3; to: 30
+                                value: Number(root.value("tray.count", 12))
+                                onValueModified: backend.setSetting("tray.count", value)
+                            }
+                        }
+                        RowLayout {
+                            Label { text: "Clicking a task"; Layout.preferredWidth: 160 }
+                            ComboBox {
+                                objectName: "setting:tray.click"
+                                implicitContentWidthPolicy: ComboBox.WidestText
+                                readonly property var modes: ["open", "complete"]
+                                model: ["Opens it in Fairfax", "Completes it"]
+                                currentIndex: Math.max(0, modes.indexOf(String(root.value("tray.click", "open"))))
+                                onActivated: (i) => backend.setSetting("tray.click", modes[i])
+                            }
+                        }
+                        RowLayout {
+                            Label { text: "Commands"; Layout.preferredWidth: 160; Layout.alignment: Qt.AlignTop }
+                            ColumnLayout {
+                                spacing: 0
+                                CheckBox { objectName: "setting:tray.commands.new"; text: "New Task"; checked: root.commandOn("new"); onToggled: root.setCommand("new", checked) }
+                                CheckBox { objectName: "setting:tray.commands.open"; text: "Open Fairfax"; checked: root.commandOn("open"); onToggled: root.setCommand("open", checked) }
+                                CheckBox { objectName: "setting:tray.commands.find"; text: "Find a Task"; checked: root.commandOn("find"); onToggled: root.setCommand("find", checked) }
+                                CheckBox { objectName: "setting:tray.commands.sync"; text: "Sync Now"; checked: root.commandOn("sync"); onToggled: root.setCommand("sync", checked) }
+                                CheckBox { objectName: "setting:tray.commands.settings"; text: "Settings"; checked: root.commandOn("settings"); onToggled: root.setCommand("settings", checked) }
+                            }
+                        }
+                        RowLayout {
+                            Label { text: "Badge colour"; Layout.preferredWidth: 160 }
+                            Button {
+                                objectName: "setting:tray.badgeColor"
+                                implicitWidth: 48
+                                implicitHeight: 28
+                                background: Rectangle {
+                                    radius: 6
+                                    color: String(root.value("tray.badgeColor", "#E5484D"))
+                                    border.width: 1
+                                    border.color: theme.divider
+                                }
+                                onClicked: root.pickTrayBadgeColour()
+                            }
+                            Button { objectName: "setting:tray.badgeColorReset"; text: "Reset"; flat: true; onClicked: backend.setSetting("tray.badgeColor", "#E5484D") }
+                        }
+                        Hint { text: "The number on the badge comes from Alerts > Badge shows." }
+                    }
                     RowLayout {
                         Label { text: "Week starts on"; Layout.preferredWidth: 160 }
                         ComboBox {
@@ -1221,6 +1307,13 @@ Window {
     }
 
     ExportDialog { id: exportDialog; owner: "settings" }
+
+    // The tray badge's colour picker: the app's usual HSV picker, storing the
+    // choice as #RRGGBB in tray.badgeColor.
+    ColorPickerDialog {
+        id: trayColourPicker
+        onPicked: (value) => backend.setSetting("tray.badgeColor", String(value).slice(0, 7).toUpperCase())
+    }
 
     component Toggle: ColumnLayout {
         property string key

@@ -162,7 +162,8 @@ offers your lists and `frfx done <Tab>` your open tasks.
   the subject. Drag tasks out of the window to hand a file manager or mail composer an
   `.ics` (one dated task) or `.txt`, or use *Email These Tasks…* in the context menu.
 - **Tray.** Fairfax sits in the bar's tray while it runs in the background; its menu is a
-  quick view of today, with New Task, Find, Sync and Quit.
+  quick view of today, with New Task, Find, Sync and Quit. The quick view, the commands and
+  the badge colour can be configured in Settings > General.
 - **Undo.** Every change is undoable with Ctrl+Z.
 
 ## Keyboard

@@ -276,6 +276,53 @@ private slots:
     }
 
     void cleanupTestCase() { m_chain.reset(); }
+
+    // The badge colour swatch opens the app's HSV picker; the chosen shade is
+    // stored as #RRGGBB and paints the tray badge.
+    void badgeColourIsPicked() {
+        Session s;
+        QVERIFY(s.start());
+        App *app = s.app.get();
+        QQuickWindow *sw = nullptr;
+        openSettings(*app, sw);
+        selectPane(sw, "General");
+        QCOMPARE(TrayMenu::badgeColour(app->store()), QColor(0xE5, 0x48, 0x4D));
+        QQuickItem *swatch = nullptr;
+        control("setting:tray.badgeColor", swatch);
+        click(swatch);
+        QQuickItem *hex = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((hex = findItem("colorHex")) != nullptr, 5000);
+        click(hex);
+        QTest::keyClick(sw, Qt::Key_A, Qt::ControlModifier);
+        typeInto(sw, "#2299CC");
+        QVERIFY(clickDialogButtonIn("Custom Color", "OK"));
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("colorHex"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(TrayMenu::badgeColour(app->store()), QColor(0x22, 0x99, 0xCC), 5000);
+        QCOMPARE(app->store().setting("tray.badgeColor").toString(), QString("#2299CC"));
+
+        // Reset puts the red back.
+        QQuickItem *reset = nullptr;
+        control("setting:tray.badgeColorReset", reset);
+        click(reset);
+        QTRY_COMPARE_WITH_TIMEOUT(TrayMenu::badgeColour(app->store()), QColor(0xE5, 0x48, 0x4D), 5000);
+    }
+
+    // The Tray menu group is enabled only while the tray icon is on.
+    void trayGroupFollowsTheToggle() {
+        Session s;
+        QVERIFY(s.start());
+        App *app = s.app.get();
+        QQuickWindow *sw = nullptr;
+        openSettings(*app, sw);
+        selectPane(sw, "General");
+        QQuickItem *source = nullptr;
+        control("setting:tray.source", source);
+        QVERIFY(source->isEnabled());
+        setCheck("setting:general.trayIcon", false);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("setting:tray.source")->isEnabled(), 5000);
+        setCheck("setting:general.trayIcon", true);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("setting:tray.source")->isEnabled(), 5000);
+    }
 };
 
 REGISTER_TEST(E2ESettings)

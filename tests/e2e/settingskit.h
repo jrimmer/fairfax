@@ -14,6 +14,7 @@
 #include "listkit.h"
 #include "model.h"
 #include "schedule.h"
+#include "traymenu.h"
 #include "views.h"
 
 namespace e2e {
@@ -551,9 +552,18 @@ struct SettingCase {
     std::function<void(Session &, bool changed)> effect;   // Asserts the effect is (not) there.
     QString outside;   // Why the effect cannot be seen in the window; the stored value is checked instead.
     QString slot;      // A dedicated test proves this one instead of the table runner.
-    // The same key can have several rows (a combo with several entries).
+    // The same key can have several rows (a combo with several entries, or
+    // the five boxes behind the one tray.commands setting).
     QString name() const {
-        return key + ":" + pane + (kind == Combo ? QString(":%1").arg(toIndex) : kind == Choice ? ":" + control.section(':', -1) : QString());
+        const QString base = key + ":" + pane;
+        if (kind == Combo)
+            return base + QString(":%1").arg(toIndex);
+        if (kind == Choice)
+            return base + ":" + control.section(':', -1);
+        // Check: only boxes that share a key need telling apart.
+        if (control != "setting:" + key)
+            return base + ":" + control.section(':', -1);
+        return base;
     }
 };
 
@@ -589,6 +599,7 @@ inline qint64 addTask(Store &st, qint64 listId, const QString &title, const std:
 #include "settingscases_general.h"
 #include "settingscases_lists.h"
 #include "settingscases_tasks.h"
+#include "settingscases_tray.h"
 
 namespace e2e {
 
@@ -598,6 +609,7 @@ inline const QVector<SettingCase> &settingCases() {
         addGeneralAndAppearanceCases(v);
         addTaskCases(v);
         addListAndAlertCases(v);
+        addTrayCases(v);
         return v;
     }();
     return cases;
