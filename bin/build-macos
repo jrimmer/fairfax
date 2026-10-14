@@ -69,15 +69,21 @@ JOBS="${FAIRFAX_JOBS:-$(sysctl -n hw.ncpu)}"
 SPEC_ARGS=()
 if [ "${FAIRFAX_UNIVERSAL:-0}" = 1 ]; then
     # The Qt in use must ship both architectures. Homebrew's Qt is native only;
-    # the Qt online installer's macOS kit is universal. Probe a framework;
-    # when it is single-architecture, build natively rather than fail.
+    # the Qt online installer's macOS kit is universal. Probe the QtCore binary
+    # in a framework or dylib layout; when it is single-architecture, build
+    # natively rather than fail.
     QT_LIB="$QTBIN/../lib"
-    PROBE="$(find "$QT_LIB" -maxdepth 3 -name 'QtCore.framework' -type d 2>/dev/null | head -n1)"
-    if [ -z "$PROBE" ]; then
-        PROBE="$(find "$QT_LIB" -maxdepth 1 -name 'libQt6Core*.dylib' 2>/dev/null | head -n1)"
-    fi
     ARCHS=""
-    [ -n "$PROBE" ] && ARCHS="$(lipo -info "$PROBE" 2>/dev/null || true)"
+    for candidate in \
+        "$QT_LIB/QtCore.framework/Versions/A/QtCore" \
+        "$QT_LIB/QtCore.framework/QtCore" \
+        "$QT_LIB/libQt6Core.6.dylib" \
+        "$QT_LIB/libQt6Core.dylib"; do
+        if [ -f "$candidate" ]; then
+            ARCHS="$(lipo -info "$candidate" 2>/dev/null || true)"
+            [ -n "$ARCHS" ] && break
+        fi
+    done
     if printf '%s' "$ARCHS" | grep -q x86_64 && printf '%s' "$ARCHS" | grep -q arm64; then
         SPEC_ARGS=("QMAKE_APPLE_DEVICE_ARCHS=x86_64 arm64")
         say "Universal build requested (arm64 + x86_64)"
