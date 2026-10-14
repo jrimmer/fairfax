@@ -1258,6 +1258,7 @@ Window {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
                             placeholderText: "Filter shortcuts"
+                            Accessible.name: "Filter shortcuts"
                             selectByMouse: true
                             text: shortcutPane.filter
                             onTextEdited: shortcutPane.filter = text
