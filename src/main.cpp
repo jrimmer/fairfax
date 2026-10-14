@@ -1,7 +1,9 @@
 // fairfax — a keyboard-first task manager for Omarchy, modelled on the reference app.
 
 #include <QClipboard>
+#include <QBuffer>
 #include <QCommandLineParser>
+#include <QDataStream>
 #include <QDesktopServices>
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -14,9 +16,14 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QIcon>
+#include <QImage>
 #include <QKeyEvent>
+#include <QPainter>
 #include <QProcess>
 #include <QThread>
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+#include <QSvgRenderer>
+#endif
 #if defined(Q_OS_LINUX)
 #include <csignal>
 #include <sys/socket.h>
@@ -104,6 +111,71 @@ QString databasePath(const QStringList &args) {
         return args.at(i + 1);
     return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/fairfax/fairfax.db";
 }
+
+// Compiling the version in keeps it in step with fairfax.pro, where the
+// build scripts also read it for the app bundle and the installer.
+#ifndef FAIRFAX_VERSION
+#define FAIRFAX_VERSION "0.0.0"
+#endif
+
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+// Renders the SVG built into the binary to an image: a Windows .ico for
+// bin/build-windows.ps1, or a PNG for bin/build-macos to turn into the
+// .icns. Both scripts call this before the real build; Linux makes its icon
+// from the installed SVG with the desktop's own tools.
+int renderIcon(const QString &file) {
+    QSvgRenderer svg(QStringLiteral(":/icon.svg"));
+    if (!svg.isValid()) {
+        QTextStream(stderr) << "fairfax: the built-in icon.svg could not be read" << Qt::endl;
+        return 1;
+    }
+#if defined(Q_OS_MACOS)
+    // The macOS iconset starts from the largest PNG iconutil accepts.
+    constexpr int side = 1024;
+#else
+    // An ICO entry can only name a size up to 256 (a width/height byte of 0
+    // means 256), so render the one frame the header describes exactly.
+    constexpr int side = 256;
+#endif
+    QImage canvas(side, side, QImage::Format_ARGB32_Premultiplied);
+    canvas.fill(Qt::transparent);
+    {
+        QPainter painter(&canvas);
+        painter.setRenderHint(QPainter::Antialiasing);
+        svg.render(&painter, QRectF(0, 0, side, side));
+    }
+#if defined(Q_OS_MACOS)
+    if (!canvas.save(file, "PNG")) {
+        QTextStream(stderr) << "fairfax: can't write " << file << Qt::endl;
+        return 1;
+    }
+    return 0;
+#else
+    // A .ico is an ICONDIR header, one ICONDIRENTRY, then the PNG data.
+    QByteArray png;
+    QBuffer buffer(&png);
+    buffer.open(QIODevice::WriteOnly);
+    if (!canvas.save(&buffer, "PNG")) {
+        QTextStream(stderr) << "fairfax: could not encode the icon as PNG" << Qt::endl;
+        return 1;
+    }
+    QFile out(file);
+    if (!out.open(QIODevice::WriteOnly)) {
+        QTextStream(stderr) << "fairfax: can't write " << file << Qt::endl;
+        return 1;
+    }
+    QDataStream stream(&out);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint16(0) << quint16(1) << quint16(1);  // reserved, type=icon, one image
+    stream << quint8(0) << quint8(0);                  // 256 px is written as 0
+    stream << quint8(0) << quint8(0);                  // palette and reserved
+    stream << quint16(1) << quint16(32);               // colour planes and bits per pixel
+    stream << quint32(png.size()) << quint32(22);      // data size, offset after the 6 + 16 byte header
+    stream.writeRawData(png.constData(), png.size());
+    return 0;
+#endif
+}
+#endif
 
 // `fairfax mcp`, `fairfax ctl …` and `fairfax --waybar` run without a
 // window against the same database, so scripts, Claude and the bar can use
@@ -249,6 +321,12 @@ int main(int argc, char *argv[]) {
         // Invoked as `frfx` (a symlink), everything is the terminal shorthand.
         const QString self = QString::fromLocal8Bit(argv[0]);
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+        if (first == "--render-icon" && argc > 2) {
+            QGuiApplication iconApp(argc, argv);
+            return renderIcon(QString::fromLocal8Bit(argv[2]));
+        }
+#endif
         if (Cli::isShorthandName(self) || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" || first == "import-mail" ||
             first == "add" || first == "setup" || first == "--complete")
             return runHeadless(argc, argv);
@@ -259,7 +337,7 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     Diagnostics::install();
     app.setApplicationName("fairfax");
-    app.setApplicationVersion("0.5.1");
+    app.setApplicationVersion(QStringLiteral(FAIRFAX_VERSION));
 
     // Matches the window to fairfax.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.

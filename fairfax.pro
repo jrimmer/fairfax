@@ -6,6 +6,14 @@ linux: QT += dbus
 CONFIG += c++20 release
 TARGET = fairfax
 TEMPLATE = app
+# The one place the app version lives: bin/build-macos and bin/build-windows.ps1
+# read it for the app bundle and the installer, and it is compiled in below.
+VERSION = 0.5.1
+DEFINES += FAIRFAX_VERSION=\\\"$$VERSION\\\"
+
+# SVG is needed by --render-icon on Windows (the .ico) and macOS (the .png
+# that sips turns into the .icns). Linux makes its icon from the installed SVG.
+win32|macx: QT += svg
 
 # Listed explicitly so a half-written file in src/ never breaks the build.
 HEADERS += src/alarms.h src/appsetup.h src/backend.h src/dateparse.h src/exchange.h src/mailtask.h src/imapclient.h src/mailfetch.h src/oauth.h src/filepicker.h src/gitsync.h src/synctree.h src/foldersync.h src/webdav.h src/synchub.h src/restorelists.h src/model.h src/nlparse.h src/query.h src/recurrence.h src/rowmodel.h src/schedule.h src/store.h src/theme.h src/views.h src/markdown.h src/automation.h src/calendar.h src/sounds.h src/selftest.h src/todoist.h src/cli.h src/tray.h src/traymenu.h src/keyring.h src/hyprland.h src/diagnostics.h src/searchrules.h src/shortcuts.h src/caldavclient.h src/vtodo.h src/caldavsync.h
@@ -16,6 +24,17 @@ RESOURCES += src/resources.qrc
 # macOS: a proper .app bundle named Fairfax; Windows: no console window.
 macx {
     TARGET = Fairfax
+    # bin/build-macos makes this from pkgbuild/fairfax.svg before qmake runs.
+    exists($$PWD/pkgbuild/macos/fairfax.icns) {
+        ICON = $$PWD/pkgbuild/macos/fairfax.icns
+    }
 }
-win32: CONFIG += windows
+win32 {
+    CONFIG += windows
+    # Made by bin/build-windows.ps1, either with ImageMagick or with the app's
+    # own --render-icon option (which is why the script may build twice).
+    exists($$PWD/pkgbuild/windows/fairfax.ico) {
+        RC_ICONS = $$PWD/pkgbuild/windows/fairfax.ico
+    }
+}
 

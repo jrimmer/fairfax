@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# Builds Fairfax for macOS (13 or later): Fairfax.app and a DMG, in build-macos/.
+# Best effort; see docs/building-macos-windows.md.
+#
+# Optional environment:
+#   FAIRFAX_SIGN_IDENTITY   codesign identity, e.g. "Developer ID Application: Name (TEAMID)"
+#   FAIRFAX_NOTARY_PROFILE  notarytool keychain profile (needs FAIRFAX_SIGN_IDENTITY)
+#   FAIRFAX_UNIVERSAL=1     arm64 + x86_64 binary (the Qt in use must support both)
+#   FAIRFAX_SKIP_TESTS=1    skip the unit tests and the selftest
+#   FAIRFAX_SKIP_DMG=1      stop after Fairfax.app
+#   FAIRFAX_JOBS            parallel compile jobs (default: all cores)
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+OUT="$ROOT/build-macos"
+LOG="$OUT/build.log"
+mkdir -p "$OUT"
+: > "$LOG"
+
+say() { printf '==> %s\n' "$*"; }
+die() {
+    printf '\nFAILED: %s\nLog: %s\nSend that file back if you need help.\n' "$*" "$LOG" >&2
+    exit 1
+}
+# Runs a command with its output in the log; shows the tail if it fails.
+step() {
+    local what="$1"; shift
+    say "$what"
+    if ! "$@" >>"$LOG" 2>&1; then
+        tail -n 25 "$LOG" >&2
+        die "$what"
+    fi
+}
+
+[ "$(uname -s)" = Darwin ] || die "this script is for macOS"
+
+# Prerequisites
+missing=""
+xcode-select -p >/dev/null 2>&1 || missing="$missing\n  xcode-select --install     (Xcode command line tools)"
+
+QMAKE=""
+if [ -n "${QTDIR:-}" ] && [ -x "$QTDIR/bin/qmake" ]; then
+    QMAKE="$QTDIR/bin/qmake"
+elif command -v qmake6 >/dev/null 2>&1; then
+    QMAKE="$(command -v qmake6)"
+elif command -v brew >/dev/null 2>&1 && [ -x "$(brew --prefix qt 2>/dev/null)/bin/qmake" ]; then
+    QMAKE="$(brew --prefix qt)/bin/qmake"
+fi
+if [ -z "$QMAKE" ]; then
+    missing="$missing\n  brew install qt            (Qt 6.8 or later), or install Qt with the Qt online installer\n  and set QTDIR to its macOS kit, e.g. export QTDIR=\$HOME/Qt/6.8.0/macos"
+fi
+if [ -n "$missing" ]; then
+    printf 'Missing prerequisites. Install them and run this script again:%b\n' "$missing" >&2
+    exit 1
+fi
+QTBIN="$(dirname "$QMAKE")"
+export PATH="$QTBIN:$PATH"
+command -v macdeployqt >/dev/null 2>&1 || die "macdeployqt not found next to $QMAKE"
+QTVER="$("$QMAKE" -query QT_VERSION)"
+case "$QTVER" in
+    6.[0-7].*|[0-5].*) die "Qt $QTVER found; Qt 6.8 or later is needed" ;;
+esac
+say "Qt $QTVER at $QTBIN"
+
+VERSION="$(sed -n 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*//p' "$ROOT/fairfax.pro" | head -n1)"
+[ -n "$VERSION" ] || die "no VERSION in fairfax.pro"
+JOBS="${FAIRFAX_JOBS:-$(sysctl -n hw.ncpu)}"
+
+SPEC_ARGS=()
+if [ "${FAIRFAX_UNIVERSAL:-0}" = 1 ]; then
+    # The Qt in use must ship both architectures. Homebrew's Qt is native only;
+    # the Qt online installer's macOS kit is universal. Probe a framework;
+    # when it is single-architecture, build natively rather than fail.
+    QT_LIB="$QTBIN/../lib"
+    PROBE="$(find "$QT_LIB" -maxdepth 3 -name 'QtCore.framework' -type d 2>/dev/null | head -n1)"
+    if [ -z "$PROBE" ]; then
+        PROBE="$(find "$QT_LIB" -maxdepth 1 -name 'libQt6Core*.dylib' 2>/dev/null | head -n1)"
+    fi
+    ARCHS=""
+    [ -n "$PROBE" ] && ARCHS="$(lipo -info "$PROBE" 2>/dev/null || true)"
+    if printf '%s' "$ARCHS" | grep -q x86_64 && printf '%s' "$ARCHS" | grep -q arm64; then
+        SPEC_ARGS=("QMAKE_APPLE_DEVICE_ARCHS=x86_64 arm64")
+        say "Universal build requested (arm64 + x86_64)"
+    else
+        say "Universal build requested, but the Qt in use is not universal; building natively"
+    fi
+fi
+
+# Build
+cd "$OUT"
+step "Running qmake" "$QMAKE" "$ROOT/fairfax.pro" ${SPEC_ARGS[@]+"${SPEC_ARGS[@]}"}
+step "Compiling (-j$JOBS)" make -j"$JOBS"
+APP="$OUT/Fairfax.app"
+[ -d "$APP" ] || die "the build did not produce Fairfax.app"
+
+# Icon: SVG -> PNG -> iconset -> icns. sips/iconutil are always present with
+# the Xcode command line tools; only turning the SVG into a PNG needs a
+# renderer, and the freshly built app can do that itself with --render-icon
+# when rsvg-convert is not installed.
+make_icns() {
+    local svg="$ROOT/pkgbuild/fairfax.svg" icns="$ROOT/pkgbuild/macos/fairfax.icns"
+    local set="$OUT/fairfax.iconset" big="$OUT/icon-1024.png"
+    rm -rf "$set"; mkdir -p "$set"
+    if command -v rsvg-convert >/dev/null 2>&1; then
+        rsvg-convert -w 1024 -h 1024 "$svg" -o "$big" || return 1
+    elif [ -x "$APP/Contents/MacOS/Fairfax" ]; then
+        QT_QPA_PLATFORM=offscreen "$APP/Contents/MacOS/Fairfax" --render-icon "$big" || return 1
+    else
+        return 1
+    fi
+    for s in 16 32 128 256 512; do
+        sips -z "$s" "$s" "$big" --out "$set/icon_${s}x${s}.png" >/dev/null
+        sips -z $((s * 2)) $((s * 2)) "$big" --out "$set/icon_${s}x${s}@2x.png" >/dev/null
+    done
+    iconutil -c icns "$set" -o "$icns"
+}
+if [ ! -f "$ROOT/pkgbuild/macos/fairfax.icns" ]; then
+    say "Making the app icon"
+    make_icns >>"$LOG" 2>&1 || die "building the app icon (install librsvg with 'brew install librsvg', or check the built app)"
+    say "Icon written to pkgbuild/macos/fairfax.icns"
+    # qmake reads ICON only when it configures, so configure again and relink;
+    # the icon-less build above already produced the renderer.
+    step "Running qmake again, with the icon" "$QMAKE" "$ROOT/fairfax.pro" ${SPEC_ARGS[@]+"${SPEC_ARGS[@]}"}
+    step "Compiling again" make -j"$JOBS"
+fi
+
+# Tests
+RESULT="tests skipped"
+if [ "${FAIRFAX_SKIP_TESTS:-0}" != 1 ]; then
+    RESULT="unit tests passed"
+    mkdir -p "$OUT/tests"
+    (
+        cd "$OUT/tests"
+        "$QMAKE" "$ROOT/tests/fairfax_tests.pro" ${SPEC_ARGS[@]+"${SPEC_ARGS[@]}"} >>"$LOG" 2>&1 && make -j"$JOBS" >>"$LOG" 2>&1
+    ) || { tail -n 25 "$LOG" >&2; die "building the unit tests"; }
+    TESTBIN="$(find "$OUT/tests" -name fairfax_tests -type f -perm -u+x | head -n1)"
+    [ -n "$TESTBIN" ] || TESTBIN="$OUT/tests/fairfax_tests.app/Contents/MacOS/fairfax_tests"
+    say "Running the unit tests"
+    if QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory "$TESTBIN" >"$OUT/tests.log" 2>&1; then
+        RESULT="unit tests passed ($(grep -E '^Totals:' "$OUT/tests.log" | tail -n1 || echo 'no totals'))"
+    else
+        tail -n 30 "$OUT/tests.log" >&2
+        cat "$OUT/tests.log" >>"$LOG"
+        die "unit tests failed (full output in $OUT/tests.log)"
+    fi
+    say "Running --demo --selftest"
+    if QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory "$APP/Contents/MacOS/Fairfax" --demo --selftest >"$OUT/selftest.log" 2>&1; then
+        RESULT="$RESULT; selftest: $(grep -E 'QML warning' "$OUT/selftest.log" | tail -n1 || echo ok)"
+    else
+        tail -n 30 "$OUT/selftest.log" >&2
+        cat "$OUT/selftest.log" >>"$LOG"
+        die "selftest failed (full output in $OUT/selftest.log)"
+    fi
+fi
+
+# Info.plist additions: bundle id, URL scheme, version
+PLIST="$APP/Contents/Info.plist"
+plist() { /usr/libexec/PlistBuddy -c "$1" "$PLIST" >>"$LOG" 2>&1 || true; }
+plist "Delete :CFBundleIdentifier"
+plist "Add :CFBundleIdentifier string casa.lacy.fairfax"
+plist "Delete :CFBundleName"
+plist "Add :CFBundleName string Fairfax"
+plist "Delete :CFBundleDisplayName"
+plist "Add :CFBundleDisplayName string Fairfax"
+plist "Delete :CFBundleShortVersionString"
+plist "Add :CFBundleShortVersionString string $VERSION"
+plist "Delete :CFBundleVersion"
+plist "Add :CFBundleVersion string $VERSION"
+plist "Delete :LSUIElement"
+plist "Add :LSUIElement bool false"
+plist "Delete :NSHighResolutionCapable"
+plist "Add :NSHighResolutionCapable bool true"
+plist "Delete :CFBundleURLTypes"
+plist "Add :CFBundleURLTypes array"
+plist "Add :CFBundleURLTypes:0 dict"
+plist "Add :CFBundleURLTypes:0:CFBundleURLName string casa.lacy.fairfax"
+plist "Add :CFBundleURLTypes:0:CFBundleURLSchemes array"
+plist "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string fairfax"
+
+# Bundle the Qt frameworks and plugins
+step "Running macdeployqt" macdeployqt "$APP" -qmldir="$ROOT/src/qml"
+
+# Sign
+SIGNED="unsigned"
+if [ -n "${FAIRFAX_SIGN_IDENTITY:-}" ]; then
+    step "Signing Fairfax.app" codesign --force --deep --options runtime --timestamp \
+        --entitlements "$ROOT/pkgbuild/macos/fairfax.entitlements" \
+        --sign "$FAIRFAX_SIGN_IDENTITY" "$APP"
+    step "Verifying the signature" codesign --verify --deep --strict "$APP"
+    SIGNED="signed"
+fi
+
+DMG=""
+if [ "${FAIRFAX_SKIP_DMG:-0}" != 1 ]; then
+    DMG="$OUT/Fairfax-$VERSION.dmg"
+    STAGE="$OUT/dmg"
+    rm -rf "$STAGE" "$DMG"
+    mkdir -p "$STAGE"
+    cp -R "$APP" "$STAGE/"
+    ln -s /Applications "$STAGE/Applications"
+    step "Making the DMG" hdiutil create -volname "Fairfax" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+    if [ -n "${FAIRFAX_SIGN_IDENTITY:-}" ]; then
+        step "Signing the DMG" codesign --force --timestamp --sign "$FAIRFAX_SIGN_IDENTITY" "$DMG"
+        if [ -n "${FAIRFAX_NOTARY_PROFILE:-}" ]; then
+            step "Notarising (this can take a few minutes)" xcrun notarytool submit "$DMG" \
+                --keychain-profile "$FAIRFAX_NOTARY_PROFILE" --wait
+            step "Stapling the ticket" xcrun stapler staple "$DMG"
+            SIGNED="signed and notarised"
+        fi
+    fi
+fi
+
+echo
+echo "App: $APP"
+[ -z "$DMG" ] || echo "DMG: $DMG"
+echo "Log: $LOG"
+echo "Result: $RESULT; $SIGNED"
+echo
+echo "To use the frfx terminal shorthand, run:"
+echo "  sudo ln -s \"$APP/Contents/MacOS/Fairfax\" /usr/local/bin/frfx"
