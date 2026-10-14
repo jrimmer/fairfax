@@ -114,11 +114,15 @@ bool acceptable(const Report &r) {
     return r.role != QAccessible::NoRole && r.role != QAccessible::Client;
 }
 
-// Whether an item reports the given role and a name that starts with `name`.
-bool reports(QQuickItem *item, QAccessible::Role role, const QString &name) {
-    const Report r = reportOf(item);
-    return r.hasInterface && r.role == role && r.name.startsWith(name);
+// Gives an item the keyboard so its Keys handlers can be exercised, and
+// returns it.
+QQuickItem *focusOn(const QString &name) {
+    QQuickItem *item = tk::waitItem(name);
+    if (item)
+        item->forceActiveFocus(Qt::TabFocusReason);
+    return item;
 }
+
 
 // Every visible interactive item under `root`, in any window. An item that
 // only owns a mouse area is skipped when an ancestor is also interactive: the
@@ -445,6 +449,48 @@ private slots:
         QVERIFY(acceptable(r));
         QCOMPARE(r.role, QAccessible::Button);
         QCOMPARE(r.name, add->property("tip").toString());
+    }
+
+    // Each custom control answers Space and Return (and provides a
+    // press action) the way a screen reader expects.
+    void keyboardActivatesControls() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+
+        // The toolbar buttons toggle and open their menus.
+        const bool asc = app.backend().sortAscending();
+        QVERIFY(focusOn("sortReverse"));
+        app.press(Qt::Key_Space);
+        QCOMPARE(app.backend().sortAscending(), !asc);
+        app.press(Qt::Key_Return);
+        QCOMPARE(app.backend().sortAscending(), asc);
+
+        QVERIFY(focusOn("sortButton"));
+        app.press(Qt::Key_Return);
+        QVERIFY(tk::waitItem("sortSeparated"));
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("sortSeparated"), 5000);
+
+        // A calendar day filters to it on Return.
+        QQuickItem *day = nullptr;
+        QVERIFY(waitUntil([&] {
+            day = findIn(tk::waitItem("miniCalendar"), [](QQuickItem *i) { return i->objectName().startsWith("calDay:"); }, true);
+            return day != nullptr;
+        }));
+        const QString iso = day->objectName().mid(7);
+        QVERIFY(focusOn(day->objectName()));
+        app.press(Qt::Key_Return);
+        QCOMPARE(app.backend().dayFilter(), iso);
+
+        // A removable tag chip takes the keyboard and removes the tag.
+        QVERIFY(mk::homeWith(app, app.ids.plants));
+        QVERIFY(tk::openEditor(app, app.ids.plants));
+        QVERIFY(tk::waitItem("editorTagsRemove:garden"));
+        QVERIFY(!app.task(app.ids.plants).tagIds.isEmpty());
+        QVERIFY(focusOn("editorTagsRemove:garden"));
+        app.press(Qt::Key_Space);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.plants).tagIds.isEmpty(), 5000);
     }
 
     void popupsAndMenusAreNamed() {
