@@ -22,7 +22,7 @@ ScheduleSettings settingsOf(const Store &store) { return ScheduleSettings::fromS
 // The app icon with a red count in the corner, as the reference app badges its Dock icon;
 // no badge for zero.
 QIcon badgeIcon(int count) {
-    const QIcon base = QIcon::fromTheme("precrime", QIcon(":/icon.svg"));
+    const QIcon base = QIcon::fromTheme("fairfax", QIcon(":/icon.svg"));
     if (count <= 0)
         return base;
     QPixmap pixmap = base.pixmap(64, 64);
@@ -49,9 +49,9 @@ Tray::Tray(Store *store, Backend *backend, QObject *parent) : QObject(parent), m
     if (!QSystemTrayIcon::isSystemTrayAvailable())
         return;
     m_menu = new QMenu;
-    m_icon = new QSystemTrayIcon(QIcon::fromTheme("precrime", QIcon(":/icon.svg")), this);
+    m_icon = new QSystemTrayIcon(QIcon::fromTheme("fairfax", QIcon(":/icon.svg")), this);
     m_icon->setContextMenu(m_menu);
-    // A plain click opens Precrime, as tray icons usually do.
+    // A plain click opens Fairfax, as tray icons usually do.
     connect(m_icon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
             m_backend->requestWindow();
@@ -134,18 +134,18 @@ void Tray::rebuild() {
 
     m_menu->addSeparator();
     m_menu->addAction("New Task…", this, [this] { m_backend->requestQuickEntry(); });
-    m_menu->addAction("Open Precrime", this, [this] { m_backend->requestWindow(); });
+    m_menu->addAction("Open Fairfax", this, [this] { m_backend->requestWindow(); });
     m_menu->addAction("Find a Task…", this, [this] { m_backend->requestPanel("open"); });
     if (canSync && canSync())
         m_menu->addAction("Sync Now", this, [this] { if (syncNow) syncNow(); });
     m_menu->addAction("Settings…", this, [this] { m_backend->requestPanel("settings"); });
     m_menu->addSeparator();
-    m_menu->addAction("Quit Precrime", qApp, &QCoreApplication::quit);
+    m_menu->addAction("Quit Fairfax", qApp, &QCoreApplication::quit);
 
     // The "Badge shows" setting picks the number drawn on the icon.
     const int badge = views.badgeCount(m_store->setting("alerts.badge", "both").toString());
     m_icon->setIcon(badgeIcon(badge));
-    QString tip = QStringLiteral("Precrime — %1 today").arg(counts.undone);
+    QString tip = QStringLiteral("Fairfax — %1 today").arg(counts.undone);
     if (counts.overdue)
         tip += QStringLiteral(", %1 overdue").arg(counts.overdue);
     m_icon->setToolTip(tip);

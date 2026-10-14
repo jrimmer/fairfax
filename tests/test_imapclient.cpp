@@ -177,15 +177,15 @@ private slots:
     }
 
     void searchWithQuotedStringsAndBooleans() {
-        m_server->add("INBOX", FakeImap::mail("jane+precrime@gmail.com", "one"));
+        m_server->add("INBOX", FakeImap::mail("jane+fairfax@gmail.com", "one"));
         m_server->add("INBOX", FakeImap::mail("bob@example.com", "two"));
-        m_server->add("INBOX", FakeImap::mail("Jane Doe <jane+precrime@gmail.com>, bob@example.com", "three"), {"\\Seen"});
+        m_server->add("INBOX", FakeImap::mail("Jane Doe <jane+fairfax@gmail.com>, bob@example.com", "three"), {"\\Seen"});
         QVERIFY(connectClient());
         QVERIFY(login());
         QVERIFY(select().ok);
         QCOMPARE(search("ALL"), (QList<qint64>{1, 2, 3}));
-        QCOMPARE(search("TO \"jane+precrime@gmail.com\""), (QList<qint64>{1, 3}));
-        QCOMPARE(search("UNSEEN TO \"jane+precrime@gmail.com\""), (QList<qint64>{1}));
+        QCOMPARE(search("TO \"jane+fairfax@gmail.com\""), (QList<qint64>{1, 3}));
+        QCOMPARE(search("UNSEEN TO \"jane+fairfax@gmail.com\""), (QList<qint64>{1}));
         QCOMPARE(search("OR TO \"bob@example.com\" CC \"nobody\""), (QList<qint64>{2, 3}));
         QCOMPARE(search("UID 2:*"), (QList<qint64>{2, 3}));
         bool ok = true;
@@ -297,23 +297,23 @@ private slots:
     void createFolderAndItsAlreadyExistsAnswer() {
         QVERIFY(connectClient());
         QVERIFY(login());
-        QVERIFY(run([&](ImapClient::Done d) { m_client->createFolder("Precrime", d); }).ok);
-        QVERIFY(m_server->folders.contains("Precrime"));
-        const Response again = run([&](ImapClient::Done d) { m_client->createFolder("Precrime", d); });
+        QVERIFY(run([&](ImapClient::Done d) { m_client->createFolder("Fairfax", d); }).ok);
+        QVERIFY(m_server->folders.contains("Fairfax"));
+        const Response again = run([&](ImapClient::Done d) { m_client->createFolder("Fairfax", d); });
         QVERIFY(!again.ok);
         QVERIFY(again.text.contains("ALREADYEXISTS"));
     }
 
     void moveUsesUidMove() {
         m_server->add("INBOX", FakeImap::mail("a@x.org", "one"));
-        m_server->folders["Precrime"];
+        m_server->folders["Fairfax"];
         QVERIFY(connectClient());
         QVERIFY(login());
         QVERIFY(select().ok);
-        QVERIFY(run([&](ImapClient::Done d) { m_client->uidMove(1, "Precrime", d); }).ok);
+        QVERIFY(run([&](ImapClient::Done d) { m_client->uidMove(1, "Fairfax", d); }).ok);
         QCOMPARE(m_server->count("INBOX"), 0);
-        QCOMPARE(m_server->count("Precrime"), 1);
-        QVERIFY(m_server->log.contains("UID MOVE 1 \"Precrime\""));
+        QCOMPARE(m_server->count("Fairfax"), 1);
+        QVERIFY(m_server->log.contains("UID MOVE 1 \"Fairfax\""));
     }
 
     // Without MOVE: COPY, mark the original \Deleted, UID EXPUNGE it.
@@ -321,15 +321,15 @@ private slots:
         m_server->capabilities = {"IMAP4rev1", "IDLE", "UIDPLUS"};
         m_server->add("INBOX", FakeImap::mail("a@x.org", "one"));
         m_server->add("INBOX", FakeImap::mail("a@x.org", "two"), {"\\Deleted"});   // Someone else's pending delete: must survive.
-        m_server->folders["Precrime"];
+        m_server->folders["Fairfax"];
         QVERIFY(connectClient());
         QVERIFY(login());
         QVERIFY(select().ok);
-        QVERIFY(run([&](ImapClient::Done d) { m_client->uidMove(1, "Precrime", d); }).ok);
-        QCOMPARE(m_server->count("Precrime"), 1);
+        QVERIFY(run([&](ImapClient::Done d) { m_client->uidMove(1, "Fairfax", d); }).ok);
+        QCOMPARE(m_server->count("Fairfax"), 1);
         QVERIFY(!m_server->find("INBOX", 1));
         QVERIFY2(m_server->find("INBOX", 2), "UID EXPUNGE removed a message it was not asked to");
-        const QStringList expected{"UID COPY 1 \"Precrime\"", "UID STORE 1 +FLAGS (\\Deleted)", "UID EXPUNGE 1"};
+        const QStringList expected{"UID COPY 1 \"Fairfax\"", "UID STORE 1 +FLAGS (\\Deleted)", "UID EXPUNGE 1"};
         QStringList seen;
         for (const QString &l : m_server->log)
             if (l.startsWith("UID COPY") || l.startsWith("UID STORE") || l.startsWith("UID EXPUNGE"))
@@ -342,11 +342,11 @@ private slots:
     void moveFallbackWithoutUidplusDoesNotExpunge() {
         m_server->capabilities = {"IMAP4rev1"};
         m_server->add("INBOX", FakeImap::mail("a@x.org", "one"));
-        m_server->folders["Precrime"];
+        m_server->folders["Fairfax"];
         QVERIFY(connectClient());
         QVERIFY(login());
         QVERIFY(select().ok);
-        QVERIFY(run([&](ImapClient::Done d) { m_client->uidMove(1, "Precrime", d); }).ok);
+        QVERIFY(run([&](ImapClient::Done d) { m_client->uidMove(1, "Fairfax", d); }).ok);
         QVERIFY(m_server->hasFlag("INBOX", 1, "\\Deleted"));
         QVERIFY(m_server->log.filter("EXPUNGE").isEmpty());
     }

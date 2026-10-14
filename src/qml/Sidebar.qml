@@ -47,7 +47,7 @@ Rectangle {
         radius: 13
         color: theme.accent
         opacity: 0.94
-        Drag.keys: grouping ? ["precrime-group"] : smart ? ["precrime-smart"] : ["precrime-list"]
+        Drag.keys: grouping ? ["fairfax-group"] : smart ? ["fairfax-smart"] : ["fairfax-list"]
         Drag.hotSpot.x: 10
         Drag.hotSpot.y: 13
         Text {
@@ -131,7 +131,7 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Precrime"
+                text: "Fairfax"
                 color: theme.foreground
                 font.pixelSize: backend.fontSize + 4
                 font.weight: Font.Bold
@@ -166,7 +166,7 @@ Rectangle {
                     id: tailDrop
                     objectName: "sidebarTailDrop"
                     anchors.fill: parent
-                    keys: ["precrime-list", "precrime-smart"]
+                    keys: ["fairfax-list", "fairfax-smart"]
                     onDropped: if (root.dragListId) backend.moveList(root.dragListId, 0, 0)
                     Rectangle {
                         visible: tailDrop.containsDrag
@@ -385,7 +385,7 @@ Rectangle {
             DropArea {
                 id: gapDrop
                 anchors.fill: parent
-                keys: ["precrime-list"]
+                keys: ["fairfax-list"]
                 onDropped: if (root.dragListId) backend.moveList(root.dragListId, 0, 0)
                 Rectangle {
                     visible: gapDrop.containsDrag
@@ -447,7 +447,7 @@ Rectangle {
             DropArea {
                 id: headerDrop
                 anchors.fill: parent
-                keys: ["precrime-list", "precrime-group"]
+                keys: ["fairfax-list", "fairfax-group"]
                 enabled: header.isGroup
                 onDropped: {
                     if (root.dragGroupId && root.dragGroupId !== header.row.groupId)
@@ -742,7 +742,7 @@ Rectangle {
             DropArea {
                 id: drop
                 anchors.fill: parent
-                keys: ["precrime-tasks"]
+                keys: ["fairfax-tasks"]
                 enabled: !!item.row.sourceKey && backend.dropHint(item.row.sourceKey) !== ""
                 readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
                 onEntered: if (proxy) proxy.hint = backend.dropHint(item.row.sourceKey)
@@ -765,7 +765,7 @@ Rectangle {
             DropArea {
                 id: listDrop
                 anchors.fill: parent
-                keys: item.row.kind === "smart" ? ["precrime-smart"] : ["precrime-list"]
+                keys: item.row.kind === "smart" ? ["fairfax-smart"] : ["fairfax-list"]
                 enabled: item.isList || item.row.kind === "smart"
                 onDropped: if (root.dragListId && root.dragListId !== item.row.listId)
                                backend.moveList(root.dragListId, item.row.listId, item.row.groupId || 0)

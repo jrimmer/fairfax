@@ -40,6 +40,6 @@
         <file>qml/TaskRow.qml</file>
         <file>qml/UtilityPanel.qml</file>
         <file alias="LICENSE">../LICENSE</file>
-        <file alias="icon.svg">../pkgbuild/precrime.svg</file>
+        <file alias="icon.svg">../pkgbuild/fairfax.svg</file>
     </qresource>
 </RCC>

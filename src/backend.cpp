@@ -3429,7 +3429,7 @@ QString Backend::diagnosticsReport(const QString &extra) const {
             ++tags;
     const QFileInfo db(m_store->path());
     QStringList out;
-    out << QStringLiteral("Precrime %1").arg(QCoreApplication::applicationVersion())
+    out << QStringLiteral("Fairfax %1").arg(QCoreApplication::applicationVersion())
         << QStringLiteral("Qt %1 (built with %2)").arg(QString::fromLatin1(qVersion()), QStringLiteral(QT_VERSION_STR))
         << QStringLiteral("System: %1, %2").arg(QSysInfo::prettyProductName(), QSysInfo::currentCpuArchitecture())
         << QStringLiteral("Locale: %1; week starts on %2")
@@ -3443,7 +3443,7 @@ QString Backend::diagnosticsReport(const QString &extra) const {
     out << QString() << QStringLiteral("Recent warnings and errors:");
     const QStringList log = Diagnostics::recent();
     if (log.isEmpty())
-        out << QStringLiteral("  none since Precrime started");
+        out << QStringLiteral("  none since Fairfax started");
     for (const auto &line : log.mid(qMax<qsizetype>(0, log.size() - 30)))
         out << "  " + line;
     return out.join('\n');
@@ -3488,7 +3488,7 @@ void Backend::maybeBackup() {
 }
 
 bool Backend::backupNow(const QString &reason) {
-    const QString name = QStringLiteral("Precrime_(%1)%2.db")
+    const QString name = QStringLiteral("Fairfax_(%1)%2.db")
                              .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd-HH_mm_ss"),
                                   reason.isEmpty() ? QString() : "_" + reason);
     QString error;
@@ -3501,7 +3501,7 @@ bool Backend::backupNow(const QString &reason) {
     // restore or import are pruned the same way.
     const int keep = qMax(1, m_store->setting("backup.keep", 10).toInt());
     QDir dir(backupFolder());
-    const auto files = dir.entryInfoList({"Precrime_*.db"}, QDir::Files, QDir::Time);
+    const auto files = dir.entryInfoList({"Fairfax_*.db"}, QDir::Files, QDir::Time);
     for (int i = keep; i < files.size(); ++i)
         QFile::remove(files.at(i).absoluteFilePath());
     if (reason.isEmpty())
@@ -3512,7 +3512,7 @@ bool Backend::backupNow(const QString &reason) {
 QVariantList Backend::backups() const {
     QVariantList result;
     QDir dir(backupFolder());
-    for (const auto &f : dir.entryInfoList({"Precrime_*.db"}, QDir::Files, QDir::Time))
+    for (const auto &f : dir.entryInfoList({"Fairfax_*.db"}, QDir::Files, QDir::Time))
         result.append(QVariantMap{{"path", f.absoluteFilePath()}, {"name", f.fileName()},
                                   {"date", English.toString(f.lastModified(), "ddd d MMM yyyy, h:mm AP")},
                                   {"size", QString::number(f.size() / 1024) + " KB"}});
@@ -3651,7 +3651,7 @@ QString Backend::dragOutFile() {
     const QVector<qint64> ids = targetIds();
     if (ids.isEmpty())
         return {};
-    const QString folder = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("precrime-drag");
+    const QString folder = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("fairfax-drag");
     QDir().mkpath(folder);
     const Task first = m_store->task(ids.first());
     QByteArray bytes;
@@ -3701,7 +3701,7 @@ bool Backend::addToCalendar(qint64 taskId, const QString &path) {
     // The desktop handler needs a file to open; a stable name per task keeps
     // repeats from piling up in the temp folder.
     const QString target = !path.isEmpty() ? path
-        : QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath(QStringLiteral("precrime-event-%1.ics").arg(t.id));
+        : QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath(QStringLiteral("fairfax-event-%1.ics").arg(t.id));
     QFile file(target);
     if (!file.open(QIODevice::WriteOnly) || file.write(ics) != ics.size()) {
         setStatus("Could not write the event: " + file.errorString());

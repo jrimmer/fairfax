@@ -14,7 +14,7 @@ ApplicationWindow {
     minimumWidth: 640
     minimumHeight: 460
     visible: !startHidden
-    title: backend.sourceTitle ? backend.sourceTitle + " — Precrime" : "Precrime"
+    title: backend.sourceTitle ? backend.sourceTitle + " — Fairfax" : "Fairfax"
     color: theme.background
 
     Material.theme: theme.dark ? Material.Dark : Material.Light
@@ -182,7 +182,7 @@ ApplicationWindow {
         Column {
             anchors.centerIn: parent
             spacing: 8
-            Text { text: "Precrime can't open its database"; color: theme.foreground; font.bold: true; font.pixelSize: 18 }
+            Text { text: "Fairfax can't open its database"; color: theme.foreground; font.bold: true; font.pixelSize: 18 }
             Text { text: storeError; color: theme.muted }
         }
     }

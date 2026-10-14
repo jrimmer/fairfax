@@ -118,7 +118,7 @@ Popup {
                 linkColor: theme.today
                 font.pixelSize: backend.fontSize - 1
                 onLinkActivated: (link) => {
-                    if (link.startsWith("precrime-task:")) backend.openTaskLink(decodeURIComponent(link.substring(14)), root.t.id || 0)
+                    if (link.startsWith("fairfax-task:")) backend.openTaskLink(decodeURIComponent(link.substring(14)), root.t.id || 0)
                     else Qt.openUrlExternally(link)
                 }
             }

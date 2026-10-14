@@ -241,8 +241,8 @@ private slots:
     void everySetting_data() {
         QTest::addColumn<int>("index");
         const auto &cases = settingCases();
-        // PRECRIME_E2E_ONLY=<text> runs just the rows whose name contains it.
-        const QString only = qEnvironmentVariable("PRECRIME_E2E_ONLY");
+        // FAIRFAX_E2E_ONLY=<text> runs just the rows whose name contains it.
+        const QString only = qEnvironmentVariable("FAIRFAX_E2E_ONLY");
         for (int pass = 0; pass < 2; ++pass)   // Rows without their own data first.
             for (int i = 0; i < cases.size(); ++i)
                 if (cases[i].slot.isEmpty() && bool(cases[i].prepare) == (pass == 1) && (only.isEmpty() || cases[i].name().contains(only)))

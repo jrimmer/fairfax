@@ -9,7 +9,7 @@
 // recurrence strings ("every 2 weeks", "every! 3 days" for repeat-from-
 // completion) and are read back with the natural-language parser. Fields
 // Todoist has no place for (start date and time, star, task type, action)
-// ride in a "<Precrime Meta>{json}</Precrime Meta>" block at the end of the
+// ride in a "<Fairfax Meta>{json}</Fairfax Meta>" block at the end of the
 // description, as the reference app does. List groups, smart lists, alarms and sections
 // stay local.
 //

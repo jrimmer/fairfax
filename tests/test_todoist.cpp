@@ -169,7 +169,7 @@ class TodoistTest : public QObject {
 private slots:
     void firstSyncImports() {
         setup();
-        const QString meta = R"(<Precrime Meta>{"uid":"UID-1","start_date":"2025-03-01","start_time":540,"starred":true,"type":2,"action_type":1,"action_value":"555-1234"}</Precrime Meta>)";
+        const QString meta = R"(<Fairfax Meta>{"uid":"UID-1","start_date":"2025-03-01","start_time":540,"starred":true,"type":2,"action_type":1,"action_value":"555-1234"}</Fairfax Meta>)";
         m_server.canned = {
             {"projects", QJsonArray{project("P0", "Inbox", true), project("P1", "Work")}},
             {"labels", QJsonArray{QJsonObject{{"id", "L1"}, {"name", "home"}, {"is_deleted", false}}}},
@@ -299,7 +299,7 @@ private slots:
         QCOMPARE(args.value("due").toObject().value("date").toString(), QString("2030-05-01T09:00:00"));
         QCOMPARE(args.value("duration").toObject().value("amount").toInt(), 30);
         QCOMPARE(args.value("duration").toObject().value("unit").toString(), QString("minute"));
-        QVERIFY(args.value("description").toString().startsWith("milk\n\n<Precrime Meta>"));
+        QVERIFY(args.value("description").toString().startsWith("milk\n\n<Fairfax Meta>"));
         QVERIFY(args.value("description").toString().contains(R"("starred":true)"));
         QVERIFY(args.value("description").toString().contains(m_store->task(pid).uid));
         // The child names its parent by temp id, and comes after it.
@@ -543,7 +543,7 @@ private slots:
             {"projects", QJsonArray{project("P0", "Inbox", true), project("P1", "Work")}},
             {"labels", QJsonArray{QJsonObject{{"id", "L1"}, {"name", "home"}, {"is_deleted", false}}}},
             {"items", QJsonArray{item("I1", "Already there", "P1",
-                                      {{"description", R"(<Precrime Meta>{"uid":"SHARED-UID"}</Precrime Meta>)"}})}}};
+                                      {{"description", R"(<Fairfax Meta>{"uid":"SHARED-UID"}</Fairfax Meta>)"}})}}};
         runSync();
         QVERIFY2(m_sync->status().startsWith("Synced"), qPrintable(m_sync->status()));
         QVERIFY(!m_server.types().contains("item_add"));

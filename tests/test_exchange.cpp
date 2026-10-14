@@ -129,7 +129,7 @@ private slots:
         QString text = QString::fromUtf8(raw);
         text.replace("\r\n ", "");
         QVERIFY(text.contains("VERSION:2.0\r\n"));
-        QVERIFY(text.contains("PRODID:-//Precrime//EN"));
+        QVERIFY(text.contains("PRODID:-//Fairfax//EN"));
         QVERIFY(text.contains("DUE;VALUE=DATE:20260715"));
         QVERIFY(text.contains("DTSTART:20260714T080000"));
         QVERIFY(text.contains("PRIORITY:9"));

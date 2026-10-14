@@ -44,7 +44,7 @@ QHash<QString, QString> &memory() {
     static QHash<QString, QString> secrets;
     return secrets;
 }
-bool useMemory() { return memoryMode || qgetenv("PRECRIME_KEYRING") == "memory"; }
+bool useMemory() { return memoryMode || qgetenv("FAIRFAX_KEYRING") == "memory"; }
 QString memoryKey(const QString &service, const QString &account) { return service + '\n' + account; }
 
 }  // namespace
@@ -77,7 +77,7 @@ bool store(const QString &service, const QString &account, const QString &secret
     f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     return true;
 #else
-    const Result r = run("secret-tool", {"store", "--label=Precrime " + account, "service", service, "account", account},
+    const Result r = run("secret-tool", {"store", "--label=Fairfax " + account, "service", service, "account", account},
                          secret.toUtf8());
     if (!r.started) {
         if (error) *error = "secret-tool is not installed; install libsecret to store the token.";

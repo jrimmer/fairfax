@@ -245,7 +245,7 @@ QString decodeEntities(const QString &s) {
 }
 
 // Enough HTML-to-text for mail. Not QTextDocumentFragment: that needs a GUI
-// application for its fonts, and `precrime import-mail` runs headless.
+// application for its fonts, and `fairfax import-mail` runs headless.
 QString htmlToText(QString html) {
     static const QRegularExpression comments("<!--.*?-->", QRegularExpression::DotMatchesEverythingOption);
     static const QRegularExpression blocks("<(style|script|head|title)\\b.*?</\\1\\s*>",

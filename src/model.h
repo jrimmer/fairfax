@@ -1,6 +1,6 @@
 #pragma once
 
-// Plain records for everything Precrime stores. They mirror the reference app's own model:
+// Plain records for everything Fairfax stores. They mirror the reference app's own model:
 // lists live in groups, tasks live in lists, projects and checklists are tasks
 // with children, and tags live in tag groups. Each record converts to and from
 // a QVariantMap so the store and the undo journal can treat them uniformly.

@@ -34,7 +34,7 @@ ThemedDialog {
         const ids = root.lists.filter(l => root.chosen[l.id]).map(l => l.id)
         const ext = format.currentIndex === 0 ? "csv" : "ics"
         filePicker.save(format.currentIndex === 0 ? "Export tasks as CSV" : "Export tasks as iCalendar",
-                        "Precrime." + ext, "export:" + root.owner + ":" + ext + ":" + scope.currentIndex + ":" + ids.join(","))
+                        "Fairfax." + ext, "export:" + root.owner + ":" + ext + ":" + scope.currentIndex + ":" + ids.join(","))
     }
 
     Connections {

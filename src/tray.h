@@ -3,7 +3,7 @@
 // The icon in the Omarchy bar's tray (a StatusNotifierItem, through Qt's
 // system tray support). Its menu is a quick view of the day, overdue first,
 // each task opening in the app, followed by the everyday commands: New Task,
-// Open, Find, Sync and Quit. It's there because Precrime keeps running in
+// Open, Find, Sync and Quit. It's there because Fairfax keeps running in
 // the background for alarms; Settings → General turns it off.
 
 #include <QObject>

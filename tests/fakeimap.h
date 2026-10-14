@@ -4,7 +4,7 @@
 // real RFC 822 messages with UIDs, flags and keywords, and enough of IMAP4rev1
 // for src/imapclient.cpp and src/mailfetch.cpp to talk to it. It answers like a
 // real server where that matters to the tests: SEARCH matches by substring (so
-// a search for jane+precrime@gmail.com also finds jane+precrime@gmail.com.au),
+// a search for jane+fairfax@gmail.com also finds jane+fairfax@gmail.com.au),
 // CREATE of an existing folder is NO, MOVE gives the message a new UID, and
 // X-GM-RAW exists only when the server pretends to be Gmail.
 //

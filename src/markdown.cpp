@@ -241,7 +241,7 @@ QString previewSource(const QString &notes) {
             if (title.isEmpty()) continue;
             QString label = title;
             label.replace(u'\\', QStringLiteral("\\\\")).replace(u'[', QStringLiteral("\\[")).replace(u']', QStringLiteral("\\]"));
-            out += s.mid(last, m.capturedStart() - last) + u'[' + label + QStringLiteral("](precrime-task:")
+            out += s.mid(last, m.capturedStart() - last) + u'[' + label + QStringLiteral("](fairfax-task:")
                    + QString::fromLatin1(QUrl::toPercentEncoding(title)) + u')';
             last = m.capturedEnd();
         }
@@ -499,7 +499,7 @@ NotesHighlighter::NotesHighlighter(QObject *parent) : QObject(parent), m_highlig
 }
 
 void NotesHighlighter::registerType() {
-    qmlRegisterType<NotesHighlighter>("Precrime", 1, 0, "NotesHighlighter");
+    qmlRegisterType<NotesHighlighter>("Fairfax", 1, 0, "NotesHighlighter");
 }
 
 void NotesHighlighter::setDocument(QQuickTextDocument *document) {

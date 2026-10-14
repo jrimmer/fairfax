@@ -176,7 +176,7 @@ AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_s
         }
     });
     m_nagTimer.start();
-    // Alarms that came due while Precrime wasn't running go off now.
+    // Alarms that came due while Fairfax wasn't running go off now.
     QTimer::singleShot(1500, this, &AlarmService::check);
 }
 
@@ -244,8 +244,8 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     return;
 #else
     QDBusMessage call = QDBusMessage::createMethodCall(Service, Path, Interface, "Notify");
-    QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-precrime.alarm"},
-                      {"desktop-entry", "precrime"}};
+    QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-fairfax.alarm"},
+                      {"desktop-entry", "fairfax"}};
     // In Do Not Disturb the notification still appears, quietly.
     const bool quiet = a.sound && doNotDisturb();
     if (a.sound && !quiet)
@@ -265,12 +265,12 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
         actions << "snooze-evening" << "This Evening (" + Schedule::formatTime(19 * 60) + ")";
     const QDateTime morning = AlarmTimes::snoozeTarget("snooze-morning", now, morningMinutes());
     actions << "snooze-morning" << "Tomorrow Morning (" + Schedule::formatTime(morning.time().hour() * 60 + morning.time().minute()) + ")";
-    call << QStringLiteral("Precrime") << uint(0) << QStringLiteral("precrime") << t.title << body << actions << hints << int(0);
+    call << QStringLiteral("Fairfax") << uint(0) << QStringLiteral("fairfax") << t.title << body << actions << hints << int(0);
     const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
     if (reply.isValid())
         m_notifications.insert(reply.value(), a.id);
     else
-        qWarning("precrime: couldn't show a notification: %s", qPrintable(reply.error().message()));
+        qWarning("fairfax: couldn't show a notification: %s", qPrintable(reply.error().message()));
     // Only sounding alerts nag; a plain message is shown once.
     if (a.sound && nagMinutes() && !m_nagging.contains(a.id))
         m_nagging.insert(a.id, now.addSecs(qint64(nagMinutes()) * 60));

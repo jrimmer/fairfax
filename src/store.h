@@ -47,7 +47,7 @@ public:
     // service, a second window) has written to the database.
     void reload();
 
-    // Reloads when another process (precrime ctl, the MCP server) has
+    // Reloads when another process (fairfax ctl, the MCP server) has
     // committed to the database since we last looked, using SQLite's
     // data_version, which only changes for other connections' writes.
     bool reloadIfChangedElsewhere();
@@ -105,7 +105,7 @@ public:
     bool backupTo(const QString &file, QString *error = nullptr);
 
     // Replaces the whole database with `file` (a backup), after checking it
-    // opens as a Precrime database. Undo history is cleared: there is no
+    // opens as a Fairfax database. Undo history is cleared: there is no
     // undoing past a restore, which is why a safety backup is made first.
     bool replaceWith(const QString &file, QString *error = nullptr);
 

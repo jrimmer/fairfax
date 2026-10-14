@@ -1,4 +1,4 @@
-// Demo data for `precrime --demo`: a lived-in database shaped like the one in
+// Demo data for `fairfax --demo`: a lived-in database shaped like the one in
 // the reference app's own screenshots, with dates relative to today so it always looks current.
 
 #include "backend.h"
@@ -217,7 +217,7 @@ void Backend::seedDemo() {
             return QStringLiteral("BEGIN:VEVENT\r\nUID:%1\r\nSUMMARY:%2\r\nDTSTART:%3T%4\r\nDTEND:%3T%5\r\nEND:VEVENT\r\n")
                 .arg(uid, title, day, start, end);
         };
-        file.write(("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Precrime//Demo//EN\r\nX-WR-CALNAME:Work\r\n" +
+        file.write(("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Fairfax//Demo//EN\r\nX-WR-CALNAME:Work\r\n" +
                     event("standup", "Team stand-up", "093000", "100000") + event("jeremy", "Call with Jeremy", "110000", "114500") +
                     event("lunch", "Lunch with Ana", "123000", "133000") + event("review", "Design review", "150000", "160000") +
                     // Declined by the demo user, so the bar shows it struck through.

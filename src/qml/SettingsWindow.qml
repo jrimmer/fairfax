@@ -8,7 +8,7 @@ import QtQuick.Layouts
 Window {
     id: root
 
-    title: "Precrime Settings"
+    title: "Fairfax Settings"
     width: 720
     height: 560
     minimumWidth: 560
@@ -111,14 +111,14 @@ Window {
                     Image { source: "qrc:/icon.svg"; width: 28; height: 28; sourceSize: Qt.size(56, 56); anchors.verticalCenter: parent.verticalCenter }
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        Text { objectName: "aboutName"; text: "Precrime"; color: theme.foreground; font.pixelSize: backend.fontSize; font.bold: true }
+                        Text { objectName: "aboutName"; text: "Fairfax"; color: theme.foreground; font.pixelSize: backend.fontSize; font.bold: true }
                         Text { objectName: "aboutVersion"; text: "Version " + Qt.application.version; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
                     }
                 }
                 Text {
                     objectName: "aboutLink"
                     topPadding: 4
-                    text: "github.com/jrimmer/precrime"
+                    text: "github.com/jrimmer/fairfax"
                     color: theme.today
                     font.pixelSize: backend.fontSize - 3
                     font.underline: linkMouse.containsMouse
@@ -127,7 +127,7 @@ Window {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Qt.openUrlExternally("https://github.com/jrimmer/precrime")
+                        onClicked: Qt.openUrlExternally("https://github.com/jrimmer/fairfax")
                     }
                 }
                 Text { text: "© 2026 Jason Rimmer"; color: theme.muted; font.pixelSize: backend.fontSize - 3 }
@@ -195,10 +195,10 @@ Window {
                 ColumnLayout {
                     visible: root.pane === 0
                     Layout.fillWidth: true
-                    Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Precrime running. Q or Ctrl+Q quits for real." }
+                    Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Fairfax running. Q or Ctrl+Q quits for real." }
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
-                    Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Precrime takes the free one. With tiled windows Hyprland places it as usual." }
-                    Toggle { key: "general.trayIcon"; fallback: true; label: "Show Precrime in the bar's tray"; note: "Its menu lists today's tasks, with New Task, Find, Sync and Quit." }
+                    Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Fairfax takes the free one. With tiled windows Hyprland places it as usual." }
+                    Toggle { key: "general.trayIcon"; fallback: true; label: "Show Fairfax in the bar's tray"; note: "Its menu lists today's tasks, with New Task, Find, Sync and Quit." }
                     RowLayout {
                         Label { text: "Week starts on"; Layout.preferredWidth: 160 }
                         ComboBox {
@@ -211,10 +211,10 @@ Window {
                             onActivated: (i) => backend.setSetting("general.weekStart", days[i])
                         }
                     }
-                    Hint { Layout.topMargin: 0; text: "Used by this-week searches and Focus Filter, the mini calendar, date pickers and weekly repeats. Precrime is English only; month and day names are English and dates are laid out for the system locale (" + Qt.locale().name + ")." }
+                    Hint { Layout.topMargin: 0; text: "Used by this-week searches and Focus Filter, the mini calendar, date pickers and weekly repeats. Fairfax is English only; month and day names are English and dates are laid out for the system locale (" + Qt.locale().name + ")." }
                     Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
                     Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }
-                    Hint { text: "On Omarchy, run  precrime setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Precrime section in the Super+Space menu, and starts Precrime at sign-in so alarms arrive. Undo with  precrime setup omarchy --remove." }
+                    Hint { text: "On Omarchy, run  fairfax setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Fairfax section in the Super+Space menu, and starts Fairfax at sign-in so alarms arrive. Undo with  fairfax setup omarchy --remove." }
                 }
 
                 // Appearance
@@ -477,7 +477,7 @@ Window {
                             onActivated: (i) => backend.setSetting("alerts.badge", metrics[i])
                         }
                     }
-                    Hint { Layout.topMargin: 0; text: "The number on the tray icon and in the Waybar module (precrime --waybar). Today counts tasks due today, not overdue ones." }
+                    Hint { Layout.topMargin: 0; text: "The number on the tray icon and in the Waybar module (fairfax --waybar). Today counts tasks due today, not overdue ones." }
 
                     Label { text: "Default Reminders"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
@@ -514,7 +514,7 @@ Window {
                         }
                     }
                     Hint { text: "Added whenever a task gets a due date and has no alerts yet. You can still edit or remove alerts on any task." }
-                    Hint { text: "Silence a single list from its right-click menu (Mute Alerts). Alerts appear as notifications with Complete and Snooze; Precrime has to be running to deliver them." }
+                    Hint { text: "Silence a single list from its right-click menu (Mute Alerts). Alerts appear as notifications with Complete and Snooze; Fairfax has to be running to deliver them." }
                 }
 
                 // Sync
@@ -566,7 +566,7 @@ Window {
                     Label { text: "Todoist"; font.bold: true; Layout.topMargin: 16 }
                     Hint {
                         Layout.topMargin: 0
-                        text: "Two-way sync with Todoist, so your phone sees your tasks. Paste your API token from Todoist's Settings → Integrations → Developer; it's kept in your keyring, not in Precrime's database. Lists, tags, dates, repeats, priority and sub-tasks sync; start dates, stars and task types ride along in a small metadata block in each task's description. List groups, smart lists and alerts stay local. Turn it on on one machine only if you also use git sync."
+                        text: "Two-way sync with Todoist, so your phone sees your tasks. Paste your API token from Todoist's Settings → Integrations → Developer; it's kept in your keyring, not in Fairfax's database. Lists, tags, dates, repeats, priority and sub-tasks sync; start dates, stars and task types ride along in a small metadata block in each task's description. List groups, smart lists and alerts stay local. Turn it on on one machine only if you also use git sync."
                     }
                     RowLayout {
                         visible: !!todoist && !todoist.connected
@@ -605,12 +605,12 @@ Window {
                     Label { text: "WebDAV"; font.bold: true; Layout.topMargin: 16 }
                     Hint {
                         Layout.topMargin: 0
-                        text: "The same files over WebDAV, for Nextcloud, ownCloud and other servers. Use the address of an existing folder, such as https://cloud.example.com/remote.php/dav/files/you/Precrime/. The password is kept in your keyring."
+                        text: "The same files over WebDAV, for Nextcloud, ownCloud and other servers. Use the address of an existing folder, such as https://cloud.example.com/remote.php/dav/files/you/Fairfax/. The password is kept in your keyring."
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
                         visible: !!webDavSync
-                        TextField { id: davUrl; objectName: "davUrl"; Layout.fillWidth: true; placeholderText: "https://…/dav/files/you/Precrime/"; text: webDavSync ? webDavSync.url : "" }
+                        TextField { id: davUrl; objectName: "davUrl"; Layout.fillWidth: true; placeholderText: "https://…/dav/files/you/Fairfax/"; text: webDavSync ? webDavSync.url : "" }
                         RowLayout {
                             Layout.fillWidth: true
                             TextField { id: davUser; objectName: "davUser"; Layout.fillWidth: true; placeholderText: "User name"; text: webDavSync ? webDavSync.user : "" }
@@ -635,7 +635,7 @@ Window {
                     Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV and Todoist sync all skip it." }
                 }
 
-                // Mail to Precrime
+                // Mail to Fairfax
                 ColumnLayout {
                     id: mailPane
                     visible: root.pane === 6
@@ -653,13 +653,13 @@ Window {
 
                     CheckBox {
                         objectName: "setting:mail.enabled"
-                        text: "Enable Mail to Precrime"
+                        text: "Enable Mail to Fairfax"
                         checked: { mailFetch.revision; return mailFetch.option("mail.enabled") === "true" }
                         onToggled: mailFetch.setOption("mail.enabled", checked)
                     }
                     Hint {
                         Layout.topMargin: 0
-                        text: "Mail sent to a Precrime address becomes tasks, as in the reference app's Mail to the reference app. Precrime has no server of its own, so it watches a mailbox you own and picks out only the messages meant for it; the rest of that mailbox is left alone."
+                        text: "Mail sent to a Fairfax address becomes tasks, as in the reference app's Mail to the reference app. Fairfax has no server of its own, so it watches a mailbox you own and picks out only the messages meant for it; the rest of that mailbox is left alone."
                     }
                     RowLayout {
                         Layout.topMargin: 8
@@ -702,7 +702,7 @@ Window {
                             Layout.fillWidth: true
                             Hint {
                                 Layout.topMargin: 0
-                                text: "Precrime ships no Google client of its own. Create a Desktop app OAuth client in your own Google Cloud project, publish its consent screen to Production (otherwise Google expires the sign-in after 7 days), download its client_secret.json and import it here."
+                                text: "Fairfax ships no Google client of its own. Create a Desktop app OAuth client in your own Google Cloud project, publish its consent screen to Production (otherwise Google expires the sign-in after 7 days), download its client_secret.json and import it here."
                             }
                             RowLayout {
                                 Button { objectName: "mailImportClient"; text: "Import client JSON…"; onClicked: filePicker.open("Choose your Google client_secret.json", "mail-client-json") }
@@ -726,8 +726,8 @@ Window {
                             font.pixelSize: backend.fontSize - 1
                             text: {
                                 mailFetch.revision
-                                const a = mailFetch.plusAddress || "you+precrime@gmail.com"
-                                return "Send or forward mail to <b>" + a + "</b>. Gmail delivers it to your normal inbox; Precrime takes only mail sent to that address, files it under the "
+                                const a = mailFetch.plusAddress || "you+fairfax@gmail.com"
+                                return "Send or forward mail to <b>" + a + "</b>. Gmail delivers it to your normal inbox; Fairfax takes only mail sent to that address, files it under the "
                                     + mailFetch.option("mail.moveTo") + " label and out of your inbox, and leaves everything else alone."
                             }
                         }
@@ -753,7 +753,7 @@ Window {
                         Hint {
                             objectName: "mailOutlookDavmail"
                             Layout.topMargin: 0
-                            text: "DavMail is an open-source gateway that makes Outlook.com and Microsoft 365 look like a local IMAP server (it is in the AUR). Install it, point it at your account, and Precrime reads it on 127.0.0.1."
+                            text: "DavMail is an open-source gateway that makes Outlook.com and Microsoft 365 look like a local IMAP server (it is in the AUR). Install it, point it at your account, and Fairfax reads it on 127.0.0.1."
                         }
                         Button { objectName: "mailUseDavMail"; text: "Use DavMail"; onClicked: mailFetch.useDavMail() }
                         Label { text: "3. Advanced"; font.bold: true; Layout.topMargin: 8 }
@@ -826,7 +826,7 @@ Window {
                             objectName: "setting:mail.moveTo"
                             visible: mailPane.after === "move"
                             Layout.preferredWidth: 160
-                            placeholderText: "Precrime"
+                            placeholderText: "Fairfax"
                             selectByMouse: true
                             text: { mailFetch.revision; return mailFetch.option("mail.moveTo") }
                             onEditingFinished: if (text !== mailFetch.option("mail.moveTo")) mailFetch.setOption("mail.moveTo", text.trim())
@@ -864,7 +864,7 @@ Window {
                         }
                         Label { text: "minutes" }
                     }
-                    Hint { Layout.topMargin: 0; text: "Used when the server can't push new mail (IDLE); otherwise Precrime is told as soon as mail arrives." }
+                    Hint { Layout.topMargin: 0; text: "Used when the server can't push new mail (IDLE); otherwise Fairfax is told as soon as mail arrives." }
 
                     Label { text: "Status"; font.bold: true; Layout.topMargin: 14 }
                     RowLayout {
@@ -885,7 +885,7 @@ Window {
                     }
 
                     Label { text: "Or pipe it in"; font.bold: true; Layout.topMargin: 14 }
-                    Hint { Layout.topMargin: 0; text: "For Sieve, procmail, fetchmail or a bridge, pass messages to Precrime yourself:" }
+                    Hint { Layout.topMargin: 0; text: "For Sieve, procmail, fetchmail or a bridge, pass messages to Fairfax yourself:" }
                     TextEdit {
                         objectName: "mailPipe"
                         readOnly: true
@@ -898,7 +898,7 @@ Window {
                         selectionColor: theme.selection
                         font.family: "monospace"
                         font.pixelSize: backend.fontSize - 1
-                        text: "precrime import-mail message.eml\nprecrime import-mail --maildir ~/Mail/precrime"
+                        text: "fairfax import-mail message.eml\nfairfax import-mail --maildir ~/Mail/fairfax"
                     }
                 }
 
@@ -923,7 +923,7 @@ Window {
                     }
                     RowLayout {
                         Button { objectName: "backupNow"; text: "Back Up Now"; onClicked: { backend.backupNow(); backupList.model = backend.backups() } }
-                        Button { text: "Restore from File…"; flat: true; onClicked: filePicker.open("Restore a Precrime backup", "restore") }
+                        Button { text: "Restore from File…"; flat: true; onClicked: filePicker.open("Restore a Fairfax backup", "restore") }
                     }
                     Hint { text: "Backups are kept in " + backend.backupFolder() }
                     Repeater {
@@ -949,8 +949,8 @@ Window {
                     Label { text: "Export"; font.bold: true }
                     RowLayout {
                         Button { objectName: "exportChoose"; text: "Choose Lists…"; onClicked: exportDialog.show() }
-                        Button { objectName: "exportCsv"; text: "Everything as CSV…"; flat: true; onClicked: filePicker.save("Export tasks as CSV", "Precrime.csv", "export-csv") }
-                        Button { objectName: "exportIcs"; text: "Everything as .ics…"; flat: true; onClicked: filePicker.save("Export tasks as iCalendar", "Precrime.ics", "export-ics") }
+                        Button { objectName: "exportCsv"; text: "Everything as CSV…"; flat: true; onClicked: filePicker.save("Export tasks as CSV", "Fairfax.csv", "export-csv") }
+                        Button { objectName: "exportIcs"; text: "Everything as .ics…"; flat: true; onClicked: filePicker.save("Export tasks as iCalendar", "Fairfax.ics", "export-ics") }
                     }
                     Label { text: "Import"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
@@ -1067,7 +1067,7 @@ Window {
                     Hint {
                         objectName: "automationHint"
                         Layout.topMargin: 0
-                        text: "Let Claude work with your tasks: add Precrime as an MCP server. In Claude Code run:\n  claude mcp add precrime -- precrime mcp\n\nScripts can use the same commands from a terminal:\n  precrime ctl help\n  precrime ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like precrime://x-callback-url/add?task=Buy%20milk open in the app.\n\nWaybar: add a custom module that runs  precrime --waybar  every 60 seconds to show overdue and due-today counts."
+                        text: "Let Claude work with your tasks: add Fairfax as an MCP server. In Claude Code run:\n  claude mcp add fairfax -- fairfax mcp\n\nScripts can use the same commands from a terminal:\n  fairfax ctl help\n  fairfax ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like fairfax://x-callback-url/add?task=Buy%20milk open in the app.\n\nWaybar: add a custom module that runs  fairfax --waybar  every 60 seconds to show overdue and due-today counts."
                     }
                 }
 

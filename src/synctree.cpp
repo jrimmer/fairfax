@@ -273,7 +273,7 @@ bool writeTree(const Store &store, const QString &directory, const QDateTime &no
     }
     const qint64 cutoff = stampOf(now.addDays(-TombstoneDays));
     QJsonObject meta;
-    meta.insert("format", "precrime-sync");
+    meta.insert("format", "fairfax-sync");
     meta.insert("version", 1);
     if (!writeIfChanged(root.filePath("Store.json"), bytesOf(meta), error))
         return false;

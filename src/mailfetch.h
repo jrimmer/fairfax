@@ -1,17 +1,17 @@
 #pragma once
 
-// The Mail to Precrime connector: watches an IMAP mailbox you own and turns the
-// messages meant for Precrime into tasks (src/mailtask.h does the converting).
+// The Mail to Fairfax connector: watches an IMAP mailbox you own and turns the
+// messages meant for Fairfax into tasks (src/mailtask.h does the converting).
 // The mailbox can be your everyday one: only mail that matches the filters
 // (sent to a plus-address, carrying a label or keyword) is imported, and
 // everything else is left alone.
 //
 // Settings are key/value in the store (`mail.*`, see option()); secrets are in
-// the keyring (src/keyring.h) under service "precrime": account "mail" holds
+// the keyring (src/keyring.h) under service "fairfax": account "mail" holds
 // the password or Gmail app password, "mail-client" a Google OAuth client
 // secret, "mail-oauth" the OAuth refresh token.
 //
-// No OAuth client id or secret ships with Precrime, and none ever should: it
+// No OAuth client id or secret ships with Fairfax, and none ever should: it
 // is open source, and nobody runs a registration for forks. The defaults need
 // none (a Gmail app password; Outlook through forwarding or a local DavMail
 // gateway). OAuth exists only for a client the user brings: an imported Google
@@ -90,7 +90,7 @@ public:
     // Outlook through a local DavMail gateway: the Other preset with 127.0.0.1:1143, no TLS.
     Q_INVOKABLE void useDavMail();
 
-    // jane@gmail.com -> jane+precrime@gmail.com; empty when there is no address or it already has a plus.
+    // jane@gmail.com -> jane+fairfax@gmail.com; empty when there is no address or it already has a plus.
     static QString plusAddressOf(const QString &address);
     QString plusAddress() const { return plusAddressOf(option("mail.address")); }
     bool unfiltered() const;
@@ -192,7 +192,7 @@ private:
     QList<qint64> m_todo;          // Uids found by the search, still to do.
     QList<qint64> m_batch;         // The part of m_todo whose sizes are known.
     QHash<qint64, qint64> m_sizes;
-    QSet<qint64> m_rejected;       // Uids that were not for Precrime or too big; not fetched again this session.
+    QSet<qint64> m_rejected;       // Uids that were not for Fairfax or too big; not fetched again this session.
     QTimer m_retry, m_poll, m_idleRenew, m_reconfigure;
 
     OAuth::Flow m_flow;      // Signing in.

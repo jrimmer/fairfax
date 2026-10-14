@@ -1,9 +1,9 @@
 #pragma once
 
-// Mail to Precrime: turns an RFC 822 message into a task the way the reference app's "Mail
+// Mail to Fairfax: turns an RFC 822 message into a task the way the reference app's "Mail
 // to the reference app" does (see its manual page on email). the reference app hosts a private address;
-// Precrime has no server, so the message arrives from an IMAP mailbox you own
-// or from `precrime import-mail`, and both come through here.
+// Fairfax has no server, so the message arrives from an IMAP mailbox you own
+// or from `fairfax import-mail`, and both come through here.
 //
 // parse() reads the message; import() files it. They are separate so a caller
 // can look at a message (its recipients, its size) before deciding to import.

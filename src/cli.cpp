@@ -84,13 +84,13 @@ namespace Cli {
 int add(Store &store, const QStringList &words, QTextStream &out, QTextStream &err) {
     const QString text = words.join(' ').trimmed();
     if (text.isEmpty()) {
-        err << "usage: pc <task, e.g. Call Sam tomorrow 3pm #family !!>" << Qt::endl;
+        err << "usage: frfx <task, e.g. Call Sam tomorrow 3pm #family !!>" << Qt::endl;
         return 2;
     }
     Automation automation(store);
     const QJsonObject r = automation.run("create_task", {{"title", text}, {"natural_language", true}});
     if (!r.value("ok").toBool()) {
-        err << "precrime: " << r.value("error").toObject().value("message").toString() << Qt::endl;
+        err << "fairfax: " << r.value("error").toObject().value("message").toString() << Qt::endl;
         return 1;
     }
     const QJsonObject task = r.value("task").toObject();
@@ -123,19 +123,19 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
             options.naturalLanguage = true;
         } else if (a == "--list" || a == "--maildir") {
             if (i + 1 >= args.size()) {
-                err << "precrime import-mail: " << a << " needs a value" << Qt::endl;
+                err << "fairfax import-mail: " << a << " needs a value" << Qt::endl;
                 return 2;
             }
             (a == "--list" ? listName : maildir) = args.at(++i);
         } else if (a.startsWith("--") && a.size() > 2) {
-            err << "precrime import-mail: unknown option " << a << Qt::endl;
+            err << "fairfax import-mail: unknown option " << a << Qt::endl;
             return 2;
         } else {
             files << a;
         }
     }
     if (!maildir.isEmpty() && !files.isEmpty()) {
-        err << "precrime import-mail: give message files or --maildir, not both" << Qt::endl;
+        err << "fairfax import-mail: give message files or --maildir, not both" << Qt::endl;
         return 2;
     }
     if (!listName.isEmpty()) {
@@ -143,7 +143,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
             if (!l.deleted && !l.archived && l.kind != ListKind::Smart && l.name.compare(listName, Qt::CaseInsensitive) == 0)
                 options.listId = l.id;
         if (!options.listId) {
-            err << "precrime import-mail: no list called \u201c" << listName << "\u201d" << Qt::endl;
+            err << "fairfax import-mail: no list called \u201c" << listName << "\u201d" << Qt::endl;
             return 2;
         }
     }
@@ -153,7 +153,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
     const auto handle = [&](const QByteArray &bytes, const QString &source) {
         const MailTask::Message message = MailTask::parse(bytes);
         if (!message.valid) {
-            err << "precrime: " << source << ": not an email message" << Qt::endl;
+            err << "fairfax: " << source << ": not an email message" << Qt::endl;
             return false;
         }
         const MailTask::Result r = MailTask::import(store, message, options);
@@ -163,7 +163,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
         } else if (r.reason == "duplicate" || r.reason == "empty") {
             out << "Skipped: " << r.reason << Qt::endl;
         } else {
-            err << "precrime: " << source << ": there is no list to put the task in; open Precrime once to set up the database" << Qt::endl;
+            err << "fairfax: " << source << ": there is no list to put the task in; open Fairfax once to set up the database" << Qt::endl;
             return false;
         }
         return true;
@@ -173,7 +173,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
         // A Maildir delivers into new/; reading a message moves it to cur/ with the Seen flag.
         const QDir fresh(maildir + "/new");
         if (!fresh.exists()) {
-            err << "precrime: " << maildir << " has no new/ folder" << Qt::endl;
+            err << "fairfax: " << maildir << " has no new/ folder" << Qt::endl;
             return 1;
         }
         QDir().mkpath(maildir + "/cur");
@@ -182,7 +182,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
                 continue;
             QFile file(fresh.filePath(name));
             if (!file.open(QIODevice::ReadOnly)) {
-                err << "precrime: can't read " << file.fileName() << Qt::endl;
+                err << "fairfax: can't read " << file.fileName() << Qt::endl;
                 status = 1;
                 continue;
             }
@@ -194,7 +194,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
             }
             const QString seen = maildir + "/cur/" + name.section(':', 0, 0) + ":2,S";
             if (!QFile::rename(file.fileName(), seen)) {
-                err << "precrime: can't move " << file.fileName() << " to " << seen << Qt::endl;
+                err << "fairfax: can't move " << file.fileName() << " to " << seen << Qt::endl;
                 status = 1;
             }
         }
@@ -208,7 +208,7 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
     for (const QString &path : files) {
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly)) {
-            err << "precrime: can't read " << path << Qt::endl;
+            err << "fairfax: can't read " << path << Qt::endl;
             status = 1;
         } else if (!handle(file.readAll(), path)) {
             status = 1;
@@ -217,24 +217,24 @@ int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream
     return status;
 }
 
-int pc(Store &store, const QStringList &args, QTextStream &out, QTextStream &err) {
+int shorthand(Store &store, const QStringList &args, QTextStream &out, QTextStream &err) {
     const QString command = args.value(0).toLower();
     if (args.isEmpty() || command == "today")
         return show(store, Source{Source::Today, 0}, {}, out);
     if (command == "help" || command == "-h" || command == "--help") {
-        out << "pc <task>               add a task: pc Call Sam tomorrow 3pm #family !!\n"
-               "pc                      Today, numbered\n"
-               "pc ls [all|starred|scheduled|done|<list>]\n"
-               "pc done <n> [<n>…]      complete tasks by number\n"
-               "pc find <words>         search everything (the reference app search syntax works)\n"
-               "pc open                 open Precrime\n"
-               "pc add <task>           add a task that starts with one of these words\n";
+        out << "frfx <task>             add a task: frfx Call Sam tomorrow 3pm #family !!\n"
+               "frfx                    Today, numbered\n"
+               "frfx ls [all|starred|scheduled|done|<list>]\n"
+               "frfx done <n> [<n>…]    complete tasks by number\n"
+               "frfx find <words>       search everything (the reference app search syntax works)\n"
+               "frfx open               open Fairfax\n"
+               "frfx add <task>         add a task that starts with one of these words\n";
         return 0;
     }
     if (command == "add")
         return add(store, args.mid(1), out, err);
     if (command == "open") {
-        QProcess::startDetached("precrime", {});
+        QProcess::startDetached("fairfax", {});
         return 0;
     }
     if (command == "ls" || command == "list") {
@@ -247,7 +247,7 @@ int pc(Store &store, const QStringList &args, QTextStream &out, QTextStream &err
         for (const auto &l : store.lists())
             if (!l.deleted && l.name.compare(which, Qt::CaseInsensitive) == 0)
                 return show(store, Source{Source::List, l.id}, {}, out);
-        err << "pc: no list called “" << which << "”" << Qt::endl;
+        err << "frfx: no list called “" << which << "”" << Qt::endl;
         return 1;
     }
     if (command == "find" || command == "search")
@@ -258,19 +258,19 @@ int pc(Store &store, const QStringList &args, QTextStream &out, QTextStream &err
             bool ok = false;
             const qint64 id = QString(a).remove('#').toLongLong(&ok);
             if (!ok || !store.tasks().contains(id)) {
-                err << "pc: no task #" << a << Qt::endl;
+                err << "frfx: no task #" << a << Qt::endl;
                 return 1;
             }
             ids.append(QString::number(id));
         }
         if (ids.isEmpty()) {
-            err << "usage: pc " << command << " <n> [<n>…]   (numbers from pc or pc ls)" << Qt::endl;
+            err << "usage: frfx " << command << " <n> [<n>…]   (numbers from frfx or frfx ls)" << Qt::endl;
             return 2;
         }
         Automation automation(store);
         const QJsonObject r = automation.run(command == "done" ? "complete_task" : "uncomplete_task", {{"task_ids", ids}});
         if (!r.value("ok").toBool()) {
-            err << "precrime: " << r.value("error").toObject().value("message").toString() << Qt::endl;
+            err << "fairfax: " << r.value("error").toObject().value("message").toString() << Qt::endl;
             return 1;
         }
         for (const auto &id : ids)

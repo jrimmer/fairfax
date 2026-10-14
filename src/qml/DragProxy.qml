@@ -51,7 +51,7 @@ Rectangle {
     radius: 13
     color: theme.accent
     opacity: 0.94
-    Drag.keys: ["precrime-tasks"]
+    Drag.keys: ["fairfax-tasks"]
     Drag.hotSpot.x: 10
     Drag.hotSpot.y: 13
 

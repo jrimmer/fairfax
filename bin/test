@@ -5,11 +5,11 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build/tests"
 cd "$ROOT/build/tests"
 
-qmake6 "$ROOT/tests/precrime_tests.pro"
-make -j"${PRECRIME_JOBS:-$(nproc)}"
-QT_QPA_PLATFORM=offscreen ./precrime_tests
+qmake6 "$ROOT/tests/fairfax_tests.pro"
+make -j"${FAIRFAX_JOBS:-$(nproc)}"
+QT_QPA_PLATFORM=offscreen ./fairfax_tests
 
 # The UI tests need a second full build, so they run here only on request.
-if [ -n "${PRECRIME_E2E:-}" ]; then
+if [ -n "${FAIRFAX_E2E:-}" ]; then
     "$ROOT/bin/e2e"
 fi

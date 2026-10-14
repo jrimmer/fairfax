@@ -21,8 +21,8 @@ namespace {
 const QString ETasks = QStringLiteral("tasks");
 const QString ELists = QStringLiteral("lists");
 const QString ETags = QStringLiteral("tags");
-const QString MetaOpen = QStringLiteral("<Precrime Meta>");
-const QString MetaClose = QStringLiteral("</Precrime Meta>");
+const QString MetaOpen = QStringLiteral("<Fairfax Meta>");
+const QString MetaClose = QStringLiteral("</Fairfax Meta>");
 constexpr int MaxCloses = 20;
 
 QString newUuid() { return QUuid::createUuid().toString(QUuid::WithoutBraces); }
@@ -84,7 +84,7 @@ QString ruleOnly(QString s) {
 }
 
 QString splitDescription(const QString &description, QJsonObject *meta, bool *present) {
-    static const QRegularExpression re("<Precrime Meta>(.*?)</Precrime Meta>", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression re("<Fairfax Meta>(.*?)</Fairfax Meta>", QRegularExpression::DotMatchesEverythingOption);
     QString notes = description;
     *present = false;
     const auto m = re.match(description);
@@ -1067,7 +1067,7 @@ TodoistSync::TodoistSync(Store *store, QObject *parent) : QObject(parent), m_sto
 QString TodoistSync::token() const {
     if (!m_tokenLooked) {
         m_tokenLooked = true;
-        m_cachedToken = Keyring::lookup("precrime", "todoist");
+        m_cachedToken = Keyring::lookup("fairfax", "todoist");
     }
     return m_cachedToken;
 }
@@ -1097,7 +1097,7 @@ void TodoistSync::connectAccount(const QString &tokenText) {
         return;
     }
     QString error;
-    if (!Keyring::store("precrime", "todoist", t, &error)) {
+    if (!Keyring::store("fairfax", "todoist", t, &error)) {
         setStatus(error);
         return;
     }
@@ -1111,7 +1111,7 @@ void TodoistSync::connectAccount(const QString &tokenText) {
 
 void TodoistSync::disconnectAccount() {
     if (!m_transport)
-        Keyring::clear("precrime", "todoist");
+        Keyring::clear("fairfax", "todoist");
     m_cachedToken.clear();
     m_tokenLooked = true;
     m_store->setSetting(SyncTokenSetting, QString());

@@ -34,7 +34,7 @@ QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
 }  // namespace
 
 Store::Store(QObject *parent)
-    : QObject(parent), m_connection(QStringLiteral("precrime-%1").arg(reinterpret_cast<quintptr>(this))) {}
+    : QObject(parent), m_connection(QStringLiteral("fairfax-%1").arg(reinterpret_cast<quintptr>(this))) {}
 
 Store::~Store() {
     if (m_db.isOpen())
@@ -500,7 +500,7 @@ bool Store::write(const QVector<Edit> &edits, bool forward) {
     }
     if (!ok) {
         m_db.rollback();
-        qWarning("precrime: failed to write a change; it stays in memory only");
+        qWarning("fairfax: failed to write a change; it stays in memory only");
         return false;
     }
     return m_db.commit();
@@ -532,7 +532,7 @@ bool Store::writeRow(const QString &table, const QVariantMap &row) {
         q.bindValue(":" + it.key(), value);
     }
     if (!q.exec()) {
-        qWarning("precrime: %s", qPrintable(errorText(q)));
+        qWarning("fairfax: %s", qPrintable(errorText(q)));
         return false;
     }
     return true;
@@ -669,7 +669,7 @@ bool Store::replaceWith(const QString &file, QString *error) {
             probe.close();
             if (!ok) {
                 if (error)
-                    *error = QStringLiteral("%1 isn't a Precrime database.").arg(file);
+                    *error = QStringLiteral("%1 isn't a Fairfax database.").arg(file);
                 QSqlDatabase::removeDatabase(probeName);
                 return false;
             }

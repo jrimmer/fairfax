@@ -2,7 +2,7 @@
 // (smart-lists.md, "The Rule Builder"): a row per clause (Property, is / is
 // not, value), "all" or "any" of the following at the top, [+] to add a
 // clause, [-] to remove one, and Option-click on [+] to add a sub-filter. In
-// Precrime Option is Alt, and a right-click on [+] offers both choices.
+// Fairfax Option is Alt, and a right-click on [+] offers both choices.
 //
 // The rows write the `type:` section of the search language; each test
 // asserts the rows on the sheet, the query they write, and the tasks that

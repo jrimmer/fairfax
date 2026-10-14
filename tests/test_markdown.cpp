@@ -309,7 +309,7 @@ private slots:
     void previewSourceConverts() {
         QCOMPARE(Markdown::previewSource("x ::hot:: y"), QString("x <mark>hot</mark> y"));
         QCOMPARE(Markdown::previewSource("[u]a[/u]"), QString("<u>a</u>"));
-        QCOMPARE(Markdown::previewSource("see @{Weekly review}"), QString("see [Weekly review](precrime-task:Weekly%20review)"));
+        QCOMPARE(Markdown::previewSource("see @{Weekly review}"), QString("see [Weekly review](fairfax-task:Weekly%20review)"));
         QCOMPARE(Markdown::previewSource("`::no::`"), QString("`::no::`"));
         QCOMPARE(Markdown::previewSource("```\n::no:: @{x}\n```"), QString("```\n::no:: @{x}\n```"));
     }

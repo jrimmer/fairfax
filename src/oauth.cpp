@@ -138,7 +138,7 @@ void Flow::onConnection() {
             socket->setProperty("handled", true);
             const QList<QByteArray> parts = data.left(data.indexOf("\r\n")).split(' ');
             if (parts.size() < 2 || parts[0] != "GET") {
-                respond(socket, 400, "Bad request", "Precrime expected a browser redirect.");
+                respond(socket, 400, "Bad request", "Fairfax expected a browser redirect.");
                 return;
             }
             const QUrl target = QUrl::fromEncoded("http://localhost" + parts[1]);
@@ -153,7 +153,7 @@ void Flow::onConnection() {
                 return;
             }
             if (q.queryItemValue("state") != m_state) {
-                respond(socket, 400, "Sign-in failed", "The sign-in response didn't match this request. Close this tab and try again from Precrime.");
+                respond(socket, 400, "Sign-in failed", "The sign-in response didn't match this request. Close this tab and try again from Fairfax.");
                 stop();
                 emit failed(QStringLiteral("The sign-in response didn't match the request (state mismatch)."));
                 return;
@@ -165,7 +165,7 @@ void Flow::onConnection() {
                 emit failed(why.isEmpty() ? q.queryItemValue("error") : why);
                 return;
             }
-            respond(socket, 200, "Signed in", "You can close this tab and return to Precrime.");
+            respond(socket, 200, "Signed in", "You can close this tab and return to Fairfax.");
             stop();   // One-shot.
             exchange(q.queryItemValue("code", QUrl::FullyDecoded));
         });
@@ -235,7 +235,7 @@ void Flow::handleTokenReply(int status, const QJsonObject &reply, const QString 
         t.refreshToken = oldRefreshToken;
     t.expires = QDateTime::currentDateTime().addSecs(reply.value("expires_in").toInt(3600));
     if (t.refreshToken.isEmpty()) {
-        emit failed(QStringLiteral("The provider sent no refresh token, so Precrime couldn't stay signed in."));
+        emit failed(QStringLiteral("The provider sent no refresh token, so Fairfax couldn't stay signed in."));
         return;
     }
     emit finished(t);

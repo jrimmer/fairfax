@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build"
 cd "$ROOT/build"
 
-qmake6 "$ROOT/precrime.pro"
-make -j"${PRECRIME_JOBS:-$(nproc)}"
+qmake6 "$ROOT/fairfax.pro"
+make -j"${FAIRFAX_JOBS:-$(nproc)}"
 
-echo "Built $ROOT/build/precrime"
+echo "Built $ROOT/build/fairfax"

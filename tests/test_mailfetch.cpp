@@ -12,7 +12,7 @@
 #include "store.h"
 #include "testregistry.h"
 
-// The Mail to Precrime connector against a fake IMAP server (tests/fakeimap.h),
+// The Mail to Fairfax connector against a fake IMAP server (tests/fakeimap.h),
 // with the keyring in memory (tests/main.cpp) and the OAuth HTTP calls through
 // MailFetch::setHttpTransport. Nothing here touches the network beyond the
 // loopback, or the real keyring.
@@ -81,7 +81,7 @@ class MailFetchTest : public QObject {
     }
     int fetchesOf(qint64 uid) const { return m_server->log.filter("UID FETCH " + QString::number(uid) + " (BODY.PEEK[])").size(); }
 
-    static QByteArray plus(const QString &subject, const QString &id = QString(), const QString &to = "jane+precrime@gmail.com") {
+    static QByteArray plus(const QString &subject, const QString &id = QString(), const QString &to = "jane+fairfax@gmail.com") {
         return FakeImap::mail(to, subject, "Body of " + subject, id);
     }
 
@@ -140,7 +140,7 @@ private slots:
         m_server = std::make_unique<FakeImap>();
         m_fetch = std::make_unique<MailFetch>(m_store.get());
         for (const char *account : {"mail", "mail-client", "mail-oauth"})
-            Keyring::clear("precrime", account);
+            Keyring::clear("fairfax", account);
         MailFetch::Timings t;
         t.imapTimeout = 1500;
         t.backoffBase = 80;
@@ -161,7 +161,7 @@ private slots:
         m_server->add("INBOX", plus("Buy milk"));
         m_server->add("INBOX", FakeImap::mail("bob@example.com", "Lunch?"));
         m_server->add("INBOX", plus("Call Alex"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(titles(), (QStringList{"Buy milk", "Call Alex"}));
@@ -170,7 +170,7 @@ private slots:
         QVERIFY(m_fetch->lastCheck().isValid());
         QVERIFY2(m_fetch->statusLine().startsWith("Connected · checked "), qPrintable(m_fetch->statusLine()));
         QVERIFY2(m_fetch->statusLine().endsWith("· 2 imported"), qPrintable(m_fetch->statusLine()));
-        // The mail that was not for Precrime is exactly as it was: never fetched, never flagged.
+        // The mail that was not for Fairfax is exactly as it was: never fetched, never flagged.
         QCOMPARE(fetchesOf(2), 0);
         QVERIFY(m_server->find("INBOX", 2)->flags.isEmpty());
         QCOMPARE(m_server->count("INBOX"), 3);
@@ -180,7 +180,7 @@ private slots:
 
     void tasksGoToTheChosenList() {
         m_server->add("INBOX", plus("Draft the memo"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.listId", m_work);
         enable();
         waitIdle();
@@ -190,7 +190,7 @@ private slots:
 
     void naturalLanguageSwitch() {
         m_server->add("INBOX", plus("Call Sam tomorrow"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(mailTasks().value(0).title, QString("Call Sam tomorrow"));
@@ -199,7 +199,7 @@ private slots:
 
     void naturalLanguageOn() {
         m_server->add("INBOX", plus("Call Sam tomorrow"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.naturalLanguage", true);
         enable();
         waitIdle();
@@ -209,7 +209,7 @@ private slots:
 
     void filingInstructionsAlwaysWork() {
         m_server->add("INBOX", plus("Pay rent due(2026-12-01) priority(!!!) list(Work)"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         const Task t = mailTasks().value(0);
@@ -220,23 +220,23 @@ private slots:
 
     // ----------------------------------------------------------- filters
 
-    // "jane+precrime@gmail.com" is a substring of "jane+precrime@gmail.com.au", so the
+    // "jane+fairfax@gmail.com" is a substring of "jane+fairfax@gmail.com.au", so the
     // server's SEARCH finds both; the headers are compared whole before importing.
     void toFilterRecheckRejectsASubstringMatch() {
-        m_server->add("INBOX", plus("Not mine", "au", "jane+precrime@gmail.com.au"));
+        m_server->add("INBOX", plus("Not mine", "au", "jane+fairfax@gmail.com.au"));
         m_server->add("INBOX", plus("Mine", "mine"));
-        m_server->add("INBOX", plus("Not mine either", "pre", "xjane+precrime@gmail.com"));
-        configure("jane+precrime@gmail.com", "move");
+        m_server->add("INBOX", plus("Not mine either", "pre", "xjane+fairfax@gmail.com"));
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Mine"});
-        QVERIFY2(lastSearch().contains("TO \"jane+precrime@gmail.com\""), qPrintable(lastSearch()));
+        QVERIFY2(lastSearch().contains("TO \"jane+fairfax@gmail.com\""), qPrintable(lastSearch()));
         QCOMPARE(fetchesOf(1), 1);   // It was fetched (the server said it matched), then turned down.
         // And it is left exactly where it was: not moved, not flagged.
         QVERIFY(m_server->find("INBOX", 1));
         QVERIFY(m_server->find("INBOX", 3));
         QVERIFY(m_server->find("INBOX", 1)->flags.isEmpty());
-        QCOMPARE(m_server->count("Precrime"), 1);
+        QCOMPARE(m_server->count("Fairfax"), 1);
         // A turned-down message is not fetched again on the next look.
         m_fetch->fetchNow();
         QTRY_COMPARE_WITH_TIMEOUT(searchesLogged(), 2, 5000);
@@ -246,8 +246,8 @@ private slots:
     }
 
     void toFilterIsCaseInsensitiveOnTheBareAddress() {
-        m_server->add("INBOX", plus("Shouting", "u", "Jane Doe <JANE+PRECRIME@Gmail.COM>"));
-        configure("Jane+Precrime@gmail.com");
+        m_server->add("INBOX", plus("Shouting", "u", "Jane Doe <JANE+FAIRFAX@Gmail.COM>"));
+        configure("Jane+Fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Shouting"});
@@ -255,11 +255,11 @@ private slots:
 
     // An Outlook rule that redirects keeps the original To; the plus-address is in Delivered-To.
     void deliveredToAndXOriginalToCount() {
-        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Redirected", "b", "r1", "Delivered-To: jane+precrime@gmail.com\r\n"));
-        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Aliased", "b", "r2", "X-Original-To: jane+precrime@gmail.com\r\n"));
-        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Copied", "b", "r3", "Cc: Jane <jane+precrime@gmail.com>\r\n"));
+        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Redirected", "b", "r1", "Delivered-To: jane+fairfax@gmail.com\r\n"));
+        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Aliased", "b", "r2", "X-Original-To: jane+fairfax@gmail.com\r\n"));
+        m_server->add("INBOX", FakeImap::mail("someone@else.org", "Copied", "b", "r3", "Cc: Jane <jane+fairfax@gmail.com>\r\n"));
         m_server->add("INBOX", FakeImap::mail("someone@else.org", "Unrelated", "b", "r4"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(titles(), (QStringList{"Redirected", "Aliased", "Copied"}));
@@ -271,45 +271,45 @@ private slots:
     // plus-address in a later one.
     void everyDeliveredToHeaderCounts() {
         m_server->add("INBOX", FakeImap::mail("someone@else.org", "Forwarded", "b", "f1",
-                                              "Delivered-To: jane@gmail.com\r\nDelivered-To: jane+precrime@gmail.com\r\n"));
-        configure("jane+precrime@gmail.com");
+                                              "Delivered-To: jane@gmail.com\r\nDelivered-To: jane+fairfax@gmail.com\r\n"));
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Forwarded"});
     }
 
     void labelFilterUsesAKeywordOnOtherServers() {
-        m_server->add("INBOX", plus("Tagged", "k1"), {}, {"precrime"});
+        m_server->add("INBOX", plus("Tagged", "k1"), {}, {"fairfax"});
         m_server->add("INBOX", plus("Plain", "k2"));
-        configure(QString(), "leave", "precrime");
+        configure(QString(), "leave", "fairfax");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Tagged"});
-        QVERIFY2(lastSearch().contains("KEYWORD precrime"), qPrintable(lastSearch()));
+        QVERIFY2(lastSearch().contains("KEYWORD fairfax"), qPrintable(lastSearch()));
         QVERIFY(!lastSearch().contains("X-GM-RAW"));
     }
 
     void labelFilterUsesXGmRawOnGmail() {
         m_server->gmail = true;
-        m_server->add("INBOX", plus("Labelled", "g1"), {}, {"precrime"});
+        m_server->add("INBOX", plus("Labelled", "g1"), {}, {"fairfax"});
         m_server->add("INBOX", plus("Unlabelled", "g2"));
-        configure(QString(), "leave", "precrime");
+        configure(QString(), "leave", "fairfax");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Labelled"});
-        QVERIFY2(lastSearch().endsWith("X-GM-RAW \"label:precrime\""), qPrintable(lastSearch()));
+        QVERIFY2(lastSearch().endsWith("X-GM-RAW \"label:fairfax\""), qPrintable(lastSearch()));
         QVERIFY(!lastSearch().contains("KEYWORD"));
     }
 
     // X-GM-RAW is only for servers that say X-GM-EXT-1.
     void xGmRawOnlyWhenAdvertised() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QVERIFY(!m_server->log.filter("X-GM-RAW").size());
-        QCOMPARE(lastSearch(), QString("UID SEARCH NOT DELETED OR OR OR TO \"jane+precrime@gmail.com\" CC \"jane+precrime@gmail.com\" "
-                                       "HEADER Delivered-To \"jane+precrime@gmail.com\" HEADER X-Original-To \"jane+precrime@gmail.com\""));
+        QCOMPARE(lastSearch(), QString("UID SEARCH NOT DELETED OR OR OR TO \"jane+fairfax@gmail.com\" CC \"jane+fairfax@gmail.com\" "
+                                       "HEADER Delivered-To \"jane+fairfax@gmail.com\" HEADER X-Original-To \"jane+fairfax@gmail.com\""));
 
         m_fetch->setOption("mail.enabled", false);
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Off, 3000);
@@ -318,20 +318,20 @@ private slots:
         m_server->gmail = true;
         enable();
         waitIdle();
-        QCOMPARE(lastSearch(), QString("UID SEARCH NOT DELETED X-GM-RAW \"deliveredto:jane+precrime@gmail.com OR to:jane+precrime@gmail.com\""));
+        QCOMPARE(lastSearch(), QString("UID SEARCH NOT DELETED X-GM-RAW \"deliveredto:jane+fairfax@gmail.com OR to:jane+fairfax@gmail.com\""));
         QCOMPARE(m_server->log.filter("TO \"").size(), 0);
     }
 
     void gmailToFilterAndLabelTogether() {
         m_server->gmail = true;
-        m_server->add("INBOX", plus("Both", "b1"), {}, {"precrime"});
+        m_server->add("INBOX", plus("Both", "b1"), {}, {"fairfax"});
         m_server->add("INBOX", plus("Only address", "b2"));
-        m_server->add("INBOX", FakeImap::mail("x@y.org", "Only label", "b", "b3"), {}, {"precrime"});
-        configure("jane+precrime@gmail.com", "leave", "precrime");
+        m_server->add("INBOX", FakeImap::mail("x@y.org", "Only label", "b", "b3"), {}, {"fairfax"});
+        configure("jane+fairfax@gmail.com", "leave", "fairfax");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Both"});
-        QVERIFY2(lastSearch().endsWith("X-GM-RAW \"(deliveredto:jane+precrime@gmail.com OR to:jane+precrime@gmail.com) label:precrime\""),
+        QVERIFY2(lastSearch().endsWith("X-GM-RAW \"(deliveredto:jane+fairfax@gmail.com OR to:jane+fairfax@gmail.com) label:fairfax\""),
                  qPrintable(lastSearch()));
     }
 
@@ -339,7 +339,7 @@ private slots:
         m_server->add("INBOX", plus("In the inbox"));
         m_server->folders["Orders"];
         m_server->add("Orders", plus("In orders"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.folder", "Orders");
         enable();
         waitIdle();
@@ -349,7 +349,7 @@ private slots:
     }
 
     void aMissingFolderIsAnError() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.folder", "Nowhere");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
@@ -375,31 +375,31 @@ private slots:
         m_server->add("INBOX", plus("One", "a1"));
         m_server->add("INBOX", plus("Two", "a2"));
         m_server->add("INBOX", FakeImap::mail("bob@example.com", "Not mine", "b", "a3"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         waitIdle();
         QCOMPARE(titles(), (QStringList{"One", "Two"}));
-        QVERIFY(m_server->folders.contains("Precrime"));
-        QCOMPARE(m_server->count("Precrime"), 2);
+        QVERIFY(m_server->folders.contains("Fairfax"));
+        QCOMPARE(m_server->count("Fairfax"), 2);
         QCOMPARE(m_server->count("INBOX"), 1);
-        QCOMPARE(m_server->log.filter("CREATE \"Precrime\"").size(), 1);
+        QCOMPARE(m_server->log.filter("CREATE \"Fairfax\"").size(), 1);
         QCOMPARE(m_server->log.filter(QRegularExpression("^UID MOVE")).size(), 2);
         QVERIFY(m_server->find("INBOX", 3));   // The other person's mail stayed.
     }
 
     void afterMoveToAnExistingFolderIsNotAnError() {
-        m_server->folders["Precrime"];
+        m_server->folders["Fairfax"];
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         waitIdle();
-        QCOMPARE(m_server->count("Precrime"), 1);
+        QCOMPARE(m_server->count("Fairfax"), 1);
         QVERIFY(m_fetch->lastError().isEmpty());
     }
 
     void afterMoveUsesTheNameFromTheSettings() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         m_fetch->setOption("mail.moveTo", "Tasks/Mail");
         enable();
         waitIdle();
@@ -409,10 +409,10 @@ private slots:
     void afterMoveWithoutMoveCapabilityFallsBack() {
         m_server->capabilities = {"IMAP4rev1", "IDLE", "UIDPLUS"};
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         waitIdle();
-        QCOMPARE(m_server->count("Precrime"), 1);
+        QCOMPARE(m_server->count("Fairfax"), 1);
         QCOMPARE(m_server->count("INBOX"), 0);
         QVERIFY(m_server->log.contains("UID EXPUNGE 1"));
     }
@@ -420,20 +420,20 @@ private slots:
     void afterReadMarksSeenAndSearchesUnseen() {
         m_server->add("INBOX", plus("Fresh", "r1"));
         m_server->add("INBOX", plus("Already read", "r2"), {"\\Seen"});
-        configure("jane+precrime@gmail.com", "read");
+        configure("jane+fairfax@gmail.com", "read");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Fresh"});
         QVERIFY(lastSearch().contains("UNSEEN"));
         QVERIFY(m_server->hasFlag("INBOX", 1, "\\Seen"));
         QCOMPARE(m_server->count("INBOX"), 2);   // Read, not moved.
-        QCOMPARE(m_server->count("Precrime"), 0);
-        QVERIFY(!m_server->folders.contains("Precrime"));
+        QCOMPARE(m_server->count("Fairfax"), 0);
+        QVERIFY(!m_server->folders.contains("Fairfax"));
     }
 
     void afterLeaveTouchesNothingOnTheServer() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com", "leave");
+        configure("jane+fairfax@gmail.com", "leave");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"One"});
@@ -450,7 +450,7 @@ private slots:
     void aFailedMoveIsReportedAndRetriedByTheNextLook() {
         m_server->refuse << "UID MOVE";
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
         QVERIFY2(m_fetch->lastError().contains("Couldn't move"), qPrintable(m_fetch->lastError()));
@@ -461,7 +461,7 @@ private slots:
         waitIdle();
         QCOMPARE(titles(), QStringList{"One"});     // Still one task,
         QCOMPARE(m_server->count("INBOX"), 0);      // and the mail is out of the inbox now.
-        QCOMPARE(m_server->count("Precrime"), 1);
+        QCOMPARE(m_server->count("Fairfax"), 1);
     }
 
     // ------------------------------------------------- duplicates and marks
@@ -473,13 +473,13 @@ private slots:
         QVERIFY(MailTask::import(*m_store, MailTask::parse(plus("Existing", "same-id")), options).ok());
         QCOMPARE(mailTasks().size(), 1);
         m_server->add("INBOX", plus("Existing", "same-id"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         waitIdle();
         QCOMPARE(mailTasks(true).size(), 1);   // No second task.
         QCOMPARE(m_fetch->imported(), 0);
         QCOMPARE(m_server->count("INBOX"), 0);   // The duplicate got the same after-action.
-        QCOMPARE(m_server->count("Precrime"), 1);
+        QCOMPARE(m_server->count("Fairfax"), 1);
     }
 
     void aDeletedTaskIsStillADuplicate() {
@@ -492,7 +492,7 @@ private slots:
         m_store->putTask(t);
         m_store->commit();
         m_server->add("INBOX", plus("Gone", "gone-id"));
-        configure("jane+precrime@gmail.com", "read");
+        configure("jane+fairfax@gmail.com", "read");
         enable();
         waitIdle();
         QCOMPARE(mailTasks().size(), 0);           // Not brought back to life,
@@ -503,7 +503,7 @@ private slots:
     void highWaterMarkKeepsOldMailFromBeingFetchedAgain() {
         m_server->add("INBOX", plus("One", "h1"));
         m_server->add("INBOX", plus("Two", "h2"));
-        configure("jane+precrime@gmail.com", "leave");
+        configure("jane+fairfax@gmail.com", "leave");
         enable();
         waitIdle();
         QCOMPARE(m_store->setting("mail.mark.INBOX").toString(), QString("1:2"));   // UIDVALIDITY:last uid.
@@ -528,7 +528,7 @@ private slots:
     // then keeps everything from being imported twice.
     void aNewUidValidityResetsTheMark() {
         m_server->add("INBOX", plus("One", "v1"));
-        configure("jane+precrime@gmail.com", "leave");
+        configure("jane+fairfax@gmail.com", "leave");
         enable();
         waitIdle();
         QCOMPARE(m_store->setting("mail.mark.INBOX").toString(), QString("1:1"));
@@ -546,7 +546,7 @@ private slots:
         m_server->add("INBOX", plus("One", "p1"));
         m_server->folders["Other"];
         m_server->add("Other", plus("Two", "p2"));
-        configure("jane+precrime@gmail.com", "leave");
+        configure("jane+fairfax@gmail.com", "leave");
         enable();
         waitIdle();
         QCOMPARE(m_store->setting("mail.mark.INBOX").toString(), QString("1:1"));
@@ -555,7 +555,7 @@ private slots:
 
     void markIsNotKeptWhenMessagesAreMovedOrRead() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com", "read");
+        configure("jane+fairfax@gmail.com", "read");
         enable();
         waitIdle();
         QVERIFY(!m_store->setting("mail.mark.INBOX").isValid());
@@ -568,7 +568,7 @@ private slots:
         const qint64 big = m_server->add("INBOX", plus("Huge", "s2"));
         m_server->setSize("INBOX", big, 30 * 1024 * 1024);
         m_server->add("INBOX", plus("Also small", "s3"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         enable();
         waitIdle();
         QCOMPARE(titles(), (QStringList{"Small", "Also small"}));
@@ -585,7 +585,7 @@ private slots:
     void exactlyTheLimitIsStillImported() {
         const qint64 uid = m_server->add("INBOX", plus("Borderline"));
         m_server->setSize("INBOX", uid, MailFetch::MaxMessageSize);
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"Borderline"});
@@ -595,7 +595,7 @@ private slots:
     void aLargeMailboxIsFetchedInBatches() {
         for (int i = 0; i < 130; ++i)
             m_server->add("INBOX", plus(QString("Task %1").arg(i), QString("bulk%1").arg(i)));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(mailTasks().size(), 130, 20000);
         waitIdle();
@@ -605,7 +605,7 @@ private slots:
     // ------------------------------------------------------- scheduling
 
     void idleBringsNewMailAtOnce() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QTRY_COMPARE_WITH_TIMEOUT(m_server->idlers, 1, 5000);
@@ -625,7 +625,7 @@ private slots:
         t.pollOverride = 150;
         m_fetch->setTimings(t);
         m_server->add("INBOX", plus("First", "q1"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(titles(), QStringList{"First"}, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(m_server->log.contains("LOGOUT"), 5000);
@@ -637,7 +637,7 @@ private slots:
 
     void pollIntervalComesFromTheSetting() {
         m_server->capabilities = {"IMAP4rev1"};
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.interval", 7);
         QCOMPARE(m_fetch->option("mail.interval"), QString("7"));
         enable();
@@ -654,7 +654,7 @@ private slots:
         t.backoffBase = 80;
         t.idleRenew = 150;
         m_fetch->setTimings(t);
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QTRY_VERIFY_WITH_TIMEOUT(m_server->log.filter(QRegularExpression("^IDLE$")).size() >= 3, 8000);
@@ -665,7 +665,7 @@ private slots:
 
     // STARTTLS is for a server that offers it; one that does not is said so, not talked to in the clear.
     void starttlsOnAServerWithoutItIsAnError() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.security", "starttls");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
@@ -674,7 +674,7 @@ private slots:
     }
 
     void fetchNowWhileIdlingLooksAtOnce() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QTRY_COMPARE_WITH_TIMEOUT(m_server->idlers, 1, 5000);
@@ -686,7 +686,7 @@ private slots:
     }
 
     void syncNowIsFetchNow() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         m_server->add("INBOX", plus("Via sync", "sn"));
@@ -696,7 +696,7 @@ private slots:
 
     void fetchNowWhenOffDoesNothing() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->fetchNow();
         QTest::qWait(200);
         QCOMPARE(m_server->connections, 0);
@@ -705,7 +705,7 @@ private slots:
     }
 
     void startConnectsOnlyWhenEnabled() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->start();
         QTest::qWait(150);
         QCOMPARE(m_server->connections, 0);
@@ -716,7 +716,7 @@ private slots:
     }
 
     void turningItOffDisconnects() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QTRY_COMPARE_WITH_TIMEOUT(m_server->idlers, 1, 5000);
@@ -734,7 +734,7 @@ private slots:
         m_server->add("INBOX", plus("One", "c1"));
         m_server->folders["Other"];
         m_server->add("Other", plus("Two", "c2"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(titles(), QStringList{"One"});
@@ -746,7 +746,7 @@ private slots:
 
     void aRefusedPasswordIsAnErrorWithoutRetries() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setPassword("wrong");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
@@ -763,7 +763,7 @@ private slots:
     }
 
     void noPasswordSavedIsSaidPlainly() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setPassword("");
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
@@ -779,7 +779,7 @@ private slots:
     }
 
     void connectionRefusedRetriesWithBackoff() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         m_fetch->setOption("mail.port", 1);   // Nobody listens there.
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
@@ -792,7 +792,7 @@ private slots:
     }
 
     void aDroppedConnectionReconnects() {
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QTRY_COMPARE_WITH_TIMEOUT(m_server->idlers, 1, 5000);
@@ -806,7 +806,7 @@ private slots:
 
     void aSilentServerTimesOutAndRetries() {
         m_server->silentOn = "SEARCH";
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         MailFetch::Timings t;
         t.imapTimeout = 250;
         t.backoffBase = 80;
@@ -829,7 +829,7 @@ private slots:
         }
         m_store->commit();
         m_server->add("INBOX", plus("Nowhere to go"));
-        configure("jane+precrime@gmail.com", "move");
+        configure("jane+fairfax@gmail.com", "move");
         m_fetch->setOption("mail.listId", 0);
         enable();
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 8000);
@@ -840,7 +840,7 @@ private slots:
 
     void importsAreOneUndoStepEach() {
         m_server->add("INBOX", plus("One"));
-        configure("jane+precrime@gmail.com");
+        configure("jane+fairfax@gmail.com");
         enable();
         waitIdle();
         QCOMPARE(m_store->undoLabel(), QString("Mail"));
@@ -861,8 +861,8 @@ private slots:
     // -------------------------------------------------- presets and options
 
     void plusAddressRules() {
-        QCOMPARE(MailFetch::plusAddressOf("jane@gmail.com"), QString("jane+precrime@gmail.com"));
-        QCOMPARE(MailFetch::plusAddressOf("a.b@example.co.uk"), QString("a.b+precrime@example.co.uk"));
+        QCOMPARE(MailFetch::plusAddressOf("jane@gmail.com"), QString("jane+fairfax@gmail.com"));
+        QCOMPARE(MailFetch::plusAddressOf("a.b@example.co.uk"), QString("a.b+fairfax@example.co.uk"));
         QCOMPARE(MailFetch::plusAddressOf("jane+news@gmail.com"), QString());   // Already a plus-address.
         QCOMPARE(MailFetch::plusAddressOf("nonsense"), QString());
         QCOMPARE(MailFetch::plusAddressOf(""), QString());
@@ -875,7 +875,7 @@ private slots:
         QCOMPARE(m_fetch->option("mail.security"), QString("tls"));
         QCOMPARE(m_fetch->option("mail.folder"), QString("INBOX"));
         QCOMPARE(m_fetch->option("mail.after"), QString("move"));
-        QCOMPARE(m_fetch->option("mail.moveTo"), QString("Precrime"));
+        QCOMPARE(m_fetch->option("mail.moveTo"), QString("Fairfax"));
         QCOMPARE(m_fetch->option("mail.interval"), QString("5"));
         QCOMPARE(m_fetch->option("mail.enabled"), QString("false"));
         QCOMPARE(m_fetch->option("mail.naturalLanguage"), QString("false"));
@@ -886,16 +886,16 @@ private slots:
         m_fetch->setAccount("gmail");   // Writes the preset, filter included, so the filter is a stored value that has to be moved.
         m_fetch->setOption("mail.address", "jane@gmail.com");
         QCOMPARE(m_fetch->option("mail.user"), QString("jane@gmail.com"));
-        QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane+precrime@gmail.com"));
-        QCOMPARE(m_fetch->plusAddress(), QString("jane+precrime@gmail.com"));
+        QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane+fairfax@gmail.com"));
+        QCOMPARE(m_fetch->plusAddress(), QString("jane+fairfax@gmail.com"));
         m_fetch->setOption("mail.address", "jane.doe@gmail.com");
-        QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane.doe+precrime@gmail.com"));
+        QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane.doe+fairfax@gmail.com"));
         QCOMPARE(m_fetch->option("mail.user"), QString("jane.doe@gmail.com"));
         // The user takes the filter over: it stays theirs.
         m_fetch->setOption("mail.toFilter", "tasks@example.org");
         m_fetch->setOption("mail.address", "other@gmail.com");
         QCOMPARE(m_fetch->option("mail.toFilter"), QString("tasks@example.org"));
-        QCOMPARE(m_fetch->plusAddress(), QString("other+precrime@gmail.com"));   // The guidance still follows the address.
+        QCOMPARE(m_fetch->plusAddress(), QString("other+fairfax@gmail.com"));    // The guidance still follows the address.
     }
 
     void emptyingTheGmailFilterIsRespected() {
@@ -926,7 +926,7 @@ private slots:
         QCOMPARE(m_fetch->option("mail.host"), QString("imap.gmail.com"));
         QCOMPARE(m_fetch->option("mail.port"), QString("993"));
         QCOMPARE(m_fetch->option("mail.security"), QString("tls"));
-        QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane+precrime@example.org"));
+        QCOMPARE(m_fetch->option("mail.toFilter"), QString("jane+fairfax@example.org"));
         QCOMPARE(m_fetch->option("mail.after"), QString("move"));
     }
 
@@ -966,12 +966,12 @@ private slots:
         QVERIFY(!m_fetch->hasPassword());
         m_fetch->setPassword("s3cret!");
         QVERIFY(m_fetch->hasPassword());
-        QCOMPARE(Keyring::lookup("precrime", "mail"), QString("s3cret!"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail"), QString("s3cret!"));
         for (const QString &key : MailFetch::optionKeys())
             QVERIFY2(!m_fetch->option(key).contains("s3cret"), qPrintable(key));
         m_fetch->setPassword("");
         QVERIFY(!m_fetch->hasPassword());
-        QVERIFY(Keyring::lookup("precrime", "mail").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail").isEmpty());
     }
 
     // --------------------------------------------------------------- OAuth
@@ -980,7 +980,7 @@ private slots:
         QCOMPARE(m_fetch->importClientJson(writeClientJson(googleClientJson())), QString());
         QVERIFY(m_fetch->hasGoogleClient());
         QCOMPARE(m_fetch->option("mail.googleClientId"), QString("test-id.apps.example"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-client"), QString("test-secret"));   // The secret is in the keyring only.
+        QCOMPARE(Keyring::lookup("fairfax", "mail-client"), QString("test-secret"));    // The secret is in the keyring only.
         QVERIFY(databaseHolds("mail.googleClientId"));   // (the control: the helper does see the database)
         QVERIFY(!databaseHolds("test-secret"));
     }
@@ -991,7 +991,7 @@ private slots:
         QVERIFY(m_fetch->importClientJson(writeClientJson("{\"web\":{\"client_id\":\"x\",\"client_secret\":\"y\"}}")).contains("Web client"));
         QVERIFY(m_fetch->importClientJson(writeClientJson("{\"installed\":{\"client_id\":\"x\"}}")).contains("client_secret"));
         QVERIFY(!m_fetch->hasGoogleClient());
-        QVERIFY(Keyring::lookup("precrime", "mail-client").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-client").isEmpty());
     }
 
     void signInNeedsAClient() {
@@ -1035,7 +1035,7 @@ private slots:
         QCOMPARE(http.forms[0].queryItemValue("code"), QString("google-code"));
         QCOMPARE(http.forms[0].queryItemValue("client_secret"), QString("test-secret"));
         QCOMPARE(OAuth::challengeFor(http.forms[0].queryItemValue("code_verifier")), param("code_challenge"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("rt-1"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail-oauth"), QString("rt-1"));
         QCOMPARE(m_fetch->option("mail.oauth"), QString("google"));
         QVERIFY(!databaseHolds("rt-1"));   // Tokens are not in the database.
         QVERIFY(!databaseHolds("at-1"));
@@ -1049,7 +1049,7 @@ private slots:
         m_fetch->setOption("mail.port", m_server->port());
         m_fetch->setOption("mail.security", "none");
         m_fetch->setOption("mail.after", "leave");
-        m_fetch->setOption("mail.toFilter", "jane+precrime@gmail.com");
+        m_fetch->setOption("mail.toFilter", "jane+fairfax@gmail.com");
         m_fetch->setOption("mail.user", "jane@example.org");
         enable();
         waitIdle();
@@ -1060,7 +1060,7 @@ private slots:
         // Sign out clears the tokens and stops using them.
         m_fetch->signOut();
         QCOMPARE(m_fetch->oauthState(), QString("none"));
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-oauth").isEmpty());
         QVERIFY(m_fetch->option("mail.oauth").isEmpty());
         QVERIFY(m_fetch->signedInAs().isEmpty());
         QTRY_COMPARE_WITH_TIMEOUT(m_fetch->state(), MailFetch::State::Error, 5000);   // No password either, and it says so.
@@ -1087,7 +1087,7 @@ private slots:
         m_fetch->setOption("mail.port", m_server->port());
         m_fetch->setOption("mail.security", "none");
         m_fetch->setOption("mail.after", "leave");
-        m_fetch->setOption("mail.toFilter", "jane+precrime@gmail.com");
+        m_fetch->setOption("mail.toFilter", "jane+fairfax@gmail.com");
         m_fetch->setOption("mail.user", "jane@example.org");
         enable();
         waitIdle();
@@ -1095,7 +1095,7 @@ private slots:
         QCOMPARE(http.forms[1].queryItemValue("grant_type"), QString("refresh_token"));
         QCOMPARE(http.forms[1].queryItemValue("refresh_token"), QString("rt-1"));
         QCOMPARE(http.forms[1].queryItemValue("client_secret"), QString("test-secret"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("rt-2"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail-oauth"), QString("rt-2"));
         QCOMPARE(m_server->mechanisms, QStringList{"XOAUTH2"});
         QCOMPARE(titles(), QStringList{"Needs a fresh token"});
     }
@@ -1135,7 +1135,7 @@ private slots:
         QVERIFY2(m_fetch->oauthError().contains("state"), qPrintable(m_fetch->oauthError()));
         QCOMPARE(m_fetch->oauthState(), QString("none"));
         QVERIFY(http.forms.isEmpty());
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-oauth").isEmpty());
     }
 
     void cancellingASignInStopsListening() {
@@ -1188,7 +1188,7 @@ private slots:
         QVERIFY(!http.forms[0].hasQueryItem("client_secret"));   // A public client has none.
         QCOMPARE(OAuth::challengeFor(http.forms[0].queryItemValue("code_verifier")), param("code_challenge"));
         QCOMPARE(m_fetch->option("mail.oauth"), QString("microsoft"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("ms-rt"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail-oauth"), QString("ms-rt"));
 
         m_server->user = "jane@contoso.com";
         m_server->accessToken = "ms-at";
@@ -1203,7 +1203,7 @@ private slots:
         QCOMPARE(titles(), QStringList{"From Microsoft"});
         m_fetch->signOut();
         QCOMPARE(m_fetch->oauthState(), QString("none"));
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-oauth").isEmpty());
     }
 
     // A Google sign-in does not authenticate an Outlook account, or the other way round.
@@ -1222,15 +1222,15 @@ private slots:
         QCOMPARE(m_fetch->oauthState(), QString("signedIn"));
     }
 
-    // The repository must never ship an OAuth client: Precrime is open source and runs no
+    // The repository must never ship an OAuth client: Fairfax is open source and runs no
     // registration for forks. Clients come from the user (an imported JSON, a pasted ID).
     void theSourceContainsNoOAuthClient() {
-#ifdef PRECRIME_ROOT
+#ifdef FAIRFAX_ROOT
         static const QRegularExpression google("[0-9]{6,}-[0-9a-z]{20,}\\.apps\\.googleusercontent\\.com|GOCSPX-[A-Za-z0-9_-]{10,}");
         static const QRegularExpression guid("\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b");
         QStringList found;
-        QStringList files{QStringLiteral(PRECRIME_ROOT "/README.md")};
-        for (const QString &dir : {QStringLiteral(PRECRIME_ROOT "/src"), QStringLiteral(PRECRIME_ROOT "/completions")}) {
+        QStringList files{QStringLiteral(FAIRFAX_ROOT "/README.md")};
+        for (const QString &dir : {QStringLiteral(FAIRFAX_ROOT "/src"), QStringLiteral(FAIRFAX_ROOT "/completions")}) {
             QDirIterator it(dir, QDir::Files, QDirIterator::Subdirectories);
             while (it.hasNext())
                 files << it.next();
@@ -1246,7 +1246,7 @@ private slots:
         }
         QVERIFY2(found.isEmpty(), qPrintable("looks like a client id in: " + found.join(", ")));
 #else
-        QSKIP("PRECRIME_ROOT not defined");
+        QSKIP("FAIRFAX_ROOT not defined");
 #endif
     }
 };

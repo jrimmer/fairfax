@@ -358,9 +358,9 @@ void GitSync::runCycle(std::function<void(bool ok, const QString &message)> done
             git({"config", "user.email"}, [=, this](int ec, const QString &eout, const QString &) {
                 c->identityArgs.clear();
                 if (nc || nout.trimmed().isEmpty())
-                    c->identityArgs << "-c" << "user.name=Precrime";
+                    c->identityArgs << "-c" << "user.name=Fairfax";
                 if (ec || eout.trimmed().isEmpty())
-                    c->identityArgs << "-c" << "user.email=precrime@localhost";
+                    c->identityArgs << "-c" << "user.email=fairfax@localhost";
                 c->commit();
             });
         });

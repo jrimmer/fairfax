@@ -22,7 +22,7 @@ void clickCancel() {
 }
 
 QStringList backupFiles(App &app) {
-    return QDir(app.dir() + "/backups").entryList({"Precrime_*.db"}, QDir::Files, QDir::Time);
+    return QDir(app.dir() + "/backups").entryList({"Fairfax_*.db"}, QDir::Files, QDir::Time);
 }
 
 void clickOk() {
@@ -605,7 +605,7 @@ private slots:
 
     // Diagnostics: the report is built when the pane opens and describes this
     // install; Refresh brings it up to date; Copy puts it on the clipboard.
-    // Automation has nothing to switch: it shows how to reach Precrime.
+    // Automation has nothing to switch: it shows how to reach Fairfax.
     void diagnosticsAndAutomationPanes() {
         Session s;
         QVERIFY(s.start());
@@ -615,8 +615,8 @@ private slots:
         selectPane(sw, "Automation");
         QQuickItem *hint = nullptr;
         control("automationHint", hint);
-        QVERIFY(hint->property("text").toString().contains("claude mcp add precrime -- precrime mcp"));
-        QVERIFY(hint->property("text").toString().contains("precrime --waybar"));
+        QVERIFY(hint->property("text").toString().contains("claude mcp add fairfax -- fairfax mcp"));
+        QVERIFY(hint->property("text").toString().contains("fairfax --waybar"));
         // No switch, box or list on this pane.
         int controls = 0;
         findIn(sw->contentItem(), [&](QQuickItem *i) { controls += i->objectName().startsWith("setting:"); return false; });
@@ -625,7 +625,7 @@ private slots:
         selectPane(sw, "Diagnostics");
         QQuickItem *report = nullptr;
         control("diagReport", report);
-        QVERIFY(report->property("text").toString().contains("Precrime"));
+        QVERIFY(report->property("text").toString().contains("Fairfax"));
         QVERIFY(report->property("text").toString().contains("Tasks: 7 open, 1 completed"));
         QVERIFY(report->property("text").toString().contains("Lists: 2, tags: 1"));
         QVERIFY(report->property("text").toString().contains("Git sync: off"));
@@ -645,7 +645,7 @@ private slots:
         control("diagCopy", copy);
         click(copy);
         QTRY_VERIFY_WITH_TIMEOUT(QGuiApplication::clipboard()->text().contains("Tasks: 8 open, 1 completed"), 5000);
-        QVERIFY(QGuiApplication::clipboard()->text().startsWith("Precrime "));
+        QVERIFY(QGuiApplication::clipboard()->text().startsWith("Fairfax "));
     }
 };
 

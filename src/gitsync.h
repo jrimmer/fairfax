@@ -4,7 +4,7 @@
 // machines. The database never goes into git; instead every record is a
 // small JSON file, laid out like the reference app's own folder-sync tree (Tasks.sync/):
 //
-//   Store.json                  {"format": "precrime-sync", "version": 1}
+//   Store.json                  {"format": "fairfax-sync", "version": 1}
 //   list-groups/<uid>.json
 //   lists/<uid>.json
 //   tag-groups/<uid>.json
@@ -52,7 +52,7 @@ class GitSync : public QObject {
 
 public:
     // `directory` is the working copy; empty means the default beside the
-    // database (…/precrime/sync).
+    // database (…/fairfax/sync).
     explicit GitSync(Store *store, const QString &directory = {}, QObject *parent = nullptr);
 
     bool configured() const;

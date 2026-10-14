@@ -192,7 +192,7 @@ ColumnLayout {
                 DropArea {
                     id: dayDrop
                     anchors.fill: parent
-                    keys: ["precrime-tasks"]
+                    keys: ["fairfax-tasks"]
                     readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
                     onEntered: {
                         if (proxy) proxy.hint = "Defer to " + Qt.formatDate(cell.day, "ddd d MMM")

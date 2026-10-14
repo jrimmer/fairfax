@@ -249,7 +249,7 @@ private slots:
         QVERIFY2(m_errors[0].contains("reach"), qPrintable(m_errors[0]));
     }
 
-    // Without a refresh token Precrime could not stay signed in, so that is a failed sign-in.
+    // Without a refresh token Fairfax could not stay signed in, so that is a failed sign-in.
     void noRefreshTokenIsAFailure() {
         m_reply = QJsonObject{{"access_token", "at"}, {"expires_in", 10}};
         startFlow(OAuth::google("cid", "s"));

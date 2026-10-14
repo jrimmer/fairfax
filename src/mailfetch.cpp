@@ -12,7 +12,7 @@
 
 namespace {
 
-constexpr auto KeyringService = "precrime";
+constexpr auto KeyringService = "fairfax";
 constexpr auto PasswordAccount = "mail";
 constexpr auto ClientAccount = "mail-client";
 constexpr auto RefreshAccount = "mail-oauth";
@@ -86,7 +86,7 @@ QString MailFetch::plusAddressOf(const QString &address) {
     const int at = address.indexOf('@');
     if (at <= 0 || address.left(at).contains('+'))
         return QString();
-    return address.left(at) + "+precrime" + address.mid(at);
+    return address.left(at) + "+fairfax" + address.mid(at);
 }
 
 bool MailFetch::enabled() const { return truthy(m_store->setting("mail.enabled")); }
@@ -124,7 +124,7 @@ QString MailFetch::option(const QString &key) const {
     if (key == "mail.after")
         return value.isEmpty() ? (account == "gmail" ? "move" : "leave") : value;
     if (key == "mail.moveTo")
-        return value.isEmpty() ? "Precrime" : value;
+        return value.isEmpty() ? "Fairfax" : value;
     if (key == "mail.listId")
         return value.isEmpty() ? "0" : value;
     if (key == "mail.naturalLanguage")
@@ -189,7 +189,7 @@ void MailFetch::setAccount(const QString &account) {
         if (wasPlain)
             put("mail.toFilter", plusAddressOf(address));
         put("mail.after", "move");
-        put("mail.moveTo", "Precrime");
+        put("mail.moveTo", "Fairfax");
     } else {
         // Leaving Gmail takes its automatic filter and its move-out-of-the-inbox default with it.
         if (previous == "gmail") {
@@ -663,8 +663,8 @@ bool MailFetch::toFilterMatches(const MailTask::Message &message, const QString 
     const QStringList wanted = filterTerms(filter);
     if (wanted.isEmpty())
         return true;
-    // Server search is by substring (jane+precrime@gmail.com also finds
-    // jane+precrime@gmail.com.au), so the headers are compared whole.
+    // Server search is by substring (jane+fairfax@gmail.com also finds
+    // jane+fairfax@gmail.com.au), so the headers are compared whole.
     QStringList have;
     for (const QString &h : {message.to, message.cc, message.deliveredTo, message.xOriginalTo})
         have << addressesIn(h);

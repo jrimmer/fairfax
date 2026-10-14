@@ -4,7 +4,7 @@
 // from the search bar, editing, renaming, deleting with undo, the sheet's
 // options, and the Combine Today and Overdue walkthrough.
 //
-// Precrime's builder has a row per clause under SEARCH PRESETS (Property,
+// Fairfax's builder has a row per clause under SEARCH PRESETS (Property,
 // is / is not, value, with [-] and [+] and Match All / Any at the top), chips
 // for named tags, lists, tag groups, list groups and locations, relative-time
 // fields, and groups of whole filters. The row tests that go deeper (every

@@ -217,7 +217,7 @@ private slots:
 
     // "Inherit Search under Today & Lists… Off: Project View shows all of a
     // project's sub-tasks, ignoring the outside search. Your original search is
-    // restored the moment you leave the project." Precrime ships it off.
+    // restored the moment you leave the project." Fairfax ships it off.
     void inheritSearchOffShowsEverySubtask() {
         App &app = *m_app;
         QCOMPARE(app.store().setting("search.inheritInProject", false).toBool(), false);

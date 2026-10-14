@@ -25,7 +25,7 @@ QUrl WebDavRemote::urlFor(const QString &path) const {
 WebDavRemote::Response WebDavRemote::request(const QByteArray &verb, const QUrl &url, const QByteArray &body,
                                              const QList<QPair<QByteArray, QByteArray>> &headers) {
     QNetworkRequest req(url);
-    req.setRawHeader("User-Agent", "Precrime");
+    req.setRawHeader("User-Agent", "Fairfax");
     if (!m_authorization.isEmpty())
         req.setRawHeader("Authorization", m_authorization);
     for (const auto &h : headers)
@@ -138,7 +138,7 @@ bool WebDavRemote::listDir(const QString &relativeDir, QMap<QString, QString> *s
     }
     if (xml.hasError()) {
         if (error)
-            *error = "The WebDAV server sent a listing Precrime cannot read";
+            *error = "The WebDAV server sent a listing Fairfax cannot read";
         return false;
     }
 

@@ -464,7 +464,7 @@ struct Automation::Impl {
     }
 
     // A task is addressed by the id automation hands out or by its uid, the
-    // latter so a precrime:// link's uid works anywhere a task_id does.
+    // latter so a fairfax:// link's uid works anywhere a task_id does.
     Task findTask(const QJsonValue &v, const QString &key = "task_id") {
         if (!v.isString() && !v.isDouble())
             invalid(QStringLiteral("%1 is required.").arg(key));
@@ -896,7 +896,7 @@ struct Automation::Impl {
 
     QJsonObject selectedTasks(const QJsonObject &) {
         if (!a.selectedTaskIds)
-            fail("automation_unavailable", "Reading the selection needs the Precrime window; this process has none.");
+            fail("automation_unavailable", "Reading the selection needs the Fairfax window; this process has none.");
         QList<Task> tasks;
         for (auto id : a.selectedTaskIds()) {
             const Task t = s.task(id);
@@ -1407,7 +1407,7 @@ struct Automation::Impl {
 
     void needSelect() {
         if (!a.selectSource)
-            fail("automation_unavailable", "Navigation needs the Precrime window; this process has none.");
+            fail("automation_unavailable", "Navigation needs the Fairfax window; this process has none.");
     }
 
     QJsonObject selectList(const QJsonObject &args) {
@@ -1443,7 +1443,7 @@ struct Automation::Impl {
     QJsonObject openTaskCmd(const QJsonObject &args) {
         const Task t = findTask(args["task_id"]);
         if (!a.openTask)
-            fail("automation_unavailable", "Opening a task needs the Precrime window; this process has none.");
+            fail("automation_unavailable", "Opening a task needs the Fairfax window; this process has none.");
         a.openTask(t.id);
         return QJsonObject{{"opened", true}, {"task_id", idString(t.id)}};
     }
@@ -1511,7 +1511,7 @@ const QList<Command> &commands() {
                      {}, &I::queryTasks};
         c << Command{"list_subtasks", "List the sub-tasks of a project or checklist.",
                      {{"task_id", str("The project or checklist.")}, {"include_completed", flag("Default true.")}}, {"task_id"}, &I::listSubtasks};
-        c << Command{"selected_tasks", "Return the tasks currently selected in the Precrime window.", {}, {}, &I::selectedTasks};
+        c << Command{"selected_tasks", "Return the tasks currently selected in the Fairfax window.", {}, {}, &I::selectedTasks};
         c << Command{"create_task", "Create a task, project or checklist, optionally with sub-tasks. One undoable change.",
                      taskWriteProps(true), {"title"}, &I::createTask};
         c << Command{"update_task", "Change a task's fields. Omitted fields stay as they are. One undoable change.", update, {"task_id"}, &I::updateTask};
@@ -1542,11 +1542,11 @@ const QList<Command> &commands() {
                      {{"tag_id", str("Tag id.")}, {"tag_name", str("Tag name; use instead of tag_id.")}}, {}, &I::pauseTag};
         c << Command{"unpause_tag", "Resume a paused tag. Idempotent.",
                      {{"tag_id", str("Tag id.")}, {"tag_name", str("Tag name; use instead of tag_id.")}}, {}, &I::unpauseTag};
-        c << Command{"select_list", "Show a list in the Precrime window.", {{"list_id", str("List id.")}}, {"list_id"}, &I::selectList};
-        c << Command{"select_list_group", "Show a list group in the Precrime window.", {{"list_group_id", str("List group id.")}}, {"list_group_id"}, &I::selectListGroup};
-        c << Command{"select_smart_list", "Show a Smart List in the Precrime window.", {{"smart_list_id", str("Smart List id.")}}, {"smart_list_id"}, &I::selectSmartList};
-        c << Command{"select_focus", "Show a focus list in the Precrime window.", {{"focus", enumStr("Focus list.", kFocusNames)}}, {"focus"}, &I::selectFocus};
-        c << Command{"open_task", "Open a task in the Precrime window.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::openTaskCmd};
+        c << Command{"select_list", "Show a list in the Fairfax window.", {{"list_id", str("List id.")}}, {"list_id"}, &I::selectList};
+        c << Command{"select_list_group", "Show a list group in the Fairfax window.", {{"list_group_id", str("List group id.")}}, {"list_group_id"}, &I::selectListGroup};
+        c << Command{"select_smart_list", "Show a Smart List in the Fairfax window.", {{"smart_list_id", str("Smart List id.")}}, {"smart_list_id"}, &I::selectSmartList};
+        c << Command{"select_focus", "Show a focus list in the Fairfax window.", {{"focus", enumStr("Focus list.", kFocusNames)}}, {"focus"}, &I::selectFocus};
+        c << Command{"open_task", "Open a task in the Fairfax window.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::openTaskCmd};
         return c;
     }();
     return table;
@@ -1596,7 +1596,7 @@ QJsonObject Automation::run(const QString &command, const QJsonObject &args) {
     try {
         const Command *c = findCommand(command);
         if (!c)
-            invalid(QStringLiteral("Unknown command \"%1\". Run `precrime ctl help` for the list.").arg(command));
+            invalid(QStringLiteral("Unknown command \"%1\". Run `fairfax ctl help` for the list.").arg(command));
         for (const auto &k : args.keys())
             if (!c->properties.contains(k))
                 invalid(QStringLiteral("Unknown argument \"%1\" for %2.").arg(k, command));
@@ -1665,9 +1665,9 @@ int Automation::runCli(const QStringList &args, QTextStream &out, QTextStream &e
                 << QJsonDocument(inputSchema(*c)).toJson(QJsonDocument::Indented) << "\n";
             return 0;
         }
-        out << "Usage: precrime ctl <command> [json-args | key=value ...]\n"
-               "       precrime ctl url <precrime://x-callback-url/...>\n"
-               "       precrime ctl help [command]\n\nCommands:\n";
+        out << "Usage: fairfax ctl <command> [json-args | key=value ...]\n"
+               "       fairfax ctl url <fairfax://x-callback-url/...>\n"
+               "       fairfax ctl help [command]\n\nCommands:\n";
         for (const auto &c : commands())
             out << "  " << c.name.leftJustified(30) << c.description.section('.', 0, 0) << "\n";
         return 0;
@@ -1677,7 +1677,7 @@ int Automation::runCli(const QStringList &args, QTextStream &out, QTextStream &e
     QJsonObject response;
     if (command == "url") {
         if (args.size() != 2) {
-            err << "Usage: precrime ctl url <url>\n";
+            err << "Usage: fairfax ctl url <url>\n";
             return 1;
         }
         response = handleUrl(QUrl(args.at(1)));
@@ -1714,7 +1714,7 @@ int Automation::runCli(const QStringList &args, QTextStream &out, QTextStream &e
 // ================================================================ URL scheme
 
 QString Automation::shareableLink(const Task &task) {
-    return QStringLiteral("precrime://x-callback-url/showTask?uid=%1").arg(QString::fromUtf8(QUrl::toPercentEncoding(task.uid)));
+    return QStringLiteral("fairfax://x-callback-url/showTask?uid=%1").arg(QString::fromUtf8(QUrl::toPercentEncoding(task.uid)));
 }
 
 QJsonObject Automation::handleUrl(const QUrl &url) {
@@ -1743,9 +1743,9 @@ QJsonObject Automation::handleUrl(const QUrl &url) {
 }
 
 QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
-    if (url.scheme().compare("precrime", Qt::CaseInsensitive) != 0)
-        invalid("Not a precrime:// URL.");
-    // precrime://x-callback-url/<action>, and tolerate precrime://<action>.
+    if (url.scheme().compare("fairfax", Qt::CaseInsensitive) != 0)
+        invalid("Not a fairfax:// URL.");
+    // fairfax://x-callback-url/<action>, and tolerate fairfax://<action>.
     QString action = url.host().compare("x-callback-url", Qt::CaseInsensitive) == 0 ? url.path() : url.host();
     action = action.remove('/').toLower();
     const QUrlQuery q(url);
@@ -1756,7 +1756,7 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
         static const QStringList clipboardKeys = {"task", "note", "tags", "locations", "subtasks"};
         if (v.trimmed() == "(clipboard)" && clipboardKeys.contains(key)) {
             if (!a.clipboardText)
-                fail("automation_unavailable", "(clipboard) needs the Precrime window; this process has none.");
+                fail("automation_unavailable", "(clipboard) needs the Fairfax window; this process has none.");
             return a.clipboardText();
         }
         return v;
@@ -2129,9 +2129,9 @@ QJsonObject McpServer::handle(const QJsonObject &message) {
 
     if (method == "initialize") {
         return reply(QJsonObject{{"protocolVersion", "2025-06-18"},
-                                 {"serverInfo", QJsonObject{{"name", "precrime"}, {"version", m_version}}},
+                                 {"serverInfo", QJsonObject{{"name", "fairfax"}, {"version", m_version}}},
                                  {"capabilities", QJsonObject{{"tools", QJsonObject()}}},
-                                 {"instructions", "Precrime is a classic task manager. Call list_lists first to find list ids, then query_tasks, create_task and the rest."}});
+                                 {"instructions", "Fairfax is a classic task manager. Call list_lists first to find list ids, then query_tasks, create_task and the rest."}});
     }
     if (method == "ping")
         return reply({});

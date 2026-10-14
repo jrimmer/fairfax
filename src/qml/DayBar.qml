@@ -365,7 +365,7 @@ Item {
                 DropArea {
                     id: stripDrop
                     anchors.fill: parent
-                    keys: ["precrime-tasks"]
+                    keys: ["fairfax-tasks"]
                     onPositionChanged: drag => root.hover(root.firstMinute + drag.x / width * root.span)
                     onExited: root.hoverMinute = -1
                     onDropped: drop => {
@@ -509,7 +509,7 @@ Item {
                 y: 0
                 width: grid.width - grid.labelWidth
                 height: grid.contentHeight
-                keys: ["precrime-tasks"]
+                keys: ["fairfax-tasks"]
                 onPositionChanged: drag => root.hover(root.firstMinute + (drag.y + y - 4) / root.rowHeight * 60)
                 onExited: root.hoverMinute = -1
                 onDropped: drop => {

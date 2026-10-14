@@ -4,7 +4,7 @@ QT += core gui widgets sql qml quick quickcontrols2 network
 linux: QT += dbus
 
 CONFIG += c++20 release
-TARGET = precrime
+TARGET = fairfax
 TEMPLATE = app
 
 # Listed explicitly so a half-written file in src/ never breaks the build.
@@ -13,9 +13,9 @@ SOURCES += src/alarms.cpp src/appsetup.cpp src/backend.cpp src/dateparse.cpp src
 
 RESOURCES += src/resources.qrc
 
-# macOS: a proper .app bundle named Precrime; Windows: no console window.
+# macOS: a proper .app bundle named Fairfax; Windows: no console window.
 macx {
-    TARGET = Precrime
+    TARGET = Fairfax
 }
 win32: CONFIG += windows
 

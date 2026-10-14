@@ -1,11 +1,11 @@
 #!/bin/bash
-# Wires Precrime into Omarchy, or takes it out again:
+# Wires Fairfax into Omarchy, or takes it out again:
 #
-#   precrime setup omarchy            add Quick Entry key, window rules, autostart, menu entries
-#   precrime setup omarchy --remove   undo all of it
-#   precrime setup omarchy --key "SUPER + ALT + T"   use another Quick Entry key
+#   fairfax setup omarchy             add Quick Entry key, window rules, autostart, menu entries
+#   fairfax setup omarchy --remove    undo all of it
+#   fairfax setup omarchy --key "SUPER + ALT + T"    use another Quick Entry key
 #
-# Everything Precrime adds to Hyprland lives in ~/.config/hypr/precrime.lua,
+# Everything Fairfax adds to Hyprland lives in ~/.config/hypr/fairfax.lua,
 # loaded by one marked line in hyprland.lua; launcher entries are a marked
 # block in ~/.config/omarchy/extensions/omarchy-menu.jsonc. Files are backed
 # up before they change, and Hyprland's config is validated afterwards.
@@ -13,10 +13,10 @@
 set -euo pipefail
 
 hypr="$HOME/.config/hypr"
-module="$hypr/precrime.lua"
+module="$hypr/fairfax.lua"
 main="$hypr/hyprland.lua"
 menu="$HOME/.config/omarchy/extensions/omarchy-menu.jsonc"
-require_line='require("hypr.precrime") -- precrime: added by `precrime setup omarchy`'
+require_line='require("hypr.fairfax") -- fairfax: added by `fairfax setup omarchy`'
 key="SUPER + SHIFT + T"
 remove=false
 
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     --remove) remove=true ;;
     --key) key="$2"; shift ;;
     -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "precrime setup omarchy: unknown option $1" >&2; exit 2 ;;
+    *) echo "fairfax setup omarchy: unknown option $1" >&2; exit 2 ;;
   esac
   shift
 done
@@ -47,16 +47,16 @@ edit_menu() {
 import re, sys
 path, mode = sys.argv[1], sys.argv[2]
 text = open(path, encoding="utf-8").read()
-begin, end = "// precrime: begin", "// precrime: end"
+begin, end = "// fairfax: begin", "// fairfax: end"
 text = re.sub(r"\n?[ \t]*" + re.escape(begin) + r".*?" + re.escape(end) + r"[^\n]*\n?", "\n", text, flags=re.S)
 if mode == "add":
-    block = """  // precrime: begin (added by `precrime setup omarchy`)
-  "precrime": {"icon":"󰄲","label":"Precrime","description":"Tasks: new task, Today, Quick Open"},
-  "precrime.new": {"icon":"󰐕","label":"New Task","action":"precrime --quick","description":"Precrime Quick Entry"},
-  "precrime.today": {"icon":"󰃭","label":"Today","action":"precrime precrime://x-callback-url/showtoday"},
-  "precrime.find": {"icon":"󰍉","label":"Find a Task","action":"precrime --open","description":"Precrime Quick Open"},
-  "precrime.settings": {"icon":"󰒓","label":"Settings","action":"precrime --settings"},
-  // precrime: end
+    block = """  // fairfax: begin (added by `fairfax setup omarchy`)
+  "fairfax": {"icon":"󰄲","label":"Fairfax","description":"Tasks: new task, Today, Quick Open"},
+  "fairfax.new": {"icon":"󰐕","label":"New Task","action":"fairfax --quick","description":"Fairfax Quick Entry"},
+  "fairfax.today": {"icon":"󰃭","label":"Today","action":"fairfax fairfax://x-callback-url/showtoday"},
+  "fairfax.find": {"icon":"󰍉","label":"Find a Task","action":"fairfax --open","description":"Fairfax Quick Open"},
+  "fairfax.settings": {"icon":"󰒓","label":"Settings","action":"fairfax --settings"},
+  // fairfax: end
 """
     close = text.rstrip().rfind("}")
     head = text[:close].rstrip()
@@ -84,64 +84,64 @@ validate() {
 
 if $remove; then
   [[ -f $module ]] && rm "$module" && echo "Removed $module"
-  if grep -qF 'require("hypr.precrime")' "$main"; then
+  if grep -qF 'require("hypr.fairfax")' "$main"; then
     backup "$main"
-    sed -i '/require("hypr.precrime")/d' "$main"
-    echo "Removed Precrime from $main"
+    sed -i '/require("hypr.fairfax")/d' "$main"
+    echo "Removed Fairfax from $main"
   fi
-  [[ -f $menu ]] && edit_menu remove && echo "Removed Precrime from the launcher menu"
+  [[ -f $menu ]] && edit_menu remove && echo "Removed Fairfax from the launcher menu"
   validate
-  echo "Precrime is no longer wired into Omarchy (the app itself stays installed)."
+  echo "Fairfax is no longer wired into Omarchy (the app itself stays installed)."
   exit 0
 fi
 
 # Refuse a key that's already taken, so nothing is silently overridden.
 if command -v omarchy >/dev/null; then
   taken=$(omarchy menu keybindings --print 2>/dev/null | grep -i -E "^${key//+/\\+}[[:space:]]+→" || true)
-  taken=$(echo "$taken" | grep -v -i precrime || true)
+  taken=$(echo "$taken" | grep -v -i fairfax || true)
   if [[ -n $taken ]]; then
     echo "$key is already bound: $taken" >&2
-    echo "Pick another with: precrime setup omarchy --key \"SUPER + ALT + T\"" >&2
+    echo "Pick another with: fairfax setup omarchy --key \"SUPER + ALT + T\"" >&2
     exit 1
   fi
 fi
 
 [[ -f $module ]] && backup "$module"
 cat >"$module" <<LUA
--- Precrime, added by \`precrime setup omarchy\`. Remove with
--- \`precrime setup omarchy --remove\`, or edit freely.
+-- Fairfax, added by \`fairfax setup omarchy\`. Remove with
+-- \`fairfax setup omarchy --remove\`, or edit freely.
 
 -- Quick Entry from anywhere: press it again to save and start the next task.
-o.bind("$key", "Precrime quick entry", "precrime --quick")
+o.bind("$key", "Fairfax quick entry", "fairfax --quick")
 
 -- Quick Entry and Settings float, centred, like the reference app's panels. Quick Entry
 -- sizes itself to its contents.
-o.window({ class = "^precrime\$", title = "^Precrime Quick Entry\$" }, { float = true, center = true })
-o.window({ class = "^precrime\$", title = "^Precrime Settings\$" }, { float = true, center = true, size = { 760, 580 } })
+o.window({ class = "^fairfax\$", title = "^Fairfax Quick Entry\$" }, { float = true, center = true })
+o.window({ class = "^fairfax\$", title = "^Fairfax Settings\$" }, { float = true, center = true, size = { 760, 580 } })
 
 
--- Keep Precrime running in the background after sign-in, so alarms arrive
+-- Keep Fairfax running in the background after sign-in, so alarms arrive
 -- and Quick Entry opens instantly.
-o.launch_on_start("precrime --background")
+o.launch_on_start("fairfax --background")
 LUA
 echo "Wrote $module"
 
-if ! grep -qF 'require("hypr.precrime")' "$main"; then
+if ! grep -qF 'require("hypr.fairfax")' "$main"; then
   backup "$main"
   printf '%s\n' "$require_line" >>"$main"
   echo "Loaded it from $main"
 fi
 
 edit_menu add
-echo "Added a Precrime section to the Omarchy menu ($menu)"
+echo "Added a Fairfax section to the Omarchy menu ($menu)"
 
 validate
 cat <<DONE
 
-Precrime is wired into Omarchy:
+Fairfax is wired into Omarchy:
   $key          Quick Entry from anywhere
-  Super+Space        Omarchy menu → Precrime → New Task / Today / Find a Task / Settings
-  Super+Alt+Space    Apps → Precrime
-  sign-in            Precrime starts in the background for alarms
-  pc …               add and list tasks from any terminal (try: pc help)
+  Super+Space        Omarchy menu → Fairfax → New Task / Today / Find a Task / Settings
+  Super+Alt+Space    Apps → Fairfax
+  sign-in            Fairfax starts in the background for alarms
+  frfx …             add and list tasks from any terminal (try: frfx help)
 DONE

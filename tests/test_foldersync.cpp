@@ -17,7 +17,7 @@ namespace {
 // (Depth 1), GET, PUT, DELETE and MKCOL, with basic authentication.
 class FakeDav : public QTcpServer {
 public:
-    explicit FakeDav(const QString &root = "/dav/Precrime/") : m_root(root) {
+    explicit FakeDav(const QString &root = "/dav/Fairfax/") : m_root(root) {
         connect(this, &QTcpServer::newConnection, this, [this] {
             while (auto *socket = nextPendingConnection()) {
                 connect(socket, &QTcpSocket::readyRead, this, [this, socket] { handle(socket); });
@@ -146,7 +146,7 @@ class FolderSyncTest : public QObject {
         m.store = std::make_unique<Store>();
         QString err;
         const QString base = m_dir.filePath(QString("%1%2").arg(name).arg(++m_n));
-        [&] { QVERIFY2(m.store->open(base + "/precrime.db", &err), qPrintable(err)); }();
+        [&] { QVERIFY2(m.store->open(base + "/fairfax.db", &err), qPrintable(err)); }();
         m.mirror = base + "/mirror";
         return m;
     }

@@ -232,5 +232,5 @@ Menu {
     MenuItem { text: "Add to Calendar"; onTriggered: backend.addToCalendar(root.row.taskId) }
     MenuItem { text: "Save as Event (.ics)…"; onTriggered: filePicker.save("Save the task as a calendar event", "Event.ics", "event:" + root.row.taskId) }
     MenuItem { text: "Email These Tasks…"; onTriggered: backend.emailTasks() }
-    MenuItem { text: "Export Selection…"; onTriggered: filePicker.save("Export the selected tasks", "Precrime.csv", "export-selection") }
+    MenuItem { text: "Export Selection…"; onTriggered: filePicker.save("Export the selected tasks", "Fairfax.csv", "export-selection") }
 }

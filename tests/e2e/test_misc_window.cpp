@@ -110,11 +110,11 @@ private slots:
         App app;
         QVERIFY(app.ok);
         QVERIFY(app.openSource(lk(app.ids.home)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.window->title(), QString("Home — Precrime"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.window->title(), QString("Home — Fairfax"), 5000);
         QVERIFY(app.openSource(lk(app.ids.work)));
-        QTRY_COMPARE_WITH_TIMEOUT(app.window->title(), QString("Work — Precrime"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.window->title(), QString("Work — Fairfax"), 5000);
         app.press(Qt::Key_5, Qt::ControlModifier);
-        QTRY_COMPARE_WITH_TIMEOUT(app.window->title(), QString("Done — Precrime"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.window->title(), QString("Done — Fairfax"), 5000);
     }
 
     // Settings carries the About block: name, version, project link, copyright,
@@ -129,9 +129,9 @@ private slots:
         control("aboutVersion", version);
         control("aboutLink", link);
         control("aboutLicense", licence);
-        QCOMPARE(name->property("text").toString(), QString("Precrime"));
+        QCOMPARE(name->property("text").toString(), QString("Fairfax"));
         QVERIFY(version->property("text").toString().startsWith("Version "));
-        QCOMPARE(link->property("text").toString(), QString("github.com/jrimmer/precrime"));
+        QCOMPARE(link->property("text").toString(), QString("github.com/jrimmer/fairfax"));
         QVERIFY(textUnder(sw->contentItem(), QStringLiteral("© 2026 Jason Rimmer")) != nullptr);
         QObject *dialog = findObject("licenseDialog");
         QVERIFY(dialog);

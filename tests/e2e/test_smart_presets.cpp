@@ -84,7 +84,7 @@ private slots:
     // view"; "`task` Top-level plain Tasks only"; … "`emptychck` Checklists
     // with no active sub-tasks" (smart-lists.md, type: Presets for Task
     // Structure). Checklist items and sub-tasks of plain tasks nest under
-    // their parent in Precrime, so `subtasks` lists project children only.
+    // their parent in Fairfax, so `subtasks` lists project children only.
     void typeStructure_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -129,7 +129,7 @@ private slots:
 
     // "`audio` Tasks with audio attachments; `pict` picture attachments;
     // `note` Tasks with notes; `capturedmail` Tasks captured from an email".
-    // Precrime has no mail capture, so that preset matches nothing.
+    // Fairfax has no mail capture, so that preset matches nothing.
     void typeAttachmentsNotesCapture_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");

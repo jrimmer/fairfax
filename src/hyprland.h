@@ -4,7 +4,7 @@
 // users keep floating windows snapped into thirds of the screen rather than
 // tiling; a tiled window there lands underneath them across the full width.
 // So when the main window appears: if the workspace's other windows are all
-// floating, Precrime floats itself into the first third none of them
+// floating, Fairfax floats itself into the first third none of them
 // occupies (same geometry as a thirds-snapping script: reserved bar space
 // and outer gaps respected). With tiled windows, or none, Hyprland decides.
 

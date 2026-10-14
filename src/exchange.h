@@ -27,7 +27,7 @@ struct ImportResult {
 namespace Exchange {
 
 // Decodes RFC 2047 encoded words in a mail header value; plain text passes
-// through. Shared by the .eml reader and Mail to Precrime.
+// through. Shared by the .eml reader and Mail to Fairfax.
 QString decodeMimeWords(const QString &raw);
 
 // Which tasks an export includes, as in the reference app's "Tasks to export:" popup.
@@ -50,7 +50,7 @@ QByteArray eventIcs(const Store &store, const Task &task);
 bool exportCsv(const Store &store, const QString &path, const QList<qint64> &taskIds = {}, QString *error = nullptr);
 
 // RFC 5545 VCALENDAR of VTODOs. Each VTODO carries its list name in
-// X-PRECRIME-LIST, tags in CATEGORIES,
+// X-FAIRFAX-LIST, tags in CATEGORIES,
 // priority in PRIORITY (1 high, 5 medium, 9 low), start in DTSTART, due in
 // DUE, recurrence in RRULE, alerts as VALARM, parents via RELATED-TO.
 bool exportIcs(const Store &store, const QString &path, const QList<qint64> &taskIds = {}, QString *error = nullptr);

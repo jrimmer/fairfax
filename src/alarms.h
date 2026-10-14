@@ -2,7 +2,7 @@
 
 // Delivers alarms as desktop notifications (org.freedesktop.Notifications,
 // which mako shows on Omarchy), with Complete and Snooze actions. Like the reference app's
-// Alarm Helper it only works while Precrime runs, which is why the app keeps
+// Alarm Helper it only works while Fairfax runs, which is why the app keeps
 // running in the background after its window closes.
 
 #include <QDateTime>

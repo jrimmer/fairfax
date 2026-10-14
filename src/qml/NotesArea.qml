@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Basic as Plain
-import Precrime 1.0
+import Fairfax 1.0
 
 // The notes editor: a Markdown-styled text area with the reference app's left chip column
 // (note, Markdown preview, insert date, open links). The text is always the
@@ -323,7 +323,7 @@ Rectangle {
         linkColor: theme.today
         font.pixelSize: root.fontSize
         onLinkActivated: (link) => {
-            if (link.startsWith("precrime-task:")) root.linkActivated(decodeURIComponent(link.substring(14)), "task")
+            if (link.startsWith("fairfax-task:")) root.linkActivated(decodeURIComponent(link.substring(14)), "task")
             else root.linkActivated(link, link.indexOf("@") > 0 && link.indexOf(":") < 0 ? "email" : "url")
         }
     }

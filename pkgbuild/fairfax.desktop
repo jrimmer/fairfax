@@ -1,29 +1,29 @@
 [Desktop Entry]
 Type=Application
-Name=Precrime
+Name=Fairfax
 GenericName=Task Manager
 Comment=A keyboard-first task manager, modelled on the reference app
-Exec=precrime %u
-MimeType=x-scheme-handler/precrime;
-Icon=precrime
+Exec=fairfax %u
+MimeType=x-scheme-handler/fairfax;
+Icon=fairfax
 Terminal=false
 Categories=Office;ProjectManagement;Utility;
 Keywords=todo;tasks;gtd;taskapp;
-StartupWMClass=precrime
+StartupWMClass=fairfax
 Actions=new-task;new-window;today;find;
 
 [Desktop Action new-task]
 Name=New Task
-Exec=precrime --quick
+Exec=fairfax --quick
 
 [Desktop Action today]
 Name=Today
-Exec=precrime precrime://x-callback-url/showtoday
+Exec=fairfax fairfax://x-callback-url/showtoday
 
 [Desktop Action find]
 Name=Find a Task
-Exec=precrime --open
+Exec=fairfax --open
 
 [Desktop Action new-window]
 Name=New Window
-Exec=precrime --new-window
+Exec=fairfax --new-window

@@ -1,41 +1,41 @@
-#compdef precrime pc
-# zsh completion for precrime and pc.
+#compdef fairfax frfx
+# zsh completion for fairfax and frfx.
 
-_precrime_tasks() {
+_fairfax_tasks() {
   local -a tasks
-  tasks=(${(f)"$(precrime --complete ${1:-tasks} 2>/dev/null | sed 's/\t/:/')"})
+  tasks=(${(f)"$(fairfax --complete ${1:-tasks} 2>/dev/null | sed 's/\t/:/')"})
   _describe -t tasks 'task' tasks
 }
 
-_precrime_lists() {
+_fairfax_lists() {
   local -a lists
-  lists=(all starred scheduled done today ${(f)"$(precrime --complete lists 2>/dev/null)"})
+  lists=(all starred scheduled done today ${(f)"$(fairfax --complete lists 2>/dev/null)"})
   _describe -t lists 'list' lists
 }
 
-_pc() {
+_frfx() {
   if (( CURRENT == 2 )); then
     local -a commands=(
       'ls:show a list (Today when omitted)'
       'find:search everything (the reference app search syntax)'
       'done:complete tasks by number'
       'undone:reopen tasks by number'
-      'open:open Precrime'
+      'open:open Fairfax'
       'add:add a task that starts with a command word'
       'help:show usage'
       'today:show Today'
     )
-    _describe -t commands 'pc command (or type a task)' commands
+    _describe -t commands 'frfx command (or type a task)' commands
     return
   fi
   case $words[2] in
-    ls|list) _precrime_lists ;;
-    done) _precrime_tasks tasks ;;
-    undone) _precrime_tasks done ;;
+    ls|list) _fairfax_lists ;;
+    done) _fairfax_tasks tasks ;;
+    undone) _fairfax_tasks done ;;
   esac
 }
 
-_precrime_main() {
+_fairfax_main() {
   local -a ctl_commands
   _arguments -C \
     '(- *)--help[show help]' \
@@ -62,15 +62,15 @@ _precrime_main() {
         'ctl:run an automation command'
         'mcp:run the MCP server on stdio'
         'import:import a TickTick backup, the reference app database or iCalendar file'
-        'import-mail:turn emails into tasks (Mail to Precrime)'
-        'setup:wire Precrime into Omarchy'
+        'import-mail:turn emails into tasks (Mail to Fairfax)'
+        'setup:wire Fairfax into Omarchy'
       )
-      _describe -t commands 'precrime command' commands
+      _describe -t commands 'fairfax command' commands
       ;;
     args)
       case $words[1] in
         ctl)
-          ctl_commands=(help url ${(f)"$(precrime --complete ctl 2>/dev/null)"})
+          ctl_commands=(help url ${(f)"$(fairfax --complete ctl 2>/dev/null)"})
           (( CURRENT == 2 )) && _describe -t ctl 'automation command' ctl_commands
           ;;
         import-mail)
@@ -93,6 +93,6 @@ _precrime_main() {
 }
 
 case $service in
-  pc) _pc ;;
-  *) _precrime_main ;;
+  frfx) _frfx ;;
+  *) _fairfax_main ;;
 esac

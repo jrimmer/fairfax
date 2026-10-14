@@ -32,16 +32,16 @@ int main(int argc, char *argv[]) {
     Keyring::useMemoryStore(true);   // No test reads or writes the real keyring.
     // No session bus: the file chooser portal would otherwise put a real dialog on the
     // desktop of whoever runs the tests; with none, FilePicker reports that it failed.
-    qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/precrime-e2e");
+    qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/fairfax-e2e");
     QQuickStyle::setStyle("Material");
     QApplication app(argc, argv);
 
     std::vector<std::unique_ptr<QObject>> tests;
     for (const auto &factory : testRegistry())
         tests.emplace_back(factory());
-    // PRECRIME_E2E_CLAIMDIR=dir: several processes (bin/e2e starts them) share one
+    // FAIRFAX_E2E_CLAIMDIR=dir: several processes (bin/e2e starts them) share one
     // directory, and a class belongs to whichever process makes its folder first.
-    const QString claims = qEnvironmentVariable("PRECRIME_E2E_CLAIMDIR");
+    const QString claims = qEnvironmentVariable("FAIRFAX_E2E_CLAIMDIR");
     if (!claims.isEmpty())
         std::stable_sort(tests.begin(), tests.end(), [](const auto &a, const auto &b) {
             return weight(a->metaObject()->className()) > weight(b->metaObject()->className());
@@ -50,17 +50,17 @@ int main(int argc, char *argv[]) {
     int failures = 0;
     for (const auto &test : tests) {
         const QString name = test->metaObject()->className();
-        // PRECRIME_E2E_CLASS=Tasks runs only the test classes whose name contains it,
+        // FAIRFAX_E2E_CLASS=Tasks runs only the test classes whose name contains it,
         // so a function name given as an argument is not looked up in the others.
-        const QByteArray only = qgetenv("PRECRIME_E2E_CLASS");
+        const QByteArray only = qgetenv("FAIRFAX_E2E_CLASS");
         if (!only.isEmpty() && !name.toUtf8().contains(only))
             continue;
         if (!claims.isEmpty() && !QDir(claims).mkdir(name))
             continue;
         QElapsedTimer clock;
         clock.start();
-        // PRECRIME_E2E_XMLDIR=dir also writes dir/<class>.xml, which has the time of every test.
-        const QByteArray xmlDir = qgetenv("PRECRIME_E2E_XMLDIR");
+        // FAIRFAX_E2E_XMLDIR=dir also writes dir/<class>.xml, which has the time of every test.
+        const QByteArray xmlDir = qgetenv("FAIRFAX_E2E_XMLDIR");
         QList<QByteArray> args;
         for (int i = 0; i < argc; ++i)
             args << argv[i];

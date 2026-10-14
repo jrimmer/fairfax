@@ -64,7 +64,7 @@ QString clampNotes(const QString &notes, bool *truncated = nullptr);
 
 // Notes ready for a Markdown renderer that only knows CommonMark: ::highlight::
 // and underline tags become inline HTML, and @{Title} links become
-// precrime-task: links the viewer can resolve.
+// fairfax-task: links the viewer can resolve.
 QString previewSource(const QString &notes);
 
 }  // namespace Markdown
@@ -105,7 +105,7 @@ class NotesHighlighter : public QObject {
 public:
     explicit NotesHighlighter(QObject *parent = nullptr);
 
-    // Registers the type as Precrime 1.0 NotesHighlighter; call before loading QML.
+    // Registers the type as Fairfax 1.0 NotesHighlighter; call before loading QML.
     static void registerType();
 
     QQuickTextDocument *document() const { return m_document; }

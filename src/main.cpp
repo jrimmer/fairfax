@@ -1,4 +1,4 @@
-// precrime — a keyboard-first task manager for Omarchy, modelled on the reference app.
+// fairfax — a keyboard-first task manager for Omarchy, modelled on the reference app.
 
 #include <QClipboard>
 #include <QCommandLineParser>
@@ -81,7 +81,7 @@ protected:
         auto *window = qobject_cast<QWindow *>(watched);
         if (!window || window != QGuiApplication::focusWindow())
             return false;
-        if (window->title() == "Precrime Settings" || window->title() == "Precrime Quick Entry") {
+        if (window->title() == "Fairfax Settings" || window->title() == "Fairfax Quick Entry") {
             // A window can keep Escape for itself (Quick Entry with an option
             // row open closes the row first).
             const QVariant own = window->property("escapeCloses");
@@ -102,26 +102,26 @@ QString databasePath(const QStringList &args) {
     const int i = args.indexOf("--db");
     if (i >= 0 && i + 1 < args.size())
         return args.at(i + 1);
-    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/precrime/precrime.db";
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/fairfax/fairfax.db";
 }
 
-// `precrime mcp`, `precrime ctl …` and `precrime --waybar` run without a
+// `fairfax mcp`, `fairfax ctl …` and `fairfax --waybar` run without a
 // window against the same database, so scripts, Claude and the bar can use
-// Precrime while the app is open (SQLite's WAL mode keeps that safe).
+// Fairfax while the app is open (SQLite's WAL mode keeps that safe).
 int runHeadless(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
-    app.setApplicationName("precrime");
+    app.setApplicationName("fairfax");
     QStringList args = app.arguments();
     if (args.value(1) == "setup") {
-        // `precrime setup omarchy [--remove] [--key …]` runs the packaged
+        // `fairfax setup omarchy [--remove] [--key …]` runs the packaged
         // script (or the repo's copy when running from a build).
         if (args.value(2) != "omarchy") {
-            QTextStream(stderr) << "usage: precrime setup omarchy [--remove] [--key \"SUPER + SHIFT + T\"]" << Qt::endl;
+            QTextStream(stderr) << "usage: fairfax setup omarchy [--remove] [--key \"SUPER + SHIFT + T\"]" << Qt::endl;
             return 2;
         }
         const QString appDir = QCoreApplication::applicationDirPath();
-        for (const QString &script : {QStringLiteral("/usr/lib/precrime/precrime-omarchy-setup"),
-                                      appDir + "/../scripts/precrime-omarchy-setup"}) {
+        for (const QString &script : {QStringLiteral("/usr/lib/fairfax/fairfax-omarchy-setup"),
+                                      appDir + "/../scripts/fairfax-omarchy-setup"}) {
             if (QFileInfo(script).isExecutable()) {
                 QProcess run;
                 run.setProcessChannelMode(QProcess::ForwardedChannels);
@@ -130,7 +130,7 @@ int runHeadless(int argc, char *argv[]) {
                 return run.exitCode();
             }
         }
-        QTextStream(stderr) << "precrime: the Omarchy setup script isn't installed." << Qt::endl;
+        QTextStream(stderr) << "fairfax: the Omarchy setup script isn't installed." << Qt::endl;
         return 1;
     }
     const QString dbPath = databasePath(args);
@@ -140,7 +140,7 @@ int runHeadless(int argc, char *argv[]) {
     QString error;
     QTextStream out(stdout), err(stderr);
     if (!store.open(dbPath, &error)) {
-        err << "precrime: can't open the database: " << error << Qt::endl;
+        err << "fairfax: can't open the database: " << error << Qt::endl;
         return 1;
     }
     if (args.value(1) == "--complete") {
@@ -165,9 +165,9 @@ int runHeadless(int argc, char *argv[]) {
         }
         return 0;
     }
-    const bool shorthand = args.value(0).section('/', -1) == "pc";
+    const bool shorthand = args.value(0).section('/', -1) == "frfx";
     if (shorthand)
-        return Cli::pc(store, args.mid(1), out, err);
+        return Cli::shorthand(store, args.mid(1), out, err);
     const QString mode = args.value(1);
     if (mode == "add")
         return Cli::add(store, args.mid(2), out, err);
@@ -189,13 +189,13 @@ int runHeadless(int argc, char *argv[]) {
         if (AlarmTimes::hasPending(store, QDateTime::currentDateTime())) {
             const int dbAt = args.indexOf("--db");
             const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME", "user"));
-            const QString socket = QStringLiteral("precrime-%1").arg(user)
+            const QString socket = QStringLiteral("fairfax-%1").arg(user)
                                    + (dbAt >= 0 && dbAt + 1 < args.size() ? "-" + QString::number(qHash(args.at(dbAt + 1))) : QString());
             QLocalSocket probe;
             probe.connectToServer(socket);
             if (!probe.waitForConnected(300)) {
                 cls = "no-daemon";
-                tooltip += QStringLiteral("\nAlarms won't go off: Precrime isn't running.");
+                tooltip += QStringLiteral("\nAlarms won't go off: Fairfax isn't running.");
             }
         }
         const QJsonObject json{{"text", count ? text : cls == "no-daemon" ? QStringLiteral("!") : QString()},
@@ -205,16 +205,16 @@ int runHeadless(int argc, char *argv[]) {
         return 0;
     }
     if (mode == "import-mail") {
-        // Mail to Precrime from a pipe: a message on stdin or in files, or a Maildir.
+        // Mail to Fairfax from a pipe: a message on stdin or in files, or a Maildir.
         QFile in;
         in.open(stdin, QIODevice::ReadOnly);
         return Cli::importMail(store, args.mid(2), in, out, err);
     }
     if (mode == "import") {
-        // precrime import FILE: a the reference app database or .taskdb backup, or .ics.
+        // fairfax import FILE: a the reference app database or .taskdb backup, or .ics.
         const QString file = args.value(2);
         if (file.isEmpty()) {
-            err << "usage: precrime import <tasks.db | backup.taskdb | tasks.ics | TickTick-backup.csv | Things.json | OmniFocus.taskpaper> [--db PATH]" << Qt::endl;
+            err << "usage: fairfax import <tasks.db | backup.taskdb | tasks.ics | TickTick-backup.csv | Things.json | OmniFocus.taskpaper> [--db PATH]" << Qt::endl;
             return 2;
         }
         const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive) ? Exchange::importIcs(store, file, 0)
@@ -223,7 +223,7 @@ int runHeadless(int argc, char *argv[]) {
                                : Exchange::isTaskPaper(file)               ? Exchange::importOmniFocus(store, file)
                                                                            : Exchange::importTwoDo(store, file);
         if (!r.error.isEmpty()) {
-            err << "precrime: import failed: " << r.error << Qt::endl;
+            err << "fairfax: import failed: " << r.error << Qt::endl;
             return 1;
         }
         out << QStringLiteral("Imported %1 lists, %2 tasks, %3 tags, %4 alerts").arg(r.lists).arg(r.tasks).arg(r.tags).arg(r.alarms)
@@ -246,10 +246,10 @@ int runHeadless(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     {
-        // Invoked as `pc` (a symlink), everything is the terminal shorthand.
+        // Invoked as `frfx` (a symlink), everything is the terminal shorthand.
         const QString self = QString::fromLocal8Bit(argv[0]).section('/', -1);
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
-        if (self == "pc" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" || first == "import-mail" ||
+        if (self == "frfx" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" || first == "import-mail" ||
             first == "add" || first == "setup" || first == "--complete")
             return runHeadless(argc, argv);
     }
@@ -258,13 +258,13 @@ int main(int argc, char *argv[]) {
     // menu, which Qt builds with widgets; the window itself is all QML.
     QApplication app(argc, argv);
     Diagnostics::install();
-    app.setApplicationName("precrime");
+    app.setApplicationName("fairfax");
     app.setApplicationVersion("0.5.1");
 
-    // Matches the window to precrime.desktop, so the compositor (Wayland
+    // Matches the window to fairfax.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
-    app.setDesktopFileName("precrime");
-    app.setWindowIcon(QIcon::fromTheme("precrime"));
+    app.setDesktopFileName("fairfax");
+    app.setWindowIcon(QIcon::fromTheme("fairfax"));
 
     QCommandLineParser cli;
     cli.setApplicationDescription("A keyboard-first task manager for Omarchy.");
@@ -290,16 +290,16 @@ int main(int argc, char *argv[]) {
     cli.addOptions({dbOption, demoOption, shotOption, sizeOption, sourceOption, editOption, themeOption, quickOption,
                     daemonOption, quickTextOption, selfTestOption, openOption, settingsOption, schemeOption,
                     evalOption, shotWindowOption, newWindowOption});
-    cli.addPositionalArgument("url", "A precrime:// link to open.", "[url]");
+    cli.addPositionalArgument("url", "A fairfax:// link to open.", "[url]");
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
 
     // One instance per user and database: a second launch hands its request
     // to the running one (open Quick Entry, or bring the window forward) and
-    // exits, so a Hyprland bind on `precrime --quick` is instant.
+    // exits, so a Hyprland bind on `fairfax --quick` is instant.
     const bool offscreen = cli.isSet(shotOption) || cli.isSet(demoOption);
     const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME", "user"));
-    const QString socketName = QStringLiteral("precrime-%1").arg(user)
+    const QString socketName = QStringLiteral("fairfax-%1").arg(user)
                                + (cli.isSet(dbOption) ? "-" + QString::number(qHash(cli.value(dbOption))) : QString());
     if (!offscreen) {
         QLocalSocket probe;
@@ -332,8 +332,8 @@ int main(int argc, char *argv[]) {
                 auto stillRunning = [&] { return peer > 0 && ::kill(peer, 0) == 0; };
                 for (int i = 0; i < 15 && stillRunning(); ++i)
                     QThread::msleep(100);
-                // Only ever stop a process that really is Precrime.
-                if (stillRunning() && QFileInfo(QStringLiteral("/proc/%1/exe").arg(peer)).symLinkTarget().contains("precrime")) {
+                // Only ever stop a process that really is Fairfax.
+                if (stillRunning() && QFileInfo(QStringLiteral("/proc/%1/exe").arg(peer)).symLinkTarget().contains("fairfax")) {
                     ::kill(peer, SIGTERM);
                     for (int i = 0; i < 20 && stillRunning(); ++i)
                         QThread::msleep(100);
@@ -353,7 +353,7 @@ int main(int argc, char *argv[]) {
         if (probe.state() == QLocalSocket::ConnectedState) {
             if (cli.isSet(daemonOption))
                 return 0;
-            if (openUrl.startsWith("precrime:"))
+            if (openUrl.startsWith("fairfax:"))
                 probe.write(("url " + openUrl + "\n").toUtf8());
             else if (cli.isSet(openOption))
                 probe.write("open\n");
@@ -416,7 +416,7 @@ int main(int argc, char *argv[]) {
         backend.requestWindow();
     };
 
-    // Changes written by `precrime ctl` or the MCP server show up here.
+    // Changes written by `fairfax ctl` or the MCP server show up here.
     QTimer externalChanges;
     QObject::connect(&externalChanges, &QTimer::timeout, &store, [&store] { store.reloadIfChangedElsewhere(); });
     externalChanges.start(1500);
@@ -489,7 +489,7 @@ int main(int argc, char *argv[]) {
     }
     if (cli.isSet(quickOption))
         QTimer::singleShot(0, &backend, &Backend::requestQuickEntry);
-    if (openUrl.startsWith("precrime:"))
+    if (openUrl.startsWith("fairfax:"))
         QTimer::singleShot(0, &backend, [handleUrl, openUrl] { handleUrl(openUrl); });
     if (cli.isSet(openOption))
         QTimer::singleShot(300, &backend, [&backend] { backend.requestPanel("open"); });
@@ -539,7 +539,7 @@ int main(int argc, char *argv[]) {
         QQmlComponent component(&engine, QUrl("qrc:/qml/Main.qml"));
         QObject *window = component.create(context);
         if (!window) {
-            qWarning("precrime: couldn't open another window: %s", qPrintable(component.errorString()));
+            qWarning("fairfax: couldn't open another window: %s", qPrintable(component.errorString()));
             delete extra;
             return;
         }

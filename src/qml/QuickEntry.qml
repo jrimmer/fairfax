@@ -5,7 +5,7 @@ import QtQuick.Controls.Basic as Plain
 import QtQuick.Layouts
 
 // Quick Entry: a small floating window for capturing a task from anywhere,
-// summoned with `precrime --quick` from a Hyprland bind. Its layout follows
+// summoned with `fairfax --quick` from a Hyprland bind. Its layout follows
 // the reference app's own Quick Entry: the title (priority and star at the right), a ribbon
 // in the list's colour with the list, the due summary and the attribute
 // buttons, tags beside the Start and Due fields, notes, and a footer.
@@ -21,7 +21,7 @@ import QtQuick.Layouts
 Window {
     id: root
 
-    title: "Precrime Quick Entry"
+    title: "Fairfax Quick Entry"
     width: 600
     height: body.implicitHeight
     minimumWidth: 480

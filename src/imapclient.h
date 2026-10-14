@@ -1,6 +1,6 @@
 #pragma once
 
-// A small asynchronous IMAP4rev1 client on QSslSocket, for Mail to Precrime
+// A small asynchronous IMAP4rev1 client on QSslSocket, for Mail to Fairfax
 // (src/mailfetch.h). It speaks only what the connector needs: LOGIN or
 // AUTHENTICATE PLAIN / XOAUTH2, SELECT, UID SEARCH, UID FETCH, UID STORE,
 // CREATE, UID MOVE (or COPY + \Deleted + UID EXPUNGE), IDLE and LOGOUT.

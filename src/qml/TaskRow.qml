@@ -347,7 +347,7 @@ Item {
     // the file manager attach to it.
     DropArea {
         anchors.fill: parent
-        keys: ["precrime-tag"]
+        keys: ["fairfax-tag"]
         onDropped: (drop) => backend.tagTask(root.r.taskId, drop.source.tagId)
         Rectangle { anchors.fill: parent; color: "transparent"; border.color: theme.accent; border.width: 2; radius: 6; visible: parent.containsDrag }
     }
@@ -361,7 +361,7 @@ Item {
     // Dropping tasks onto this row moves them in front of it.
     DropArea {
         anchors.fill: parent
-        keys: ["precrime-tasks"]
+        keys: ["fairfax-tasks"]
         onDropped: backend.dropBefore(root.r.taskId)
         Rectangle {
             visible: parent.containsDrag

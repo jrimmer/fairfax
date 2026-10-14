@@ -1,7 +1,7 @@
-// Mail to Precrime with a client the user brings: Gmail's "Import client JSON…" and
+// Mail to Fairfax with a client the user brings: Gmail's "Import client JSON…" and
 // "Sign in with Google", and Outlook's "Use your own client ID" with "Sign in with
-// Microsoft". The browser is the test (it reads the URL Precrime opens and sends the
-// redirect itself) and the token endpoint is a fake HTTP seam; Precrime ships no OAuth
+// Microsoft". The browser is the test (it reads the URL Fairfax opens and sends the
+// redirect itself) and the token endpoint is a fake HTTP seam; Fairfax ships no OAuth
 // client of its own, so the client comes from the test.
 
 #include "mailkit.h"
@@ -27,7 +27,7 @@ class E2EMailOAuth : public QObject {
 private slots:
     void init() {
         for (const char *account : {"mail", "mail-client", "mail-oauth"})
-            Keyring::clear("precrime", account);
+            Keyring::clear("fairfax", account);
     }
     void cleanup() { QDesktopServices::unsetUrlHandler("https"); }
 
@@ -40,7 +40,7 @@ private slots:
         FakeImap server;
         server.user = "jane@gmail.com";
         server.accessToken = "e2e-at";
-        server.add("INBOX", plusMail("Via Google", "g1", "jane+precrime@gmail.com"));
+        server.add("INBOX", plusMail("Via Google", "g1", "jane+fairfax@gmail.com"));
         App app;
         fakeHttp(app, http);
         QQuickWindow *sw = nullptr;
@@ -80,7 +80,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(textOf("mailClientStatus").contains("e2e… imported"), 5000);
         QVERIFY(!findItem("mailClientError"));
         QCOMPARE(app.store().setting("mail.googleClientId").toString(), QString("e2e-client.apps.example"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-client"), QString("e2e-secret"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail-client"), QString("e2e-secret"));
         QTRY_VERIFY_WITH_TIMEOUT(!findItem("mailOAuthError"), 5000);
 
         click(findItem("mailSignIn"));
@@ -108,7 +108,7 @@ private slots:
         QCOMPARE(http.forms[0].queryItemValue("client_secret"), QString("e2e-secret"));
         QCOMPARE(OAuth::challengeFor(http.forms[0].queryItemValue("code_verifier")), q2.queryItemValue("code_challenge"));
         QCOMPARE(app.store().setting("mail.oauth").toString(), QString("google"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("e2e-rt"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail-oauth"), QString("e2e-rt"));
 
         // Mail flows over XOAUTH2 with no app password.
         // The server is the test's own, so it is set up directly rather than through the Other account's fields.
@@ -125,7 +125,7 @@ private slots:
         // Sign Out clears the tokens.
         click(findItem("mailSignOut"));
         QTRY_VERIFY_WITH_TIMEOUT(findItem("mailSignIn") != nullptr, 5000);
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-oauth").isEmpty());
         QVERIFY(app.store().setting("mail.oauth").toString().isEmpty());
         QVERIFY(!findItem("mailSignOut"));
         QCOMPARE(app.services().mail->oauthState(), QString("none"));
@@ -157,7 +157,7 @@ private slots:
         QVERIFY(findItem("mailSignIn"));
         QVERIFY(!findItem("mailSignOut"));
         QVERIFY(http.forms.isEmpty());
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-oauth").isEmpty());
     }
 
     // Outlook, advanced: paste your own client ID, then "Sign in with Microsoft".
@@ -208,11 +208,11 @@ private slots:
         QVERIFY(!http.forms.value(0).hasQueryItem("client_secret"));
         QCOMPARE(OAuth::challengeFor(http.forms.value(0).queryItemValue("code_verifier")), q.queryItemValue("code_challenge"));
         QCOMPARE(app.store().setting("mail.oauth").toString(), QString("microsoft"));
-        QCOMPARE(Keyring::lookup("precrime", "mail-oauth"), QString("ms-rt"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail-oauth"), QString("ms-rt"));
 
         click(findItem("mailSignOut"));
         QTRY_VERIFY_WITH_TIMEOUT(findItem("mailSignIn") != nullptr, 5000);
-        QVERIFY(Keyring::lookup("precrime", "mail-oauth").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail-oauth").isEmpty());
         QVERIFY(app.store().setting("mail.oauth").toString().isEmpty());
         // The client ID is the user's own setting and stays after a sign-out.
         QCOMPARE(textOf("setting:mail.msClientId"), QString("00000000-aaaa-bbbb-cccc-000000000000"));

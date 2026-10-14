@@ -532,7 +532,7 @@ CalendarFeed::CalendarFeed(QObject *parent) : QObject(parent), m_palette(kDefaul
     m_tickTimer.start();
 }
 
-void CalendarFeed::registerType() { qmlRegisterType<CalendarFeed>("Precrime", 1, 0, "CalendarFeed"); }
+void CalendarFeed::registerType() { qmlRegisterType<CalendarFeed>("Fairfax", 1, 0, "CalendarFeed"); }
 
 void CalendarFeed::setClock(std::function<QDateTime()> clock) {
     m_clock = std::move(clock);

@@ -2,8 +2,8 @@
 
 // OAuth 2.0 for the installed-app loopback flow with PKCE (RFC 8252 and RFC
 // 7636), by hand on QNetworkAccessManager and a one-shot QTcpServer. Mail to
-// Precrime uses it to sign in to Gmail or Microsoft 365 with a client the
-// user supplies; Precrime ships no client id or secret of its own (see
+// Fairfax uses it to sign in to Gmail or Microsoft 365 with a client the
+// user supplies; Fairfax ships no client id or secret of its own (see
 // src/mailfetch.h).
 //
 // The flow: listen on 127.0.0.1 at a random port, open the authorisation URL

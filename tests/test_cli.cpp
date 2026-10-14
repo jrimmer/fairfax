@@ -6,7 +6,7 @@
 #include "store.h"
 #include "testregistry.h"
 
-// `precrime import-mail`: a message on stdin, message files, or a Maildir.
+// `fairfax import-mail`: a message on stdin, message files, or a Maildir.
 
 namespace {
 

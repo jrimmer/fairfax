@@ -239,7 +239,7 @@ private slots:
             {"Copy Notes", "Mist them, see https://example.com/ferns first"},
             {"Copy Links from Notes", "https://example.com/ferns"},
             {"Copy Embeddable Link", "@{Water the plants}"},
-            {"Copy Shareable Link", "precrime://x-callback-url/showTask?uid=" + QString::fromUtf8(QUrl::toPercentEncoding(t.uid))},
+            {"Copy Shareable Link", "fairfax://x-callback-url/showTask?uid=" + QString::fromUtf8(QUrl::toPercentEncoding(t.uid))},
         };
         for (const Row &row : rows) {
             setClipboard("untouched");
@@ -280,7 +280,7 @@ private slots:
             {"Copy Title", "Water the plants", "Title copied."},
             {"Copy Notes", "Mist them first", "Notes copied."},
             {"Copy as Text", "Water the plants\nMist them first", "Task copied."},
-            {"Copy Link", "precrime://x-callback-url/showTask?uid=" + QString::fromUtf8(QUrl::toPercentEncoding(t.uid)), "Link copied."},
+            {"Copy Link", "fairfax://x-callback-url/showTask?uid=" + QString::fromUtf8(QUrl::toPercentEncoding(t.uid)), "Link copied."},
         };
         for (const Row &row : rows) {
             setClipboard("untouched");

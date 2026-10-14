@@ -1,12 +1,12 @@
 QT += core gui widgets sql qml quick quickcontrols2 testlib qmltest network
 linux: QT += dbus
 CONFIG += c++20
-TARGET = precrime_e2e
+TARGET = fairfax_e2e
 TEMPLATE = app
 
 INCLUDEPATH += ../../src
 
-# The whole app minus its main(), as in precrime_tests.pro, plus appsetup and
+# The whole app minus its main(), as in fairfax_tests.pro, plus appsetup and
 # the QML resources: the tests boot the real window and drive it with the mouse
 # and keyboard.
 HEADERS += ../../src/alarms.h ../../src/appsetup.h ../../src/backend.h ../../src/dateparse.h ../../src/exchange.h ../../src/filepicker.h ../../src/gitsync.h ../../src/synctree.h ../../src/foldersync.h ../../src/webdav.h ../../src/synchub.h ../../src/restorelists.h ../../src/model.h ../../src/nlparse.h ../../src/query.h ../../src/recurrence.h ../../src/rowmodel.h ../../src/schedule.h ../../src/store.h ../../src/theme.h ../../src/views.h ../../src/markdown.h ../../src/automation.h ../../src/calendar.h ../../src/sounds.h ../../src/todoist.h ../../src/keyring.h ../../src/mailtask.h ../../src/imapclient.h ../../src/mailfetch.h ../../src/oauth.h ../../src/diagnostics.h ../../src/searchrules.h harness.h
@@ -39,6 +39,6 @@ SOURCES += test_gaps_editor.cpp test_gaps_notes.cpp test_gaps_settings.cpp
 # Gap-filling end-to-end tests: menus, sections and sidebar buttons.
 SOURCES += test_gaps_menus.cpp
 
-# Mail to Precrime end-to-end tests: Settings > Mail and the connector against a fake IMAP server.
+# Mail to Fairfax end-to-end tests: Settings > Mail and the connector against a fake IMAP server.
 SOURCES += test_mail.cpp test_mail_oauth.cpp
 HEADERS += mailkit.h ../fakeimap.h ../loopback.h

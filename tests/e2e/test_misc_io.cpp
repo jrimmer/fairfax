@@ -163,7 +163,7 @@ qint64 listIdNamed(App &app, const QString &name) {
 }
 
 QStringList backupFiles(App &app) {
-    return QDir(app.dir() + "/backups").entryList({"Precrime_*.db"}, QDir::Files, QDir::Time);
+    return QDir(app.dir() + "/backups").entryList({"Fairfax_*.db"}, QDir::Files, QDir::Time);
 }
 
 // Imports a fixture the way a user does: Settings > Import & Export, the
@@ -228,7 +228,7 @@ private slots:
         const Asked a = asked(app, [&] { clickSteady(go); });
         QVERIFY(a.ok);
         QCOMPARE(a.purpose, QString("export:main:csv:1:%1").arg(app.ids.home));
-        QCOMPARE(a.name, QString("Precrime.csv"));
+        QCOMPARE(a.name, QString("Fairfax.csv"));
         QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 5000);
         answer(app, file, a.purpose);
         QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).size() > 0, 5000);
@@ -302,7 +302,7 @@ private slots:
             const Asked a = asked(app, [&] { clickSteady(go); });
             QVERIFY(a.ok);
             QVERIFY2(a.purpose.startsWith("export:main:ics:0:"), qPrintable(a.purpose));
-            QCOMPARE(a.name, QString("Precrime.ics"));
+            QCOMPARE(a.name, QString("Fairfax.ics"));
             answer(app, file, a.purpose);
             QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).size() > 0, 5000);
             for (const Task &t : app.store().tasks()) {
@@ -628,7 +628,7 @@ private slots:
         counters().urls.clear();
         QVERIFY(contextMenuOn(app, app.ids.buyMilk));
         QVERIFY(pickLowEntry("Add to Calendar"));
-        QTRY_VERIFY_WITH_TIMEOUT(counters().urls.size() == 1 && counters().urls.first().endsWith(QString("precrime-event-%1.ics").arg(app.ids.buyMilk)), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(counters().urls.size() == 1 && counters().urls.first().endsWith(QString("fairfax-event-%1.ics").arg(app.ids.buyMilk)), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().statusMessage().startsWith("Opened “Buy milk”"), 5000);
     }
 

@@ -7,7 +7,7 @@
 #include "store.h"
 #include "testregistry.h"
 
-// Mail to Precrime's converter. The sentences quoted in the comments are from
+// Mail to Fairfax's converter. The sentences quoted in the comments are from
 // the the reference app manual page "Mail to the reference app" (reference/manual/email-to-tasks.md).
 
 #ifndef MAIL_FIXTURES
@@ -123,7 +123,7 @@ private slots:
         QVERIFY(m.valid);
         QCOMPARE(m.subject, "Buy milk");
         QCOMPARE(m.from, "Sam Carter <sam@example.com>");
-        QCOMPARE(m.to, "jane+precrime@example.com");
+        QCOMPARE(m.to, "jane+fairfax@example.com");
         QCOMPARE(m.messageId, "<plain-1@example.com>");
         QCOMPARE(m.body, "Two litres, semi-skimmed.\nThe corner shop closes at six.");
         QVERIFY(m.date.isValid());
@@ -134,15 +134,15 @@ private slots:
     void parseHeadersUnfoldedAndRecipients() {
         const QByteArray raw =
             "Message-ID: <h1@x>\nDate: Tue, 13 Oct 2026 09:30:00 +0200 (CEST)\nFrom: a@x.example\n"
-            "To: jane+precrime@gmail.com,\n bob@example.com\nCc: carol@example.com\n"
-            "Delivered-To: jane+precrime@gmail.com\nX-Original-To: jane+precrime@gmail.com\n"
+            "To: jane+fairfax@gmail.com,\n bob@example.com\nCc: carol@example.com\n"
+            "Delivered-To: jane+fairfax@gmail.com\nX-Original-To: jane+fairfax@gmail.com\n"
             "Subject: A very long subject\n that continues here\n\tand here\n\nbody\n";
         const MailTask::Message m = MailTask::parse(raw);
         QCOMPARE(m.subject, "A very long subject that continues here and here");
-        QCOMPARE(m.to, "jane+precrime@gmail.com, bob@example.com");
+        QCOMPARE(m.to, "jane+fairfax@gmail.com, bob@example.com");
         QCOMPARE(m.cc, "carol@example.com");
-        QCOMPARE(m.deliveredTo, "jane+precrime@gmail.com");
-        QCOMPARE(m.xOriginalTo, "jane+precrime@gmail.com");
+        QCOMPARE(m.deliveredTo, "jane+fairfax@gmail.com");
+        QCOMPARE(m.xOriginalTo, "jane+fairfax@gmail.com");
         QVERIFY2(m.date.isValid(), "a trailing (CEST) comment must not spoil the Date");
         QCOMPARE(m.date.toUTC().time(), QTime(7, 30));
     }

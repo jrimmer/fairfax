@@ -293,7 +293,7 @@ private slots:
 
     void missingFileReportsError() {
         CalendarFeed feed;
-        feed.setSources({"/nonexistent/precrime.ics"});
+        feed.setSources({"/nonexistent/fairfax.ics"});
         QVERIFY(feed.error().contains("Cannot read"));
         QCOMPARE(feed.today().size(), 0);
     }
@@ -406,7 +406,7 @@ private:
             QDir::currentPath() + "/../src/qml/DayBar.qml",
             QDir::currentPath() + "/src/qml/DayBar.qml",
             QCoreApplication::applicationDirPath() + "/../src/qml/DayBar.qml",
-            qEnvironmentVariable("PRECRIME_QML_DIR") + "/DayBar.qml",
+            qEnvironmentVariable("FAIRFAX_QML_DIR") + "/DayBar.qml",
         };
         for (const QString &c : candidates)
             if (QFileInfo::exists(c)) return QFileInfo(c).absoluteFilePath();

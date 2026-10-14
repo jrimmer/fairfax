@@ -78,7 +78,7 @@ Item {
     // Tasks dropped on a list section's heading move into it.
     DropArea {
         anchors.fill: parent
-        keys: ["precrime-tasks"]
+        keys: ["fairfax-tasks"]
         enabled: (root.r.sectionId || -1) >= 0
         readonly property var proxy: ApplicationWindow.window ? ApplicationWindow.window.dragProxy : null
         onEntered: if (proxy) proxy.hint = root.r.sectionId > 0 ? "Move to " + root.r.title : "Remove from Section"

@@ -1,9 +1,9 @@
 #pragma once
 
-// Precrime's automation layer, mirroring the reference app's 26-command Automation Suite.
-// One command table serves three front ends: the `precrime ctl` command line,
+// Fairfax's automation layer, mirroring the reference app's 26-command Automation Suite.
+// One command table serves three front ends: the `fairfax ctl` command line,
 // an MCP server on stdio (for Claude Co-Work and other agents) and the
-// precrime:// URL scheme. Commands use the reference app's snake_case names and argument
+// fairfax:// URL scheme. Commands use the reference app's snake_case names and argument
 // names, are strict about unknown keys, and every mutating command is exactly
 // one store change, so the app's undo reverses it.
 
@@ -27,7 +27,7 @@ public:
     explicit Automation(Store &store);
     ~Automation();
 
-    // UI hooks. A headless process (`precrime mcp`, `precrime ctl`) leaves
+    // UI hooks. A headless process (`fairfax mcp`, `fairfax ctl`) leaves
     // them unset and the commands that need a window answer
     // automation_unavailable instead of pretending.
     std::function<void(const QString &key)> selectSource;  // "today", "list:3", "project:5", "group:2".
@@ -46,11 +46,11 @@ public:
     // {"tools": [{name, description, inputSchema}, ...]}, the MCP tools/list result.
     static QJsonObject mcpTools();
 
-    // `precrime ctl` with the arguments after "ctl". Prints the pretty JSON
+    // `fairfax ctl` with the arguments after "ctl". Prints the pretty JSON
     // response to `out`; returns 0 when the command succeeded and 1 otherwise.
     int runCli(const QStringList &args, QTextStream &out, QTextStream &err);
 
-    // precrime://x-callback-url/<action>?...; see url-schemes in the reference app's manual.
+    // fairfax://x-callback-url/<action>?...; see url-schemes in the reference app's manual.
     // Actions that need the window use the callbacks when set, and always
     // describe what they want in the result ("source", "task_id", "search",
     // "quickEntry") so the caller can act on it.

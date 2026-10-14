@@ -63,7 +63,7 @@ void FilePicker::request(const QString &method, const QString &title, const QVar
     // The portal answers on a Request object whose path we can predict from
     // our unique bus name and a handle token, so we subscribe before calling
     // and can't miss a fast reply.
-    const QString token = "precrime" + QUuid::createUuid().toString(QUuid::Id128).left(12);
+    const QString token = "fairfax" + QUuid::createUuid().toString(QUuid::Id128).left(12);
     QString sender = bus.baseService().mid(1).replace('.', '_');
     const QString handle = QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2").arg(sender, token);
     if (!m_handle.isEmpty())

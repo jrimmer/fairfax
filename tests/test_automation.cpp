@@ -464,7 +464,7 @@ private slots:
         QCOMPARE(replies.size(), 7);  // The notification gets no reply.
         const auto init = replies[0]["result"].toObject();
         QCOMPARE(init["protocolVersion"].toString(), "2025-06-18");
-        QCOMPARE(init["serverInfo"].toObject()["name"].toString(), "precrime");
+        QCOMPARE(init["serverInfo"].toObject()["name"].toString(), "fairfax");
         QCOMPARE(init["serverInfo"].toObject()["version"].toString(), "9.9");
         QVERIFY(init["capabilities"].toObject().contains("tools"));
         const auto tools = replies[1]["result"].toObject()["tools"].toArray();
@@ -534,7 +534,7 @@ private slots:
         QCOMPARE(rc, 1);
         QVERIFY(!cli({"create_task", "titleonly"}, &rc).second.isEmpty());
         QCOMPARE(rc, 1);
-        cli({"url", "precrime://x-callback-url/showtoday"}, &rc);
+        cli({"url", "fairfax://x-callback-url/showtoday"}, &rc);
         QCOMPARE(rc, 0);
     }
 
@@ -545,19 +545,19 @@ private slots:
         m_auto->openTask = [&](qint64 i) { opened = i; };
 
         auto url = [&](const QString &u) { return m_auto->handleUrl(QUrl(u)); };
-        QCOMPARE(url("precrime://x-callback-url/showToday")["source"].toString(), "today");
-        QCOMPARE(url("precrime://x-callback-url/showall")["source"].toString(), "all");
-        QCOMPARE(url("precrime://x-callback-url/showstarred")["source"].toString(), "starred");
-        QCOMPARE(url("precrime://x-callback-url/showscheduled")["source"].toString(), "scheduled");
+        QCOMPARE(url("fairfax://x-callback-url/showToday")["source"].toString(), "today");
+        QCOMPARE(url("fairfax://x-callback-url/showall")["source"].toString(), "all");
+        QCOMPARE(url("fairfax://x-callback-url/showstarred")["source"].toString(), "starred");
+        QCOMPARE(url("fairfax://x-callback-url/showscheduled")["source"].toString(), "scheduled");
         QCOMPARE(keys, (QStringList{"today", "all", "starred", "scheduled"}));
-        QVERIFY(url("precrime://x-callback-url/launch")["ok"].toBool());
-        QCOMPARE(url("precrime://x-callback-url/showlist?name=Work")["source"].toString(), "list:" + id(m_work));
-        QCOMPARE(code(url("precrime://x-callback-url/showlist?name=work")), "not_found");  // Case-sensitive.
-        QCOMPARE(url("precrime://x-callback-url/search?text=invoice%20acme")["search"].toString(), "invoice acme");
-        QCOMPARE(code(url("precrime://x-callback-url/frobnicate")), "invalid_arguments");
+        QVERIFY(url("fairfax://x-callback-url/launch")["ok"].toBool());
+        QCOMPARE(url("fairfax://x-callback-url/showlist?name=Work")["source"].toString(), "list:" + id(m_work));
+        QCOMPARE(code(url("fairfax://x-callback-url/showlist?name=work")), "not_found");   // Case-sensitive.
+        QCOMPARE(url("fairfax://x-callback-url/search?text=invoice%20acme")["search"].toString(), "invoice acme");
+        QCOMPARE(code(url("fairfax://x-callback-url/frobnicate")), "invalid_arguments");
         QCOMPARE(code(url("twodo://x-callback-url/showtoday")), "invalid_arguments");
 
-        const auto added = url("precrime://x-callback-url/add?task=Submit%20expenses&note=Receipts&forlist=work&due=2026-07-15&duetime=17:00"
+        const auto added = url("fairfax://x-callback-url/add?task=Submit%20expenses&note=Receipts&forlist=work&due=2026-07-15&duetime=17:00"
                                "&tags=finance%2Cadmin&priority=2&starred=1&action=call%3A%2B15551234567&x-success=other%3A%2F%2Fdone");
         QVERIFY2(added["ok"].toBool(), qPrintable(QJsonDocument(added).toJson()));
         const auto task = added["task"].toObject();
@@ -573,45 +573,45 @@ private slots:
         QVERIFY(m_store->canUndo());
 
         // Day offsets, phrases, checklists and repeat presets.
-        auto rel = url("precrime://x-callback-url/add?task=Offset&due=1&repeat=4")["task"].toObject();
+        auto rel = url("fairfax://x-callback-url/add?task=Offset&due=1&repeat=4")["task"].toObject();
         QCOMPARE(rel["due_date"].toString(), "2026-07-11");
         QVERIFY(rel["repeat"].isString());
-        QCOMPARE(url("precrime://x-callback-url/add?task=Phrase&due=tomorrow")["task"].toObject()["due_date"].toString(), "2026-07-11");
-        const auto list = url("precrime://x-callback-url/add?task=Trip&type=2&subtasks=Flights%0AHotel&forlist=Work");
+        QCOMPARE(url("fairfax://x-callback-url/add?task=Phrase&due=tomorrow")["task"].toObject()["due_date"].toString(), "2026-07-11");
+        const auto list = url("fairfax://x-callback-url/add?task=Trip&type=2&subtasks=Flights%0AHotel&forlist=Work");
         QCOMPARE(list["task"].toObject()["type"].toString(), "checklist");
         QCOMPARE(list["subtasks"].toArray().size(), 2);
-        QCOMPARE(url("precrime://x-callback-url/add")["task"].toObject()["title"].toString(), "New Task");
+        QCOMPARE(url("fairfax://x-callback-url/add")["task"].toObject()["title"].toString(), "New Task");
 
         // A parent by name inside a list.
-        const auto proj = url("precrime://x-callback-url/add?task=Launch&type=1&forlist=Work")["task"].toObject();
-        const auto kid = url("precrime://x-callback-url/add?task=Copy&forlist=Work&forparentname=launch")["task"].toObject();
+        const auto proj = url("fairfax://x-callback-url/add?task=Launch&type=1&forlist=Work")["task"].toObject();
+        const auto kid = url("fairfax://x-callback-url/add?task=Copy&forlist=Work&forparentname=launch")["task"].toObject();
         QCOMPARE(kid["parent_id"].toString(), proj["id"].toString());
-        const auto found = url("precrime://x-callback-url/gettaskid?task=Launch&forlist=Work");
+        const auto found = url("fairfax://x-callback-url/gettaskid?task=Launch&forlist=Work");
         QCOMPARE(found["uid"].toString(), proj["uid"].toString());
 
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&priority=9")), "invalid_arguments");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&type=7")), "invalid_arguments");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&due=2026-13-45")), "invalid_arguments");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&forlist=Nowhere")), "not_found");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&repeat=2")), "invalid_arguments");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&action=teleport%3Amars")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&priority=9")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&type=7")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&due=2026-13-45")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&forlist=Nowhere")), "not_found");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&repeat=2")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&action=teleport%3Amars")), "invalid_arguments");
 
         // Quick Entry hand-off creates nothing.
         const int tasksBefore = liveTasks();
-        const auto qe = url("precrime://x-callback-url/add?task=Call%20Sam&usequickentry=1&tags=family&priority=2&due=1");
+        const auto qe = url("fairfax://x-callback-url/add?task=Call%20Sam&usequickentry=1&tags=family&priority=2&due=1");
         QVERIFY(qe["quickEntry"].toBool());
         QCOMPARE(qe["text"].toString(), "Call Sam #family !! tomorrow");
         QCOMPARE(liveTasks(), tasksBefore);
-        QVERIFY(url("precrime://x-callback-url/addnewtask")["quickEntry"].toBool());
+        QVERIFY(url("fairfax://x-callback-url/addnewtask")["quickEntry"].toBool());
 
         // showtask / completetasks by uid, and the shareable link round trip.
         const Task shown = m_store->task(task["id"].toString().toLongLong());
         const QString link = Automation::shareableLink(shown);
-        QCOMPARE(link, "precrime://x-callback-url/showTask?uid=" + shown.uid);
+        QCOMPARE(link, "fairfax://x-callback-url/showTask?uid=" + shown.uid);
         QVERIFY(url(link)["ok"].toBool());
         QCOMPARE(opened, shown.id);
-        QCOMPARE(code(url("precrime://x-callback-url/showtask?uid=missing")), "not_found");
-        const auto completed = url("precrime://x-callback-url/completetasks?uids=" + shown.uid);
+        QCOMPARE(code(url("fairfax://x-callback-url/showtask?uid=missing")), "not_found");
+        const auto completed = url("fairfax://x-callback-url/completetasks?uids=" + shown.uid);
         QVERIFY(completed["ok"].toBool());
         QVERIFY(m_store->task(shown.id).completed);
     }
@@ -619,28 +619,28 @@ private slots:
     void urlPasteClipboardCallbacks() {
         auto url = [&](const QString &u) { return m_auto->handleUrl(QUrl(u)); };
         // paste: one task per non-empty line, optionally inside a project.
-        const auto pasted = url("precrime://x-callback-url/paste?forlist=Work&text=Buy%20milk%0A%0ACall%20Sam");
+        const auto pasted = url("fairfax://x-callback-url/paste?forlist=Work&text=Buy%20milk%0A%0ACall%20Sam");
         QVERIFY(pasted["ok"].toBool());
         QCOMPARE(pasted["item_count"].toInt(), 2);
         QCOMPARE(pasted["tasks"].toArray().at(1).toObject()["list"].toObject()["name"].toString(), "Work");
         const qint64 proj = addTask({{"title", "Launch"}, {"task_type", "project"}, {"list_id", id(m_work)}});
-        const auto inProject = url("precrime://x-callback-url/paste?forlist=Work&inproject=launch&text=Copy");
+        const auto inProject = url("fairfax://x-callback-url/paste?forlist=Work&inproject=launch&text=Copy");
         QCOMPARE(inProject["tasks"].toArray().first().toObject()["parent_id"].toString(), id(proj));
-        QCOMPARE(code(url("precrime://x-callback-url/paste?text=%0A")), "invalid_arguments");
-        QCOMPARE(code(url("precrime://x-callback-url/paste?inproject=x&text=a")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/paste?text=%0A")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/paste?inproject=x&text=a")), "invalid_arguments");
 
         // (clipboard) needs a clipboard, and reads it when there is one.
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=(clipboard)")), "automation_unavailable");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=(clipboard)")), "automation_unavailable");
         m_auto->clipboardText = [] { return QStringLiteral("From the clipboard"); };
-        QCOMPARE(url("precrime://x-callback-url/add?task=(clipboard)")["task"].toObject()["title"].toString(), "From the clipboard");
-        QCOMPARE(url("precrime://x-callback-url/search?text=(clipboard)")["search"].toString(), "(clipboard)");
+        QCOMPARE(url("fairfax://x-callback-url/add?task=(clipboard)")["task"].toObject()["title"].toString(), "From the clipboard");
+        QCOMPARE(url("fairfax://x-callback-url/search?text=(clipboard)")["search"].toString(), "(clipboard)");
 
         // saveinclipboard asks the window to copy the uid.
-        const auto saved = url("precrime://x-callback-url/add?task=Keep&saveinclipboard=1");
+        const auto saved = url("fairfax://x-callback-url/add?task=Keep&saveinclipboard=1");
         QCOMPARE(saved["clipboard"].toString(), saved["task"].toObject()["uid"].toString());
 
         // x-error receives the failure; x-cancel is passed along.
-        const auto failed = url("precrime://x-callback-url/add?task=x&forlist=Nowhere&x-error=app%3A%2F%2Ffailed&x-cancel=app%3A%2F%2Fcancelled");
+        const auto failed = url("fairfax://x-callback-url/add?task=x&forlist=Nowhere&x-error=app%3A%2F%2Ffailed&x-cancel=app%3A%2F%2Fcancelled");
         QVERIFY(!failed["ok"].toBool());
         QVERIFY(failed["callback"].toString().startsWith("app://failed?errorCode=not_found&errorMessage="));
         QCOMPARE(failed["cancel_callback"].toString(), "app://cancelled");
@@ -654,28 +654,28 @@ private slots:
         m_store->begin("loc");
         m_store->putLocation(place);
         m_store->commit();
-        const auto withPlace = url("precrime://x-callback-url/add?task=Badge&locations=office");
+        const auto withPlace = url("fairfax://x-callback-url/add?task=Badge&locations=office");
         QCOMPARE(withPlace["task"].toObject()["locations"].toArray().first().toObject()["name"].toString(), "Office");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&locations=Mars")), "not_found");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&locations=Mars")), "not_found");
 
         // A 1x1 PNG arrives as an attachment; text posing as one is refused.
         const QString png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-        const auto pic = url("precrime://x-callback-url/add?task=Snap&picture=" + QString::fromUtf8(QUrl::toPercentEncoding(png)));
+        const auto pic = url("fairfax://x-callback-url/add?task=Snap&picture=" + QString::fromUtf8(QUrl::toPercentEncoding(png)));
         QVERIFY(pic["ok"].toBool());
         const auto atts = m_store->attachmentsFor(pic["task"].toObject()["id"].toString().toLongLong());
         QCOMPARE(atts.size(), 1);
         QCOMPARE(atts.first().kind, int(Attachment::Image));
         QVERIFY(QFile::exists(m_store->attachmentsFolder() + "/" + atts.first().fileName));
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&picture=bm90IGFuIGltYWdl")), "invalid_arguments");
-        QCOMPARE(code(url("precrime://x-callback-url/add?task=x&audio=" + QString::fromUtf8(QUrl::toPercentEncoding(png)))), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&picture=bm90IGFuIGltYWdl")), "invalid_arguments");
+        QCOMPARE(code(url("fairfax://x-callback-url/add?task=x&audio=" + QString::fromUtf8(QUrl::toPercentEncoding(png)))), "invalid_arguments");
 
         // ignoredefaults skips the default list and the default reminder.
         m_store->setSetting("tasks.defaultList", m_work);
         m_store->setSetting("alerts.defaultTimed", 15);
-        const auto plain = url("precrime://x-callback-url/add?task=Plain&due=2026-07-20&duetime=10:00&ignoredefaults=1");
+        const auto plain = url("fairfax://x-callback-url/add?task=Plain&due=2026-07-20&duetime=10:00&ignoredefaults=1");
         QCOMPARE(plain["task"].toObject()["list"].toObject()["name"].toString(), "Inbox");
         QCOMPARE(m_store->alarmsFor(plain["task"].toObject()["id"].toString().toLongLong()).size(), 0);
-        const auto normal = url("precrime://x-callback-url/add?task=Normal&due=2026-07-20&duetime=10:00");
+        const auto normal = url("fairfax://x-callback-url/add?task=Normal&due=2026-07-20&duetime=10:00");
         QCOMPARE(normal["task"].toObject()["list"].toObject()["name"].toString(), "Work");
         QCOMPARE(m_store->alarmsFor(normal["task"].toObject()["id"].toString().toLongLong()).size(), 1);
     }

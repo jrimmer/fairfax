@@ -1,6 +1,6 @@
 #pragma once
 
-// Helpers for the Mail to Precrime end-to-end tests: driving Settings > Mail,
+// Helpers for the Mail to Fairfax end-to-end tests: driving Settings > Mail,
 // a fake IMAP server to point it at, and a fake HTTP seam for the OAuth calls.
 
 #include <QClipboard>
@@ -93,7 +93,7 @@ inline void typePassword(QQuickWindow *sw, const QString &password) {
     QTest::keyClick(sw, Qt::Key_Return);
 }
 
-inline QByteArray plusMail(const QString &subject, const QString &id, const QString &to = "jane+precrime@example.org") {
+inline QByteArray plusMail(const QString &subject, const QString &id, const QString &to = "jane+fairfax@example.org") {
     return FakeImap::mail(to, subject, "Body of " + subject, id);
 }
 
@@ -104,7 +104,7 @@ inline QString writeFile(const QString &dir, const QString &name, const QString 
     return f.fileName();
 }
 
-// A Google "Desktop app" client file, as downloaded from Google Cloud (made up; Precrime ships none).
+// A Google "Desktop app" client file, as downloaded from Google Cloud (made up; Fairfax ships none).
 // Plain string literals: moc loses its place at a raw string.
 inline const char *GoogleClient() {
     return "{\"installed\":{\"client_id\":\"e2e-client.apps.example\",\"client_secret\":\"e2e-secret\","

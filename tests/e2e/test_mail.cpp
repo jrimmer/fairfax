@@ -1,6 +1,6 @@
-// Mail to Precrime, from the user's side: Settings > Mail, and the connector
+// Mail to Fairfax, from the user's side: Settings > Mail, and the connector
 // against a fake IMAP server on 127.0.0.1 (tests/fakeimap.h). The the reference app manual
-// page "Mail to the reference app" (email-to-tasks.md) describes a hosted address; Precrime
+// page "Mail to the reference app" (email-to-tasks.md) describes a hosted address; Fairfax
 // reaches a mailbox you own instead, so these tests quote the manual for what
 // becomes a task and follow the Mail spec for how mail arrives.
 //
@@ -35,7 +35,7 @@ class E2EMail : public QObject {
 private slots:
     void init() {
         for (const char *account : {"mail", "mail-client", "mail-oauth"})
-            Keyring::clear("precrime", account);
+            Keyring::clear("fairfax", account);
         QApplication::clipboard()->setText("untouched");
     }
     void cleanup() { QDesktopServices::unsetUrlHandler("https"); }
@@ -65,14 +65,14 @@ private slots:
         QVERIFY(!findItem("setting:mail.host"));
         // Filters and what happens afterwards show Gmail's defaults.
         QCOMPARE(comboText("setting:mail.after"), QString("Move to"));
-        QCOMPARE(textOf("setting:mail.moveTo"), QString("Precrime"));
+        QCOMPARE(textOf("setting:mail.moveTo"), QString("Fairfax"));
         QCOMPARE(textOf("setting:mail.folder"), QString("INBOX"));
         QCOMPARE(comboText("setting:mail.listId"), QString("Inbox"));
         QVERIFY(!isChecked(findItem("setting:mail.naturalLanguage")));
         QCOMPARE(findItem("setting:mail.interval")->property("value").toInt(), 5);
     }
 
-    // "Send or forward mail to jane+precrime@gmail.com (shown live from the address)".
+    // "Send or forward mail to jane+fairfax@gmail.com (shown live from the address)".
     void plusAddressGuidanceFollowsTheAddressLive() {
         App app;
         QQuickWindow *sw = nullptr;
@@ -80,18 +80,18 @@ private slots:
         QQuickItem *guide = nullptr;
         control("mailPlusGuide", guide);
         QVERIFY(guide);
-        QVERIFY(guide->property("text").toString().contains("you+precrime@gmail.com"));   // The example until there is an address.
+        QVERIFY(guide->property("text").toString().contains("you+fairfax@gmail.com"));    // The example until there is an address.
         setText(sw, "setting:mail.address", "jane@gmail.com");
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane+precrime@gmail.com</b>"), 5000);
-        QVERIFY(textOf("mailPlusGuide").contains("files it under the Precrime label and out of your inbox"));
-        QCOMPARE(textOf("setting:mail.toFilter"), QString("jane+precrime@gmail.com"));   // The filter is prefilled and follows.
+        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane+fairfax@gmail.com</b>"), 5000);
+        QVERIFY(textOf("mailPlusGuide").contains("files it under the Fairfax label and out of your inbox"));
+        QCOMPARE(textOf("setting:mail.toFilter"), QString("jane+fairfax@gmail.com"));    // The filter is prefilled and follows.
         setText(sw, "setting:mail.address", "jane.doe@gmail.com");
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane.doe+precrime@gmail.com</b>"), 5000);
-        QCOMPARE(textOf("setting:mail.toFilter"), QString("jane.doe+precrime@gmail.com"));
+        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane.doe+fairfax@gmail.com</b>"), 5000);
+        QCOMPARE(textOf("setting:mail.toFilter"), QString("jane.doe+fairfax@gmail.com"));
         // Edited by hand, the filter stays put when the address changes.
         setText(sw, "setting:mail.toFilter", "tasks@gmail.com");
         setText(sw, "setting:mail.address", "jane@gmail.com");
-        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane+precrime@gmail.com</b>"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(textOf("mailPlusGuide").contains("<b>jane+fairfax@gmail.com</b>"), 5000);
         QCOMPARE(textOf("setting:mail.toFilter"), QString("tasks@gmail.com"));
         QCOMPARE(app.store().setting("mail.toFilter").toString(), QString("tasks@gmail.com"));
     }
@@ -107,7 +107,7 @@ private slots:
         setText(sw, "setting:mail.address", "jane@gmail.com");
         QTRY_VERIFY_WITH_TIMEOUT(findItem("mailCopyAddress")->isEnabled(), 5000);
         click(findItem("mailCopyAddress"));
-        QTRY_COMPARE_WITH_TIMEOUT(QApplication::clipboard()->text(), QString("jane+precrime@gmail.com"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(QApplication::clipboard()->text(), QString("jane+fairfax@gmail.com"), 5000);
         // Cleared again, nothing more to copy.
         setText(sw, "setting:mail.address", "");
         QTRY_VERIFY_WITH_TIMEOUT(!findItem("mailCopyAddress")->isEnabled(), 5000);
@@ -148,7 +148,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(findItem("mailPlusGuide") != nullptr, 5000);
         QVERIFY(!findItem("setting:mail.host"));
         QCOMPARE(app.store().setting("mail.host").toString(), QString("imap.gmail.com"));
-        QCOMPARE(textOf("setting:mail.toFilter"), QString("jane+precrime@example.org"));
+        QCOMPARE(textOf("setting:mail.toFilter"), QString("jane+fairfax@example.org"));
         QCOMPARE(comboText("setting:mail.after"), QString("Move to"));
     }
 
@@ -187,8 +187,8 @@ private slots:
         control("mailPipe", pipe);
         QVERIFY(pipe);
         QVERIFY2(pipe->width() <= 700, qPrintable(QString("the command text is %1 px wide in a 720 px window").arg(pipe->width())));
-        QVERIFY(pipe->property("text").toString().contains("precrime import-mail message.eml"));
-        QVERIFY(pipe->property("text").toString().contains("precrime import-mail --maildir"));
+        QVERIFY(pipe->property("text").toString().contains("fairfax import-mail message.eml"));
+        QVERIFY(pipe->property("text").toString().contains("fairfax import-mail --maildir"));
         QVERIFY(pipe->property("readOnly").toBool());
         QVERIFY(pipe->property("selectByMouse").toBool());
         QVERIFY(pipe->property("font").value<QFont>().family().contains("mono", Qt::CaseInsensitive));
@@ -210,7 +210,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!findItem("mailUnfilteredWarning"), 5000);
         setText(sw, "setting:mail.toFilter", "");
         QTRY_VERIFY_WITH_TIMEOUT(findItem("mailUnfilteredWarning") != nullptr, 5000);
-        setText(sw, "setting:mail.labelFilter", "precrime");
+        setText(sw, "setting:mail.labelFilter", "fairfax");
         QTRY_VERIFY_WITH_TIMEOUT(!findItem("mailUnfilteredWarning"), 5000);
     }
 
@@ -245,7 +245,7 @@ private slots:
         QVERIFY(!app.services().mail->hasPassword());
         typePassword(sw, "abcd efgh ijkl mnop");
         QTRY_VERIFY_WITH_TIMEOUT(app.services().mail->hasPassword(), 5000);
-        QCOMPARE(Keyring::lookup("precrime", "mail"), QString("abcd efgh ijkl mnop"));
+        QCOMPARE(Keyring::lookup("fairfax", "mail"), QString("abcd efgh ijkl mnop"));
         QTRY_COMPARE_WITH_TIMEOUT(textOf("mailPassword"), QString(), 5000);   // The field never shows it again.
         QTRY_COMPARE_WITH_TIMEOUT(findItem("mailPassword")->property("placeholderText").toString(), QString("Saved in your keyring"), 5000);
         // Not in the database.
@@ -258,7 +258,7 @@ private slots:
         QVERIFY(forget);
         click(forget);
         QTRY_VERIFY_WITH_TIMEOUT(!app.services().mail->hasPassword(), 5000);
-        QVERIFY(Keyring::lookup("precrime", "mail").isEmpty());
+        QVERIFY(Keyring::lookup("fairfax", "mail").isEmpty());
         QTRY_COMPARE_WITH_TIMEOUT(findItem("mailPassword")->property("placeholderText").toString(), QString("Not set"), 5000);
     }
 
@@ -282,7 +282,7 @@ private slots:
         choose("setting:mail.security", "STARTTLS");
         setText(sw, "setting:mail.user", "jane-login");
         setText(sw, "setting:mail.toFilter", "me+tasks@example.org");
-        setText(sw, "setting:mail.labelFilter", "precrime");
+        setText(sw, "setting:mail.labelFilter", "fairfax");
         setText(sw, "setting:mail.folder", "Orders");
         choose("setting:mail.after", "Mark as read");
         choose("setting:mail.listId", "Work");
@@ -299,7 +299,7 @@ private slots:
         QCOMPARE(st().setting("mail.security").toString(), QString("starttls"));
         QCOMPARE(st().setting("mail.user").toString(), QString("jane-login"));
         QCOMPARE(st().setting("mail.toFilter").toString(), QString("me+tasks@example.org"));
-        QCOMPARE(st().setting("mail.labelFilter").toString(), QString("precrime"));
+        QCOMPARE(st().setting("mail.labelFilter").toString(), QString("fairfax"));
         QCOMPARE(st().setting("mail.folder").toString(), QString("Orders"));
         QCOMPARE(st().setting("mail.after").toString(), QString("move"));
         QCOMPARE(st().setting("mail.moveTo").toString(), QString("Tasks"));
@@ -321,7 +321,7 @@ private slots:
         QCOMPARE(comboText("setting:mail.security"), QString("STARTTLS"));
         QCOMPARE(textOf("setting:mail.user"), QString("jane-login"));
         QCOMPARE(textOf("setting:mail.toFilter"), QString("me+tasks@example.org"));
-        QCOMPARE(textOf("setting:mail.labelFilter"), QString("precrime"));
+        QCOMPARE(textOf("setting:mail.labelFilter"), QString("fairfax"));
         QCOMPARE(textOf("setting:mail.folder"), QString("Orders"));
         QCOMPARE(comboText("setting:mail.after"), QString("Move to"));
         QCOMPARE(textOf("setting:mail.moveTo"), QString("Tasks"));
@@ -336,7 +336,7 @@ private slots:
         setSpin(sw, "setting:mail.interval", 5);
         choose("setting:mail.listId", "Inbox");
         clearField(sw, "setting:mail.moveTo");   // (Only shown while "Move to" is chosen.)
-        QTRY_COMPARE_WITH_TIMEOUT(textOf("setting:mail.moveTo"), QString("Precrime"), 5000);   // Emptied: the default again.
+        QTRY_COMPARE_WITH_TIMEOUT(textOf("setting:mail.moveTo"), QString("Fairfax"), 5000);    // Emptied: the default again.
         choose("setting:mail.after", "Leave as is");
         clearField(sw, "setting:mail.folder");
         setText(sw, "setting:mail.labelFilter", "");
@@ -417,12 +417,12 @@ private slots:
         server.add("INBOX", plusMail("Book the venue", "e1"));
         server.add("INBOX", FakeImap::mail("bob@example.org", "Lunch on Friday?", "b", "e2"));
         server.add("INBOX", plusMail("Send the invoice", "e3"));
-        server.add("INBOX", plusMail("Not for me", "e4", "jane+precrime@example.org.au"));
+        server.add("INBOX", plusMail("Not for me", "e4", "jane+fairfax@example.org.au"));
         App app;
         QVERIFY(app.ok);
         QQuickWindow *sw = nullptr;
         openMailPane(app, sw);
-        fillServer(sw, server, "jane+precrime@example.org");
+        fillServer(sw, server, "jane+fairfax@example.org");
         choose("setting:mail.after", "Leave as is");
         choose("setting:mail.listId", "Work");
         QCOMPARE(textOf("mailStatus"), QString("Off"));
@@ -439,7 +439,7 @@ private slots:
         QVERIFY(venue.uid.startsWith("mail-"));
         QVERIFY(!app.taskTitled("Lunch on Friday?").id);
         QVERIFY(!app.taskTitled("Not for me").id);
-        // Mail that was not for Precrime is exactly as it was.
+        // Mail that was not for Fairfax is exactly as it was.
         QCOMPARE(server.count("INBOX"), 4);
         for (qint64 uid : {2, 4})
             QVERIFY(server.find("INBOX", uid)->flags.isEmpty());
@@ -465,7 +465,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(textOf("mailStatus"), QString("Off"), 5000);
     }
 
-    // the reference app manual: "Move to" is the Gmail default; the mail goes under the Precrime label and out
+    // the reference app manual: "Move to" is the Gmail default; the mail goes under the Fairfax label and out
     // of the inbox, and a message that was already a task is moved all the same.
     void movedMailLeavesTheInbox() {
         FakeImap server;
@@ -475,13 +475,13 @@ private slots:
         App app;
         QQuickWindow *sw = nullptr;
         openMailPane(app, sw);
-        fillServer(sw, server, "jane+precrime@example.org");
+        fillServer(sw, server, "jane+fairfax@example.org");
         choose("setting:mail.after", "Move to");
-        QCOMPARE(textOf("setting:mail.moveTo"), QString("Precrime"));
+        QCOMPARE(textOf("setting:mail.moveTo"), QString("Fairfax"));
         clickFetchNow();
         waitStatus("Connected");
         QVERIFY(app.taskTitled("Call the plumber").id);
-        QTRY_COMPARE_WITH_TIMEOUT(server.count("Precrime"), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(server.count("Fairfax"), 1, 5000);
         QCOMPARE(server.count("INBOX"), 1);   // Only the friend's mail is left.
         QVERIFY(server.find("INBOX", 2));
     }
@@ -493,7 +493,7 @@ private slots:
         App app;
         QQuickWindow *sw = nullptr;
         openMailPane(app, sw);
-        fillServer(sw, server, "jane+precrime@example.org");
+        fillServer(sw, server, "jane+fairfax@example.org");
         choose("setting:mail.after", "Mark as read");
         clickFetchNow();
         waitStatus("· 1 imported");
@@ -508,7 +508,7 @@ private slots:
         App app;
         QQuickWindow *sw = nullptr;
         openMailPane(app, sw);
-        fillServer(sw, server, "jane+precrime@example.org");
+        fillServer(sw, server, "jane+fairfax@example.org");
         choose("setting:mail.after", "Leave as is");
         typePassword(sw, "wrong");
         clickFetchNow();
@@ -529,7 +529,7 @@ private slots:
         App app;
         QQuickWindow *sw = nullptr;
         openMailPane(app, sw);
-        fillServer(sw, server, "jane+precrime@example.org");
+        fillServer(sw, server, "jane+fairfax@example.org");
         choose("setting:mail.after", "Leave as is");
         clickFetchNow();
         waitStatus("· 2 imported");
@@ -551,7 +551,7 @@ private slots:
         App app;
         QQuickWindow *sw = nullptr;
         openMailPane(app, sw);
-        fillServer(sw, server, "jane+precrime@example.org");
+        fillServer(sw, server, "jane+fairfax@example.org");
         choose("setting:mail.after", "Leave as is");
         setCheck("setting:mail.enabled", true);
         waitStatus("Connected");

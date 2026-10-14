@@ -15,7 +15,7 @@
 class WebDavRemote : public SyncTree::Remote {
 public:
     // `baseUrl` is the collection that holds the tree, e.g.
-    // https://cloud.example.com/remote.php/dav/files/me/Precrime/
+    // https://cloud.example.com/remote.php/dav/files/me/Fairfax/
     WebDavRemote(const QUrl &baseUrl, const QString &user, const QString &password, int timeoutMs = 30000);
 
     bool list(QMap<QString, QString> *signatures, QString *error) override;

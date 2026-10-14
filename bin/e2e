@@ -2,9 +2,9 @@
 # Builds and runs the end-to-end UI tests: the real QML window, driven by
 # synthetic mouse and keyboard events, offscreen.
 #
-# The full suite is shared by PRECRIME_E2E_SHARDS processes (default 1: one process; 3 is about twice as fast, with three processes at once) that
+# The full suite is shared by FAIRFAX_E2E_SHARDS processes (default 1: one process; 3 is about twice as fast, with three processes at once) that
 # run side by side, each taking the next test class nobody has started, and
-# their reports are printed one after another at the end. A run of one class or one test (PRECRIME_E2E_CLASS
+# their reports are printed one after another at the end. A run of one class or one test (FAIRFAX_E2E_CLASS
 # set, or a test name given as an argument) is a single process.
 set -eu
 
@@ -12,13 +12,13 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build/e2e"
 cd "$ROOT/build/e2e"
 
-qmake6 "$ROOT/tests/e2e/precrime_e2e.pro"
-make -j"${PRECRIME_JOBS:-$(nproc)}"
+qmake6 "$ROOT/tests/e2e/fairfax_e2e.pro"
+make -j"${FAIRFAX_JOBS:-$(nproc)}"
 
 export QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1
-SHARDS="${PRECRIME_E2E_SHARDS:-1}"
-if [ "$SHARDS" -le 1 ] || [ -n "${PRECRIME_E2E_CLAIMDIR:-}" ] || [ -n "${PRECRIME_E2E_CLASS:-}" ] || [ "$#" -gt 0 ]; then
-    exec ./precrime_e2e "$@"
+SHARDS="${FAIRFAX_E2E_SHARDS:-1}"
+if [ "$SHARDS" -le 1 ] || [ -n "${FAIRFAX_E2E_CLAIMDIR:-}" ] || [ -n "${FAIRFAX_E2E_CLASS:-}" ] || [ "$#" -gt 0 ]; then
+    exec ./fairfax_e2e "$@"
 fi
 
 LOGS="$(mktemp -d)"
@@ -27,7 +27,7 @@ mkdir "$LOGS/claims"
 PIDS=""
 i=0
 while [ "$i" -lt "$SHARDS" ]; do
-    PRECRIME_E2E_CLAIMDIR="$LOGS/claims" ./precrime_e2e > "$LOGS/$i.log" 2>&1 &
+    FAIRFAX_E2E_CLAIMDIR="$LOGS/claims" ./fairfax_e2e > "$LOGS/$i.log" 2>&1 &
     PIDS="$PIDS $!"
     i=$((i + 1))
 done

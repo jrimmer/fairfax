@@ -6,8 +6,8 @@ import QtQuick.Layouts
 // searchable, draggable) and Locations (saved places). Clicking filters the
 // task list; right-click pauses, which hides matching tasks everywhere.
 //
-// Dragging a tag row onto a task: drag key "precrime-tag"; drop on a DropArea
-// with keys ["precrime-tag"] and read the tag from drop.source.tagId (the
+// Dragging a tag row onto a task: drag key "fairfax-tag"; drop on a DropArea
+// with keys ["fairfax-tag"] and read the tag from drop.source.tagId (the
 // source of the drag is the pill that follows the pointer).
 Rectangle {
     id: root
@@ -190,7 +190,7 @@ Rectangle {
                 DropArea {
                     id: reorder
                     anchors.fill: parent
-                    keys: ["precrime-tag"]
+                    keys: ["fairfax-tag"]
                     enabled: row.shown
                     onDropped: (d) => {
                         const id = d.source.tagId
@@ -211,7 +211,7 @@ Rectangle {
                 DropArea {
                     id: drop
                     anchors.fill: parent
-                    keys: ["precrime-tasks"]
+                    keys: ["fairfax-tasks"]
                     enabled: row.shown && (!row.isHeader || row.isGroup)
                     onEntered: if (root.dragProxy) root.dragProxy.hint = "Drop to Tag"
                     onExited: if (root.dragProxy) root.dragProxy.hint = ""
@@ -367,7 +367,7 @@ Rectangle {
                 DropArea {
                     id: pdrop
                     anchors.fill: parent
-                    keys: ["precrime-tasks"]
+                    keys: ["fairfax-tasks"]
                     onEntered: if (root.dragProxy) root.dragProxy.hint = "Drop to Set Location"
                     onExited: if (root.dragProxy) root.dragProxy.hint = ""
                     onDropped: backend.dropOnLocation(prow.model.locationId)
@@ -482,7 +482,7 @@ Rectangle {
         radius: 13
         color: theme.accent
         opacity: 0.94
-        Drag.keys: ["precrime-tag"]
+        Drag.keys: ["fairfax-tag"]
         Drag.hotSpot.x: 10
         Drag.hotSpot.y: 13
         function place(p) {

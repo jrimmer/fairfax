@@ -97,7 +97,7 @@ private slots:
     void cleanupTestCase() { QDesktopServices::unsetUrlHandler("https"); }
     void init() { seen().clear(); }
 
-    // "Precrime" block in the corner of Settings: the project address is a link.
+    // "Fairfax" block in the corner of Settings: the project address is a link.
     void aboutLinkOpensTheProjectPage() {
         App app;
         QVERIFY(app.ok);
@@ -106,7 +106,7 @@ private slots:
         QQuickItem *link = nullptr;
         control("aboutLink", link);
         click(link);
-        QTRY_COMPARE_WITH_TIMEOUT(seen(), QStringList{"https://github.com/jrimmer/precrime"}, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(seen(), QStringList{"https://github.com/jrimmer/fairfax"}, 5000);
     }
 
     void firstFolderSyncChoice_data() {

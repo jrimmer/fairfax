@@ -83,7 +83,7 @@ inline void activate(QQuickWindow *w) {
     QTRY_VERIFY_WITH_TIMEOUT(w->isActive(), 5000);
 }
 
-inline QQuickWindow *settingsWindow() { return windowTitled("Precrime Settings"); }
+inline QQuickWindow *settingsWindow() { return windowTitled("Fairfax Settings"); }
 
 // Opens Settings with its shortcut, as a user does, and makes it tall enough
 // that no control hides below the fold.
@@ -632,7 +632,7 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"calendar.colors", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.emails", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.expanded", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
-        // Mail to Precrime: its own class drives each through the Settings > Mail controls, and
+        // Mail to Fairfax: its own class drives each through the Settings > Mail controls, and
         // E2EMail::everyMailSettingHasACase insists that every key the connector knows has one.
         {"mail.enabled", "E2EMail::everyFieldPersistsAndComesBack"},
         {"mail.account", "E2EMail::everyFieldPersistsAndComesBack"},

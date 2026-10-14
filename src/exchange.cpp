@@ -917,7 +917,7 @@ bool exportIcs(const Store &store, const QString &path, const QList<qint64> &tas
     auto line = [&](const QString &l) { appendFolded(out, l); };
     line("BEGIN:VCALENDAR");
     line("VERSION:2.0");
-    line("PRODID:-//Precrime//EN");
+    line("PRODID:-//Fairfax//EN");
     line("CALSCALE:GREGORIAN");
     for (qint64 id : ids) {
         const Task t = store.task(id);
@@ -956,18 +956,18 @@ bool exportIcs(const Store &store, const QString &path, const QList<qint64> &tas
         if (!cats.isEmpty())
             line("CATEGORIES:" + cats.join(','));
         if (store.lists().contains(t.listId))
-            line("X-PRECRIME-LIST:" + escapeText(store.list(t.listId).name));
-        line(QString("X-PRECRIME-TYPE:") + (t.type == TaskType::Project ? "project" : t.type == TaskType::Checklist ? "checklist" : "task"));
+            line("X-FAIRFAX-LIST:" + escapeText(store.list(t.listId).name));
+        line(QString("X-FAIRFAX-TYPE:") + (t.type == TaskType::Project ? "project" : t.type == TaskType::Checklist ? "checklist" : "task"));
         if (t.starred)
-            line("X-PRECRIME-STARRED:1");
+            line("X-FAIRFAX-STARRED:1");
         if (t.duration > 0)
-            line(QStringLiteral("X-PRECRIME-DURATION:%1").arg(t.duration));
+            line(QStringLiteral("X-FAIRFAX-DURATION:%1").arg(t.duration));
         if (t.parentId && included.contains(t.parentId) && store.tasks().contains(t.parentId))
             line("RELATED-TO;RELTYPE=PARENT:" + store.task(t.parentId).uid);
         if (t.recurrence.isSet()) {
             line("RRULE:" + rruleText(t.recurrence));
             if (t.recurrence.from == Repeat::FromCompletion)
-                line("X-PRECRIME-REPEAT-FROM:COMPLETION");
+                line("X-FAIRFAX-REPEAT-FROM:COMPLETION");
         }
         for (const Alarm &a : store.alarmsFor(t.id)) {
             if (a.deleted)
@@ -1012,7 +1012,7 @@ QByteArray eventIcs(const Store &store, const Task &t) {
     auto line = [&](const QString &l) { appendFolded(out, l); };
     line("BEGIN:VCALENDAR");
     line("VERSION:2.0");
-    line("PRODID:-//Precrime//EN");
+    line("PRODID:-//Fairfax//EN");
     line("CALSCALE:GREGORIAN");
     line("METHOD:PUBLISH");
     line("BEGIN:VEVENT");
@@ -1099,7 +1099,7 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
             t.dueTime = d.minutes;
         }
         qint64 seconds = 0;
-        const QString durationText = c.first("X-PRECRIME-DURATION");
+        const QString durationText = c.first("X-FAIRFAX-DURATION");
         if (!durationText.isEmpty())
             t.duration = qMax(0, durationText.trimmed().toInt());
         else if (parseDurationSeconds(c.first("DURATION"), &seconds) && seconds > 0)
@@ -1130,10 +1130,10 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
                     t.tagIds << id;
             }
         }
-        const QString type = c.first("X-PRECRIME-TYPE").trimmed().toLower();
+        const QString type = c.first("X-FAIRFAX-TYPE").trimmed().toLower();
         t.type = type == "project" ? TaskType::Project : type == "checklist" ? TaskType::Checklist : TaskType::Task;
-        t.starred = truthy(c.first("X-PRECRIME-STARRED"));
-        p.listName = unescapeText(c.first("X-PRECRIME-LIST")).trimmed();
+        t.starred = truthy(c.first("X-FAIRFAX-STARRED"));
+        p.listName = unescapeText(c.first("X-FAIRFAX-LIST")).trimmed();
 
         for (const Prop &prop : c.props) {
             if (prop.name == "RELATED-TO" && p.parentUid.isEmpty()) {
@@ -1144,7 +1144,7 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
         }
         if (const Prop *r = c.find("RRULE")) {
             t.recurrence = parseRrule(r->value);
-            if (t.recurrence.isSet() && c.first("X-PRECRIME-REPEAT-FROM").trimmed().toUpper() == "COMPLETION")
+            if (t.recurrence.isSet() && c.first("X-FAIRFAX-REPEAT-FROM").trimmed().toUpper() == "COMPLETION")
                 t.recurrence.from = Repeat::FromCompletion;
         }
 
@@ -1234,7 +1234,7 @@ ImportResult importTwoDo(Store &store, const QString &path) {
         result.error = QStringLiteral("The file does not exist.");
         return result;
     }
-    const QString name = QStringLiteral("precrime-taskdb-import-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const QString name = QStringLiteral("fairfax-taskdb-import-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
     {
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", name);
         db.setDatabaseName(path);
@@ -2227,7 +2227,7 @@ bool writePdf(const QString &path, const QString &title, const QVector<PrintSect
     writer.setPageSize(QPageSize(QPageSize::A4));
     writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
     writer.setTitle(title);
-    writer.setCreator("Precrime");
+    writer.setCreator("Fairfax");
     QTextDocument document;
     document.setHtml(printHtml(title, sections, includeNotes));
     document.print(&writer);

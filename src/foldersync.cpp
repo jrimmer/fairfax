@@ -124,7 +124,7 @@ void TreeProvider::chooseFirstSync(const QString &choice) {
         return;
     if (choice == "local") {
         // Replace Local discards this machine's tasks, so keep a copy first.
-        const QString name = QStringLiteral("Precrime_(%1)_before-sync.db")
+        const QString name = QStringLiteral("Fairfax_(%1)_before-sync.db")
                                  .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd-HH_mm_ss"));
         m_store->backupTo(QFileInfo(m_store->path()).absolutePath() + "/backups/" + name);
         m_mode = SyncTree::FirstSync::ReplaceLocal;
@@ -180,7 +180,7 @@ void WebDavSync::setServer(const QString &url, const QString &user, const QStrin
     if (busy())
         return;
     QString error;
-    if (!Keyring::store("precrime-webdav", user + "@" + url, password, &error)) {
+    if (!Keyring::store("fairfax-webdav", user + "@" + url, password, &error)) {
         setStatus(error);
         return;
     }
@@ -197,13 +197,13 @@ std::unique_ptr<SyncTree::Remote> WebDavSync::makeRemote(QString *error) {
             *error = "The WebDAV address must start with http:// or https://";
         return nullptr;
     }
-    return std::make_unique<WebDavRemote>(u, user(), Keyring::lookup("precrime-webdav", user() + "@" + url()));
+    return std::make_unique<WebDavRemote>(u, user(), Keyring::lookup("fairfax-webdav", user() + "@" + url()));
 }
 
 void FolderSync::clearConfig() { store()->setSetting("folder.path", QString()); }
 
 void WebDavSync::clearConfig() {
-    Keyring::clear("precrime-webdav", user() + "@" + url());
+    Keyring::clear("fairfax-webdav", user() + "@" + url());
     store()->setSetting("webdav.url", QString());
     store()->setSetting("webdav.user", QString());
 }

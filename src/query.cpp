@@ -452,7 +452,7 @@ const QHash<QString, Predicate> &typePresets() {
         add({"visit"}, action(ActionType::Visit));
         add({"google"}, action(ActionType::Google));
 
-        add({"capturedmail"}, [](T t, C) { return t.uid.startsWith("mail-"); });  // Mail to Precrime tasks, which get uid "mail-…".
+        add({"capturedmail"}, [](T t, C) { return t.uid.startsWith("mail-"); });  // Mail to Fairfax tasks, which get uid "mail-…".
         add({"anylocation"}, [](T t, C c) { return !locationNamesOf(t, c).isEmpty(); });
         add({"nolocation"}, [](T t, C c) { return locationNamesOf(t, c).isEmpty(); });
         add({"alarms"}, [](T t, C c) { return c.store && !c.store->alarmsFor(t.id).isEmpty(); });
