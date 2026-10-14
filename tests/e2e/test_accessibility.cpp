@@ -6,7 +6,6 @@
 #include <QAccessible>
 #include <QMetaEnum>
 #include <QQuickItem>
-#include <QtQuick/private/qquickaccessibleattached_p.h>
 #include <QQuickWindow>
 #include <QRegularExpression>
 
@@ -32,22 +31,11 @@ QString where(QQuickItem *item) {
     return chain.join(" < ");
 }
 
-// An item a later slice has marked to be skipped, so the guard neither names
-// it nor the list behind it.
-bool ignored(QQuickItem *item) {
-    QQuickAccessibleAttached *att = QQuickAccessibleAttached::attachedProperties(item);
-    return att && att->ignored();
-}
-
 // Whether an item is one a user can act on: it takes keyboard focus, it is a
 // button, it holds a mouse area or tap handler, or it is a text field. A bare
 // MouseArea or TapHandler is the click target of the item that owns it, not an
-// item in its own right, so it is not judged on its own; a mouse area marked
-// Accessible.ignored is a gestural layer the slice has named its child for, so
-// it does not make its owner interactive either.
+// item in its own right, so it is not judged on its own.
 bool interactive(QQuickItem *item) {
-    if (ignored(item))
-        return false;
     if (item->inherits("QQuickMouseArea") || item->inherits("QQuickTapHandler"))
         return false;
     if (item->property("activeFocusOnTab").toBool())
@@ -57,7 +45,7 @@ bool interactive(QQuickItem *item) {
     if (item->inherits("QQuickTextInput") || item->inherits("QQuickTextEdit"))
         return true;
     for (QQuickItem *child : item->childItems()) {
-        if (!child->isVisible() || !child->isEnabled() || ignored(child))
+        if (!child->isVisible() || !child->isEnabled())
             continue;
         if (child->inherits("QQuickMouseArea") && child->property("acceptedButtons").toInt() != Qt::NoButton)
             return true;
@@ -130,7 +118,7 @@ QQuickItem *focusOn(const QString &name) {
 void collect(QQuickItem *root, bool underInteractive, QList<QQuickItem *> &out) {
     if (!root->isVisible() || !root->isEnabled())
         return;
-    const bool here = interactive(root) && !ignored(root);
+    const bool here = interactive(root);
     if (here && (!underInteractive || independent(root)) && (independent(root) || !hasIndependentDescendant(root)))
         out << root;
     for (QQuickItem *child : root->childItems())

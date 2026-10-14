@@ -218,12 +218,10 @@ ColumnLayout {
         }
     }
     // One mouse area over the whole grid so a press can drag across days. It
-    // is a gestural layer, not a control: the day cells are the accessible
-    // targets, so the guard treats it as ignored and does not judge the
-    // wrapper item that owns it.
+    // is a gestural layer, not a control: the day cells it covers are the
+    // accessible targets, so the guard passes over the wrapper that owns it.
     MouseArea {
         anchors.fill: grid
-        Accessible.ignored: true
         function cellAt(x, y) {
             const c = grid.childAt(x, y)
             return c && c.dayIso !== undefined ? c : null

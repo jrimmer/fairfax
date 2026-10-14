@@ -1,6 +1,4 @@
 QT += core gui widgets sql qml quick quickcontrols2 testlib qmltest network
-# qquickaccessibleattached_p.h names the Accessible.ignored marker the guard reads.
-QT += quick-private
 linux: QT += dbus
 CONFIG += c++20
 TARGET = fairfax_e2e
