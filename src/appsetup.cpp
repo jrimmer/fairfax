@@ -17,6 +17,8 @@ AppServices::AppServices(Store &store, const QString &themeOverride)
     QObject::connect(&backend, &Backend::settingsChanged, &theme,
                      [this] { theme.setScheme(this->store.setting("appearance.scheme", "system").toString()); });
     NotesHighlighter::registerType();
+    mail = std::make_unique<MailFetch>(&store);
+    syncHub.add(mail.get(), "Mail");
 
     sounds.setEnabled(store.setting("general.sounds", true).toBool());
     QObject::connect(&backend, &Backend::settingsChanged, &sounds,
@@ -37,6 +39,7 @@ void AppServices::startSync(bool opened, bool offscreen)
 {
     if (!opened || offscreen)
         return;
+    QTimer::singleShot(6000, mail.get(), &MailFetch::start);
     // Git sync works on a working copy beside the database; demo and
     // screenshot runs leave it alone.
     gitSync = std::make_unique<GitSync>(&store);
@@ -76,6 +79,7 @@ void AppServices::install(QQmlEngine &engine, const QString &storeError, bool st
     context->setContextProperty("todoist", todoist.get());
     context->setContextProperty("folderSync", folderSync.get());
     context->setContextProperty("webDavSync", webDavSync.get());
+    context->setContextProperty("mailFetch", mail.get());
     context->setContextProperty("syncHub", &syncHub);
     context->setContextProperty("calendar", &calendar);
     context->setContextProperty("sounds", &sounds);
