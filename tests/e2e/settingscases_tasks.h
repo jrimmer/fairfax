@@ -306,6 +306,63 @@ inline void addTaskCases(QVector<SettingCase> &v) {
             };
             v << c;
         }
+        // ---------------------------------------------------------- My Day
+        // The plan and its capacity come from backend.myDayCapacity(); the
+        // work day's two ends change the window it reports.
+        {
+            K c{"myday.enabled", "Tasks", "setting:myday.enabled", K::Check, true};
+            c.effect = SK_EFFECT {
+                SK_APP
+                const QVariantMap cap = app.backend().myDayCapacity();
+                if (changed) {
+                    // Off: the plan is empty and there is no window.
+                    QCOMPARE(cap.value("windowMinutes").toInt(), 0);
+                    QCOMPARE(cap.value("plannedMinutes").toInt(), 0);
+                    QCOMPARE(cap.value("freeMinutes").toInt(), 0);
+                } else {
+                    const QTime now = QTime::currentTime();
+                    const int nowMinute = now.hour() * 60 + now.minute();
+                    const int expected = qMax(0, 17 * 60 - qMax(nowMinute, 9 * 60));
+                    QVERIFY(qAbs(cap.value("windowMinutes").toInt() - expected) <= 1);
+                }
+            };
+            v << c;
+        }
+        {
+            K c{"myday.workStart", "Tasks", "setting:myday.workStart", K::Combo};
+            c.fromIndex = 18;  // 9:00
+            c.toIndex = 16;    // 8:00
+            c.stored = "480";
+            c.effect = SK_EFFECT {
+                SK_APP
+                const QVariantMap cap = app.backend().myDayCapacity();
+                const QTime now = QTime::currentTime();
+                const int nowMinute = now.hour() * 60 + now.minute();
+                const int expected = qMax(0, 17 * 60 - qMax(nowMinute, changed ? 8 * 60 : 9 * 60));
+                QVERIFY(qAbs(cap.value("windowMinutes").toInt() - expected) <= 1);
+            };
+            v << c;
+        }
+        {
+            K c{"myday.workEnd", "Tasks", "setting:myday.workEnd", K::Combo};
+            c.fromIndex = 34;  // 17:00
+            c.toIndex = 36;    // 18:00
+            c.stored = "1080";
+            c.effect = SK_EFFECT {
+                SK_APP
+                const QVariantMap cap = app.backend().myDayCapacity();
+                const QTime now = QTime::currentTime();
+                const int nowMinute = now.hour() * 60 + now.minute();
+                const int expected = qMax(0, (changed ? 18 * 60 : 17 * 60) - qMax(nowMinute, 9 * 60));
+                QVERIFY(qAbs(cap.value("windowMinutes").toInt() - expected) <= 1);
+            };
+            v << c;
+        }
+        {
+            K c{"myday.prompt", "Tasks", "setting:myday.prompt", K::Check, false};
+            // The once-a-day prompt itself is a later slice; the switch persists.
+            v << c;
+        }
 }
 
 }  // namespace e2e

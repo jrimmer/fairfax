@@ -693,6 +693,8 @@ inline const QMap<QString, QString> &internalKeys() {
         {"ui.source", "remembered view state, not a choice"},
         {"window.", "remembered view state: whether the Lists and Tags panels are shown (E2EMiscWindow::panelTogglesHideShowAndPersist)"},
         {"tasks.lastList", "bookkeeping behind the \"Last used\" default list"},
+        {"myday.lastPlanned", "bookkeeping: the day My Day last offered to plan"},
+        {"myday.hidden", "bookkeeping: task uids hidden for one day, cleared when the date changes"},
         {"tasks.quickEntryList", "retired setting, migrated into tasks.defaultList on launch"},
         {"lists.doneWarned", "one-off warning flag"},
         {"lists.hiddenRevealed", "per-session reveal of hidden lists"},
