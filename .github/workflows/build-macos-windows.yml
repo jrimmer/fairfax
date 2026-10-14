@@ -43,11 +43,10 @@ jobs:
       HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' && secrets.MACOS_SIGN_IDENTITY != '' }}
       HAS_NOTARY: ${{ secrets.MACOS_NOTARY_APPLE_ID != '' && secrets.MACOS_NOTARY_TEAM_ID != '' && secrets.MACOS_NOTARY_PASSWORD != '' }}
     steps:
-      # PIN-ME: resolve to a full commit SHA before the first run; the runner
-      # here is offline and cannot look one up.
-      - uses: actions/checkout@v4 # PIN-ME
+      # Actions are pinned to commit SHAs, with the release in the comment.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: jurplel/install-qt-action@v4 # PIN-ME
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ env.QT_VERSION }}
           cache: true
@@ -91,7 +90,7 @@ jobs:
         if: env.FAIRFAX_SKIP_DMG == '1'
         run: ditto -c -k --keepParent build-macos/Fairfax.app build-macos/Fairfax-app.zip
 
-      - uses: actions/upload-artifact@v4 # PIN-ME
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: fairfax-macos
@@ -111,11 +110,10 @@ jobs:
       FAIRFAX_SKIP_INSTALLER: ${{ inputs.make_installers && '0' || '1' }}
       HAS_CERT: ${{ secrets.WINDOWS_CERT_PFX != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
     steps:
-      # PIN-ME: resolve to a full commit SHA before the first run; the runner
-      # here is offline and cannot look one up.
-      - uses: actions/checkout@v4 # PIN-ME
+      # Actions are pinned to commit SHAs, with the release in the comment.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: jurplel/install-qt-action@v4 # PIN-ME
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ env.QT_VERSION }}
           arch: win64_msvc2022_64
@@ -142,7 +140,7 @@ jobs:
           FAIRFAX_SIGN_PASSWORD: ${{ env.HAS_CERT == 'true' && secrets.WINDOWS_CERT_PASSWORD || '' }}
         run: ./bin/build-windows.ps1
 
-      - uses: actions/upload-artifact@v4 # PIN-ME
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: fairfax-windows

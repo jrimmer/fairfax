@@ -151,9 +151,10 @@ cancels the previous one.
 Artifacts appear at the bottom of the run's page, as `fairfax-macos` and
 `fairfax-windows`, and are deleted after 5 days. They include the build logs.
 
-The workflow's actions carry `# PIN-ME` comments: resolve each to a full
-commit SHA (for example with `gh api repos/actions/checkout/git/refs/tags/v4`)
-before the first run, and keep the version in a comment next to it.
+The workflow's actions are pinned to full commit SHAs, with the release in a
+comment next to each. To update one, resolve the new release to its commit
+(for example `gh api repos/actions/checkout/commits/v4.4.0 --jq .sha`) and
+change both.
 
 Signing in the workflow happens only when these repository secrets exist
 (Settings > Secrets and variables > Actions); without them it builds unsigned:
