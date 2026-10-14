@@ -3880,10 +3880,7 @@ QString Backend::shortcutText(const QString &id) const {
     const QStringList list = Shortcuts::current(*m_store, id);
     if (list.isEmpty())
         return QStringLiteral("Not set");
-    QStringList pretty;
-    for (const QString &s : list)
-        pretty << QKeySequence::fromString(s, QKeySequence::PortableText).toString(QKeySequence::NativeText);
-    return pretty.join(QStringLiteral(" / "));
+    return Shortcuts::nativeText(list);
 }
 
 void Backend::setRecordingShortcut(bool on) {

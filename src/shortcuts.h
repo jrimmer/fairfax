@@ -48,6 +48,12 @@ Context contextFromName(const QString &name, bool *ok = nullptr);
 // (Shift, Control, Alt, Meta) gives an empty string.
 QString sequenceFor(int key, int modifiers);
 
+// A binding list as the platform writes it: QKeySequence::NativeText, so
+// macOS shows ⌘/⌥ where Linux and Windows show Ctrl/Alt. On Linux the result
+// is the same portable text the defaults are written in. Entries are joined
+// with " / ".
+QString nativeText(const QStringList &sequences);
+
 // The current binding: the stored one when there is one, else the defaults.
 QStringList current(const Store &store, const QString &id);
 void set(Store &store, const QString &id, const QStringList &sequences);

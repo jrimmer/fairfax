@@ -242,6 +242,13 @@ QString sequenceFor(int key, int modifiers) {
     return QKeySequence(QKeyCombination(Qt::KeyboardModifiers(modifiers), Qt::Key(key))).toString(QKeySequence::PortableText);
 }
 
+QString nativeText(const QStringList &sequences) {
+    QStringList pretty;
+    for (const QString &s : sequences)
+        pretty << QKeySequence::fromString(s, QKeySequence::PortableText).toString(QKeySequence::NativeText);
+    return pretty.join(QStringLiteral(" / "));
+}
+
 QStringList current(const Store &store, const QString &id) {
     const Command *cmd = command(id);
     if (!cmd)

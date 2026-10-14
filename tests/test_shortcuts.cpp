@@ -180,6 +180,26 @@ private slots:
         QCOMPARE(Shortcuts::sequenceFor(Qt::Key_T, Qt::NoModifier), QStringLiteral("T"));
     }
 
+    void nativeTextFormatsEachPlatform() {
+        // nativeText is QKeySequence::NativeText per entry, joined with " / ".
+        // On Linux that is the same Ctrl/Alt spelling the defaults use; the
+        // macOS ⌘/⌥ spelling comes from the same call, so it needs no Mac to
+        // test the shape: every default round-trips through PortableText and
+        // nativeText agrees with Qt's own NativeText conversion.
+        for (const Shortcuts::Command &c : Shortcuts::commands()) {
+            QStringList native;
+            for (const QString &s : c.defaults)
+                native << QKeySequence::fromString(s, QKeySequence::PortableText).toString(QKeySequence::NativeText);
+            QCOMPARE(Shortcuts::nativeText(c.defaults), native.join(QStringLiteral(" / ")));
+        }
+        QVERIFY(Shortcuts::nativeText({}).isEmpty());
+#ifdef Q_OS_LINUX
+        // Linux has no native modifier glyphs, so the spelling is unchanged.
+        for (const Shortcuts::Command &c : Shortcuts::commands())
+            QCOMPARE(Shortcuts::nativeText(c.defaults), c.defaults.join(QStringLiteral(" / ")));
+#endif
+    }
+
     void qmlHasNoLiteralAppSequences() {
 #ifdef FAIRFAX_ROOT
         const QString root = QStringLiteral(FAIRFAX_ROOT);
