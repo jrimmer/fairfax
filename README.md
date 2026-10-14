@@ -169,7 +169,9 @@ offers your lists and `frfx done <Tab>` your open tasks.
 ## Keyboard
 
 the reference app's ⌘ is Ctrl here, since Super belongs to Hyprland. The bare keys work while the task
-list has focus. Press `?` in the app for the full list.
+list has focus. Press `?` in the app for the full list. Every shortcut can be changed in
+Settings → Shortcuts, except the navigation, Return, Esc and clipboard keys; the table below
+lists the defaults.
 
 | Keys | Action |
 |---|---|
