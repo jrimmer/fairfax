@@ -458,11 +458,14 @@ private slots:
         QVERIFY(app.ok);
         QVERIFY(mk::homeWith(app, app.ids.buyMilk));
 
-        // The toolbar buttons toggle and open their menus.
+        // The toolbar buttons toggle and open their menus. A refilter pulls
+        // focus back to the task list (TaskPane's viewChanged handler), so each
+        // activation is given the keyboard again before the next key.
         const bool asc = app.backend().sortAscending();
         QVERIFY(focusOn("sortReverse"));
         app.press(Qt::Key_Space);
         QCOMPARE(app.backend().sortAscending(), !asc);
+        QVERIFY(focusOn("sortReverse"));
         app.press(Qt::Key_Return);
         QCOMPARE(app.backend().sortAscending(), asc);
 
@@ -482,6 +485,7 @@ private slots:
         QVERIFY(focusOn(day->objectName()));
         app.press(Qt::Key_Return);
         QCOMPARE(app.backend().dayFilter(), iso);
+        app.backend().setDayFilter(QString());
 
         // A removable tag chip takes the keyboard and removes the tag.
         QVERIFY(mk::homeWith(app, app.ids.plants));
