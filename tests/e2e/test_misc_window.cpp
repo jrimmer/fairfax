@@ -380,7 +380,24 @@ private slots:
         QVERIFY(selectRow(app, app.ids.buyMilk));
         QQuickItem *dropCell = findItem("calDay:" + drop.toString(Qt::ISODate));
         QVERIFY(dropCell);
-        tk::dragSlowly(app.row(app.ids.buyMilk), dropCell);
+        // Release only once the drag pill says it is over that day, as a user
+        // would: on a slow machine the pill can trail the pointer.
+        {
+            QQuickWindow *w = app.window;
+            const QPoint from = centreOf(app.row(app.ids.buyMilk)), to = centreOf(dropCell);
+            QTest::mouseMove(w, from);
+            QTest::mousePress(w, Qt::LeftButton, Qt::NoModifier, from);
+            for (int i = 1; i <= 40; ++i) {
+                QTest::mouseMove(w, from + (to - from) * i / 40);
+                QTest::qWait(5);
+            }
+            const QString want = "Defer to " + QLocale(QLocale::English).toString(drop, "ddd d MMM");
+            QVERIFY2(QTest::qWaitFor([&] {
+                QTest::mouseMove(w, to);
+                return tk::prop("dragProxy", "hint").toString() == want;
+            }, 5000), qPrintable(tk::prop("dragProxy", "hint").toString()));
+            QTest::mouseRelease(w, Qt::LeftButton, Qt::NoModifier, to);
+        }
         QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).dueDate, drop, 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).dueDate, today, 5000);
