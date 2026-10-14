@@ -185,6 +185,10 @@ int runHeadless(int argc, char *argv[]) {
     app.setApplicationName("fairfax");
     QStringList args = app.arguments();
     if (args.value(1) == "setup") {
+#if !defined(Q_OS_LINUX)
+        QTextStream(stderr) << "fairfax: 'setup omarchy' is only on Linux (Omarchy); Fairfax runs on macOS and Windows without it." << Qt::endl;
+        return 2;
+#else
         // `fairfax setup omarchy [--remove] [--key …]` runs the packaged
         // script (or the repo's copy when running from a build).
         if (args.value(2) != "omarchy") {
@@ -204,6 +208,7 @@ int runHeadless(int argc, char *argv[]) {
         }
         QTextStream(stderr) << "fairfax: the Omarchy setup script isn't installed." << Qt::endl;
         return 1;
+#endif
     }
     const QString dbPath = databasePath(args);
     if (const int i = args.indexOf("--db"); i >= 0)
@@ -244,6 +249,10 @@ int runHeadless(int argc, char *argv[]) {
     if (mode == "add")
         return Cli::add(store, args.mid(2), out, err);
     if (mode == "--waybar") {
+#if !defined(Q_OS_LINUX)
+        QTextStream(stderr) << "fairfax: --waybar is only on Linux; on macOS and Windows use the tray badge instead." << Qt::endl;
+        return 2;
+#else
         // A Waybar custom module: the count the "Badge shows" setting picks
         // (overdue, due today or both), like the reference app's Dock badge.
         const ScheduleSettings settings = ScheduleSettings::fromStore(store);
@@ -275,6 +284,7 @@ int runHeadless(int argc, char *argv[]) {
                                {"class", cls}};
         out << QJsonDocument(json).toJson(QJsonDocument::Compact) << Qt::endl;
         return 0;
+#endif
     }
     if (mode == "import-mail") {
         // Mail to Fairfax from a pipe: a message on stdin or in files, or a Maildir.
@@ -649,7 +659,8 @@ int main(int argc, char *argv[]) {
 
     // On Hyprland, fit the main window into a free third when the workspace
     // is laid out with floating windows (see hyprland.h). Each time it
-    // appears, once it's mapped.
+    // appears, once it's mapped. Hyprland only exists on Linux.
+#if defined(Q_OS_LINUX)
     if (window && !offscreen && Hyprland::available()) {
         QObject::connect(window, &QWindow::visibleChanged, window, [window, &store](bool shown) {
             if (!shown || !store.setting("omarchy.fitThirds", true).toBool())
@@ -661,6 +672,7 @@ int main(int argc, char *argv[]) {
         if (window->isVisible())
             QTimer::singleShot(400, window, [window] { Hyprland::fitIntoFreeThird(QCoreApplication::applicationPid(), window->title()); });
     }
+#endif
 
     if (cli.isSet(selfTestOption) && window)
         SelfTest::run(window, &backend);

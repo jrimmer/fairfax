@@ -159,29 +159,15 @@ if [ "${FAIRFAX_SKIP_TESTS:-0}" != 1 ]; then
     fi
 fi
 
-# Info.plist additions: bundle id, URL scheme, version
+# Info.plist additions: the bundle id, name, URL scheme and high-resolution
+# flag come from pkgbuild/macos/Info.plist (QMAKE_INFO_PLIST); the script only
+# fills in the version from fairfax.pro.
 PLIST="$APP/Contents/Info.plist"
 plist() { /usr/libexec/PlistBuddy -c "$1" "$PLIST" >>"$LOG" 2>&1 || true; }
-plist "Delete :CFBundleIdentifier"
-plist "Add :CFBundleIdentifier string casa.lacy.fairfax"
-plist "Delete :CFBundleName"
-plist "Add :CFBundleName string Fairfax"
-plist "Delete :CFBundleDisplayName"
-plist "Add :CFBundleDisplayName string Fairfax"
 plist "Delete :CFBundleShortVersionString"
 plist "Add :CFBundleShortVersionString string $VERSION"
 plist "Delete :CFBundleVersion"
 plist "Add :CFBundleVersion string $VERSION"
-plist "Delete :LSUIElement"
-plist "Add :LSUIElement bool false"
-plist "Delete :NSHighResolutionCapable"
-plist "Add :NSHighResolutionCapable bool true"
-plist "Delete :CFBundleURLTypes"
-plist "Add :CFBundleURLTypes array"
-plist "Add :CFBundleURLTypes:0 dict"
-plist "Add :CFBundleURLTypes:0:CFBundleURLName string casa.lacy.fairfax"
-plist "Add :CFBundleURLTypes:0:CFBundleURLSchemes array"
-plist "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string fairfax"
 
 # Bundle the Qt frameworks and plugins
 step "Running macdeployqt" macdeployqt "$APP" -qmldir="$ROOT/src/qml"

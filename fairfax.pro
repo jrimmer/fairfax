@@ -24,6 +24,10 @@ RESOURCES += src/resources.qrc
 # macOS: a proper .app bundle named Fairfax; Windows: no console window.
 macx {
     TARGET = Fairfax
+    # The bundle's Info.plist (bundle id, name, the fairfax:// URL scheme,
+    # high resolution) lives in the repo, so bin/build-macos only fills in the
+    # version and the icon.
+    QMAKE_INFO_PLIST = $$PWD/pkgbuild/macos/Info.plist
     # bin/build-macos makes this from pkgbuild/fairfax.svg before qmake runs.
     exists($$PWD/pkgbuild/macos/fairfax.icns) {
         ICON = $$PWD/pkgbuild/macos/fairfax.icns

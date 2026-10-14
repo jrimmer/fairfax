@@ -173,7 +173,9 @@ offers your lists and `frfx done <Tab>` your open tasks.
 the reference app's ⌘ is Ctrl here, since Super belongs to Hyprland. The bare keys work while the task
 list has focus. Press `?` in the app for the full list. Every shortcut can be changed in
 Settings → Shortcuts, except the navigation, Return, Esc and clipboard keys; the table below
-lists the defaults.
+lists the defaults. The `?` overlay, the Shortcuts pane, the editor's shortcut menu and the
+tray show each key as your platform writes it, so on macOS Ctrl appears as ⌘ and Alt as ⌥;
+the table spells them Ctrl and Alt.
 
 | Keys | Action |
 |---|---|

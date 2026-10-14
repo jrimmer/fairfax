@@ -21,6 +21,12 @@
 class Backend : public QObject {
     Q_OBJECT
     Q_PROPERTY(RowModel *sidebar READ sidebar CONSTANT)
+    // Which platform this build is for: the UI hides Linux-only controls
+    // (Omarchy, Hyprland, Waybar, the fit-thirds setting and audio notes)
+    // everywhere else, so nothing is shown that cannot work there.
+    Q_PROPERTY(bool platformIsLinux READ platformIsLinux CONSTANT)
+    Q_PROPERTY(bool platformIsMac READ platformIsMac CONSTANT)
+    Q_PROPERTY(bool platformIsWindows READ platformIsWindows CONSTANT)
     Q_PROPERTY(RowModel *tasks READ tasks CONSTANT)
     Q_PROPERTY(RowModel *tags READ tags CONSTANT)
     Q_PROPERTY(QString sourceKey READ sourceKey NOTIFY viewChanged)
@@ -83,6 +89,23 @@ public:
     explicit Backend(Store *store, QObject *parent = nullptr);
 
     RowModel *sidebar() { return &m_sidebar; }
+#if defined(Q_OS_LINUX)
+    bool platformIsLinux() const { return true; }
+    bool platformIsMac() const { return false; }
+    bool platformIsWindows() const { return false; }
+#elif defined(Q_OS_MACOS)
+    bool platformIsLinux() const { return false; }
+    bool platformIsMac() const { return true; }
+    bool platformIsWindows() const { return false; }
+#elif defined(Q_OS_WIN)
+    bool platformIsLinux() const { return false; }
+    bool platformIsMac() const { return false; }
+    bool platformIsWindows() const { return true; }
+#else
+    bool platformIsLinux() const { return false; }
+    bool platformIsMac() const { return false; }
+    bool platformIsWindows() const { return false; }
+#endif
     RowModel *tasks() { return &m_tasks; }
     RowModel *tags() { return &m_tags; }
     RowModel *places() { return &m_places; }

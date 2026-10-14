@@ -4,12 +4,17 @@
 #include <QProcess>
 #include <QStandardPaths>
 
+#if defined(Q_OS_WIN)
+#include <QApplication>
+#endif
+
 namespace {
 constexpr qint64 kThrottleMs = 80;
 
 // Linux plays freedesktop sound-theme files with PipeWire or PulseAudio;
 // macOS has afplay and its own system sounds. Windows has no command-line
-// player, so there sounds stay off (alarm notifications still chime).
+// player, so there the system beep stands in for the sound-theme files (or,
+// with no beep, the alert stays silent). No QtMultimedia dependency.
 QString findPlayer() {
     for (const char *name : {"pw-play", "paplay", "afplay"}) {
         const QString path = QStandardPaths::findExecutable(QString::fromLatin1(name));
@@ -43,10 +48,18 @@ void Sounds::uncomplete() { play({"bell.oga", "message.oga", "Pop.aiff"}); }
 void Sounds::alarm() { play({"alarm-clock-elapsed.oga", "phone-incoming-call.oga", "bell.oga", "Sosumi.aiff"}); }
 
 void Sounds::play(const QStringList &candidates) {
-    if (!m_enabled || m_player.isEmpty())
+    if (!m_enabled)
         return;
     if (m_last.isValid() && m_last.elapsed() < kThrottleMs)
         return;
+    if (m_player.isEmpty()) {
+#if defined(Q_OS_WIN)
+        // No command-line player on Windows: the system beep is the fallback.
+        m_last.restart();
+        QApplication::beep();
+#endif
+        return;
+    }
     for (const QString &name : candidates) {
         const QString file = m_dir + QLatin1Char('/') + name;
         if (!QFileInfo::exists(file))

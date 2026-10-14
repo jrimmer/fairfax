@@ -1,5 +1,7 @@
 #include "hyprland.h"
 
+#if defined(Q_OS_LINUX)
+
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -102,3 +104,19 @@ QString fitIntoFreeThird(qint64 pid, const QString &title) {
 }
 
 }  // namespace Hyprland
+
+#else  // Hyprland is a Linux (Wayland) compositor only.
+
+namespace Hyprland {
+
+bool available() { return false; }
+
+QString fitIntoFreeThird(qint64 pid, const QString &title) {
+    Q_UNUSED(pid);
+    Q_UNUSED(title);
+    return "not hyprland";
+}
+
+}  // namespace Hyprland
+
+#endif

@@ -3146,6 +3146,13 @@ void Backend::openAttachment(qint64 attachmentId) {
 }
 
 void Backend::toggleRecording(qint64 taskId) {
+#if !defined(Q_OS_LINUX)
+    // Audio notes are recorded with PipeWire's pw-record, Omarchy's audio
+    // stack; the editor hides the mic button elsewhere, so this is a guard.
+    Q_UNUSED(taskId);
+    setStatus("Audio note recording is only on Linux (PipeWire).");
+    return;
+#else
     if (m_recorder) {
         // Stopping: pw-record finishes the file on SIGINT-like termination.
         m_recorder->terminate();
@@ -3192,6 +3199,7 @@ void Backend::toggleRecording(qint64 taskId) {
     }
     m_recordingTask = taskId;
     emit recordingChanged();
+#endif
 }
 
 void Backend::timeBlock(const QString &isoDate, int startMinute, int durationMinutes) {

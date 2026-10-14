@@ -378,6 +378,8 @@ Item {
                         RibbonButton {
                             objectName: "editorRecord"
                             icon: "mic"
+                            // PipeWire's pw-record is Linux only; hide the button elsewhere.
+                            visible: backend.platformIsLinux
                             tip: backend.recordingTaskId === root.e.id ? "Stop Recording" : "Record an Audio Note"
                             active: backend.recordingTaskId === root.e.id
                             color: backend.recordingTaskId === root.e.id ? theme.overdue : theme.muted

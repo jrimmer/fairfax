@@ -249,7 +249,7 @@ Window {
                     Layout.fillWidth: true
                     Toggle { key: "general.keepRunning"; fallback: true; label: "Keep running in the background when the window closes"; note: "Alarms and Quick Entry need Fairfax running. " + backend.shortcutText("app.quit") + " quits for real." }
                     Toggle { key: "quickEntry.clipboard"; fallback: true; label: "Auto-fill Quick Entry notes with text from the clipboard" }
-                    Toggle { key: "omarchy.fitThirds"; fallback: true; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Fairfax takes the free one. With tiled windows Hyprland places it as usual." }
+                    Toggle { key: "omarchy.fitThirds"; fallback: true; visible: backend.platformIsLinux; label: "Open into a free third when windows are snapped to thirds"; note: "On Hyprland, when the other windows on the workspace float in thirds, Fairfax takes the free one. With tiled windows Hyprland places it as usual." }
                     Toggle { key: "general.trayIcon"; fallback: true; label: "Show Fairfax in the bar's tray"; note: "Its menu shows a quick view and commands; choose them below." }
                     ColumnLayout {
                         // The tray menu's content, only while the tray icon is on.
@@ -342,7 +342,7 @@ Window {
                     Hint { Layout.topMargin: 0; text: "Used by this-week searches and Focus Filter, the mini calendar, date pickers and weekly repeats. Fairfax is English only; month and day names are English and dates are laid out for the system locale (" + Qt.locale().name + ")." }
                     Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
                     Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }
-                    Hint { text: "On Omarchy, run  fairfax setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Fairfax section in the Super+Space menu, and starts Fairfax at sign-in so alarms arrive. Undo with  fairfax setup omarchy --remove." }
+                    Hint { visible: backend.platformIsLinux; text: "On Omarchy, run  fairfax setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Fairfax section in the Super+Space menu, and starts Fairfax at sign-in so alarms arrive. Undo with  fairfax setup omarchy --remove." }
                 }
 
                 // Appearance
@@ -617,7 +617,7 @@ Window {
                             onActivated: (i) => backend.setSetting("alerts.badge", metrics[i])
                         }
                     }
-                    Hint { Layout.topMargin: 0; text: "The number on the tray icon and in the Waybar module (fairfax --waybar). Today counts tasks due today, not overdue ones." }
+                    Hint { Layout.topMargin: 0; text: "The number on the tray icon" + (backend.platformIsLinux ? " and in the Waybar module (fairfax --waybar)" : "") + ". Today counts tasks due today, not overdue ones." }
 
                     Label { text: "Default Reminders"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
@@ -1324,7 +1324,7 @@ Window {
                     Hint {
                         objectName: "automationHint"
                         Layout.topMargin: 0
-                        text: "Let Claude work with your tasks: add Fairfax as an MCP server. In Claude Code run:\n  claude mcp add fairfax -- fairfax mcp\n\nScripts can use the same commands from a terminal:\n  fairfax ctl help\n  fairfax ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like fairfax://x-callback-url/add?task=Buy%20milk open in the app.\n\nWaybar: add a custom module that runs  fairfax --waybar  every 60 seconds to show overdue and due-today counts."
+                        text: "Let Claude work with your tasks: add Fairfax as an MCP server. In Claude Code run:\n  claude mcp add fairfax -- fairfax mcp\n\nScripts can use the same commands from a terminal:\n  fairfax ctl help\n  fairfax ctl create_task title=\"Call Sam\" due_date=2026-10-12\n\nLinks like fairfax://x-callback-url/add?task=Buy%20milk open in the app." + (backend.platformIsLinux ? "\n\nWaybar: add a custom module that runs  fairfax --waybar  every 60 seconds to show overdue and due-today counts." : "")
                     }
                 }
 
@@ -1424,7 +1424,10 @@ Window {
                     Hint {
                         Layout.topMargin: 0
                         Layout.minimumWidth: 0
-                        text: "Shortcuts in the task list work while the list has focus. The system-wide Quick Entry key is a Hyprland binding that runs fairfax --quick; fairfax setup omarchy adds it."
+                        text: "Shortcuts in the task list work while the list has focus. "
+                              + (backend.platformIsLinux ? "The system-wide Quick Entry key is a Hyprland binding that runs fairfax --quick; fairfax setup omarchy adds it."
+                                 : backend.platformIsMac ? "There is no global Quick Entry key; bind fairfax --quick in Shortcuts.app or Raycast."
+                                 : "There is no global Quick Entry key; give a shortcut to fairfax.exe --quick a hotkey in its properties.")
                     }
 
                     // Takes the keyboard while a shortcut is recorded, so the
