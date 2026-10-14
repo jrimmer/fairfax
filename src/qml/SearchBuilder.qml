@@ -281,6 +281,13 @@ Popup {
         })
     }
 
+    // A row's human label from its index path: "0" is "Rule 1", "1.0" is
+    // "Rule 2.1". The top group has no number, so its own label is "Match".
+    function ruleLabel(path) {
+        if (path === "") return "Match"
+        return "Rule " + path.split(".").map(n => parseInt(n) + 1).join(".")
+    }
+
     function flatRules(group, prefix, depth, out) {
         out.push({ kind: "group", path: prefix, depth: depth, match: group.match })
         group.items.forEach((item, i) => {
@@ -438,6 +445,9 @@ Popup {
         implicitWidth: chipRow.implicitWidth + 20
         implicitHeight: 26
         radius: 13
+        Accessible.role: Accessible.Button
+        Accessible.name: chip.label
+        Accessible.onPressAction: chip.clicked()
         color: state === 1 ? Qt.alpha(theme.accent, 0.22)
              : state === 2 ? Qt.alpha(theme.overdue, 0.16)
              : chipMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07)
@@ -487,6 +497,11 @@ Popup {
     component Segment: Rectangle {
         id: seg
         property string label
+        // Overrides the displayed label for the spoken name, for a control
+        // whose text is only clear beside its neighbours (the Match buttons).
+        property string accessibleName: label
+        // A radio-like button in a group, as Match All/Any are.
+        property bool radio: false
         property bool active: false
         property bool tall: false
         signal clicked()
@@ -494,6 +509,11 @@ Popup {
         implicitHeight: 26
         radius: 13
         opacity: enabled ? 1 : 0.4
+        Accessible.role: seg.radio ? Accessible.RadioButton : Accessible.Button
+        Accessible.name: seg.accessibleName
+        Accessible.checkable: seg.radio
+        Accessible.checked: seg.radio && seg.active
+        Accessible.onPressAction: seg.clicked()
         color: active ? theme.accent : segMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07)
         Text {
             id: segText
@@ -521,12 +541,17 @@ Popup {
         id: rb
         property string symbol
         property string tip
+        // What a screen reader calls the button; the tip is a longer help.
+        property string accessibleName: tip
         property bool menu: false
         signal clicked(bool alt)
         signal menuRequested()
         implicitWidth: 26
         implicitHeight: 26
         radius: 13
+        Accessible.role: Accessible.Button
+        Accessible.name: accessibleName
+        Accessible.onPressAction: rb.clicked(false)
         color: rbMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07)
         Text {
             anchors.centerIn: parent
@@ -596,6 +621,7 @@ Popup {
                 TextField {
                     id: freeInput
                     objectName: "freeInput"
+                    Accessible.name: "Contains words"
                     Layout.fillWidth: true
                     font.pixelSize: backend.fontSize + 1
                     color: theme.foreground
@@ -651,38 +677,51 @@ Popup {
                                 spacing: 6
 
                                 // Group header: Match [All] [Any] of the following.
-                                Text {
+                                RowLayout {
                                     visible: ruleRow.isGroup
-                                    text: "Match"
-                                    color: theme.foreground
-                                    font.pixelSize: backend.fontSize
+                                    Layout.fillWidth: true
+                                    spacing: 6
+                                    objectName: "ruleMatch:" + ruleRow.path
+                                    Accessible.role: Accessible.Grouping
+                                    Accessible.name: ruleRow.path === "" ? "Match" : "Match, " + root.ruleLabel(ruleRow.path).toLowerCase()
+                                    Text {
+                                        visible: ruleRow.isGroup
+                                        text: "Match"
+                                        color: theme.foreground
+                                        font.pixelSize: backend.fontSize
+                                    }
+                                    Segment {
+                                        visible: ruleRow.isGroup
+                                        objectName: "ruleMatchAll:" + ruleRow.path
+                                        label: "All"
+                                        radio: true
+                                        accessibleName: "All"
+                                        active: ruleRow.modelData.match === "all"
+                                        onClicked: root.setMatch(ruleRow.path, "all")
+                                    }
+                                    Segment {
+                                        visible: ruleRow.isGroup
+                                        objectName: "ruleMatchAny:" + ruleRow.path
+                                        label: "Any"
+                                        radio: true
+                                        accessibleName: "Any"
+                                        active: ruleRow.modelData.match === "any"
+                                        onClicked: root.setMatch(ruleRow.path, "any")
+                                    }
+                                    Text {
+                                        visible: ruleRow.isGroup
+                                        text: "of the following"
+                                        color: theme.foreground
+                                        font.pixelSize: backend.fontSize
+                                    }
+                                    Item { visible: ruleRow.isGroup; Layout.fillWidth: true }
                                 }
-                                Segment {
-                                    visible: ruleRow.isGroup
-                                    objectName: "ruleMatchAll:" + ruleRow.path
-                                    label: "All"
-                                    active: ruleRow.modelData.match === "all"
-                                    onClicked: root.setMatch(ruleRow.path, "all")
-                                }
-                                Segment {
-                                    visible: ruleRow.isGroup
-                                    objectName: "ruleMatchAny:" + ruleRow.path
-                                    label: "Any"
-                                    active: ruleRow.modelData.match === "any"
-                                    onClicked: root.setMatch(ruleRow.path, "any")
-                                }
-                                Text {
-                                    visible: ruleRow.isGroup
-                                    text: "of the following"
-                                    color: theme.foreground
-                                    font.pixelSize: backend.fontSize
-                                }
-                                Item { visible: ruleRow.isGroup; Layout.fillWidth: true }
                                 RuleButton {
                                     visible: ruleRow.isGroup && ruleRow.path !== ""
                                     objectName: "ruleGroupRemove:" + ruleRow.path
                                     symbol: "\u2212"
                                     tip: "Remove this sub-filter"
+                                    accessibleName: "Remove " + root.ruleLabel(ruleRow.path).toLowerCase()
                                     onClicked: root.removeRule(ruleRow.path)
                                 }
 
@@ -691,6 +730,7 @@ Popup {
                                     id: propBox
                                     visible: !ruleRow.isGroup
                                     objectName: "ruleProp:" + ruleRow.path
+                                    Accessible.name: root.ruleLabel(ruleRow.path) + " property"
                                     Layout.preferredWidth: 150
                                     Layout.fillWidth: true
                                     model: root.ruleProps
@@ -702,6 +742,7 @@ Popup {
                                     id: opBox
                                     visible: !ruleRow.isGroup
                                     objectName: "ruleOp:" + ruleRow.path
+                                    Accessible.name: root.ruleLabel(ruleRow.path) + " operator"
                                     Layout.preferredWidth: 130
                                     Layout.fillWidth: true
                                     model: ruleRow.isGroup ? [] : root.propOf(ruleRow.modelData.clause.prop).ops
@@ -713,6 +754,7 @@ Popup {
                                     // A single-valued property reads in full from its operator ("Note has a note").
                                     visible: !ruleRow.isGroup && !root.propOf(ruleRow.modelData.clause.prop).single
                                     objectName: "ruleValue:" + ruleRow.path
+                                    Accessible.name: root.ruleLabel(ruleRow.path) + " value"
                                     Layout.preferredWidth: 150
                                     Layout.fillWidth: true
                                     model: ruleRow.isGroup ? [] : root.propOf(ruleRow.modelData.clause.prop).values
@@ -730,6 +772,7 @@ Popup {
                                     objectName: "ruleRemove:" + ruleRow.path
                                     symbol: "\u2212"
                                     tip: "Remove this rule"
+                                    accessibleName: "Remove " + root.ruleLabel(ruleRow.path).toLowerCase()
                                     onClicked: root.removeRule(ruleRow.path)
                                 }
                                 RuleButton {
@@ -738,6 +781,7 @@ Popup {
                                     objectName: "ruleAdd:" + ruleRow.path
                                     symbol: "+"
                                     tip: "Add a rule below. Alt+click adds a sub-filter; right-click for both."
+                                    accessibleName: "Add rule after " + root.ruleLabel(ruleRow.path).toLowerCase()
                                     menu: true
                                     onClicked: (alt) => root.addRule(ruleRow.path, alt)
                                     onMenuRequested: root.addMenuAt(plusButton, ruleRow.path)
@@ -748,7 +792,7 @@ Popup {
                 }
                 RowLayout {
                     Layout.topMargin: 4
-                    Segment { objectName: "ruleAdd"; label: "+  Add Rule"; onClicked: root.addRule("", false) }
+                    Segment { objectName: "ruleAdd"; label: "+  Add Rule"; accessibleName: "Add rule"; onClicked: root.addRule("", false) }
                 }
 
                 Heading { text: "NAMED"; Layout.topMargin: 6 }
@@ -762,6 +806,7 @@ Popup {
                             required property int index
                             objectName: "pickerTab:" + modelData.key
                             label: modelData.title + (root.pickerCount(index) ? " (" + root.pickerCount(index) + ")" : "")
+                            accessibleName: modelData.title
                             active: root.pickerTab === index
                             onClicked: root.pickerTab = index
                         }
@@ -840,7 +885,7 @@ Popup {
                             onTextEdited: root.setGroup(index, { text: text })
                             Keys.onReturnPressed: root.doSearch()
                         }
-                        Segment { objectName: "removeGroup:" + index; label: "\u00d7"; onClicked: root.removeGroup(index) }
+                        Segment { objectName: "removeGroup:" + index; label: "\u00d7"; accessibleName: "Remove group " + (index + 1); onClicked: root.removeGroup(index) }
                     }
                 }
                 RowLayout {
@@ -851,8 +896,8 @@ Popup {
                 RowLayout {
                     spacing: 6
                     Text { Layout.preferredWidth: 72; text: "Search in"; color: theme.foreground; font.pixelSize: backend.fontSize }
-                    Segment { objectName: "scopeThis"; label: "This list"; active: !backend.searchAllLists; onClicked: backend.setSearchAllLists(false) }
-                    Segment { objectName: "scopeAll"; label: "All lists"; active: backend.searchAllLists; onClicked: backend.setSearchAllLists(true) }
+                    Segment { objectName: "scopeThis"; label: "This list"; accessibleName: "Search this list"; radio: true; active: !backend.searchAllLists; onClicked: backend.setSearchAllLists(false) }
+                    Segment { objectName: "scopeAll"; label: "All lists"; accessibleName: "Search all lists"; radio: true; active: backend.searchAllLists; onClicked: backend.setSearchAllLists(true) }
                 }
                 RowLayout {
                     spacing: 6
@@ -860,12 +905,16 @@ Popup {
                     Segment {
                         objectName: "searchScheduledHide"
                         label: "Hide"
+                        accessibleName: "Hide scheduled"
+                        radio: true
                         active: root.editingListId ? !root.includeScheduled : !backend.showScheduled
                         onClicked: { if (root.editingListId) root.includeScheduled = false; else backend.showScheduled = false }
                     }
                     Segment {
                         objectName: "searchScheduledInclude"
                         label: "Include"
+                        accessibleName: "Include scheduled"
+                        radio: true
                         active: root.editingListId ? root.includeScheduled : backend.showScheduled
                         onClicked: { if (root.editingListId) root.includeScheduled = true; else backend.showScheduled = true }
                     }
@@ -887,6 +936,7 @@ Popup {
                         TextField {
                             id: nField
                             objectName: "dateN:" + modelData.key
+                            Accessible.name: "Within the last, " + modelData.title
                             Layout.preferredWidth: 60
                             horizontalAlignment: Text.AlignHCenter
                             font.pixelSize: backend.fontSize
@@ -907,12 +957,16 @@ Popup {
                         Segment {
                             objectName: "dateUnit:" + modelData.key + ":d"
                             label: "days"
+                            accessibleName: modelData.title + " unit, days"
+                            radio: true
                             active: root.dates[modelData.key].unit === "d"
                             onClicked: root.setDate(modelData.key, root.dates[modelData.key].n, "d")
                         }
                         Segment {
                             objectName: "dateUnit:" + modelData.key + ":w"
                             label: "weeks"
+                            accessibleName: modelData.title + " unit, weeks"
+                            radio: true
                             active: root.dates[modelData.key].unit === "w"
                             onClicked: root.setDate(modelData.key, root.dates[modelData.key].n, "w")
                         }
@@ -923,10 +977,10 @@ Popup {
                 RowLayout {
                     spacing: 6
                     Text { Layout.preferredWidth: 72; text: "Due date"; color: theme.foreground; font.pixelSize: backend.fontSize }
-                    Segment { objectName: "rangeNone"; label: "Any"; active: root.rangeKind === "none"; onClicked: root.rangeKind = "none" }
-                    Segment { objectName: "rangeFixed"; label: "Between"; active: root.rangeKind === "fixed"; onClicked: root.rangeKind = "fixed" }
-                    Segment { objectName: "rangeNext"; label: "In the next"; active: root.rangeKind === "next"; onClicked: root.rangeKind = "next" }
-                    Segment { objectName: "rangeNoDue"; label: "No due date"; active: root.rangeKind === "nodue"; onClicked: root.rangeKind = "nodue" }
+                    Segment { objectName: "rangeNone"; label: "Any"; accessibleName: "Due date, any"; radio: true; active: root.rangeKind === "none"; onClicked: root.rangeKind = "none" }
+                    Segment { objectName: "rangeFixed"; label: "Between"; accessibleName: "Due date, between"; radio: true; active: root.rangeKind === "fixed"; onClicked: root.rangeKind = "fixed" }
+                    Segment { objectName: "rangeNext"; label: "In the next"; accessibleName: "Due date, in the next"; radio: true; active: root.rangeKind === "next"; onClicked: root.rangeKind = "next" }
+                    Segment { objectName: "rangeNoDue"; label: "No due date"; accessibleName: "Due date, no due date"; radio: true; active: root.rangeKind === "nodue"; onClicked: root.rangeKind = "nodue" }
                 }
                 RowLayout {
                     visible: root.rangeKind === "fixed"
@@ -935,6 +989,7 @@ Popup {
                     TextField {
                         id: fromField
                         objectName: "rangeFrom"
+                        Accessible.name: "Due date, from"
                         Layout.preferredWidth: 120
                         placeholderText: "yyyy-mm-dd"
                         text: root.rangeFrom
@@ -947,6 +1002,7 @@ Popup {
                     TextField {
                         id: toField
                         objectName: "rangeTo"
+                        Accessible.name: "Due date, to"
                         Layout.preferredWidth: 120
                         placeholderText: "yyyy-mm-dd"
                         text: root.rangeTo
@@ -963,6 +1019,7 @@ Popup {
                     TextField {
                         id: nextField
                         objectName: "rangeN"
+                        Accessible.name: "Due date, number"
                         Layout.preferredWidth: 60
                         horizontalAlignment: Text.AlignHCenter
                         font.pixelSize: backend.fontSize
@@ -979,6 +1036,8 @@ Popup {
                             required property var modelData
                             objectName: "rangeUnit:" + modelData[0]
                             label: modelData[1]
+                            accessibleName: "Due date unit, " + modelData[1]
+                            radio: true
                             active: root.rangeUnit === modelData[0]
                             onClicked: root.rangeUnit = modelData[0]
                         }
@@ -987,9 +1046,9 @@ Popup {
                 RowLayout {
                     spacing: 6
                     Text { Layout.preferredWidth: 72; text: "Completed"; color: theme.foreground; font.pixelSize: backend.fontSize }
-                    Segment { objectName: "completedDefault"; label: "Default"; active: root.completedMode === 0; onClicked: root.completedMode = 0 }
-                    Segment { objectName: "completedInclude"; label: "Include"; active: root.completedMode === 1; onClicked: root.completedMode = 1 }
-                    Segment { objectName: "completedExclude"; label: "Exclude"; active: root.completedMode === 2; onClicked: root.completedMode = 2 }
+                    Segment { objectName: "completedDefault"; label: "Default"; accessibleName: "Completed, default"; radio: true; active: root.completedMode === 0; onClicked: root.completedMode = 0 }
+                    Segment { objectName: "completedInclude"; label: "Include"; accessibleName: "Completed, include"; radio: true; active: root.completedMode === 1; onClicked: root.completedMode = 1 }
+                    Segment { objectName: "completedExclude"; label: "Exclude"; accessibleName: "Completed, exclude"; radio: true; active: root.completedMode === 2; onClicked: root.completedMode = 2 }
                 }
                 Text {
                     Layout.fillWidth: true
@@ -1024,6 +1083,7 @@ Popup {
                     TextArea {
                         id: preview
                         objectName: "preview"
+                        Accessible.name: "Search query"
                         wrapMode: TextEdit.Wrap
                         font.family: theme.monoFont
                         font.pixelSize: backend.fontSize
