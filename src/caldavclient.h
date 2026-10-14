@@ -96,6 +96,9 @@ public:
     // Creates or updates a resource. `ifMatch` empty means a new resource
     // (If-None-Match: *); otherwise it is the etag to replace. On success
     // `etag` is the new one, fetched again when the server does not return it.
+    // If that fetch fails the outcome is still ok (the write happened) but
+    // `etag` is empty and `error` says why: treat the etag as unknown and take
+    // it from the next etag listing, never as a new resource.
     void put(const QString &href, const QByteArray &data, const QString &ifMatch, PutDone done);
     void remove(const QString &href, const QString &ifMatch, RemoveDone done);
     void mkcalendar(const QString &homeHref, const QString &name, const QString &color, MkCalendarDone done);

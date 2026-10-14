@@ -489,11 +489,14 @@ void CalDavClient::put(const QString &href, const QByteArray &data, const QStrin
             done(o, etag);
             return;
         }
-        // The server did not return an ETag; ask for it.
-        fetchEtag(href, [done](const Outcome &e, const QString &fetched) {
-            Outcome out = e;
-            out.ok = true;
-            done(out, fetched);
+        // The server did not return an ETag; ask for it. The write itself
+        // succeeded, so the outcome stays ok even if that fails: the etag is
+        // then empty (unknown) and the error says why.
+        fetchEtag(href, [o, done](const Outcome &e, const QString &fetched) {
+            Outcome out = o;
+            if (!e.ok)
+                out.error = QStringLiteral("saved, but the new etag could not be read: ") + e.error;
+            done(out, e.ok ? fetched : QString());
         });
     });
 }
