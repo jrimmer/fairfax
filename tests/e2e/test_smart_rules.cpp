@@ -315,9 +315,12 @@ private slots:
         // Take the inner group's rows out one by one.
         QVERIFY(pressBuilderForChange("ruleRemove:1.1.1"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: starred AND (note OR duration)"), 5000);
+        QVERIFY(findItem("ruleGroupRemove:1.1") != nullptr);
         QVERIFY(pressBuilderForChange("ruleRemove:1.1.0"));
         QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("type: starred AND note"), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(!ruleRowShown("1.1.0"), 5000);
+        // The emptied inner group is gone, header and all, not left as a bare "Match" row.
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("ruleGroupRemove:1.1") == nullptr && findItem("ruleMatchAll:1.1") == nullptr, 5000);
         QCOMPARE(ruleRowCount(), 2);
         applyAndExpect("type: starred AND note", specTitles([](const Spec &s) { return shownInAll(s) && s.star && !s.notes.isEmpty(); }));
     }
