@@ -149,10 +149,6 @@ QList<QQuickItem *> visibleInteractive() {
 // offender cannot hide behind a broad prefix.
 const QVector<QString> &pendingAccessibility() {
     static const QVector<QString> pending{
-        // slice 2: task and sidebar rows
-        "taskRow:", "taskCheck:", "rowStarArea:", "paneTitle",
-        "sidebarRow:", "sidebarGroup:", "sidebarAdd", "sidebarTailDrop", "sidebarArchived",
-        "tagRow:", "tagGroup:",
         // slice 3: editor, settings, search builder
         "editorTitle", "editorCard", "setting:", "settingsPane:", "settingsClose",
         "ruleProp:", "ruleOp:", "ruleValue:", "ruleAdd", "ruleRemove:", "ruleGroupRemove:",
@@ -534,6 +530,113 @@ private slots:
         QVERIFY(focusOn("editorTagsRemove:garden"));
         app.press(Qt::Key_Space);
         QTRY_VERIFY_WITH_TIMEOUT(app.task(app.ids.plants).tagIds.isEmpty(), 5000);
+    }
+
+    // A task row reads its title and the facts the sighted row shows: the
+    // friendly due text, the priority and the star.
+    void taskRowIsNamed() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(lk(app.ids.home)));
+
+        // Pay electricity bill is overdue and high priority.
+        QVERIFY(tk::waitItem(QString("taskRow:%1").arg(app.ids.electricity)));
+        const QString due = tk::rowText("rowDue", app.ids.electricity);
+        QVERIFY(!due.isEmpty());
+        const QString billed = axName(QString("taskRow:%1").arg(app.ids.electricity));
+        QVERIFY2(billed.contains("Pay electricity bill"), qPrintable(billed));
+        QVERIFY2(billed.contains(due), qPrintable(billed));
+        QVERIFY2(billed.contains("high priority"), qPrintable(billed));
+
+        // Fix the shelf is starred (and has no due date).
+        const QString shelf = axName(QString("taskRow:%1").arg(app.ids.shelf));
+        QVERIFY2(shelf.contains("Fix the shelf"), qPrintable(shelf));
+        QVERIFY2(shelf.contains("starred"), qPrintable(shelf));
+    }
+
+    // Completing a task adds "completed" to the name and sets the checked
+    // state; selecting it sets the selected state.
+    void taskRowCheckedAndSelected() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        const qint64 id = app.ids.buyMilk;
+        QVERIFY(tk::waitItem(QString("taskRow:%1").arg(id)));
+
+        QVERIFY(!axName(QString("taskRow:%1").arg(id)).contains("completed"));
+        QVERIFY(!iface(QString("taskRow:%1").arg(id))->state().checked);
+
+        QVERIFY(tk::clickNamed(QString("taskCheck:%1").arg(id)));
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(axName(QString("taskRow:%1").arg(id)).contains("completed"), 5000);
+        QVERIFY(iface(QString("taskRow:%1").arg(id))->state().checked);
+
+        QVERIFY(tk::selectRow(app, id));
+        QTRY_VERIFY_WITH_TIMEOUT(iface(QString("taskRow:%1").arg(id))->state().selected, 5000);
+    }
+
+    // A project's row says what it is and how its sub-tasks are going.
+    void projectRowSaysProjectAndProgress() {
+        App app(seedLists);
+        QVERIFY(app.ok);
+        const auto &w = world();
+        QVERIFY(app.openSource(lk(app.ids.work)));
+        QVERIFY(tk::waitItem(QString("taskRow:%1").arg(w.launch)));
+
+        const QString name = axName(QString("taskRow:%1").arg(w.launch));
+        QVERIFY2(name.contains("Launch"), qPrintable(name));
+        QVERIFY2(name.contains("project"), qPrintable(name));
+        QVERIFY2(name.contains("0 of 1 done"), qPrintable(name));
+
+        // Completing the one sub-task moves the count.
+        QVERIFY(tk::clickNamed(QString("taskCheck:%1").arg(w.announce)));
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(w.announce).completed, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(axName(QString("taskRow:%1").arg(w.launch)).contains("1 of 1 done"), 5000);
+    }
+
+    // A sidebar list row's name is its title and the counts the row shows.
+    void sidebarListRowIsNamed() {
+        App app(seedLists);
+        QVERIFY(app.ok);
+        const auto &w = world();
+        const QString key = lk(w.errands);
+        QVERIFY(tk::waitItem("sidebarRow:" + key));
+        const auto badge = badgeOf(app, key);
+        QVERIFY(badge.overdueShown);
+        QVERIFY(badge.undoneShown);
+
+        const QString name = axName("sidebarRow:" + key);
+        QVERIFY2(name.contains("Errands"), qPrintable(name));
+        QVERIFY2(name.contains(QString::number(badge.undone) + " tasks"), qPrintable(name));
+        QVERIFY2(name.contains(QString::number(badge.overdue) + " overdue"), qPrintable(name));
+
+        // Focus lists say what they are and carry the counts shown too.
+        const QString today = axName("sidebarRow:today");
+        QVERIFY2(today.contains("Today") && today.contains("focus list"), qPrintable(today));
+    }
+
+    // A group header is a tree item whose name and state track expanded and
+    // collapsed.
+    void sidebarGroupReportsExpanded() {
+        App app(seedLists);
+        QVERIFY(app.ok);
+        const auto &w = world();
+        QQuickItem *header = nullptr;
+        QVERIFY(tk::waitFor([&] { return (header = groupHeader(w.projects)) != nullptr; }));
+        const QString name = "sidebarGroup:" + QString::number(w.projects);
+        QCOMPARE(axRole(name), QAccessible::TreeItem);
+        QVERIFY(iface(name)->state().expanded);
+        QVERIFY(!iface(name)->state().collapsed);
+        QVERIFY2(axName(name).contains("expanded"), qPrintable(axName(name)));
+
+        QVERIFY(tk::clickNamed(name));
+        QTRY_VERIFY_WITH_TIMEOUT(liveGroup(app, w.projects).collapsed, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!iface(name)->state().expanded, 5000);
+        QVERIFY2(axName(name).contains("collapsed"), qPrintable(axName(name)));
+
+        QVERIFY(tk::clickNamed(name));
+        QTRY_VERIFY_WITH_TIMEOUT(!liveGroup(app, w.projects).collapsed, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(iface(name)->state().expanded, 5000);
     }
 
     void popupsAndMenusAreNamed() {

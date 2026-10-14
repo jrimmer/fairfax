@@ -121,6 +121,16 @@ Rectangle {
                 visible: shown
                 height: !shown ? 0 : isHeader ? 36 : 28
 
+                // A tag row reads its name and count; a group reads as a
+                // tree item that is expanded or collapsed.
+                Accessible.role: isHeader ? Accessible.TreeItem : Accessible.ListItem
+                Accessible.name: isHeader ? (model.title || "") + ", " + (root.collapsed[model.groupId] ? "collapsed" : "expanded")
+                                          : [model.title || "", (model.count || 0) > 0 ? model.count + ((model.count || 0) === 1 ? " task" : " tasks") : ""].filter(s => s !== "").join(", ")
+                Accessible.selected: !isHeader && !!model.filtered
+                Accessible.expandable: isGroup
+                Accessible.expanded: isGroup && !root.collapsed[model.groupId]
+                Accessible.onPressAction: isHeader ? root.toggleCollapsed(model.groupId) : backend.toggleTagFilter(model.tagId)
+
                 // Header.
                 Text {
                     visible: row.isHeader

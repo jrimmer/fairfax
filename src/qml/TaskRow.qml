@@ -28,6 +28,44 @@ Item {
     height: lineHeight + (hasCrumb ? backend.fontSize + 2 : 0) + (showNotes ? backend.fontSize + 2 : 0)
     opacity: r.dimmed ? 0.55 : 1
 
+    // What a screen reader reads for this row: the title, then the facts a
+    // sighted user sees on it, comma-separated. The date uses the same
+    // friendly text the row shows.
+    readonly property string axDetails: {
+        const parts = []
+        if (root.r.type === 1 || root.r.type === 2) {
+            parts.push(root.r.type === 1 ? "project" : "checklist")
+            if ((root.r.childCount || 0) > 0)
+                parts.push(((root.r.childCount || 0) - (root.r.childOpen || 0)) + " of " + root.r.childCount + " done")
+            parts.push(root.r.collapsed ? "collapsed" : "expanded")
+        }
+        if (root.r.startText)
+            parts.push("starts " + root.r.startText)
+        if (root.r.dueText)
+            parts.push((root.r.overdue ? "overdue since " : "due ") + root.r.dueText)
+        if ((root.r.priority || 0) > 0)
+            parts.push(["", "low", "medium", "high"][root.r.priority] + " priority")
+        if (root.r.starred)
+            parts.push("starred")
+        // The list name shows in focus lists when chosen in Settings, or while
+        // Alt is held; the reader hears it whenever the row would show it.
+        if ((root.revealNames || backend.showListNames) && backend.sourceIsFocus && root.r.listName)
+            parts.push("in " + root.r.listName)
+        if ((root.r.tags || []).length > 0)
+            parts.push("tagged " + (root.r.tags || []).join(", "))
+        if (root.r.hasNotes)
+            parts.push("has notes")
+        if (root.r.completed)
+            parts.push("completed")
+        return parts.join(", ")
+    }
+
+    Accessible.role: Accessible.ListItem
+    Accessible.name: [root.r.title || "", root.axDetails].filter(s => s !== "").join(", ")
+    Accessible.selected: !!root.r.selected
+    Accessible.checkable: true
+    Accessible.checked: !!root.r.completed
+
     // The list's colour runs down the pane's leading edge, row by row.
     Rectangle {
         width: 4

@@ -186,6 +186,9 @@ Rectangle {
                     anchors.rightMargin: 8
                     radius: 6
                     color: archiveMouse.containsMouse ? theme.mix(theme.sidebar, theme.foreground, 0.05) : "transparent"
+                    Accessible.role: Accessible.Button
+                    Accessible.name: root.archived.length === 1 ? "Archived, 1 list" : "Archived, " + root.archived.length + " lists"
+                    Accessible.onPressAction: archiveDialog.open()
                     Icon {
                         x: 14
                         anchors.verticalCenter: parent.verticalCenter
@@ -443,6 +446,13 @@ Rectangle {
             }
             readonly property bool isGroup: (header.row.groupId || 0) > 0
 
+            Accessible.role: header.isGroup ? Accessible.TreeItem : Accessible.Heading
+            Accessible.name: header.isGroup ? (header.row.title || "") + ", " + (header.row.collapsed ? "collapsed" : "expanded")
+                                            : (header.row.title || "")
+            Accessible.expandable: header.isGroup
+            Accessible.expanded: header.isGroup && !header.row.collapsed
+            Accessible.onPressAction: if (header.isGroup) backend.toggleGroupCollapsed(header.row.groupId)
+
             // Lists dropped on a header go to the end of its group; groups
             // dropped on it land before it.
             DropArea {
@@ -553,6 +563,26 @@ Rectangle {
             property int rowIndex: parent ? parent.index : 0
             readonly property bool isList: row.kind === "list"
             readonly property color band: theme.listColor(row.color || 0)
+
+            // What a screen reader reads for this row: the name, what kind of
+            // entry it is, then the counts the row shows.
+            readonly property string axCounts: {
+                const parts = []
+                if ((row.undone || 0) > 0)
+                    parts.push(row.undone === 1 ? "1 task" : row.undone + " tasks")
+                if ((row.overdue || 0) > 0)
+                    parts.push(row.overdue === 1 ? "1 overdue" : row.overdue + " overdue")
+                return parts.join(", ")
+            }
+            readonly property string axKind: row.kind === "focus" ? "focus list"
+                                            : row.kind === "smart" ? "smart list"
+                                            : row.kind === "project" ? "project" : ""
+            Accessible.role: Accessible.TreeItem
+            Accessible.name: [row.title || "", axKind, axCounts].filter(s => s !== "").join(", ")
+            Accessible.selected: !!row.selected
+            Accessible.expandable: row.expandable === true
+            Accessible.expanded: row.expanded === true
+            Accessible.onPressAction: if (row.sourceKey) backend.selectSource(row.sourceKey)
             // Consecutive lists' colour pills join into one rounded column.
             readonly property bool runStart: {
                 const prev = backend.sidebar.get(rowIndex - 1)
@@ -606,6 +636,9 @@ Rectangle {
                 size: 11
                 stroke: 2
                 color: theme.muted
+                Accessible.role: Accessible.Button
+                Accessible.name: (item.row.expanded ? "Collapse " : "Expand ") + (item.row.title || "")
+                Accessible.onPressAction: backend.toggleListExpanded(item.row.listId)
                 MouseArea { anchors.fill: parent; anchors.margins: -5; onClicked: backend.toggleListExpanded(item.row.listId) }
             }
 
