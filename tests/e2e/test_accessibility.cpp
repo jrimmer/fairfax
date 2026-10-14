@@ -167,13 +167,16 @@ const QVector<QString> &pendingAccessibility() {
 
 // Whether an item is excused for a later slice. A named pattern is matched
 // against the item's objectName and class; an anonymous helper item (one with
-// no objectName) is also matched by the names of its parents, so the whole
-// body of a not-yet-named component is excused together.
+// no objectName) is matched by the nearest named ancestor only, so one
+// not-yet-named component is excused without a broader subtree behind it.
 bool pending(const QQuickItem *item) {
     QStringList names{item->objectName()};
     if (item->objectName().isEmpty())
         for (QQuickItem *p = item->parentItem(); p; p = p->parentItem())
-            names << p->objectName();
+            if (!p->objectName().isEmpty()) {
+                names << p->objectName();
+                break;
+            }
     const QString type = shortClass(item);
     for (const QString &p : pendingAccessibility()) {
         if (p.contains('*')) {
@@ -351,50 +354,52 @@ private slots:
         closeSettings(app);
     }
 
+    // The accessible item of a popup or dialog, and a check that it reports
+    // the Dialog role and the given title.
+    void checkDialog(const QString &objectName, const QString &title) {
+        QObject *p = findObject(objectName);
+        QVERIFY2(p, qPrintable("no popup " + objectName));
+        // Accessible properties on a Popup's contentItem surface through the
+        // content item; a Dialog puts them on its own surface.
+        auto *content = p->property("contentItem").value<QQuickItem *>();
+        QQuickItem *item = (content && QAccessible::queryAccessibleInterface(content) && QAccessible::queryAccessibleInterface(content)->isValid())
+                               ? content : popupSurface(p);
+        QVERIFY2(item, qPrintable(objectName + " has no accessible item"));
+        QAccessibleInterface *i = QAccessible::queryAccessibleInterface(item);
+        QVERIFY2(i && i->isValid(), qPrintable(objectName + " has no interface"));
+        QCOMPARE(int(i->role()), int(QAccessible::Dialog));
+        QCOMPARE(i->text(QAccessible::Name), title);
+    }
+
     // The command popup, the Quick Look and shortcut popups and the
     // ThemedDialog windows all report the Dialog role and their title.
     void popupsReportDialogAndTitle() {
         App app;
         QVERIFY(app.ok);
 
-        struct Case {
-            const char *name;
-            const char *title;
-        };
-        // Quick Look and the shortcut overlay are Popups with a fixed title;
-        // the Accessible properties live on the popup's content item.
-        const auto checkPopup = [&](const QString &objectName, const QString &title) {
-            QObject *p = findObject(objectName);
-            QVERIFY2(p, qPrintable("no popup " + objectName));
-            // Accessible properties on a Popup's contentItem surface on the
-            // popup item itself; a Dialog puts them on its own surface.
-            auto *content = p->property("contentItem").value<QQuickItem *>();
-            QQuickItem *item = (content && QAccessible::queryAccessibleInterface(content) && QAccessible::queryAccessibleInterface(content)->isValid())
-                                   ? content : popupSurface(p);
-            QVERIFY2(item, qPrintable(objectName + " has no accessible item"));
-            QAccessibleInterface *i = QAccessible::queryAccessibleInterface(item);
-            QVERIFY2(i && i->isValid(), qPrintable(objectName + " has no interface"));
-            QCOMPARE(int(i->role()), int(QAccessible::Dialog));
-            QCOMPARE(i->text(QAccessible::Name), title);
-        };
-
         QVERIFY(mk::homeWith(app, app.ids.buyMilk));
         app.press(Qt::Key_Space);
         QVERIFY(waitUntil([] { QObject *p = findObject("quickLook"); return p && p->property("visible").toBool(); }));
-        checkPopup("quickLook", "Quick Look");
+        checkDialog("quickLook", "Quick Look");
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!findObject("quickLook")->property("visible").toBool(), 5000);
 
         app.press(Qt::Key_Question, Qt::ShiftModifier);
         QVERIFY(waitUntil([] { QObject *p = findObject("shortcutOverlay"); return p && p->property("visible").toBool(); }));
-        checkPopup("shortcutOverlay", "Keyboard Shortcuts");
+        checkDialog("shortcutOverlay", "Keyboard Shortcuts");
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!findObject("shortcutOverlay")->property("visible").toBool(), 5000);
 
-        // The command bar's title comes from its kind.
+        // The command bar's title comes from its kind, first Defer (d) then
+        // Quick Open (Ctrl+Shift+O).
         app.press(Qt::Key_D);
         QVERIFY(waitUntil([] { QObject *p = findObject("commandPopup"); return p && p->property("visible").toBool(); }));
-        checkPopup("commandPopup", "Defer");
+        checkDialog("commandPopup", "Defer");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("commandPopup")->property("visible").toBool(), 5000);
+        app.press(Qt::Key_O, Qt::ControlModifier | Qt::ShiftModifier);
+        QVERIFY(waitUntil([] { QObject *p = findObject("commandPopup"); return p && p->property("visible").toBool(); }));
+        checkDialog("commandPopup", "Quick Open");
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!findObject("commandPopup")->property("visible").toBool(), 5000);
 
@@ -404,7 +409,7 @@ private slots:
         app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
         QObject *exportDialog = nullptr;
         QVERIFY(waitUntil([&] { return (exportDialog = findObject("exportDialog")) && exportDialog->property("opened").toBool(); }));
-        checkPopup("exportDialog", "Export Tasks");
+        checkDialog("exportDialog", "Export Tasks");
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!exportDialog->property("opened").toBool(), 5000);
 
@@ -421,6 +426,38 @@ private slots:
         QVERIFY2(qi->text(QAccessible::Name).contains("Quick Entry"), qPrintable(qi->text(QAccessible::Name)));
         quick->close();
         QTRY_VERIFY_WITH_TIMEOUT(windowTitled("Fairfax Quick Entry") == nullptr, 5000);
+    }
+
+    // The other ThemedDialogs keep the Dialog role and their title through Qt's
+    // own defaults: the archive, the list editor and the colour picker.
+    void themedDialogsReportDialogAndTitle() {
+        App app(seedLists);
+        QVERIFY(app.ok);
+        const auto &w = world();
+
+        // Archived Lists, opened from the sidebar's Archived row.
+        QVERIFY(listMenu(app, w.errands, "Archive"));
+        QQuickItem *archived = nullptr;
+        QVERIFY(waitUntil([&] { return (archived = findItem("sidebarArchived")) != nullptr; }));
+        clickSteady(archived);
+        QVERIFY(waitUntil([] { QObject *p = findObject("archiveDialog"); return p && p->property("opened").toBool(); }));
+        checkDialog("archiveDialog", "Archived Lists");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("archiveDialog")->property("opened").toBool(), 5000);
+
+        // Edit List, from a list row's context menu.
+        QVERIFY(listMenu(app, app.ids.home, "Edit List…"));
+        QVERIFY(waitUntil([] { QObject *p = findObject("editListDialog"); return p && p->property("opened").toBool(); }));
+        checkDialog("editListDialog", "Edit List");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("editListDialog")->property("opened").toBool(), 5000);
+
+        // Custom Color, from the same menu's Color submenu.
+        QVERIFY(listSubmenu(app, app.ids.home, "Color", "Custom…"));
+        QVERIFY(waitUntil([] { QObject *p = findObject("colorPicker"); return p && p->property("opened").toBool(); }));
+        checkDialog("colorPicker", "Custom Color");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("colorPicker")->property("opened").toBool(), 5000);
     }
 
     // The guard's own scan detects a MouseArea-owned control (IconButton), so

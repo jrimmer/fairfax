@@ -82,13 +82,14 @@ Rectangle {
         onAccepted: backend.deleteGroup(root.deleteGroupId)
     }
 
-    ArchiveDialog { id: archiveDialog; lists: root.archived }
+    ArchiveDialog { id: archiveDialog; objectName: "archiveDialog"; lists: root.archived }
 
     // One colour picker serves every custom-colour entry; `colorDone` says
     // what to do with the choice.
     property var colorDone: null
     ColorPickerDialog {
         id: colorPicker
+        objectName: "colorPicker"
         onPicked: (value) => { if (root.colorDone) root.colorDone(theme.customListColor(value)) }
     }
     function editList(id) { editListDialog.edit(id) }
