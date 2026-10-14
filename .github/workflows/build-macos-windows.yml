@@ -1,0 +1,154 @@
+name: Build macOS/Windows
+
+# Manual only: nothing here ever starts on its own, because macOS minutes
+# cost ten times as much on private repositories.
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: Which platforms to build
+        type: choice
+        options:
+          - windows
+          - macos
+          - both
+        default: windows
+      run_tests:
+        description: Run the unit tests and the selftest
+        type: boolean
+        default: true
+      make_installers:
+        description: Make the DMG (macOS) and the installer (Windows), not only the app and the zip
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: "6.8.3"
+
+jobs:
+  macos:
+    if: inputs.platforms == 'macos' || inputs.platforms == 'both'
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      FAIRFAX_SKIP_TESTS: ${{ inputs.run_tests && '0' || '1' }}
+      FAIRFAX_SKIP_DMG: ${{ inputs.make_installers && '0' || '1' }}
+      HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' && secrets.MACOS_SIGN_IDENTITY != '' }}
+      HAS_NOTARY: ${{ secrets.MACOS_NOTARY_APPLE_ID != '' && secrets.MACOS_NOTARY_TEAM_ID != '' && secrets.MACOS_NOTARY_PASSWORD != '' }}
+    steps:
+      # PIN-ME: resolve to a full commit SHA before the first run; the runner
+      # here is offline and cannot look one up.
+      - uses: actions/checkout@v4 # PIN-ME
+
+      - uses: jurplel/install-qt-action@v4 # PIN-ME
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      # Only when the signing secrets exist: import the certificate into a
+      # temporary keychain.
+      - name: Import the signing certificate
+        if: env.HAS_CERT == 'true'
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/fairfax.keychain-db"
+          pass="$(uuidgen)"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$pass" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$pass" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$pass" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Store the notarisation credentials
+        if: env.HAS_CERT == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials fairfax-notary \
+            --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$APP_PASSWORD"
+
+      - name: Build
+        env:
+          FAIRFAX_SIGN_IDENTITY: ${{ env.HAS_CERT == 'true' && secrets.MACOS_SIGN_IDENTITY || '' }}
+          FAIRFAX_NOTARY_PROFILE: ${{ env.HAS_CERT == 'true' && env.HAS_NOTARY == 'true' && 'fairfax-notary' || '' }}
+        run: bin/build-macos
+
+      - name: Zip the app
+        if: env.FAIRFAX_SKIP_DMG == '1'
+        run: ditto -c -k --keepParent build-macos/Fairfax.app build-macos/Fairfax-app.zip
+
+      - uses: actions/upload-artifact@v4 # PIN-ME
+        if: always()
+        with:
+          name: fairfax-macos
+          retention-days: 5
+          if-no-files-found: warn
+          path: |
+            build-macos/*.dmg
+            build-macos/Fairfax-app.zip
+            build-macos/*.log
+
+  windows:
+    if: inputs.platforms == 'windows' || inputs.platforms == 'both'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      FAIRFAX_SKIP_TESTS: ${{ inputs.run_tests && '0' || '1' }}
+      FAIRFAX_SKIP_INSTALLER: ${{ inputs.make_installers && '0' || '1' }}
+      HAS_CERT: ${{ secrets.WINDOWS_CERT_PFX != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
+    steps:
+      # PIN-ME: resolve to a full commit SHA before the first run; the runner
+      # here is offline and cannot look one up.
+      - uses: actions/checkout@v4 # PIN-ME
+
+      - uses: jurplel/install-qt-action@v4 # PIN-ME
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Install Inno Setup
+        if: env.FAIRFAX_SKIP_INSTALLER == '0'
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Write the signing certificate
+        if: env.HAS_CERT == 'true'
+        shell: pwsh
+        env:
+          CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP 'fairfax-sign.pfx'
+          [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:CERT_PFX))
+          "FAIRFAX_SIGN_CERT=$path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build
+        shell: pwsh
+        env:
+          FAIRFAX_SIGN_PASSWORD: ${{ env.HAS_CERT == 'true' && secrets.WINDOWS_CERT_PASSWORD || '' }}
+        run: ./bin/build-windows.ps1
+
+      - uses: actions/upload-artifact@v4 # PIN-ME
+        if: always()
+        with:
+          name: fairfax-windows
+          retention-days: 5
+          if-no-files-found: warn
+          path: |
+            build-windows/*.zip
+            build-windows/*-setup.exe
+            build-windows/*.log
