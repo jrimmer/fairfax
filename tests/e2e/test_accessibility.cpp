@@ -95,6 +95,14 @@ Report reportOf(QQuickItem *item) {
         return r;
     r.hasInterface = true;
     r.name = iface->text(QAccessible::Name).trimmed();
+    // Qt blanks the name of a password field, whatever it is given, so the
+    // label it is tied to with Accessible.labelledBy stands for it.
+    if (r.name.isEmpty() && item->property("echoMode").toInt() != 0)
+        for (QObject *child : item->findChildren<QObject *>(QString(), Qt::FindDirectChildrenOnly))
+            if (!qstrcmp(child->metaObject()->className(), "QQuickAccessibleAttached"))
+                if (auto *label = child->property("labelledBy").value<QQuickItem *>())
+                    if (QAccessibleInterface *li = QAccessible::queryAccessibleInterface(label); li && li->isValid())
+                        r.name = li->text(QAccessible::Name).trimmed();
     r.role = iface->role();
     return r;
 }
@@ -149,22 +157,6 @@ QList<QQuickItem *> visibleInteractive() {
 // offender cannot hide behind a broad prefix.
 const QVector<QString> &pendingAccessibility() {
     static const QVector<QString> pending{
-        // slice 3: editor, settings, search builder
-        "editorTitle", "editorCard", "setting:", "settingsPane:", "settingsClose",
-        "ruleProp:", "ruleOp:", "ruleValue:", "ruleAdd", "ruleRemove:", "ruleGroupRemove:",
-        "ruleMatchAll:", "ruleMatchAny:", "nameChip:", "pickerTab:", "groupJoin:", "groupField",
-        "dateN:", "dateUnit:", "rangeNone", "rangeFixed", "rangeNext", "rangeNoDue",
-        "rangeFrom", "rangeTo", "rangeN", "rangeUnit:",
-        "completedDefault", "completedInclude", "completedExclude",
-        "freeInput", "preview", "clearButton",
-        "saveButton", "updateButton", "searchButton", "ruleAddMenu", "soundexBox",
-        "aboutLink", "aboutLicense", "mailPipe", "mailPassword", "addGroup", "scopeThis",
-        "scopeAll", "searchScheduledHide", "searchScheduledInclude",
-        "editorStart", "editorStartTime", "editorDue", "editorDueTime", "editorTagsInput",
-        "editorNewSubtask", "notesText", "notesStamp", "notesPreviewToggle",
-        "quickStart", "quickStartTime", "quickDue", "quickDueTime", "quickTitle", "quickNotes",
-        "quickTagInput", "quickTagChip", "quickTagRemove", "quickTagMatch",
-        "quickType", "quickCancel", "quickSave",
         // slice 5: anything left
         "quickUnit:", "quickWeekday:",
         "utilityTabLocations", "utilityTabTags",
@@ -637,6 +629,239 @@ private slots:
         QVERIFY(tk::clickNamed(name));
         QTRY_VERIFY_WITH_TIMEOUT(!liveGroup(app, w.projects).collapsed, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(iface(name)->state().expanded, 5000);
+    }
+
+    // Every field of the editor reads by its field name; the star menu's
+    // entry reads "Starred" and carries the star's state.
+    void editorFieldsAreNamed() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        QVERIFY(tk::openEditor(app, app.ids.buyMilk));
+
+        // The spec's field names, plus the time halves of the two date fields.
+        const QStringList fields{"Title", "Notes", "Due date", "Start date", "Repeat", "Alerts", "List", "Tags",
+                                 "Action", "Location", "Priority", "Starred", "Duration"};
+        const QList<QPair<QString, QString>> expected{
+            {"editorTitle", "Title"},       {"notesText", "Notes"},        {"editorDue", "Due date"},
+            {"editorStart", "Start date"},  {"editorRepeat", "Repeat"},    {"editorAlarm", "Alerts"},
+            {"editorList", "List"},         {"editorTagsInput", "Tags"},   {"editorAction", "Action"},
+            {"editorLocation", "Location"}, {"editorPriority", "Priority"}, {"editorDuration", "Duration"},
+            {"editorDueTime", "Due time"},  {"editorStartTime", "Start time"}};
+        for (const auto &[objectName, name] : expected) {
+            QVERIFY2(tk::waitItem(objectName), qPrintable("no editor field " + objectName));
+            QCOMPARE(axName(objectName), name);
+            QVERIFY2(fields.contains(name) || name.endsWith(" time"), qPrintable(name));
+        }
+
+        // The list badge reads its list as the description.
+        QAccessibleInterface *list = iface("editorList");
+        QVERIFY(list && list->isValid());
+        QVERIFY(!list->text(QAccessible::Description).isEmpty());
+
+        // Starring is reached through the priority menu.
+        QVERIFY(tk::clickNamed("editorPriority"));
+        QQuickItem *star = nullptr;
+        QVERIFY(waitUntil([&] { return (star = findItem("editorStarred")) != nullptr; }));
+        QAccessibleInterface *si = QAccessible::queryAccessibleInterface(star);
+        QVERIFY(si && si->isValid());
+        QCOMPARE(si->text(QAccessible::Name), QString("Starred"));
+        QVERIFY(si->state().checkable);
+        QVERIFY(fields.contains(si->text(QAccessible::Name)));
+        app.press(Qt::Key_Escape);
+    }
+
+    // The date picker, the repeat editor and the alert dialogs name their parts.
+    void pickersAreNamed() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        QVERIFY(tk::openEditor(app, app.ids.buyMilk));
+
+        // The date picker opens under the due field with Down.
+        QVERIFY(focusOn("editorDue"));
+        app.press(Qt::Key_Down);
+        QQuickItem *none = nullptr;
+        QVERIFY(waitUntil([&] { return (none = findItem("pickerChip:None")) != nullptr; }));
+        QCOMPARE(axName("pickerChip:None"), QString("None"));
+        QCOMPARE(axRole("pickerChip:None"), QAccessible::Button);
+        QCOMPARE(axName("pickerPrevious"), QString("Previous month"));
+        QCOMPARE(axName("pickerNext"), QString("Next month"));
+        QQuickItem *day = findIn(none->window()->contentItem(), [](QQuickItem *i) { return i->objectName().startsWith("pickerDay:"); });
+        QVERIFY(day);
+        const QDate date = QDate::fromString(day->objectName().mid(10), Qt::ISODate);
+        QVERIFY(date.isValid());
+        QVERIFY2(axName(day->objectName()).startsWith(date.toString("dddd d MMMM yyyy")), qPrintable(axName(day->objectName())));
+        checkState("date picker");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("pickerChip:None"), 5000);
+
+        // The repeat editor, in the weekly and the monthly shape.
+        QVERIFY(tk::clickNamed("editorRepeat"));
+        QVERIFY(tk::waitItem("repeatFreq:Weekly"));
+        QVERIFY(tk::clickNamed("repeatFreq:Weekly"));
+        QVERIFY(tk::waitItem("repeatWeekday:0"));
+        QVERIFY(waitUntil([] { return findItem("repeatInterval") != nullptr; }));
+        QCOMPARE(axName("repeatWeekday:0"), QString("Monday"));
+        QCOMPARE(axName("repeatInterval"), QString("Repeat every"));
+        checkState("repeat editor, weekly");
+        QVERIFY(tk::clickNamed("repeatFreq:Monthly"));
+        QVERIFY(tk::waitItem("repeatMonthNth"));
+        QCOMPARE(axRole("repeatMonthNth"), QAccessible::RadioButton);
+        QVERIFY(!axName("repeatOrdinal").isEmpty());
+        checkState("repeat editor, monthly");
+        app.press(Qt::Key_Escape);
+    }
+
+    // The pane list is a tab list and the panes are tabs; the selected pane
+    // reports it.
+    void settingsPanesAreTabs() {
+        App app;
+        QVERIFY(app.ok);
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        QQuickItem *first = tk::waitItem("settingsPane:" + paneNames().first());
+        QVERIFY(first);
+        QAccessibleInterface *list = QAccessible::queryAccessibleInterface(first->parentItem());
+        QVERIFY(list && list->isValid());
+        QCOMPARE(int(list->role()), int(QAccessible::PageTabList));
+        for (const QString &pane : paneNames()) {
+            QQuickItem *tab = tk::waitItem("settingsPane:" + pane);
+            QVERIFY2(tab, qPrintable(pane));
+            QAccessibleInterface *i = QAccessible::queryAccessibleInterface(tab);
+            QVERIFY(i && i->isValid());
+            QCOMPARE(int(i->role()), int(QAccessible::PageTab));
+            QCOMPARE(i->text(QAccessible::Name), pane);
+        }
+        selectPane(sw, "Tasks");
+        QAccessibleInterface *tasks = QAccessible::queryAccessibleInterface(tk::waitItem("settingsPane:Tasks"));
+        QVERIFY(tasks->state().selected);
+        QAccessibleInterface *general = QAccessible::queryAccessibleInterface(tk::waitItem("settingsPane:General"));
+        QVERIFY(!general->state().selected);
+        closeSettings(app);
+    }
+
+    // Each Settings switch is named by its label and described by its note.
+    void settingsTogglesReadLabelAndNote() {
+        App app;
+        QVERIFY(app.ok);
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        int toggles = 0, withNote = 0;
+        for (const QString &pane : paneNames()) {
+            selectPane(sw, pane);
+            settleWindow(sw);
+            QList<QQuickItem *> boxes;
+            findIn(sw->contentItem(), [&](QQuickItem *i) {
+                QQuickItem *owner = i->parentItem();
+                if (i->objectName().startsWith("setting:") && i->inherits("QQuickCheckBox") && owner
+                    && owner->property("label").isValid() && owner->property("note").isValid())
+                    boxes << i;
+                return false;
+            });
+            for (QQuickItem *box : boxes) {
+                const QString label = box->parentItem()->property("label").toString();
+                const QString note = box->parentItem()->property("note").toString();
+                QAccessibleInterface *i = QAccessible::queryAccessibleInterface(box);
+                QVERIFY(i && i->isValid());
+                QCOMPARE(i->text(QAccessible::Name), label);
+                QCOMPARE(i->text(QAccessible::Description), note);
+                QCOMPARE(int(i->role()), int(QAccessible::CheckBox));
+                ++toggles;
+                withNote += !note.isEmpty();
+            }
+        }
+        QVERIFY2(toggles >= 10, qPrintable(QString::number(toggles)));
+        QVERIFY2(withNote >= 1, qPrintable(QString::number(withNote)));
+        closeSettings(app);
+    }
+
+    // The shortcut rows say which command their buttons belong to.
+    void shortcutButtonsNameTheirCommand() {
+        App app;
+        QVERIFY(app.ok);
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        selectPane(sw, "Shortcuts");
+        settleWindow(sw);
+        QQuickItem *key = tk::waitItem("shortcut:task.new");
+        QVERIFY(key);
+        const QString name = axName("shortcut:task.new");
+        QVERIFY2(name.startsWith("New task: "), qPrintable(name));
+        QVERIFY2(name.endsWith(app.backend().shortcutText("task.new")), qPrintable(name));
+        QCOMPARE(axName("shortcutClear:task.new"), QString("Clear New task"));
+        closeSettings(app);
+    }
+
+    // The About links take the keyboard and open on Space and Return.
+    void aboutLinksAreKeyboardReachable() {
+        App app;
+        QVERIFY(app.ok);
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        for (const QString &name : {QString("aboutLink"), QString("aboutLicense")}) {
+            QQuickItem *link = tk::waitItem(name);
+            QVERIFY(link);
+            QVERIFY(link->property("activeFocusOnTab").toBool());
+            QCOMPARE(axRole(name), QAccessible::Link);
+            QVERIFY(!axName(name).isEmpty());
+        }
+        // Return and Space each open the licence.
+        for (Qt::Key key : {Qt::Key_Return, Qt::Key_Space}) {
+            QQuickItem *license = tk::waitItem("aboutLicense");
+            license->forceActiveFocus(Qt::TabFocusReason);
+            QTest::keyClick(sw, key);
+            QObject *dialog = nullptr;
+            QVERIFY(waitUntil([&] { return (dialog = findObject("licenseDialog")) && dialog->property("visible").toBool(); }));
+            QTest::keyClick(sw, Qt::Key_Escape);
+            QTRY_VERIFY_WITH_TIMEOUT(!dialog->property("visible").toBool(), 5000);
+        }
+        closeSettings(app);
+    }
+
+    // The search builder names its rule combos and buttons by the rule's
+    // path, in a sub-filter too, and groups Match All/Any.
+    void searchBuilderNamesRules() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(openBuilder(app));
+        QVERIFY(!addRuleRow("Starred", "is").isEmpty());
+        QVERIFY(!addRuleRow("Note", "has").isEmpty());
+        QVERIFY(pressBuilderForChange("ruleAdd:0", Qt::AltModifier));
+        QVERIFY(waitUntil([] { return ruleRowShown("1.0"); }));
+
+        const QList<QPair<QString, QString>> expected{
+            {"ruleProp:0", "Rule 1 property"},     {"ruleOp:0", "Rule 1 operator"},
+            {"ruleAdd:0", "Add rule after rule 1"}, {"ruleRemove:0", "Remove rule 1"},
+            {"ruleProp:1.0", "Rule 2.1 property"}, {"ruleOp:1.0", "Rule 2.1 operator"},
+            {"ruleAdd:1.0", "Add rule after rule 2.1"}, {"ruleRemove:1.0", "Remove rule 2.1"},
+            {"ruleGroupRemove:1", "Remove rule 2"}};
+        for (const auto &[objectName, name] : expected) {
+            QVERIFY2(tk::waitItem(objectName), qPrintable("no " + objectName));
+            QCOMPARE(axName(objectName), name);
+        }
+        // A rule with a value combo names it too.
+        if (findItem("ruleValue:1.0"))
+            QCOMPARE(axName("ruleValue:1.0"), QString("Rule 2.1 value"));
+
+        // Match All/Any: radio buttons inside a group named "Match".
+        QCOMPARE(axName("ruleMatch:"), QString("Match"));
+        QCOMPARE(axRole("ruleMatch:"), QAccessible::Grouping);
+        QCOMPARE(axName("ruleMatch:1"), QString("Match, rule 2"));
+        QCOMPARE(axRole("ruleMatch:1"), QAccessible::Grouping);
+        for (const QString &path : {QString(), QString("1")}) {
+            QQuickItem *all = tk::waitItem("ruleMatchAll:" + path);
+            QVERIFY(all);
+            QCOMPARE(axRole("ruleMatchAll:" + path), QAccessible::RadioButton);
+            QCOMPARE(axRole("ruleMatchAny:" + path), QAccessible::RadioButton);
+            QCOMPARE(axName("ruleMatchAll:" + path), QString("All"));
+            QCOMPARE(axName("ruleMatchAny:" + path), QString("Any"));
+            QVERIFY(iface("ruleMatchAll:" + path)->state().checked);
+            QVERIFY(!iface("ruleMatchAny:" + path)->state().checked);
+            QCOMPARE(QAccessible::queryAccessibleInterface(all->parentItem())->text(QAccessible::Name),
+                     path.isEmpty() ? QString("Match") : QString("Match, rule 2"));
+        }
+        QVERIFY(closeBuilder(app));
     }
 
     void popupsAndMenusAreNamed() {
