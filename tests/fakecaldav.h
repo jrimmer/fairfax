@@ -231,9 +231,6 @@ private:
                 respond(s, 412, {});
                 return;
             }
-            if (ifNoneMatch.isEmpty() && ifMatch.isEmpty() && !exists) {
-                // A plain create still works.
-            }
             c->resources.insert(path, body);
             const QString etag = nextEtag();
             c->etags.insert(path, etag);
