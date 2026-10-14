@@ -1,14 +1,16 @@
 #pragma once
 
 // The icon in the Omarchy bar's tray (a StatusNotifierItem, through Qt's
-// system tray support). Its menu is a quick view of the day, overdue first,
-// each task opening in the app, followed by the everyday commands: New Task,
-// Open, Find, Sync and Quit. It's there because Fairfax keeps running in
-// the background for alarms; Settings → General turns it off.
+// system tray support). Its menu is a quick view chosen in Settings > General,
+// followed by the everyday commands: New Task, Open, Find, Sync and Quit. It's
+// there because Fairfax keeps running in the background for alarms; Settings →
+// General turns it off.
 
 #include <QObject>
 #include <QTimer>
 #include <functional>
+
+#include "traymenu.h"
 
 class QMenu;
 class QSystemTrayIcon;
@@ -30,6 +32,9 @@ public:
     // A notification from the tray icon, for alarms where the desktop has
     // no freedesktop notification service; clicking it opens the task.
     void showMessage(const QString &title, const QString &body, qint64 taskId);
+    // Carries out a menu entry: opening or completing a task, or running a
+    // command. Public so the offscreen end-to-end tests can drive it.
+    void activate(const TrayEntry &entry);
 
 private:
     void rebuild();

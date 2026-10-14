@@ -4,44 +4,17 @@
 #include <QCoreApplication>
 #include <QIcon>
 #include <QMenu>
-#include <QPainter>
-#include <QPixmap>
 #include <QSystemTrayIcon>
 
 #include "backend.h"
 #include "schedule.h"
 #include "store.h"
+#include "traymenu.h"
 #include "views.h"
 
 namespace {
 
-constexpr int MaxTasks = 12;
-
 ScheduleSettings settingsOf(const Store &store) { return ScheduleSettings::fromStore(store); }
-
-// The app icon with a red count in the corner, as the reference app badges its Dock icon;
-// no badge for zero.
-QIcon badgeIcon(int count) {
-    const QIcon base = QIcon::fromTheme("fairfax", QIcon(":/icon.svg"));
-    if (count <= 0)
-        return base;
-    QPixmap pixmap = base.pixmap(64, 64);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    const QString text = count > 99 ? QStringLiteral("99+") : QString::number(count);
-    QFont font = painter.font();
-    font.setBold(true);
-    font.setPixelSize(text.size() > 2 ? 24 : 30);
-    painter.setFont(font);
-    const int width = qMax(34, painter.fontMetrics().horizontalAdvance(text) + 14);
-    const QRect badge(pixmap.width() - width, pixmap.height() - 34, width, 34);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0xE5, 0x48, 0x4D));
-    painter.drawRoundedRect(badge, 17, 17);
-    painter.setPen(Qt::white);
-    painter.drawText(badge, Qt::AlignCenter, text);
-    return QIcon(pixmap);
-}
 
 }  // namespace
 
@@ -91,60 +64,37 @@ void Tray::rebuild() {
     if (!m_menu)
         return;
     const QDateTime now = QDateTime::currentDateTime();
-    const ScheduleSettings settings = settingsOf(*m_store);
-    const ViewBuilder views(*m_store, now, settings);
-    ViewOptions options;
-    options.completedWindowMinutes = 0;
-    const auto sections = views.build(Source{Source::Today, 0}, SortSpec{SortField::DueDate, true, true}, options);
-    const ListCounts counts = views.countsForFocus(Source::Today);
+    const ViewBuilder views(*m_store, now, settingsOf(*m_store));
 
     m_menu->clear();
-    QString heading = QStringLiteral("Today — ") + QLocale(QLocale::English).toString(now.date(), "ddd d MMM");
-    m_menu->addSection(heading);
-
-    int shown = 0, total = 0;
-    for (const auto &section : sections) {
-        for (const auto &row : section.rows) {
-            if (row.depth != 0)
-                continue;
-            ++total;
-            if (shown >= MaxTasks)
-                continue;
-            const Task t = m_store->task(row.taskId);
-            QString label = t.title;
-            if (Schedule::isOverdue(t, now, settings))
-                label = QStringLiteral("⚠ %1   ·  %2").arg(t.title, Schedule::friendlyDate(t.dueDate, now.date()).toLower());
-            else if (t.dueTime >= 0)
-                label = QStringLiteral("%1   ·  %2").arg(t.title, Schedule::formatTime(t.dueTime));
-            if (t.starred)
-                label = "★ " + label;
-            label.replace('&', "&&");  // Menus treat & as a mnemonic.
-            const qint64 id = t.id;
-            m_menu->addAction(label, this, [this, id] { m_backend->requestWindow(); m_backend->revealInList(id); });
-            ++shown;
+    for (const TrayEntry &entry : TrayMenu::entries(*m_store, now, canSync && canSync())) {
+        switch (entry.kind) {
+        case TrayEntry::Section:
+            m_menu->addSection(entry.label);
+            break;
+        case TrayEntry::Task:
+            m_menu->addAction(entry.label, this, [this, entry] { activate(entry); });
+            break;
+        case TrayEntry::Info:
+            m_menu->addAction(entry.label)->setEnabled(entry.enabled);
+            break;
+        case TrayEntry::More:
+            m_menu->addAction(entry.label, this, [this, entry] { activate(entry); });
+            break;
+        case TrayEntry::Separator:
+            m_menu->addSeparator();
+            break;
+        case TrayEntry::Command:
+            m_menu->addAction(entry.label, this, [this, entry] { activate(entry); });
+            break;
         }
     }
-    if (total == 0)
-        m_menu->addAction("Nothing left for today")->setEnabled(false);
-    else if (total > shown)
-        m_menu->addAction(QStringLiteral("… and %1 more").arg(total - shown), this, [this] {
-            m_backend->selectSource("today");
-            m_backend->requestWindow();
-        });
 
-    m_menu->addSeparator();
-    m_menu->addAction("New Task…", this, [this] { m_backend->requestQuickEntry(); });
-    m_menu->addAction("Open Fairfax", this, [this] { m_backend->requestWindow(); });
-    m_menu->addAction("Find a Task…", this, [this] { m_backend->requestPanel("open"); });
-    if (canSync && canSync())
-        m_menu->addAction("Sync Now", this, [this] { if (syncNow) syncNow(); });
-    m_menu->addAction("Settings…", this, [this] { m_backend->requestPanel("settings"); });
-    m_menu->addSeparator();
-    m_menu->addAction("Quit Fairfax", qApp, &QCoreApplication::quit);
-
-    // The "Badge shows" setting picks the number drawn on the icon.
+    // The "Badge shows" setting picks the number drawn on the icon; the
+    // "Badge colour" setting picks its shade.
     const int badge = views.badgeCount(m_store->setting("alerts.badge", "both").toString());
-    m_icon->setIcon(badgeIcon(badge));
+    m_icon->setIcon(TrayMenu::badgeIcon(badge, TrayMenu::badgeColour(*m_store)));
+    const ListCounts counts = views.countsForFocus(Source::Today);
     QString tip = QStringLiteral("Fairfax — %1 today").arg(counts.undone);
     if (counts.overdue)
         tip += QStringLiteral(", %1 overdue").arg(counts.overdue);
@@ -152,4 +102,39 @@ void Tray::rebuild() {
     m_icon->show();
     if (!m_store->setting("general.trayIcon", true).toBool())
         m_icon->hide();
+}
+
+void Tray::activate(const TrayEntry &entry) {
+    if (entry.kind == TrayEntry::Task) {
+        const QDateTime now = QDateTime::currentDateTime();
+        const Task t = m_store->task(entry.taskId);
+        if (!t.id)
+            return;
+        if (m_store->setting("tray.click", "open").toString() == "complete") {
+            m_backend->toggleComplete(entry.taskId);
+            showMessage(QStringLiteral("Completed: %1").arg(t.title), QString(), entry.taskId);
+        } else {
+            m_backend->requestWindow();
+            m_backend->revealInList(entry.taskId);
+        }
+        return;
+    }
+    if (entry.kind == TrayEntry::More) {
+        m_backend->selectSource(entry.sourceKey);
+        m_backend->requestWindow();
+        return;
+    }
+    if (entry.command == "new")
+        m_backend->requestQuickEntry();
+    else if (entry.command == "open")
+        m_backend->requestWindow();
+    else if (entry.command == "find")
+        m_backend->requestPanel("open");
+    else if (entry.command == "sync") {
+        if (syncNow)
+            syncNow();
+    } else if (entry.command == "settings")
+        m_backend->requestPanel("settings");
+    else if (entry.command == "quit")
+        QCoreApplication::quit();
 }
