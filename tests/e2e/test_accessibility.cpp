@@ -137,9 +137,11 @@ QList<QQuickItem *> visibleInteractive() {
 }
 
 // The interactive items that will be named by a later slice. Each pattern is
-// matched against an item's objectName and class name; a pattern that is not
-// a plain name (it contains ':' or '*') is a regular expression. Every entry
-// is removed by the slice that names the control.
+// matched against an item's objectName and class name: a plain prefix by
+// startsWith (so "taskRow:" covers every task row), and a pattern containing
+// '*' as a wildcard. Every entry is removed by the slice that names the
+// control. The ObjectName patterns are deliberately specific, so a new
+// offender cannot hide behind a broad prefix.
 const QVector<QString> &pendingAccessibility() {
     static const QVector<QString> pending{
         // slice 2: task and sidebar rows
