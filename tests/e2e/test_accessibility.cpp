@@ -2,6 +2,11 @@
 // app can show and reports every interactive one that a screen reader could
 // not name. New controls are added to pendingAccessibility() only while the
 // slice that names them is still to come; by the last slice the list is empty.
+//
+// Run against main before this slice, with nothing excused and every window
+// state probed, the guard found 809 offenders across those states (about 160
+// distinct items). The shared components named by this slice remove the ones
+// they cover; the rest sit in pendingAccessibility().
 
 #include <QAccessible>
 #include <QMetaEnum>
