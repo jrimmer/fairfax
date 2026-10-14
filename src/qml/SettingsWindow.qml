@@ -144,9 +144,16 @@ Window {
                     objectName: "aboutLink"
                     topPadding: 4
                     text: "github.com/jrimmer/fairfax"
+                    Accessible.role: Accessible.Link
+                    Accessible.name: "Project page on GitHub"
+                    Accessible.onPressAction: Qt.openUrlExternally("https://github.com/jrimmer/fairfax")
+                    activeFocusOnTab: true
+                    Keys.onSpacePressed: Qt.openUrlExternally("https://github.com/jrimmer/fairfax")
+                    Keys.onReturnPressed: Qt.openUrlExternally("https://github.com/jrimmer/fairfax")
+                    Keys.onEnterPressed: Qt.openUrlExternally("https://github.com/jrimmer/fairfax")
                     color: theme.today
                     font.pixelSize: backend.fontSize - 3
-                    font.underline: linkMouse.containsMouse
+                    font.underline: linkMouse.containsMouse || activeFocus
                     MouseArea {
                         id: linkMouse
                         anchors.fill: parent
@@ -159,9 +166,16 @@ Window {
                 Text {
                     objectName: "aboutLicense"
                     text: "MIT License"
+                    Accessible.role: Accessible.Link
+                    Accessible.name: "MIT License"
+                    Accessible.onPressAction: licenseDialog.open()
+                    activeFocusOnTab: true
+                    Keys.onSpacePressed: licenseDialog.open()
+                    Keys.onReturnPressed: licenseDialog.open()
+                    Keys.onEnterPressed: licenseDialog.open()
                     color: theme.today
                     font.pixelSize: backend.fontSize - 3
-                    font.underline: licenseMouse.containsMouse
+                    font.underline: licenseMouse.containsMouse || activeFocus
                     MouseArea {
                         id: licenseMouse
                         anchors.fill: parent
@@ -176,6 +190,8 @@ Window {
                 anchors.fill: parent
                 anchors.topMargin: 14
                 spacing: 2
+                Accessible.role: Accessible.PageTabList
+                Accessible.name: "Settings panes"
                 Repeater {
                     model: root.panes
                     Rectangle {
@@ -187,6 +203,10 @@ Window {
                         height: 32
                         radius: 6
                         color: root.pane === index ? theme.selection : "transparent"
+                        Accessible.role: Accessible.PageTab
+                        Accessible.name: modelData
+                        Accessible.selected: root.pane === index
+                        Accessible.onPressAction: root.pane = index
                         Text { x: 12; anchors.verticalCenter: parent.verticalCenter; text: modelData; color: theme.foreground; font.pixelSize: backend.fontSize }
                         MouseArea { anchors.fill: parent; onClicked: root.pane = index }
                     }
@@ -243,6 +263,7 @@ Window {
                             Label { text: "Quick view"; Layout.preferredWidth: 160 }
                             ComboBox {
                                 objectName: "setting:tray.source"
+                                Accessible.name: "Quick view"
                                 implicitContentWidthPolicy: ComboBox.WidestText
                                 textRole: "name"
                                 valueRole: "id"
@@ -255,6 +276,9 @@ Window {
                             Label { text: "Tasks shown"; Layout.preferredWidth: 160 }
                             SpinBox {
                                 objectName: "setting:tray.count"
+                                Accessible.name: "Tasks shown"
+                                // The number field inside the spin box is what a screen reader lands on.
+                                Component.onCompleted: contentItem.Accessible.name = "Tasks shown"
                                 from: 3; to: 30
                                 value: Number(root.value("tray.count", 12))
                                 onValueModified: backend.setSetting("tray.count", value)
@@ -264,6 +288,7 @@ Window {
                             Label { text: "Clicking a task"; Layout.preferredWidth: 160 }
                             ComboBox {
                                 objectName: "setting:tray.click"
+                                Accessible.name: "Clicking a task"
                                 implicitContentWidthPolicy: ComboBox.WidestText
                                 readonly property var modes: ["open", "complete"]
                                 model: ["Opens it in Fairfax", "Completes it"]
@@ -286,6 +311,7 @@ Window {
                             Label { text: "Badge colour"; Layout.preferredWidth: 160 }
                             Button {
                                 objectName: "setting:tray.badgeColor"
+                                Accessible.name: "Badge colour"
                                 implicitWidth: 48
                                 implicitHeight: 28
                                 background: Rectangle {
@@ -304,6 +330,7 @@ Window {
                         Label { text: "Week starts on"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:general.weekStart"
+                            Accessible.name: "Week starts on"
                             // 0 follows the system locale; 1 to 7 are Qt's Monday to Sunday.
                             readonly property var days: [0, 1, 7, 6]
                             model: ["Automatic (" + Qt.locale().dayName(Qt.locale().firstDayOfWeek, Locale.LongFormat) + ")", "Monday", "Sunday", "Saturday"]
@@ -342,18 +369,19 @@ Window {
                     }
                     RowLayout {
                         Label { text: "Text size"; Layout.preferredWidth: 160 }
-                        Slider { objectName: "setting:appearance.textSize"; from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }
+                        Slider { objectName: "setting:appearance.textSize"; Accessible.name: "Text size"; from: 0; to: 8; stepSize: 1; snapMode: Slider.SnapAlways; value: backend.textSize; onMoved: backend.textSize = value; Layout.fillWidth: true }
                         Label { text: backend.textSizeName; Layout.preferredWidth: 70 }
                     }
                     RowLayout {
                         Label { text: "Content width"; Layout.preferredWidth: 160 }
-                        Slider { objectName: "setting:appearance.contentWidth"; from: 1400; to: 640; stepSize: 20; value: Number(root.value("appearance.contentWidth", 980)); onMoved: backend.setSetting("appearance.contentWidth", value); Layout.fillWidth: true }
+                        Slider { objectName: "setting:appearance.contentWidth"; Accessible.name: "Content width"; from: 1400; to: 640; stepSize: 20; value: Number(root.value("appearance.contentWidth", 980)); onMoved: backend.setSetting("appearance.contentWidth", value); Layout.fillWidth: true }
                         Label { text: "Compact"; color: theme.muted }
                     }
                     RowLayout {
                         Label { text: "Task rows"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:appearance.density"
+                            Accessible.name: "Task rows"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             model: ["Compressed", "Normal", "Extended"]
                             currentIndex: Number(root.value("appearance.density", 1))
@@ -364,6 +392,7 @@ Window {
                         Label { text: "Mini calendar busy days"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:appearance.calendarStyle"
+                            Accessible.name: "Mini calendar busy days"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var styles: ["heat", "dots", "none"]
                             model: ["Heat Map", "Dots", "None"]
@@ -400,6 +429,7 @@ Window {
                         Label { text: "Show completed tasks for"; Layout.preferredWidth: 220 }
                         ComboBox {
                             objectName: "setting:tasks.completedWindow"
+                            Accessible.name: "Show completed tasks for"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var minutes: [0, 1, 60, 1440, 10080, 43200, -1]
                             model: ["Never", "1 minute", "1 hour", "1 day", "1 week", "1 month", "Always"]
@@ -412,6 +442,7 @@ Window {
                         Label { text: "Default list"; Layout.preferredWidth: 220 }
                         ComboBox {
                             objectName: "setting:tasks.defaultList"
+                            Accessible.name: "Default list"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             // 0 is the first list and -1 the list used last.
                             model: [{ name: "First list", id: 0 }, { name: "Last used", id: -1 }].concat(backend.listChoices)
@@ -427,6 +458,7 @@ Window {
                         Label { text: "Default due date for new tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
                             objectName: "setting:tasks.defaultDueOffset"
+                            Accessible.name: "Default due date for new tasks"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [-1, 0, 1, 2, 3, 7, 14, 30]
                             model: ["None", "Same Day", "Day After", "2 Days Later", "3 Days Later", "1 Week Later", "2 Weeks Later", "Next Month"]
@@ -460,12 +492,14 @@ Window {
                         CheckBox {
                             id: useDueTime
                             objectName: "setting:tasks.useDefaultDueTime"
+                            Accessible.name: "Default due time"
                             text: "Default due time"
                             checked: root.bool("tasks.useDefaultDueTime", false)
                             onToggled: backend.setSetting("tasks.useDefaultDueTime", checked)
                         }
                         ComboBox {
                             objectName: "setting:tasks.defaultDueTime"
+                            Accessible.name: "Default due time"
                             enabled: useDueTime.checked
                             model: root.timeSteps.map(m => root.timeLabel(m))
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -478,6 +512,7 @@ Window {
                         Label { text: "Auto-delete completed tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
                             objectName: "setting:tasks.autoDeleteDays"
+                            Accessible.name: "Auto-delete completed tasks"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [0, 1, 7, 30, 90, 180, 365]
                             model: ["Never", "After 1 day", "After 1 week", "After 1 month", "After 3 months", "After 6 months", "After 1 year"]
@@ -492,6 +527,7 @@ Window {
                         Label { text: "Due time shortcuts"; Layout.preferredWidth: 220 }
                         TextField {
                             objectName: "setting:tasks.dueTimeChips"
+                            Accessible.name: "Due time shortcuts"
                             Layout.fillWidth: true
                             placeholderText: "9am, 12pm, 3pm, 6pm"
                             text: String(backend.setting("tasks.dueTimeChips").value || "")
@@ -517,6 +553,7 @@ Window {
                         Label { text: "Counts on lists"; Layout.preferredWidth: 260 }
                         ComboBox {
                             objectName: "setting:lists.counts"
+                            Accessible.name: "Counts on lists"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             model: ["None", "Overdue", "Overdue + Undone"]
                             currentIndex: Math.max(0, Math.min(2, Number(root.value("lists.counts", 2))))
@@ -558,6 +595,7 @@ Window {
                         Label { text: "Sound alerts repeat until dismissed"; Layout.preferredWidth: 260 }
                         ComboBox {
                             objectName: "setting:alerts.nagMinutes"
+                            Accessible.name: "Sound alerts repeat until dismissed"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var minutes: [0, 2, 5, 10]
                             model: ["Never", "Every 2 mins", "Every 5 mins", "Every 10 mins"]
@@ -571,6 +609,7 @@ Window {
                         Label { text: "Badge shows"; Layout.preferredWidth: 260 }
                         ComboBox {
                             objectName: "setting:alerts.badge"
+                            Accessible.name: "Badge shows"
                             readonly property var metrics: ["both", "overdue", "today", "none"]
                             model: ["Overdue + Today", "Overdue", "Today", "None"]
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -585,6 +624,7 @@ Window {
                         Label { text: "Tasks with a due time"; Layout.preferredWidth: 170 }
                         ComboBox {
                             objectName: "setting:alerts.defaultTimed"
+                            Accessible.name: "Tasks with a due time"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var offsets: [-1, 0, 5, 10, 15, 30, 60, 120, 360, 720, 1440, 2880]
                             model: ["None", "At due time", "5 minutes before", "10 minutes before", "15 minutes before", "30 minutes before",
@@ -597,6 +637,7 @@ Window {
                         Label { text: "Tasks with only a date"; Layout.preferredWidth: 170 }
                         ComboBox {
                             objectName: "setting:alerts.defaultDateOnly"
+                            Accessible.name: "Tasks with only a date"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var days: [-1, 0, 1, 2]
                             model: ["None", "On the day", "1 day before", "2 days before"]
@@ -606,6 +647,7 @@ Window {
                         Label { text: "at" }
                         ComboBox {
                             objectName: "setting:alerts.defaultDateOnlyTime"
+                            Accessible.name: "Tasks with only a date at"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             id: reminderTime
                             readonly property var minutes: [360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260]
@@ -767,6 +809,7 @@ Window {
                         Label { text: "Account"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:mail.account"
+                            Accessible.name: "Account"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var kinds: ["gmail", "outlook", "other"]
                             model: ["Gmail", "Outlook", "Other"]
@@ -886,6 +929,7 @@ Window {
                             Label { text: "Security"; Layout.preferredWidth: 160 }
                             ComboBox {
                                 objectName: "setting:mail.security"
+                                Accessible.name: "Security"
                                 implicitContentWidthPolicy: ComboBox.WidestText
                                 readonly property var kinds: ["tls", "starttls", "none"]
                                 model: ["TLS", "STARTTLS", "None"]
@@ -917,6 +961,7 @@ Window {
                         Label { text: "After importing"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:mail.after"
+                            Accessible.name: "After importing"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             readonly property var kinds: ["move", "read", "leave"]
                             model: ["Move to", "Mark as read", "Leave as is"]
@@ -925,6 +970,7 @@ Window {
                         }
                         TextField {
                             objectName: "setting:mail.moveTo"
+                            Accessible.name: "Move to"
                             visible: mailPane.after === "move"
                             Layout.preferredWidth: 160
                             placeholderText: "Fairfax"
@@ -937,6 +983,7 @@ Window {
                         Label { text: "New tasks go to"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:mail.listId"
+                            Accessible.name: "New tasks go to"
                             implicitContentWidthPolicy: ComboBox.WidestText
                             model: [{ name: "Inbox", id: 0 }].concat(backend.listChoices.filter(l => l.name !== "Inbox"))
                             textRole: "name"
@@ -959,6 +1006,9 @@ Window {
                         Label { text: "Check every"; Layout.preferredWidth: 160 }
                         SpinBox {
                             objectName: "setting:mail.interval"
+                            Accessible.name: "Check every"
+                            // The number field inside the spin box is what a screen reader lands on.
+                            Component.onCompleted: contentItem.Accessible.name = "Check every"
                             from: 1; to: 240
                             value: { mailFetch.revision; return Number(mailFetch.option("mail.interval")) }
                             onValueModified: mailFetch.setOption("mail.interval", value)
@@ -989,6 +1039,7 @@ Window {
                     Hint { Layout.topMargin: 0; text: "For Sieve, procmail, fetchmail or a bridge, pass messages to Fairfax yourself:" }
                     TextEdit {
                         objectName: "mailPipe"
+                        Accessible.name: "Command to pipe mail in"
                         readOnly: true
                         selectByMouse: true
                         Layout.fillWidth: true
@@ -1011,6 +1062,7 @@ Window {
                         Label { text: "Back up automatically"; Layout.preferredWidth: 200 }
                         ComboBox {
                             objectName: "setting:backup.intervalHours"
+                            Accessible.name: "Back up automatically"
                             readonly property var hours: [0, 24, 48]
                             model: ["Never", "Every 24 hours", "Every 48 hours"]
                             implicitContentWidthPolicy: ComboBox.WidestText
@@ -1020,7 +1072,7 @@ Window {
                     }
                     RowLayout {
                         Label { text: "Keep at most"; Layout.preferredWidth: 200 }
-                        SpinBox { objectName: "setting:backup.keep"; from: 1; to: 100; value: Number(root.value("backup.keep", 10)); onValueModified: backend.setSetting("backup.keep", value) }
+                        SpinBox { objectName: "setting:backup.keep"; Accessible.name: "Keep at most"; Component.onCompleted: contentItem.Accessible.name = "Keep at most"; from: 1; to: 100; value: Number(root.value("backup.keep", 10)); onValueModified: backend.setSetting("backup.keep", value) }
                     }
                     RowLayout {
                         Button { objectName: "backupNow"; text: "Back Up Now"; onClicked: { backend.backupNow(); backupList.model = backend.backups() } }
@@ -1082,6 +1134,7 @@ Window {
                         TextArea {
                             id: calendarSources
                             objectName: "setting:calendar.sources"
+                            Accessible.name: "Calendar sources"
                             text: String(backend.setting("calendar.sources").value || "")
                             placeholderText: "https://calendar.example.com/private.ics"
                             wrapMode: TextEdit.NoWrap
@@ -1149,6 +1202,7 @@ Window {
                     Label { text: "My email addresses"; Layout.topMargin: 8 }
                     TextField {
                         objectName: "setting:calendar.emails"
+                        Accessible.name: "My email addresses"
                         Layout.fillWidth: true
                         text: String(backend.setting("calendar.emails").value || "")
                         placeholderText: "me@example.com, me@work.example"
@@ -1490,6 +1544,10 @@ Window {
         CheckBox {
             objectName: "setting:" + parent.key
             text: parent.label
+            // A screen reader reads the switch by its label and, when there is
+            // one, the note under it as the description.
+            Accessible.name: parent.label
+            Accessible.description: parent.note || ""
             checked: root.bool(parent.key, parent.fallback)
             onToggled: backend.setSetting(parent.key, checked)
         }
@@ -1540,6 +1598,7 @@ Window {
         Label { text: parent.label; Layout.preferredWidth: 160 }
         TextField {
             objectName: "setting:" + parent.key
+            Accessible.name: parent.label
             Layout.fillWidth: true
             placeholderText: parent.placeholder
             selectByMouse: true
@@ -1552,10 +1611,12 @@ Window {
     component MailPassword: RowLayout {
         property string label
         Layout.fillWidth: true
-        Label { text: parent.label; Layout.preferredWidth: 160 }
+        Label { id: passwordLabel; text: parent.label; Layout.preferredWidth: 160 }
         TextField {
             id: mailPasswordField
             objectName: "mailPassword"
+            Accessible.name: parent.label
+            Accessible.labelledBy: passwordLabel
             Layout.fillWidth: true
             echoMode: TextInput.Password
             selectByMouse: true
@@ -1633,6 +1694,7 @@ Window {
             }
             Button {
                 objectName: "shortcut:" + id
+                Accessible.name: cmd.title + ": " + text
                 visible: !cmd.fixed
                 Layout.preferredWidth: 170
                 Layout.minimumWidth: 0
@@ -1661,6 +1723,7 @@ Window {
                     anchors.fill: parent
                     visible: cmd.current.length > 0
                     text: "Clear"
+                    Accessible.name: "Clear " + cmd.title
                     topPadding: 2
                     bottomPadding: 2
                     flat: true
@@ -1678,6 +1741,7 @@ Window {
                     anchors.fill: parent
                     visible: shortcutPane.differs(cmd)
                     text: "Reset"
+                    Accessible.name: "Reset " + cmd.title
                     topPadding: 2
                     bottomPadding: 2
                     flat: true
