@@ -268,6 +268,20 @@ private slots:
     // Tags: "a tokenized entry field with auto-completion... press Return or
     // click to accept a suggestion... Chips shown in the order you added them".
     // Also a comma, Backspace on the empty field, and the chip's cross.
+    // Clicks a chip's cross until the chip is gone: the chips reflow after an
+    // earlier removal, and a click landing mid-reflow misses.
+    static bool removeChip(const QString &tag) {
+        for (int i = 0; i < 3; ++i) {
+            QQuickItem *cross = findItem("editorTagsRemove:" + tag);
+            if (!cross)
+                return !findItem("editorTagsChip:" + tag);
+            click(cross);
+            if (waitFor([&] { return !findItem("editorTagsChip:" + tag); }, 1500))
+                return true;
+        }
+        return false;
+    }
+
     void tagsTypedAutocompletedAndRemoved() {
         App app;
         QVERIFY(app.ok);
@@ -293,16 +307,14 @@ private slots:
         QVERIFY(waitFor([] { return !findItem("editorTagsChip:shop"); }));
         QCOMPARE(tagNames(app, app.task(id)), (QStringList{"errands", "garden"}));
         // The cross removes a chosen chip.
-        click(findItem("editorTagsRemove:errands"));
-        QVERIFY(waitFor([] { return !findItem("editorTagsChip:errands"); }));
+        QVERIFY(removeChip("errands"));
         QCOMPARE(tagNames(app, app.task(id)), QStringList{"garden"});
         QVERIFY(closeEditor(app));
         QTRY_VERIFY_WITH_TIMEOUT(badge("rowTagIcon", id), 5000);
 
         // Take the last one away: no tag icon any more.
         QVERIFY(openEditor(app, id));
-        click(findItem("editorTagsRemove:garden"));
-        QVERIFY(waitFor([] { return !findItem("editorTagsChip:garden"); }));
+        QVERIFY(removeChip("garden"));
         QVERIFY(app.task(id).tagIds.isEmpty());
         QVERIFY(closeEditor(app));
         QTRY_VERIFY_WITH_TIMEOUT(!badge("rowTagIcon", id), 5000);
