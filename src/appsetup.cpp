@@ -53,6 +53,7 @@ void AppServices::startSync(bool opened, bool offscreen)
         QTimer::singleShot(3000, todoist.get(), &TodoistSync::syncNow);
     folderSync = std::make_unique<FolderSync>(&store);
     webDavSync = std::make_unique<WebDavSync>(&store);
+    caldavSync = std::make_unique<CalDavSync>(&store, &theme);
     // The launch sync asks again when it fires, in case automatic sync was
     // switched off in the first few seconds.
     if (SyncTree::autoSyncEnabled(store)) {
@@ -69,6 +70,7 @@ void AppServices::startSync(bool opened, bool offscreen)
     syncHub.add(todoist.get(), "Todoist");
     syncHub.add(folderSync.get(), "Folder");
     syncHub.add(webDavSync.get(), "WebDAV");
+    syncHub.add(caldavSync.get(), "CalDAV");
 }
 
 void AppServices::install(QQmlEngine &engine, const QString &storeError, bool startHidden)
@@ -79,6 +81,7 @@ void AppServices::install(QQmlEngine &engine, const QString &storeError, bool st
     context->setContextProperty("todoist", todoist.get());
     context->setContextProperty("folderSync", folderSync.get());
     context->setContextProperty("webDavSync", webDavSync.get());
+    context->setContextProperty("caldavSync", caldavSync.get());
     context->setContextProperty("mailFetch", mail.get());
     context->setContextProperty("syncHub", &syncHub);
     context->setContextProperty("calendar", &calendar);

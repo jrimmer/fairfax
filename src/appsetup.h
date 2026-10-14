@@ -9,6 +9,7 @@
 #include <QString>
 
 #include "backend.h"
+#include "caldavsync.h"
 #include "calendar.h"
 #include "filepicker.h"
 #include "foldersync.h"
@@ -45,6 +46,7 @@ public:
     std::unique_ptr<TodoistSync> todoist;
     std::unique_ptr<FolderSync> folderSync;
     std::unique_ptr<WebDavSync> webDavSync;
+    std::unique_ptr<CalDavSync> caldavSync;
     // Always there (the Mail pane works anywhere), but it only connects once
     // started: startSync() does that at launch, tests call fetchNow().
     std::unique_ptr<MailFetch> mail;
