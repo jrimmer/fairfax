@@ -114,7 +114,11 @@ QQuickItem *focusOn(const QString &name) {
 
 // Every visible interactive item under `root`, in any window. An item that
 // only owns a mouse area is skipped when an ancestor is also interactive: the
-// row or badge above it is the one control a screen reader should read.
+// row or badge above it is the one control a screen reader should read. An
+// item that only owns a mouse area but wraps real controls of its own (such as
+// the calendar's drag layer over its day buttons, or the task list's scroll
+// viewport) is skipped too: the controls inside it are judged instead, so the
+// wrapper cannot hide an unnamed one.
 void collect(QQuickItem *root, bool underInteractive, QList<QQuickItem *> &out) {
     if (!root->isVisible() || !root->isEnabled())
         return;
@@ -146,7 +150,10 @@ const QVector<QString> &pendingAccessibility() {
         "editorTitle", "editorCard", "setting:", "settingsPane:", "settingsClose",
         "ruleProp:", "ruleOp:", "ruleValue:", "ruleAdd", "ruleRemove:", "ruleGroupRemove:",
         "ruleMatchAll:", "ruleMatchAny:", "nameChip:", "pickerTab:", "groupJoin:", "groupField",
-        "dateN:", "dateUnit:", "range", "completed", "freeInput", "preview", "clearButton",
+        "dateN:", "dateUnit:", "rangeNone", "rangeFixed", "rangeNext", "rangeNoDue",
+        "rangeFrom", "rangeTo", "rangeN", "rangeUnit:",
+        "completedDefault", "completedInclude", "completedExclude",
+        "freeInput", "preview", "clearButton",
         "saveButton", "updateButton", "searchButton", "ruleAddMenu", "soundexBox",
         "aboutLink", "aboutLicense", "mailPipe", "mailPassword", "addGroup", "scopeThis",
         "scopeAll", "searchScheduledHide", "searchScheduledInclude",
@@ -156,8 +163,8 @@ const QVector<QString> &pendingAccessibility() {
         "quickTagInput", "quickTagChip", "quickTagRemove", "quickTagMatch",
         "quickType", "quickCancel", "quickSave",
         // slice 5: anything left
-        "quickTag", "quickUnit:", "quickWeekday:",
-        "utilityTab",
+        "quickUnit:", "quickWeekday:",
+        "utilityTabLocations", "utilityTabTags",
         "quickCustomDone", "quickPriority", "quickList",
         "quickAttach", "quickLocation", "quickRepeat", "quickAlarm", "quickDuration",
         "calTitle", "searchClear", "commandChip:", "commandInput",
