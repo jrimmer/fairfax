@@ -185,8 +185,10 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
                 QQuickItem *row = nullptr;
                 QTRY_VERIFY_WITH_TIMEOUT((row = app.row(project)) != nullptr, 5000);
                 // A row still sliding into place can miss the click; aim again.
+                // The delegate can be rebuilt meanwhile, so look the row up again each time.
                 for (int i = 0; i < 3 && app.backend().currentTaskId() != project; ++i) {
-                    row = app.row(project);
+                    if (!QTest::qWaitFor([&] { return (row = app.row(project)) != nullptr; }, 2000))
+                        continue;
                     click(row, Qt::LeftButton, pointIn(row, 0.4, 0.5));
                     QTest::qWaitFor([&] { return app.backend().currentTaskId() == project; }, 1500);
                 }
