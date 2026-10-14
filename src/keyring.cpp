@@ -1,6 +1,7 @@
 #include "keyring.h"
 
 #include <QDir>
+#include <QHash>
 #include <QFile>
 #include <QProcess>
 #include <QStandardPaths>
@@ -38,11 +39,25 @@ QString secretFile(const QString &service, const QString &account) {
 }
 #endif
 
+bool memoryMode = false;
+QHash<QString, QString> &memory() {
+    static QHash<QString, QString> secrets;
+    return secrets;
+}
+bool useMemory() { return memoryMode || qgetenv("PRECRIME_KEYRING") == "memory"; }
+QString memoryKey(const QString &service, const QString &account) { return service + '\n' + account; }
+
 }  // namespace
 
 namespace Keyring {
 
+void useMemoryStore(bool on) { memoryMode = on; }
+
 bool store(const QString &service, const QString &account, const QString &secret, QString *error) {
+    if (useMemory()) {
+        memory().insert(memoryKey(service, account), secret);
+        return true;
+    }
 #if defined(Q_OS_MACOS)
     const Result r = run("security", {"add-generic-password", "-U", "-s", service, "-a", account, "-w", secret});
     if (!r.started || r.code != 0) {
@@ -77,6 +92,8 @@ bool store(const QString &service, const QString &account, const QString &secret
 }
 
 QString lookup(const QString &service, const QString &account) {
+    if (useMemory())
+        return memory().value(memoryKey(service, account));
 #if defined(Q_OS_MACOS)
     const Result r = run("security", {"find-generic-password", "-s", service, "-a", account, "-w"});
     return r.code == 0 ? r.out : QString();
@@ -90,6 +107,10 @@ QString lookup(const QString &service, const QString &account) {
 }
 
 void clear(const QString &service, const QString &account) {
+    if (useMemory()) {
+        memory().remove(memoryKey(service, account));
+        return;
+    }
 #if defined(Q_OS_MACOS)
     run("security", {"delete-generic-password", "-s", service, "-a", account});
 #elif defined(Q_OS_WIN)

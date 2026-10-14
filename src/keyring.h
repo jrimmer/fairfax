@@ -14,4 +14,9 @@ bool store(const QString &service, const QString &account, const QString &secret
 QString lookup(const QString &service, const QString &account);
 void clear(const QString &service, const QString &account);
 
+// Keeps secrets in memory only, touching neither the keyring nor any file.
+// The tests turn it on so they never read or write the real one; setting
+// PRECRIME_KEYRING=memory does the same for screenshots and demo runs.
+void useMemoryStore(bool on);
+
 }  // namespace Keyring

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "../../src/keyring.h"
 #include "../testregistry.h"
 
 QList<TestFactory> &testRegistry() {
@@ -28,6 +29,7 @@ int weight(const QString &name) {
 }  // namespace
 
 int main(int argc, char *argv[]) {
+    Keyring::useMemoryStore(true);   // No test reads or writes the real keyring.
     // No session bus: the file chooser portal would otherwise put a real dialog on the
     // desktop of whoever runs the tests; with none, FilePicker reports that it failed.
     qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/precrime-e2e");

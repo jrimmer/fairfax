@@ -2,6 +2,7 @@
 #include <QtTest>
 #include <memory>
 
+#include "../src/keyring.h"
 #include "testregistry.h"
 
 QList<TestFactory> &testRegistry() {
@@ -10,6 +11,7 @@ QList<TestFactory> &testRegistry() {
 }
 
 int main(int argc, char *argv[]) {
+    Keyring::useMemoryStore(true);   // No test reads or writes the real keyring.
     QGuiApplication app(argc, argv);
     int failures = 0;
     for (const auto &factory : testRegistry()) {
