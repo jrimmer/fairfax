@@ -329,18 +329,30 @@ a couple of seconds.
 
 ## Sync and backups
 
-Settings → Sync offers four ways to keep machines in step, all of which can run at once:
+Settings → Sync offers five ways to keep machines in step, all of which can run at once:
 a git repository, a plain folder (for Syncthing, Dropbox or Nextcloud's desktop client),
 a WebDAV folder (Nextcloud, ownCloud and the like; the password lives in your keyring),
-and Todoist. The folder and WebDAV providers use the same per-task files as git sync; the
-newest edit of each task wins. The first time a machine meets a folder or server that
-already holds tasks, it asks whether to Merge, Replace Local (a backup is made first) or
-Replace Server. "Sync automatically" (on by default) can be turned off to sync only with
-`Ctrl+S`. The sidebar footer shows when sync last succeeded for whichever providers are set
-up, and `Ctrl+S` or its button syncs them all.
+CalDAV (Nextcloud, Fastmail and other calendar servers), and Todoist. The folder and WebDAV
+providers use the same per-task files as git sync; the newest edit of each task wins. The
+first time a machine meets a folder or server that already holds tasks, it asks whether to
+Merge, Replace Local (a backup is made first) or Replace Server. "Sync automatically" (on by
+default) can be turned off to sync only with `Ctrl+S`. The sidebar footer shows when sync
+last succeeded for whichever providers are set up, and `Ctrl+S` or its button syncs them all.
+
+CalDAV syncs tasks as VTODOs. Sign in with an **app password** (not your account password)
+from your server's security settings, then map each Fairfax list to one of the server's
+VTODO calendars under **Lists and calendars**, or let **Create calendars for new lists** make
+one per list. Calendars that exist on the server without a matching list arrive as new lists
+in an account group. Other clients' metadata is preserved: unknown VTODO properties (such as
+the reference app's `X-EXAMPLE-*` and its `<App Meta>` notes block) ride along in each task and go back
+unchanged, so a real the reference app or Reminders client on the same server keeps its own data. Dates,
+repeats, priorities, tags, sub-tasks and alerts all sync; a wrong password is reported in the
+status line, and **Disconnect** forgets the account and its links without deleting a single
+task on either side.
 
 Right-click a list and choose **Don't Sync This List** to keep it, and its tasks, on this
-machine only; every sync provider skips it.
+machine only; every sync provider skips it. Setting a list to **Don't sync** in the CalDAV
+mapping does the same, and leaves its calendar on the server untouched.
 
 In Settings → Backups, each backup can be restored whole, **Lists…** to restore only chosen
 lists (with their tasks, tags, alerts and attachments) as new lists in a "Restored" group
