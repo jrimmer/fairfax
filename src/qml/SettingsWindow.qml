@@ -1267,7 +1267,7 @@ Window {
                     Hint {
                         Layout.topMargin: 0
                         Layout.minimumWidth: 0
-                        text: "Shortcuts in the task list work while the list has focus. The system-wide Quick Entry key is a Hyprland binding to `fairfax --quick`; see the README."
+                        text: "Shortcuts in the task list work while the list has focus. The system-wide Quick Entry key is a Hyprland binding that runs fairfax --quick; fairfax setup omarchy adds it."
                     }
 
                     // Takes the keyboard while a shortcut is recorded, so the
