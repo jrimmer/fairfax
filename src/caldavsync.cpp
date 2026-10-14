@@ -301,19 +301,59 @@ void CalDavSync::disconnectAccount() {
     emit stateChanged();
 }
 
+// Lists set to "Don't sync" in the CalDAV mapping, by uid. This is CalDAV's
+// own choice: the other providers keep syncing the list. A list excluded from
+// every provider ("Don't Sync This List", SyncTree) is skipped here as well,
+// and mapping it to a calendar never lifts that.
+static const char *const CalDavExcludedSetting = "caldav.excludedLists";
+
+static QSet<QString> calDavExcludedUids(const Store &store) {
+    QSet<QString> out;
+    for (const auto &u : store.setting(CalDavExcludedSetting).toString().split(',', Qt::SkipEmptyParts))
+        out.insert(u.trimmed());
+    return out;
+}
+
+static void setCalDavExcluded(Store &store, qint64 listId, bool excluded) {
+    const QString uid = store.list(listId).uid;
+    if (uid.isEmpty())
+        return;
+    QSet<QString> uids = calDavExcludedUids(store);
+    if (excluded)
+        uids.insert(uid);
+    else
+        uids.remove(uid);
+    QStringList sorted(uids.begin(), uids.end());
+    sorted.sort();
+    store.setSetting(CalDavExcludedSetting, sorted.join(','));
+}
+
+// Every list this provider skips: excluded everywhere, or just from CalDAV.
+static QSet<qint64> calDavSkippedListIds(const Store &store) {
+    QSet<qint64> out = SyncTree::excludedListIds(store);
+    const QSet<QString> uids = calDavExcludedUids(store);
+    if (!uids.isEmpty())
+        for (const auto &l : store.lists())
+            if (uids.contains(l.uid))
+                out.insert(l.id);
+    return out;
+}
+
+bool CalDavSync::isListSkipped(qint64 listId) const { return calDavSkippedListIds(*m_store).contains(listId); }
+
 void CalDavSync::setCalendarForList(qint64 listId, const QString &calendarHref) {
     const TaskList list = m_store->list(listId);
     if (!list.id)
         return;
     if (calendarHref.isEmpty()) {
-        // "Don't sync": unmapped and skipped, the same exclusion every other
-        // provider honours, so no sync recreates the calendar for it.
+        // "Don't sync": unmapped and skipped by CalDAV only, so no sync
+        // recreates the calendar for it; other providers are unaffected.
         m_store->removeSyncLink(Provider, ELists, listId);
-        SyncTree::setListExcluded(*m_store, listId, true);
+        setCalDavExcluded(*m_store, listId, true);
         emit stateChanged();
         return;
     }
-    SyncTree::setListExcluded(*m_store, listId, false);
+    setCalDavExcluded(*m_store, listId, false);
     // One calendar to one list: drop any other list pointed at it.
     const auto links = m_store->syncLinks(Provider, ELists);
     for (const auto &link : links)
@@ -523,7 +563,7 @@ void CalDavSync::startFirstCheck() {
 
 void CalDavSync::buildMapping() {
     const auto listLinks = m_store->syncLinks(Provider, ELists);
-    const QSet<qint64> excluded = SyncTree::excludedListIds(*m_store);
+    const QSet<qint64> excluded = calDavSkippedListIds(*m_store);
 
     QSet<QString> excludedNames;
     for (const auto &l : m_store->lists())

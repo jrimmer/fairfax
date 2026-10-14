@@ -352,7 +352,8 @@ task on either side.
 
 Right-click a list and choose **Don't Sync This List** to keep it, and its tasks, on this
 machine only; every sync provider skips it. Setting a list to **Don't sync** in the CalDAV
-mapping does the same, and leaves its calendar on the server untouched.
+mapping skips it for CalDAV only (the other providers keep syncing it) and leaves its calendar
+on the server untouched.
 
 In Settings → Backups, each backup can be restored whole, **Lists…** to restore only chosen
 lists (with their tasks, tags, alerts and attachments) as new lists in a "Restored" group

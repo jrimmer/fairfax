@@ -643,6 +643,7 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"caldav.user", "E2ECalDav::everyFieldPersistsAndComesBack"},
         {"caldav.account", "E2ECalDav::everyFieldPersistsAndComesBack"},
         {"caldav.createCalendars", "E2ECalDav::everyFieldPersistsAndComesBack"},
+        {"caldav.excludedLists", "E2ECalDav::dontSyncLeavesTheCalendarAndTasks"},
         {"calendar.sources", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.inLists", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.disabled", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},

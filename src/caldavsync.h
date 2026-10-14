@@ -79,6 +79,8 @@ public:
     // Mapping, for Settings: pair a list with a calendar href (empty unmaps),
     // and re-read the calendar list from the server.
     Q_INVOKABLE void setCalendarForList(qint64 listId, const QString &calendarHref);
+    // True when CalDAV skips the list: set to "Don't sync" here, or excluded from every provider.
+    Q_INVOKABLE bool isListSkipped(qint64 listId) const;
     // Settings' "New calendar": makes a calendar for the list on the server
     // and pairs it, without running a whole sync cycle.
     Q_INVOKABLE void createCalendarForList(qint64 listId);

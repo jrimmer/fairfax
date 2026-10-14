@@ -188,7 +188,9 @@ private slots:
         selectPane(sw, "Sync");
         choose("caldavMap:" + QString::number(home), "Don't sync");
         QTRY_VERIFY_WITH_TIMEOUT(app.store().syncLinks("caldav", "lists").value(home).remoteId.isEmpty(), 5000);
-        QVERIFY(SyncTree::isListExcluded(app.store(), home));
+        // Only CalDAV skips it: the other providers keep syncing the list.
+        QVERIFY(app.services().caldavSync->isListSkipped(home));
+        QVERIFY(!SyncTree::isListExcluded(app.store(), home));
 
         addTask(app.store(), home, "Should stay local");
         syncNow(app);

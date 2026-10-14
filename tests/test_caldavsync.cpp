@@ -213,6 +213,38 @@ private slots:
                 QVERIFY(!QString::fromUtf8(body).contains(QStringLiteral("Hidden")));
     }
 
+    // "Don't sync" in the CalDAV mapping is CalDAV's own: it never touches the
+    // exclusion every provider honours, and mapping a list that is excluded
+    // everywhere does not lift that exclusion.
+    void calDavDontSyncLeavesOtherProvidersAlone() {
+        Account a = makeAccount();
+        const qint64 work = addList(*a.store, "Work");
+        const qint64 secret = addList(*a.store, "Private");
+        addTask(*a.store, "Report", work);
+        connect(a, *m_server);
+        QVERIFY(a.sync->syncBlocking().ok);
+
+        a.sync->setCalendarForList(work, QString());
+        QVERIFY(a.sync->isListSkipped(work));
+        QVERIFY(!SyncTree::isListExcluded(*a.store, work));
+        addTask(*a.store, "Stays local", work);
+        QVERIFY(a.sync->syncBlocking().ok);
+        for (const FakeCalDav::Collection &col : m_server->collections())
+            for (const QByteArray &body : col.resources)
+                QVERIFY(!QString::fromUtf8(body).contains(QStringLiteral("Stays local")));
+
+        // Mapping it again brings it back for CalDAV.
+        const QString href = m_server->collections().value(0).href;
+        a.sync->setCalendarForList(work, href);
+        QVERIFY(!a.sync->isListSkipped(work));
+
+        // Excluded everywhere: mapping it in CalDAV keeps it excluded and skipped.
+        SyncTree::setListExcluded(*a.store, secret, true);
+        a.sync->setCalendarForList(secret, href);
+        QVERIFY(SyncTree::isListExcluded(*a.store, secret));
+        QVERIFY(a.sync->isListSkipped(secret));
+    }
+
     // ------------------------------------------------------------ local edits
 
     void localCreateEditDeleteReachTheServer() {
