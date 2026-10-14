@@ -119,11 +119,11 @@ private:
 
     struct DavItem {
         QString href;
-        QString status;
+        int status = 0;                   // The response's status, 404 for a removal.
         QMap<QString, QString> text;      // Property local name -> text.
-        QMap<QString, QStringList> components;  // supported-calendar-component-set.
         bool collection = false;
         bool calendar = false;
+        QStringList components;           // supported-calendar-component-set.
     };
 
     void request(const QByteArray &verb, const QUrl &url, const QByteArray &body,

@@ -79,8 +79,7 @@ QString CalDavClient::itemText(const QList<DavItem> &items, const QString &name)
 }
 
 bool CalDavClient::supportsVTodo(const DavItem &item) {
-    const QStringList comps = item.components.value(QStringLiteral("#all"));
-    return comps.isEmpty() || comps.contains(QStringLiteral("VTODO"), Qt::CaseInsensitive);
+    return item.components.isEmpty() || item.components.contains(QStringLiteral("VTODO"), Qt::CaseInsensitive);
 }
 
 CalDavClient::Calendar CalDavClient::calendarFrom(const DavItem &item) {
@@ -186,6 +185,10 @@ QList<CalDavClient::DavItem> CalDavClient::parseItems(const QByteArray &body, QS
     DavItem item;
     QStringList stack;
     QXmlStreamReader xml(body);
+    auto close = [&] {
+        if (!stack.isEmpty())
+            stack.removeLast();
+    };
     while (!xml.atEnd()) {
         const QXmlStreamReader::TokenType token = xml.readNext();
         if (token == QXmlStreamReader::StartElement) {
@@ -196,6 +199,7 @@ QList<CalDavClient::DavItem> CalDavClient::parseItems(const QByteArray &body, QS
                 item = DavItem();
             } else if (name == QLatin1String("href")) {
                 const QString text = xml.readElementText().trimmed();
+                close();
                 if (parent == QLatin1String("response"))
                     item.href = text;
                 else
@@ -207,23 +211,30 @@ QList<CalDavClient::DavItem> CalDavClient::parseItems(const QByteArray &body, QS
             } else if (name == QLatin1String("comp")) {
                 const QString comp = xml.attributes().value(QLatin1String("name")).toString();
                 if (!comp.isEmpty())
-                    item.components[QStringLiteral("#all")] << comp;
+                    item.components << comp;
             } else if (name == QLatin1String("displayname") || name == QLatin1String("calendar-color")
                        || name == QLatin1String("getctag") || name == QLatin1String("getetag")
                        || name == QLatin1String("sync-token") || name == QLatin1String("calendar-data")) {
                 const QString text = xml.readElementText().trimmed();
+                close();
                 item.text.insert(name, text);
                 if (name == QLatin1String("sync-token") && syncToken)
                     *syncToken = text;
+            } else if (name == QLatin1String("status")) {
+                const QString text = xml.readElementText();
+                close();
+                if (text.contains(QLatin1String(" 404")))
+                    item.status = 404;
+                else if (text.contains(QLatin1String(" 200")) && item.status == 0)
+                    item.status = 200;
             }
         } else if (token == QXmlStreamReader::EndElement) {
-            if (!stack.isEmpty())
-                stack.removeLast();
             if (xml.name() == QLatin1String("response")) {
                 if (!item.href.isEmpty())
                     items.append(item);
                 item = DavItem();
             }
+            close();
         }
     }
     return items;
@@ -400,44 +411,18 @@ void CalDavClient::syncCollection(const QString &calendarHref, const QString &to
             return;
         }
         QString newToken;
+        const QList<DavItem> items = parseItems(r.body, &newToken);
         const QString base = resolve(calendarHref).path();
         QStringList changed, removed;
         // Removed resources come back as status 404 in their own response.
-        QXmlStreamReader xml(r.body);
-        DavItem item;
-        QStringList stack;
-        int responseStatus = 0;
-        while (!xml.atEnd()) {
-            const auto t = xml.readNext();
-            if (t == QXmlStreamReader::StartElement) {
-                const QString name = xml.name().toString();
-                stack.append(name);
-                if (name == QLatin1String("response"))
-                    item = DavItem(), responseStatus = 0;
-                else if (name == QLatin1String("href"))
-                    item.href = xml.readElementText().trimmed();
-                else if (name == QLatin1String("getetag"))
-                    item.text.insert(name, xml.readElementText().trimmed());
-                else if (name == QLatin1String("status")) {
-                    const QString text = xml.readElementText();
-                    if (text.contains(QLatin1String(" 404")))
-                        responseStatus = 404;
-                } else if (name == QLatin1String("sync-token")) {
-                    newToken = xml.readElementText().trimmed();
-                }
-            } else if (t == QXmlStreamReader::EndElement) {
-                if (!stack.isEmpty())
-                    stack.removeLast();
-                if (xml.name() == QLatin1String("response")) {
-                    const QString path = resolve(item.href).path();
-                    if (path != base && !item.href.isEmpty()) {
-                        if (responseStatus == 404)
-                            removed << item.href;
-                        else
-                            changed << item.href;
-                    }
-                }
-            }
+        for (const DavItem &item : items) {
+            const QString path = resolve(item.href).path();
+            if (path == base)
+                continue;
+            if (item.status == 404)
+                removed << item.href;
+            else
+                changed << item.href;
         }
         Outcome good = o;
         good.ok = true;
