@@ -263,6 +263,7 @@ Popup {
                 Rectangle {
                     required property var modelData
                     required property int index
+                    objectName: "commandChip:" + modelData.label
                     width: chipText.implicitWidth + 20
                     height: 26
                     radius: 13

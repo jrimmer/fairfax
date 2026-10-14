@@ -159,15 +159,16 @@ const QVector<QString> &pendingAccessibility() {
         "aboutLink", "aboutLicense", "mailPipe", "mailPassword", "addGroup", "scopeThis",
         "scopeAll", "searchScheduledHide", "searchScheduledInclude",
         "editorStart", "editorStartTime", "editorDue", "editorDueTime", "editorTagsInput",
-        "editorNewSubtask", "notesText", "notesStamp", "notesPreviewToggle", "editorTags",
+        "editorNewSubtask", "notesText", "notesStamp", "notesPreviewToggle",
         "quickStart", "quickStartTime", "quickDue", "quickDueTime", "quickTitle", "quickNotes",
         "quickTagInput", "quickTagChip", "quickTagRemove", "quickTagMatch",
         "quickType", "quickCancel", "quickSave",
         // slice 5: anything left
         "quickTag", "quickUnit:", "quickWeekday:",
+        "utilityTab",
         "quickCustomDone", "quickPriority", "quickList",
         "quickAttach", "quickLocation", "quickRepeat", "quickAlarm", "quickDuration",
-        "utilityTab", "calTitle", "searchClear",
+        "calTitle", "searchClear", "commandChip:", "commandInput",
     };
     return pending;
 }
@@ -358,6 +359,78 @@ private slots:
         closeSettings(app);
     }
 
+    // The command popup, the Quick Look and shortcut popups and the
+    // ThemedDialog windows all report the Dialog role and their title.
+    void popupsReportDialogAndTitle() {
+        App app;
+        QVERIFY(app.ok);
+
+        struct Case {
+            const char *name;
+            const char *title;
+        };
+        // Quick Look and the shortcut overlay are Popups with a fixed title;
+        // the Accessible properties live on the popup's content item.
+        const auto checkPopup = [&](const QString &objectName, const QString &title) {
+            QObject *p = findObject(objectName);
+            QVERIFY2(p, qPrintable("no popup " + objectName));
+            // Accessible properties on a Popup's contentItem surface on the
+            // popup item itself; a Dialog puts them on its own surface.
+            auto *content = p->property("contentItem").value<QQuickItem *>();
+            QQuickItem *item = (content && QAccessible::queryAccessibleInterface(content) && QAccessible::queryAccessibleInterface(content)->isValid())
+                                   ? content : popupSurface(p);
+            QVERIFY2(item, qPrintable(objectName + " has no accessible item"));
+            QAccessibleInterface *i = QAccessible::queryAccessibleInterface(item);
+            QVERIFY2(i && i->isValid(), qPrintable(objectName + " has no interface"));
+            QCOMPARE(int(i->role()), int(QAccessible::Dialog));
+            QCOMPARE(i->text(QAccessible::Name), title);
+        };
+
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        app.press(Qt::Key_Space);
+        QVERIFY(waitUntil([] { QObject *p = findObject("quickLook"); return p && p->property("visible").toBool(); }));
+        checkPopup("quickLook", "Quick Look");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("quickLook")->property("visible").toBool(), 5000);
+
+        app.press(Qt::Key_Question, Qt::ShiftModifier);
+        QVERIFY(waitUntil([] { QObject *p = findObject("shortcutOverlay"); return p && p->property("visible").toBool(); }));
+        checkPopup("shortcutOverlay", "Keyboard Shortcuts");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("shortcutOverlay")->property("visible").toBool(), 5000);
+
+        // The command bar's title comes from its kind.
+        app.press(Qt::Key_D);
+        QVERIFY(waitUntil([] { QObject *p = findObject("commandPopup"); return p && p->property("visible").toBool(); }));
+        checkPopup("commandPopup", "Defer");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("commandPopup")->property("visible").toBool(), 5000);
+
+        // A ThemedDialog is a Dialog named by its title: Export Tasks.
+        app.window->requestActivate();
+        QTRY_VERIFY_WITH_TIMEOUT(app.window->isActive(), 5000);
+        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        QObject *exportDialog = nullptr;
+        QVERIFY(waitUntil([&] { return (exportDialog = findObject("exportDialog")) && exportDialog->property("opened").toBool(); }));
+        checkPopup("exportDialog", "Export Tasks");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!exportDialog->property("opened").toBool(), 5000);
+
+        // Quick Entry is its own window, so it is identified by its title and
+        // reports Dialog with that title.
+        app.press(Qt::Key_2, Qt::ShiftModifier | Qt::ControlModifier);
+        QQuickWindow *quick = nullptr;
+        QVERIFY(waitUntil([&] { return (quick = windowTitled("Fairfax Quick Entry")) != nullptr; }));
+        QQuickItem *quickBody = nullptr;
+        QVERIFY(waitUntil([&] { return (quickBody = findItem("quickEntryBody")) != nullptr; }));
+        QAccessibleInterface *qi = QAccessible::queryAccessibleInterface(quickBody);
+        QVERIFY(qi && qi->isValid());
+        QCOMPARE(int(qi->role()), int(QAccessible::Dialog));
+        QVERIFY2(qi->text(QAccessible::Name).contains("Quick Entry"), qPrintable(qi->text(QAccessible::Name)));
+        quick->close();
+        QTRY_VERIFY_WITH_TIMEOUT(windowTitled("Fairfax Quick Entry") == nullptr, 5000);
+    }
+
     // The guard's own scan detects a MouseArea-owned control (IconButton), so
     // an unnamed one would be reported. If interactive() skipped MouseArea
     // items, this would fail.
@@ -396,6 +469,15 @@ private slots:
         checkState("shortcut overlay");
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 5000);
+
+        // The command popup (Defer bar), the shared palette behind the reference app's
+        // quick commands.
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+        app.press(Qt::Key_D);
+        QVERIFY(waitUntil([] { QObject *b = findObject("commandPopup"); return b && b->property("visible").toBool(); }));
+        checkState("command popup");
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!findObject("commandPopup")->property("visible").toBool(), 5000);
 
         // The task context menu.
         QVERIFY(tk::contextMenuOn(app, app.ids.buyMilk));

@@ -581,6 +581,7 @@ Window {
 
     ColumnLayout {
         id: body
+        objectName: "quickEntryBody"
         anchors.left: parent.left
         anchors.right: parent.right
         spacing: 0
