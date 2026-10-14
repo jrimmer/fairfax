@@ -257,6 +257,61 @@ server, so mail reaches it from a mailbox you own, and the conversion is the sam
   fetched again, or fetched on two machines that sync, never makes a second task, even after you
   delete the first. The search `type: capturedmail` finds tasks that arrived this way.
 
+### Watching a mailbox (Settings → Mail)
+
+Precrime can watch an IMAP mailbox you own and import only the messages meant for it. The mailbox
+can be your everyday one: the rest is never fetched, flagged or moved. Mail arrives at once when
+the server supports IDLE, otherwise every few minutes; Ctrl+S and the sidebar's sync button also
+fetch it. Nothing is registered with anyone: Precrime ships no OAuth client of its own, so the
+defaults below need none, and signing in with OAuth is only for a client you create yourself.
+
+**Gmail** (the default), in three lines:
+
+1. Turn on 2-Step Verification, make an app password at
+   [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), and check that
+   IMAP is on in Gmail's settings.
+2. In Settings → Mail pick Gmail, enter your address and paste the app password (kept in your
+   keyring, never in the database), then turn *Enable Mail to Precrime* on.
+3. Send or forward mail to `you+precrime@gmail.com`. Gmail delivers it to your normal inbox;
+   Precrime takes only mail sent to that address, files it under the `Precrime` label and out of
+   your inbox, and leaves everything else alone.
+
+*Gmail with your own OAuth client* (instead of the app password): in Google Cloud create an OAuth
+client of type "Desktop app", and publish its consent screen to Production, or Google expires the
+sign-in after seven days. Download its `client_secret.json` (the same file the `gog` CLI uses),
+then in Settings → Mail → *Advanced: use your own OAuth client* choose *Import client JSON…* and
+*Sign in with Google*. The refresh token goes to your keyring.
+
+**Outlook.com and Microsoft 365** have no registration-free route, so Settings → Mail leads with
+the options that need none:
+
+- *Forward it*: an Outlook rule that redirects the mail you choose to your Gmail plus-address, or to
+  any IMAP mailbox you connect in Precrime.
+- *DavMail*: [DavMail](https://davmail.sourceforge.net/) (in the AUR) is a local gateway that
+  makes Outlook look like an IMAP server. Set it up, then press *Use DavMail* in Precrime, which
+  fills in `127.0.0.1`, port 1143, no TLS.
+- *Your own client ID*: register an app in Microsoft Entra (App registrations) as a public client
+  with the redirect `http://localhost` and the delegated `IMAP.AccessAsUser.All` permission, paste
+  its Application (client) ID under *Use your own client ID*, and press *Sign in with Microsoft*.
+
+**Any other IMAP server, or a bridge** (ProtonMail Bridge, DavMail, Dovecot, Fastmail…): choose
+*Other*, fill in the server, port and security (TLS, STARTTLS, or None for a bridge on 127.0.0.1),
+your user name and password.
+
+What it picks, and what it does afterwards, is set under *Which mail* and *What happens*:
+
+- *Only mail sent to* matches the To, Cc, Delivered-To and X-Original-To addresses exactly (a
+  server's own search is by substring, so Precrime re-checks each message). For Gmail it starts as
+  your plus-address and follows the address until you edit it. *Only mail labelled* matches a Gmail
+  label, or an IMAP keyword elsewhere. With both empty, every message in the folder becomes a task,
+  and the pane warns you.
+- *After importing*: *Move to* a folder or label (created when missing; the Gmail default),
+  *Mark as read*, or *Leave as is*, which relies on the task's identity and a per-folder
+  high-water mark so old mail is not fetched again. Messages that were already tasks get the same
+  treatment. Messages over 25 MB are skipped and reported.
+- *New tasks go to* a list (the Inbox by default), and *Read dates and tags in the subject* adds
+  Quick Entry's parsing to the reference app's filing instructions, which always work.
+
 From a script, `procmail`, Sieve, `fetchmail` or a ProtonMail Bridge setup:
 
     precrime import-mail message.eml            # or several files
