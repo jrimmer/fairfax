@@ -38,3 +38,7 @@ SOURCES += test_gaps_editor.cpp test_gaps_notes.cpp test_gaps_settings.cpp
 
 # Gap-filling end-to-end tests: menus, sections and sidebar buttons.
 SOURCES += test_gaps_menus.cpp
+
+# Mail to Precrime end-to-end tests: Settings > Mail and the connector against a fake IMAP server.
+SOURCES += test_mail.cpp
+HEADERS += ../fakeimap.h ../loopback.h

@@ -4,7 +4,7 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 // Settings, in the reference app's panes: General, Appearance, Tasks, Today & Lists,
-// Alerts, Backups, and Import & Export. Everything applies at once.
+// Alerts, Sync, Mail, Backups, and Import & Export. Everything applies at once.
 Window {
     id: root
 
@@ -29,7 +29,7 @@ Window {
         function onSettingsChanged() { root.hideable = backend.hideableLists() }
     }
     property string copySource
-    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"]
+    readonly property var panes: ["General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Mail", "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"]
 
     function value(key, fallback) {
         backend.settingsRevision  // Re-evaluate the caller's binding whenever any setting changes.
@@ -63,6 +63,7 @@ Window {
             else if (purpose === "import-omnifocus") backend.importFrom(path, "omnifocus")
             else if (purpose === "restore") backend.restoreBackup(path)
             else if (purpose === "sync-folder" && folderSync) folderSync.setFolder(path)
+            else if (purpose === "mail-client-json") mailPane.clientError = mailFetch.importClientJson(path)
             else if (purpose === "backup-copy") backend.saveBackupCopy(copySource, path)
         }
         function onFailed(message) { status.text = message }
@@ -172,8 +173,11 @@ Window {
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: availableWidth
+            // The column sits 20 px down, so the scrolling height has to count that, or the last control of a long pane is clipped.
+            contentHeight: paneColumn.implicitHeight + 40
 
             ColumnLayout {
+                id: paneColumn
                 width: parent.width - 48
                 x: 24
                 y: 20
@@ -631,9 +635,275 @@ Window {
                     Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV and Todoist sync all skip it." }
                 }
 
+                // Mail to Precrime
+                ColumnLayout {
+                    id: mailPane
+                    visible: root.pane === 6
+                    Layout.fillWidth: true
+                    // Re-read whenever any option changes.
+                    readonly property string account: { mailFetch.revision; return mailFetch.option("mail.account") }
+                    readonly property string after: { mailFetch.revision; return mailFetch.option("mail.after") }
+                    readonly property string address: { mailFetch.revision; return mailFetch.option("mail.address") }
+                    readonly property bool gmail: account === "gmail"
+                    readonly property bool outlook: account === "outlook"
+                    property bool googleAdvanced: false
+                    property string clientError
+                    property bool msAdvanced: false
+
+                    CheckBox {
+                        objectName: "setting:mail.enabled"
+                        text: "Enable Mail to Precrime"
+                        checked: { mailFetch.revision; return mailFetch.option("mail.enabled") === "true" }
+                        onToggled: mailFetch.setOption("mail.enabled", checked)
+                    }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Mail sent to a Precrime address becomes tasks, as in the reference app's Mail to the reference app. Precrime has no server of its own, so it watches a mailbox you own and picks out only the messages meant for it; the rest of that mailbox is left alone."
+                    }
+                    RowLayout {
+                        Layout.topMargin: 8
+                        Label { text: "Account"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            objectName: "setting:mail.account"
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            readonly property var kinds: ["gmail", "outlook", "other"]
+                            model: ["Gmail", "Outlook", "Other"]
+                            currentIndex: Math.max(0, kinds.indexOf(mailPane.account))
+                            onActivated: (i) => mailFetch.setAccount(kinds[i])
+                        }
+                    }
+                    MailField { key: "mail.address"; label: "Email address"; placeholder: "you@example.com" }
+
+                    // Gmail: an app password, with your own OAuth client as the advanced route.
+                    ColumnLayout {
+                        visible: mailPane.gmail
+                        Layout.fillWidth: true
+                        MailPassword { label: "App password" }
+                        Hint {
+                            objectName: "mailAppPasswordHelp"
+                            Layout.topMargin: 0
+                            text: "Gmail wants an app password, not your Google password. Turn on 2-Step Verification, create one at myaccount.google.com/apppasswords, and make sure IMAP is on in Gmail's settings (Forwarding and POP/IMAP). The password is kept in your keyring."
+                        }
+                        Button {
+                            objectName: "mailAppPasswordLink"
+                            text: "Open Google app passwords"
+                            flat: true
+                            onClicked: Qt.openUrlExternally("https://myaccount.google.com/apppasswords")
+                        }
+                        Button {
+                            objectName: "mailGoogleAdvanced"
+                            text: (mailPane.googleAdvanced ? "▾ " : "▸ ") + "Advanced: use your own OAuth client"
+                            flat: true
+                            onClicked: mailPane.googleAdvanced = !mailPane.googleAdvanced
+                        }
+                        ColumnLayout {
+                            visible: mailPane.googleAdvanced
+                            Layout.fillWidth: true
+                            Hint {
+                                Layout.topMargin: 0
+                                text: "Precrime ships no Google client of its own. Create a Desktop app OAuth client in your own Google Cloud project, publish its consent screen to Production (otherwise Google expires the sign-in after 7 days), download its client_secret.json and import it here."
+                            }
+                            RowLayout {
+                                Button { objectName: "mailImportClient"; text: "Import client JSON…"; onClicked: filePicker.open("Choose your Google client_secret.json", "mail-client-json") }
+                                Text {
+                                    objectName: "mailClientStatus"
+                                    color: theme.muted
+                                    font.pixelSize: backend.fontSize - 1
+                                    text: { mailFetch.revision; return mailFetch.hasGoogleClient ? "Client " + mailFetch.option("mail.googleClientId").split("-")[0] + "… imported" : "No client imported" }
+                                }
+                            }
+                            Text { objectName: "mailClientError"; visible: text !== ""; color: theme.overdue; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true; text: mailPane.clientError }
+                            MailSignIn { provider: "Google" }
+                        }
+                        Label { text: "Plus-address"; font.bold: true; Layout.topMargin: 12 }
+                        Text {
+                            objectName: "mailPlusGuide"
+                            Layout.fillWidth: true
+                            textFormat: Text.StyledText
+                            wrapMode: Text.Wrap
+                            color: theme.foreground
+                            font.pixelSize: backend.fontSize - 1
+                            text: {
+                                mailFetch.revision
+                                const a = mailFetch.plusAddress || "you+precrime@gmail.com"
+                                return "Send or forward mail to <b>" + a + "</b>. Gmail delivers it to your normal inbox; Precrime takes only mail sent to that address, files it under the "
+                                    + mailFetch.option("mail.moveTo") + " label and out of your inbox, and leaves everything else alone."
+                            }
+                        }
+                        Button {
+                            objectName: "mailCopyAddress"
+                            text: "Copy address"
+                            enabled: { mailFetch.revision; return mailFetch.plusAddress !== "" }
+                            onClicked: mailFetch.copyText(mailFetch.plusAddress)
+                        }
+                    }
+
+                    // Outlook: guidance first; there is no project sign-in.
+                    ColumnLayout {
+                        visible: mailPane.outlook
+                        Layout.fillWidth: true
+                        Label { text: "1. Forward it"; font.bold: true; Layout.topMargin: 8 }
+                        Hint {
+                            objectName: "mailOutlookForward"
+                            Layout.topMargin: 0
+                            text: "Add an Outlook rule that redirects the mail you choose to your Gmail plus-address, or to any IMAP mailbox you connect here (choose Gmail or Other above). Nothing to register."
+                        }
+                        Label { text: "2. Use DavMail"; font.bold: true; Layout.topMargin: 8 }
+                        Hint {
+                            objectName: "mailOutlookDavmail"
+                            Layout.topMargin: 0
+                            text: "DavMail is an open-source gateway that makes Outlook.com and Microsoft 365 look like a local IMAP server (it is in the AUR). Install it, point it at your account, and Precrime reads it on 127.0.0.1."
+                        }
+                        Button { objectName: "mailUseDavMail"; text: "Use DavMail"; onClicked: mailFetch.useDavMail() }
+                        Label { text: "3. Advanced"; font.bold: true; Layout.topMargin: 8 }
+                        Button {
+                            objectName: "mailMsAdvanced"
+                            text: (mailPane.msAdvanced ? "▾ " : "▸ ") + "Use your own client ID"
+                            flat: true
+                            onClicked: mailPane.msAdvanced = !mailPane.msAdvanced
+                        }
+                        ColumnLayout {
+                            visible: mailPane.msAdvanced
+                            Layout.fillWidth: true
+                            Hint {
+                                Layout.topMargin: 0
+                                text: "Register an app in Microsoft Entra (portal.azure.com, App registrations) as a public client with the redirect http://localhost and the delegated IMAP.AccessAsUser.All permission, then paste its Application (client) ID. Work and school tenants may need an admin to allow it."
+                            }
+                            MailField { key: "mail.msClientId"; label: "Client ID"; placeholder: "Application (client) ID" }
+                            MailSignIn { provider: "Microsoft" }
+                        }
+                    }
+
+                    // Other: any IMAP server.
+                    ColumnLayout {
+                        visible: !mailPane.gmail && !mailPane.outlook
+                        Layout.fillWidth: true
+                        MailField { key: "mail.host"; label: "Server"; placeholder: "imap.example.com" }
+                        MailField { key: "mail.port"; label: "Port"; placeholder: "993" }
+                        RowLayout {
+                            Label { text: "Security"; Layout.preferredWidth: 160 }
+                            ComboBox {
+                                objectName: "setting:mail.security"
+                                implicitContentWidthPolicy: ComboBox.WidestText
+                                readonly property var kinds: ["tls", "starttls", "none"]
+                                model: ["TLS", "STARTTLS", "None"]
+                                currentIndex: { mailFetch.revision; return Math.max(0, kinds.indexOf(mailFetch.option("mail.security"))) }
+                                onActivated: (i) => mailFetch.setOption("mail.security", kinds[i])
+                            }
+                        }
+                        MailField { key: "mail.user"; label: "User name"; placeholder: "you@example.com" }
+                        MailPassword { label: "Password" }
+                        Hint { Layout.topMargin: 0; text: "None is for a bridge on this machine, such as ProtonMail Bridge or DavMail on 127.0.0.1." }
+                    }
+
+                    Label { text: "Which mail"; font.bold: true; Layout.topMargin: 14 }
+                    MailField { key: "mail.toFilter"; label: "Only mail sent to"; placeholder: "An address, such as you+precrime@gmail.com" }
+                    MailField { key: "mail.labelFilter"; label: "Only mail labelled"; placeholder: "Gmail label or IMAP keyword (optional)" }
+                    MailField { key: "mail.folder"; label: "Folder"; placeholder: "INBOX" }
+                    Text {
+                        objectName: "mailUnfilteredWarning"
+                        visible: { mailFetch.revision; return mailFetch.unfiltered }
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        color: theme.overdue
+                        font.pixelSize: backend.fontSize - 1
+                        text: { mailFetch.revision; return "Every message in " + mailFetch.option("mail.folder") + " will become a task." }
+                    }
+
+                    Label { text: "What happens"; font.bold: true; Layout.topMargin: 14 }
+                    RowLayout {
+                        Label { text: "After importing"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            objectName: "setting:mail.after"
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            readonly property var kinds: ["move", "read", "leave"]
+                            model: ["Move to", "Mark as read", "Leave as is"]
+                            currentIndex: Math.max(0, kinds.indexOf(mailPane.after))
+                            onActivated: (i) => mailFetch.setOption("mail.after", kinds[i])
+                        }
+                        TextField {
+                            objectName: "setting:mail.moveTo"
+                            visible: mailPane.after === "move"
+                            Layout.preferredWidth: 160
+                            placeholderText: "Precrime"
+                            selectByMouse: true
+                            text: { mailFetch.revision; return mailFetch.option("mail.moveTo") }
+                            onEditingFinished: if (text !== mailFetch.option("mail.moveTo")) mailFetch.setOption("mail.moveTo", text.trim())
+                        }
+                    }
+                    RowLayout {
+                        Label { text: "New tasks go to"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            objectName: "setting:mail.listId"
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            model: [{ name: "Inbox", id: 0 }].concat(backend.listChoices.filter(l => l.name !== "Inbox"))
+                            textRole: "name"
+                            currentIndex: { mailFetch.revision; return Math.max(0, model.findIndex(l => l.id === Number(mailFetch.option("mail.listId")))) }
+                            onActivated: (i) => mailFetch.setOption("mail.listId", model[i].id)
+                        }
+                    }
+                    CheckBox {
+                        objectName: "setting:mail.naturalLanguage"
+                        text: "Read dates and tags in the subject (natural language)"
+                        checked: { mailFetch.revision; return mailFetch.option("mail.naturalLanguage") === "true" }
+                        onToggled: mailFetch.setOption("mail.naturalLanguage", checked)
+                    }
+                    Hint {
+                        Layout.topMargin: 0
+                        leftPadding: 44
+                        text: "the reference app's due(), start(), list(), tag(), priority() and action() in the subject always work. This also reads “tomorrow 3pm #home !!” the way Quick Entry does."
+                    }
+                    RowLayout {
+                        Label { text: "Check every"; Layout.preferredWidth: 160 }
+                        SpinBox {
+                            objectName: "setting:mail.interval"
+                            from: 1; to: 240
+                            value: { mailFetch.revision; return Number(mailFetch.option("mail.interval")) }
+                            onValueModified: mailFetch.setOption("mail.interval", value)
+                        }
+                        Label { text: "minutes" }
+                    }
+                    Hint { Layout.topMargin: 0; text: "Used when the server can't push new mail (IDLE); otherwise Precrime is told as soon as mail arrives." }
+
+                    Label { text: "Status"; font.bold: true; Layout.topMargin: 14 }
+                    RowLayout {
+                        Button {
+                            objectName: "mailFetchNow"
+                            text: mailFetch.busy ? "Fetching…" : "Fetch Now"
+                            enabled: !mailFetch.busy
+                            onClicked: mailFetch.enabled ? mailFetch.fetchNow() : mailFetch.setOption("mail.enabled", true)
+                        }
+                        Text {
+                            objectName: "mailStatus"
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                            color: mailFetch.state === "error" ? theme.overdue : theme.muted
+                            font.pixelSize: backend.fontSize - 1
+                            text: mailFetch.statusLine
+                        }
+                    }
+
+                    Label { text: "Or pipe it in"; font.bold: true; Layout.topMargin: 14 }
+                    Hint { Layout.topMargin: 0; text: "For Sieve, procmail, fetchmail or a bridge, pass messages to Precrime yourself:" }
+                    TextEdit {
+                        objectName: "mailPipe"
+                        readOnly: true
+                        selectByMouse: true
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 100   // Not the width of the unwrapped text, which would push the pane wider than the window.
+                        wrapMode: TextEdit.Wrap
+                        color: theme.foreground
+                        selectedTextColor: theme.foreground
+                        selectionColor: theme.selection
+                        font.family: "monospace"
+                        font.pixelSize: backend.fontSize - 1
+                        text: "precrime import-mail message.eml\nprecrime import-mail --maildir ~/Mail/precrime"
+                    }
+                }
+
                 // Backups
                 ColumnLayout {
-                    visible: root.pane === 6
+                    visible: root.pane === 7
                     Layout.fillWidth: true
                     RowLayout {
                         Label { text: "Back up automatically"; Layout.preferredWidth: 200 }
@@ -657,7 +927,7 @@ Window {
                     Hint { text: "Backups are kept in " + backend.backupFolder() }
                     Repeater {
                         id: backupList
-                        model: root.pane === 6 ? backend.backups() : []
+                        model: root.pane === 7 ? backend.backups() : []
                         RowLayout {
                             required property var modelData
                             Layout.fillWidth: true
@@ -673,7 +943,7 @@ Window {
 
                 // Import & Export
                 ColumnLayout {
-                    visible: root.pane === 7
+                    visible: root.pane === 8
                     Layout.fillWidth: true
                     Label { text: "Export"; font.bold: true }
                     RowLayout {
@@ -698,7 +968,7 @@ Window {
 
                 // Calendar
                 ColumnLayout {
-                    visible: root.pane === 8
+                    visible: root.pane === 9
                     Layout.fillWidth: true
                     Hint {
                         Layout.topMargin: 0
@@ -791,7 +1061,7 @@ Window {
 
                 // Automation
                 ColumnLayout {
-                    visible: root.pane === 9
+                    visible: root.pane === 10
                     Layout.fillWidth: true
                     Hint {
                         objectName: "automationHint"
@@ -803,7 +1073,7 @@ Window {
                 // Diagnostics
                 ColumnLayout {
                     id: diag
-                    visible: root.pane === 10
+                    visible: root.pane === 11
                     Layout.fillWidth: true
                     // Rebuilt each time the pane opens, so the log is current.
                     property string report: ""
@@ -999,6 +1269,78 @@ Window {
             font.pixelSize: backend.fontSize - 2
             wrapMode: Text.Wrap
             Layout.fillWidth: true
+        }
+    }
+
+    // A text field bound to a Mail option: it is written when the field is left or Return is pressed.
+    component MailField: RowLayout {
+        property string key
+        property string label
+        property string placeholder
+        Layout.fillWidth: true
+        Label { text: parent.label; Layout.preferredWidth: 160 }
+        TextField {
+            objectName: "setting:" + parent.key
+            Layout.fillWidth: true
+            placeholderText: parent.placeholder
+            selectByMouse: true
+            text: { mailFetch.revision; return mailFetch.option(parent.key) }
+            onEditingFinished: if (text.trim() !== mailFetch.option(parent.key)) mailFetch.setOption(parent.key, text.trim())
+        }
+    }
+
+    // The password goes to the keyring as soon as it is entered; the field never shows it again.
+    component MailPassword: RowLayout {
+        property string label
+        Layout.fillWidth: true
+        Label { text: parent.label; Layout.preferredWidth: 160 }
+        TextField {
+            id: mailPasswordField
+            objectName: "mailPassword"
+            Layout.fillWidth: true
+            echoMode: TextInput.Password
+            selectByMouse: true
+            placeholderText: { mailFetch.revision; return mailFetch.hasPassword ? "Saved in your keyring" : "Not set" }
+            onEditingFinished: if (text !== "") { mailFetch.setPassword(text); text = "" }
+        }
+        Button {
+            objectName: "mailPasswordClear"
+            text: "Forget"
+            flat: true
+            visible: { mailFetch.revision; return mailFetch.hasPassword }
+            onClicked: mailFetch.setPassword("")
+        }
+    }
+
+    // Sign in with a client the user brought: waiting, signed in and failed states.
+    component MailSignIn: ColumnLayout {
+        property string provider
+        Layout.fillWidth: true
+        RowLayout {
+            Button {
+                objectName: "mailSignIn"
+                visible: mailFetch.oauthState === "none"
+                text: "Sign in with " + parent.parent.provider
+                onClicked: mailFetch.signIn()
+            }
+            Text {
+                objectName: "mailOAuthStatus"
+                visible: mailFetch.oauthState !== "none"
+                color: theme.foreground
+                font.pixelSize: backend.fontSize - 1
+                text: mailFetch.oauthState === "waiting" ? "Waiting for the browser…" : "Signed in as " + mailFetch.signedInAs
+            }
+            Button { objectName: "mailCancelSignIn"; visible: mailFetch.oauthState === "waiting"; text: "Cancel"; flat: true; onClicked: mailFetch.cancelSignIn() }
+            Button { objectName: "mailSignOut"; visible: mailFetch.oauthState === "signedIn"; text: "Sign Out"; flat: true; onClicked: mailFetch.signOut() }
+        }
+        Text {
+            objectName: "mailOAuthError"
+            visible: text !== ""
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: theme.overdue
+            font.pixelSize: backend.fontSize - 1
+            text: mailFetch.oauthError
         }
     }
 

@@ -107,14 +107,14 @@ QString MailFetch::option(const QString &key) const {
     if (key == "mail.account")
         return account;
     if (key == "mail.host") {
-        if (stored.isValid())
+        if (!value.isEmpty())
             return value;
         return account == "outlook" ? "outlook.office365.com" : account == "gmail" ? "imap.gmail.com" : QString();
     }
     if (key == "mail.port")
-        return stored.isValid() ? value : "993";
+        return value.isEmpty() ? "993" : value;
     if (key == "mail.security")
-        return stored.isValid() ? value : "tls";
+        return value.isEmpty() ? "tls" : value;
     if (key == "mail.user")
         return !value.isEmpty() ? value : (account == "other" ? QString() : address);
     if (key == "mail.folder")
@@ -289,7 +289,9 @@ QString MailFetch::importClientJson(const QString &path) {
     if (!Keyring::store(KeyringService, ClientAccount, secret, &error))
         return error;
     put("mail.googleClientId", id);
+    m_oauthError.clear();   // Whatever the last attempt complained about, there is a client now.
     changed();
+    emit oauthChanged();
     return QString();
 }
 

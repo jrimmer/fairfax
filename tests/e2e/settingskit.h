@@ -114,7 +114,7 @@ inline void closeSettings(App &app) {
 }
 
 inline const QStringList &paneNames() {
-    static const QStringList names{"General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync",
+    static const QStringList names{"General", "Appearance", "Tasks", "Today & Lists", "Alerts", "Sync", "Mail",
                                    "Backups", "Import & Export", "Calendar", "Automation", "Diagnostics"};
     return names;
 }
@@ -632,6 +632,26 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"calendar.colors", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.emails", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.expanded", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
+        // Mail to Precrime: its own class drives each through the Settings > Mail controls, and
+        // E2EMail::everyMailSettingHasACase insists that every key the connector knows has one.
+        {"mail.enabled", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.account", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.address", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.host", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.port", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.security", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.user", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.folder", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.toFilter", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.labelFilter", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.after", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.moveTo", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.listId", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.naturalLanguage", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.interval", "E2EMail::everyFieldPersistsAndComesBack"},
+        {"mail.googleClientId", "E2EMail::importClientJsonThenSignInWithGoogle"},
+        {"mail.msClientId", "E2EMail::yourOwnClientIdThenSignInWithMicrosoft"},
+        {"mail.oauth", "E2EMail::importClientJsonThenSignInWithGoogle"},
     };
     return m;
 }
@@ -654,6 +674,7 @@ inline const QMap<QString, QString> &internalKeys() {
         {"lists.hiddenRevealed", "per-session reveal of hidden lists"},
         {"windows.extra", "which extra windows to reopen"},
         {"alerts.nag", "retired on/off switch, migrated into alerts.nagMinutes on launch"},
+        {"mail.mark.", "bookkeeping: the last UID seen per folder, so old mail is not fetched again (E2E-free: covered by MailFetchTest::highWaterMarkKeepsOldMailFromBeingFetchedAgain)"},
         {"print.notes", "read when saving a PDF but nothing in the UI sets it (a dead setting; see the report)"},
     };
     return m;
