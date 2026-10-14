@@ -678,6 +678,10 @@ inline const QMap<QString, QString> &internalKeys() {
         {"git.lastCommit", "bookkeeping of the sync"},
         {"git.lastSync", "bookkeeping of the sync"},
         {"todoist.lastSync", "bookkeeping of the Todoist sync"},
+        {"caldav.lastSync", "bookkeeping of the CalDAV sync"},
+        {"caldav.mapped", "bookkeeping: whether lists and calendars have been paired"},
+        {"caldav.name", "bookkeeping: the account's label, derived from its URL"},
+        {"caldav.replaceDone", "one-off flag: the server was cleared for Replace Server"},
         {"ui.collapsedSections", "remembered view state, not a choice"},
         {"ui.expandedLists", "remembered view state, not a choice"},
         {"ui.source", "remembered view state, not a choice"},
@@ -696,7 +700,12 @@ inline const QMap<QString, QString> &internalKeys() {
 
 // Keys with a user control elsewhere that no test reaches yet, and why.
 inline const QMap<QString, QString> &untestedKeys() {
-    static const QMap<QString, QString> m;
+    static const QMap<QString, QString> m{
+        // The Settings > Sync controls for the CalDAV provider are a later slice.
+        {"caldav.url", "the CalDAV server address, set through Settings once the pane arrives"},
+        {"caldav.user", "the CalDAV user name, set through Settings once the pane arrives"},
+        {"caldav.createCalendars", "the CalDAV create-calendars switch, set through Settings once the pane arrives"},
+    };
     return m;
 }
 
