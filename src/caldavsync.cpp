@@ -170,6 +170,10 @@ QString CalDavSync::accountName() const {
     return stored.isEmpty() ? accountNameFor(QUrl(m_store->setting("caldav.url").toString())) : stored;
 }
 
+QString CalDavSync::url() const { return m_store->setting("caldav.url").toString(); }
+
+QString CalDavSync::user() const { return m_store->setting("caldav.user").toString(); }
+
 QVariantList CalDavSync::calendars() const {
     QVariantList out;
     for (const CalDavClient::Calendar &c : m_calendars) {
@@ -275,6 +279,7 @@ void CalDavSync::connectAccount(const QString &url, const QString &user, const Q
     m_store->removeSetting("caldav.mapped");
     m_store->removeSetting("caldav.replaceDone");
     m_store->clearSyncLinks(Provider);
+    m_status = "Connected";
     emit stateChanged();
     if (!m_quietConnect)
         syncNow();
@@ -301,10 +306,14 @@ void CalDavSync::setCalendarForList(qint64 listId, const QString &calendarHref) 
     if (!list.id)
         return;
     if (calendarHref.isEmpty()) {
+        // "Don't sync": unmapped and skipped, the same exclusion every other
+        // provider honours, so no sync recreates the calendar for it.
         m_store->removeSyncLink(Provider, ELists, listId);
+        SyncTree::setListExcluded(*m_store, listId, true);
         emit stateChanged();
         return;
     }
+    SyncTree::setListExcluded(*m_store, listId, false);
     // One calendar to one list: drop any other list pointed at it.
     const auto links = m_store->syncLinks(Provider, ELists);
     for (const auto &link : links)
@@ -336,6 +345,47 @@ void CalDavSync::refreshCalendars() {
         if (o.ok)
             m_calendars = c;
         emit stateChanged();
+    });
+}
+
+void CalDavSync::createCalendarForList(qint64 listId) {
+    const TaskList list = m_store->list(listId);
+    if (!list.id || !configured())
+        return;
+    m_url = QUrl(m_store->setting("caldav.url").toString());
+    m_cachedPassword = Keyring::lookup(KeyringService, KeyringAccount);
+    m_passwordLooked = true;
+    m_client->setCredentials(m_store->setting("caldav.user").toString(), m_cachedPassword);
+    // Discover first when the calendar list is not known yet, so homeHref()
+    // points beside the calendars the account has.
+    auto make = [this, list] {
+        const QString name = list.name;
+        const QString color = calendarColor(list);
+        m_client->mkcalendar(homeHref(), name, color, [this, listId = list.id, name, color](const CalDavClient::Outcome &o, const QString &href) {
+            if (!o.ok) {
+                m_status = o.error.isEmpty() ? QStringLiteral("Could not create the calendar") : o.error;
+                emit stateChanged();
+                return;
+            }
+            CalDavClient::Calendar calendar;
+            calendar.href = href;
+            calendar.displayName = name;
+            calendar.color = color;
+            calendar.supportsVTodo = true;
+            m_calendars.append(calendar);
+            setCalendarForList(listId, href);
+            m_status = QStringLiteral("Created %1").arg(name);
+            emit stateChanged();
+        });
+    };
+    if (!m_calendars.isEmpty()) {
+        make();
+        return;
+    }
+    m_client->discover(m_url, [this, make](const CalDavClient::Outcome &o, const QList<CalDavClient::Calendar> &c) {
+        if (o.ok)
+            m_calendars = c;
+        make();
     });
 }
 

@@ -638,6 +638,11 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"git.remote", "E2ESettingsSystem::gitSyncPushesToTheRemote"},
         {"webdav.url", "E2ESettingsSystem::webDavAndTodoistConfiguration"},
         {"webdav.user", "E2ESettingsSystem::webDavAndTodoistConfiguration"},
+        // CalDAV: E2ECalDav drives each through the Settings > Sync controls against the fake server.
+        {"caldav.url", "E2ECalDav::everyFieldPersistsAndComesBack"},
+        {"caldav.user", "E2ECalDav::everyFieldPersistsAndComesBack"},
+        {"caldav.account", "E2ECalDav::everyFieldPersistsAndComesBack"},
+        {"caldav.createCalendars", "E2ECalDav::everyFieldPersistsAndComesBack"},
         {"calendar.sources", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.inLists", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
         {"calendar.disabled", "E2ESettingsSystem::calendarSourcesFeedTheDayBar"},
@@ -700,12 +705,7 @@ inline const QMap<QString, QString> &internalKeys() {
 
 // Keys with a user control elsewhere that no test reaches yet, and why.
 inline const QMap<QString, QString> &untestedKeys() {
-    static const QMap<QString, QString> m{
-        // The Settings > Sync controls for the CalDAV provider are a later slice.
-        {"caldav.url", "the CalDAV server address, set through Settings once the pane arrives"},
-        {"caldav.user", "the CalDAV user name, set through Settings once the pane arrives"},
-        {"caldav.createCalendars", "the CalDAV create-calendars switch, set through Settings once the pane arrives"},
-    };
+    static const QMap<QString, QString> m;
     return m;
 }
 

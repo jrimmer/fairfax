@@ -20,7 +20,8 @@ bool SyncHub::statusFailed(const QObject *p) {
     if (p->property("busy").toBool())
         return false;
     const QString status = p->property("status").toString();
-    return !(status.isEmpty() || status.startsWith("Synced") || status == "Not synced yet" || status == "Connecting…");
+    return !(status.isEmpty() || status.startsWith("Synced") || status == "Not synced yet" || status == "Connecting…"
+             || status == "Connected");
 }
 
 bool SyncHub::active() const {

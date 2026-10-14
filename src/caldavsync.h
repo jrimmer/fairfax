@@ -50,6 +50,8 @@ class CalDavSync : public QObject {
     Q_PROPERTY(QVariantList calendars READ calendars NOTIFY stateChanged)
     Q_PROPERTY(QVariantList mappings READ mappings NOTIFY stateChanged)
     Q_PROPERTY(QString accountName READ accountName NOTIFY stateChanged)
+    Q_PROPERTY(QString url READ url NOTIFY stateChanged)
+    Q_PROPERTY(QString user READ user NOTIFY stateChanged)
 
 public:
     // `theme` colours a calendar created for a new list; without one a small
@@ -64,6 +66,8 @@ public:
     QVariantList calendars() const;
     QVariantList mappings() const;
     QString accountName() const;
+    QString url() const;
+    QString user() const;
 
     // The password goes to the desktop keyring, never into the database.
     Q_INVOKABLE void connectAccount(const QString &url, const QString &user, const QString &password);
@@ -75,6 +79,9 @@ public:
     // Mapping, for Settings: pair a list with a calendar href (empty unmaps),
     // and re-read the calendar list from the server.
     Q_INVOKABLE void setCalendarForList(qint64 listId, const QString &calendarHref);
+    // Settings' "New calendar": makes a calendar for the list on the server
+    // and pairs it, without running a whole sync cycle.
+    Q_INVOKABLE void createCalendarForList(qint64 listId);
     Q_INVOKABLE void refreshCalendars();
 
     // Tests shorten the client's retry timings.

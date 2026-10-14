@@ -774,8 +774,107 @@ Window {
                     FirstSyncChoice { provider: webDavSync }
                     Text { objectName: "davStatus"; visible: !!webDavSync && webDavSync.configured; text: webDavSync ? webDavSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
 
+                    // CalDAV
+                    Label { text: "CalDAV"; font.bold: true; Layout.topMargin: 16 }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Two-way sync with the VTODO tasks in your calendar account, for Nextcloud, Fastmail and other CalDAV servers. Use an app password. iCloud Reminders created on iOS 13 or later aren't stored in CalDAV."
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: !!caldavSync
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: "Account"; Layout.preferredWidth: 160 }
+                            ComboBox {
+                                objectName: "setting:caldav.account"
+                                implicitContentWidthPolicy: ComboBox.WidestText
+                                readonly property var kinds: ["nextcloud", "fastmail", "other"]
+                                model: ["Nextcloud", "Fastmail", "Other"]
+                                currentIndex: Math.max(0, kinds.indexOf(String(root.value("caldav.account", "other"))))
+                                onActivated: (i) => backend.setSetting("caldav.account", kinds[i])
+                            }
+                        }
+                        TextField {
+                            id: caldavUrl
+                            objectName: "setting:caldav.url"
+                            Layout.fillWidth: true
+                            placeholderText: {
+                                const a = String(root.value("caldav.account", "other"))
+                                if (a === "nextcloud") return "https://<your server>/remote.php/dav"
+                                if (a === "fastmail") return "https://caldav.fastmail.com/"
+                                return ""
+                            }
+                            text: { backend.settingsRevision; return caldavSync ? caldavSync.url : "" }
+                            selectByMouse: true
+                            onEditingFinished: if (text.trim() !== (caldavSync ? caldavSync.url : "")) backend.setSetting("caldav.url", text.trim())
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            TextField {
+                                id: caldavUser
+                                objectName: "setting:caldav.user"
+                                Layout.fillWidth: true
+                                placeholderText: "User name"
+                                text: { backend.settingsRevision; return caldavSync ? caldavSync.user : "" }
+                                selectByMouse: true
+                                onEditingFinished: if (text.trim() !== (caldavSync ? caldavSync.user : "")) backend.setSetting("caldav.user", text.trim())
+                            }
+                            TextField {
+                                id: caldavPassword
+                                objectName: "setting:caldav.password"
+                                Layout.fillWidth: true
+                                echoMode: TextInput.Password
+                                placeholderText: { caldavSync && caldavSync.configured ? "Saved in your keyring" : "App password" }
+                            }
+                            Button {
+                                objectName: "caldavConnect"
+                                text: caldavSync && caldavSync.configured ? "Change" : "Connect"
+                                enabled: caldavUrl.text.trim() !== "" && caldavPassword.text !== ""
+                                onClicked: { caldavSync.connectAccount(caldavUrl.text.trim(), caldavUser.text.trim(), caldavPassword.text); caldavPassword.text = "" }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        visible: !!caldavSync && caldavSync.configured
+                        Button { objectName: "caldavSyncNow"; text: caldavSync && caldavSync.busy ? "Syncing…" : "Sync Now"; enabled: !!caldavSync && !caldavSync.busy && !caldavSync.needsChoice; onClicked: caldavSync.syncNow() }
+                        Button { objectName: "caldavDisconnect"; text: "Disconnect"; flat: true; onClicked: caldavSync.disconnectAccount() }
+                    }
+                    FirstSyncChoice { provider: caldavSync }
+                    Text { objectName: "caldavStatus"; visible: !!caldavSync; text: caldavSync ? caldavSync.status : ""; color: theme.muted; font.pixelSize: backend.fontSize - 1; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Label { text: "Lists and calendars"; font.bold: true; Layout.topMargin: 10; visible: !!caldavSync && caldavSync.configured }
+                    Repeater {
+                        model: (!!caldavSync && caldavSync.configured) ? backend.listChoices : []
+                        RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            Label { text: modelData.name; Layout.preferredWidth: 160; elide: Text.ElideRight }
+                            ComboBox {
+                                // objectName carries the list id so each row has its own combo.
+                                objectName: "caldavMap:" + modelData.id
+                                Layout.fillWidth: true
+                                implicitContentWidthPolicy: ComboBox.WidestText
+                                readonly property var calendarList: caldavSync ? caldavSync.calendars : []
+                                readonly property var mapped: caldavSync ? caldavSync.mappings : []
+                                readonly property int mappedIndex: { for (let i = 0; i < mapped.length; ++i) if (mapped[i].listId === modelData.id) return i; return -1 }
+                                readonly property string mappedHref: mappedIndex >= 0 ? mapped[mappedIndex].calendarHref : ""
+                                model: ["Don't sync"].concat(calendarList.map(c => c.name)).concat(["New calendar"])
+                                currentIndex: mappedHref === "" ? 0 : Math.max(0, 1 + calendarList.findIndex(c => c.href === mappedHref))
+                                onActivated: (i) => {
+                                    if (i === 0)
+                                        caldavSync.setCalendarForList(modelData.id, "")
+                                    else if (i === model.length - 1)
+                                        caldavSync.createCalendarForList(modelData.id)
+                                    else
+                                        caldavSync.setCalendarForList(modelData.id, calendarList[i - 1].href)
+                                }
+                            }
+                        }
+                    }
+                    Toggle { key: "caldav.createCalendars"; fallback: true; label: "Create calendars for new lists"; visible: !!caldavSync; note: "Lists without a calendar get one on the server at the next sync." }
+
                     Label { text: "Exclusions"; font.bold: true; Layout.topMargin: 16 }
-                    Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV and Todoist sync all skip it." }
+                    Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV, Todoist and CalDAV sync all skip it." }
                 }
 
                 // Mail to Fairfax
