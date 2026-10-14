@@ -14,6 +14,7 @@
 // within a couple of seconds.
 
 #include <QIODevice>
+#include <QString>
 #include <QStringList>
 #include <QTextStream>
 
@@ -28,6 +29,16 @@ int add(Store &store, const QStringList &words, QTextStream &out, QTextStream &e
 // Prints a line per message. Returns 0 when everything was added or was a
 // duplicate, 1 on an unreadable message or a store error, 2 on bad usage.
 int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream &out, QTextStream &err);
+// True when the program was started under the shorthand name: `frfx` on
+// Linux and macOS (usually a symlink); on Windows also `frfx.exe`, with
+// backslash paths and any letter case. `windowsStyle` picks the Windows
+// rules; it defaults to the platform being built for.
+#if defined(Q_OS_WIN)
+constexpr bool kWindowsNames = true;
+#else
+constexpr bool kWindowsNames = false;
+#endif
+bool isShorthandName(const QString &argv0, bool windowsStyle = kWindowsNames);
 int shorthand(Store &store, const QStringList &args, QTextStream &out, QTextStream &err);
 
 }  // namespace Cli

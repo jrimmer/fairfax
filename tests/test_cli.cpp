@@ -249,6 +249,29 @@ private slots:
         QCOMPARE(again.out, "");
         QCOMPARE(tasks().size(), 1);
     }
+
+    void shorthandNameFromArgv0() {
+        // Linux and macOS: the last path section must be exactly "frfx".
+        for (const bool windows : {false, true}) {
+            QVERIFY(Cli::isShorthandName("frfx", windows));
+            QVERIFY(Cli::isShorthandName("/usr/bin/frfx", windows));
+            QVERIFY(Cli::isShorthandName("/usr/local/bin/frfx", windows));
+            QVERIFY(Cli::isShorthandName("./frfx", windows));
+            QVERIFY(!Cli::isShorthandName("fairfax", windows));
+            QVERIFY(!Cli::isShorthandName("/opt/frfx/fairfax", windows));
+            QVERIFY(!Cli::isShorthandName("", windows));
+        }
+        QVERIFY(!Cli::isShorthandName("/Applications/Fairfax.app/Contents/MacOS/Fairfax", false));
+        QVERIFY(!Cli::isShorthandName("FRFX", false));
+        QVERIFY(!Cli::isShorthandName("frfx.exe", false));
+        // Windows: .exe, backslashes and letter case.
+        QVERIFY(Cli::isShorthandName("frfx.exe", true));
+        QVERIFY(Cli::isShorthandName("C:\\Users\\me\\AppData\\Local\\Programs\\Fairfax\\frfx.exe", true));
+        QVERIFY(Cli::isShorthandName("c:/tools/FRFX.EXE", true));
+        QVERIFY(Cli::isShorthandName("FrFx", true));
+        QVERIFY(!Cli::isShorthandName("C:\\Program Files\\frfx\\fairfax.exe", true));
+        QVERIFY(!Cli::isShorthandName("C:\\Fairfax\\fairfax.exe", true));
+    }
 };
 
 REGISTER_TEST(CliTest)

@@ -23,6 +23,21 @@
 #include "store.h"
 #include "views.h"
 
+namespace Cli {
+
+bool isShorthandName(const QString &argv0, bool windowsStyle) {
+    QString path = argv0;
+    if (windowsStyle)
+        path.replace('\\', '/');  // QFileInfo only splits on '/' on Unix.
+    const QFileInfo info(path);
+    if (!windowsStyle)
+        return info.fileName() == QLatin1String("frfx");  // No extension on Unix.
+    // Windows: `frfx` or `frfx.exe`, in any letter case.
+    return info.completeBaseName().compare(QLatin1String("frfx"), Qt::CaseInsensitive) == 0;
+}
+
+}  // namespace Cli
+
 namespace {
 
 // Colour only when writing to a terminal, so scripts get plain text.

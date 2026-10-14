@@ -165,7 +165,7 @@ int runHeadless(int argc, char *argv[]) {
         }
         return 0;
     }
-    const bool shorthand = args.value(0).section('/', -1) == "frfx";
+    const bool shorthand = Cli::isShorthandName(args.value(0));
     if (shorthand)
         return Cli::shorthand(store, args.mid(1), out, err);
     const QString mode = args.value(1);
@@ -247,9 +247,9 @@ int runHeadless(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
     {
         // Invoked as `frfx` (a symlink), everything is the terminal shorthand.
-        const QString self = QString::fromLocal8Bit(argv[0]).section('/', -1);
+        const QString self = QString::fromLocal8Bit(argv[0]);
         const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
-        if (self == "frfx" || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" || first == "import-mail" ||
+        if (Cli::isShorthandName(self) || first == "mcp" || first == "ctl" || first == "--waybar" || first == "import" || first == "import-mail" ||
             first == "add" || first == "setup" || first == "--complete")
             return runHeadless(argc, argv);
     }
