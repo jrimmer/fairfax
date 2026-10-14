@@ -640,6 +640,14 @@ void Store::setSetting(const QString &key, const QVariant &value) {
     q.exec();
 }
 
+void Store::removeSetting(const QString &key) {
+    m_settings.remove(key);
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM settings WHERE key = ?");
+    q.addBindValue(key);
+    q.exec();
+}
+
 bool Store::backupTo(const QString &file, QString *error) {
     QDir().mkpath(QFileInfo(file).absolutePath());
     QSqlQuery q(m_db);

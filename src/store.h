@@ -99,6 +99,7 @@ public:
 
     QVariant setting(const QString &key, const QVariant &fallback = {}) const;
     void setSetting(const QString &key, const QVariant &value);
+    void removeSetting(const QString &key);
 
     // Copies the database aside with SQLite's VACUUM INTO, which produces a
     // consistent file even while the app is writing.
