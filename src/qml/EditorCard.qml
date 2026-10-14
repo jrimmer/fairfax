@@ -165,11 +165,17 @@ Item {
                         color: "transparent"
                         border.width: 1.3
                         border.color: root.priorityColor || theme.faint
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Toggle completed"
+                        Accessible.onPressAction: backend.toggleComplete(root.e.id)
                         MouseArea { anchors.fill: parent; onClicked: backend.toggleComplete(root.e.id) }
                     }
                     Plain.TextField {
                         id: titleField
                         objectName: "editorTitle"
+                        // A screen reader reads the field by its label; the
+                        // placeholder is not a name.
+                        Accessible.name: "Title"
                         Layout.fillWidth: true
                         // While a new task's title is typed, recognised dates,
                         // tags and the rest are drawn as capsules, as in Quick Entry.
@@ -213,6 +219,8 @@ Item {
                         objectName: "editorPriority"
                         icon: "starred"
                         size: 17
+                        accessibleName: "Priority"
+                        Accessible.description: tip
                         color: root.priorityColor || (root.e.starred ? theme.star : theme.faint)
                         tip: (["No priority", "Low priority", "Medium priority", "High priority"][root.e.priority || 0]) + (root.e.starred ? " · starred" : "")
                         onClicked: priorityMenu.popup(prio, 0, prio.height + 4)
@@ -246,7 +254,9 @@ Item {
                             }
                             MenuSeparator {}
                             MenuItem {
+                                objectName: "editorStarred"
                                 text: "Star"
+                                Accessible.name: "Starred"
                                 checkable: true
                                 checked: !!root.e.starred
                                 onTriggered: backend.setStarred(root.e.starred ? 0 : 1, root.e.id)
@@ -312,6 +322,8 @@ Item {
                         spacing: 8
                         ListBadge {
                             objectName: "editorList"
+                            accessibleName: "List"
+                            Accessible.description: root.e.listName || ""
                             text: root.e.listName || ""
                             color: root.listColor
                             chevrons: true
@@ -362,7 +374,7 @@ Item {
                             font.pixelSize: backend.fontSize - 2
                             Layout.rightMargin: 4
                         }
-                        RibbonButton { id: actionButton; objectName: "editorAction"; icon: "url"; tip: "Action (Ctrl+B)"; active: (root.e.actionType || 0) > 0; menu: actionMenu }
+                        RibbonButton { id: actionButton; objectName: "editorAction"; icon: "url"; tip: "Action (Ctrl+B)"; accessibleName: "Action"; active: (root.e.actionType || 0) > 0; menu: actionMenu }
                         RibbonButton {
                             objectName: "editorRecord"
                             icon: "mic"
@@ -372,10 +384,10 @@ Item {
                             onClicked: backend.toggleRecording(root.e.id)
                         }
                         RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
-                        RibbonButton { id: locationButton; objectName: "editorLocation"; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; active: (root.e.locations || []).length > 0; menu: locationMenu }
-                        RibbonButton { id: repeatButton; objectName: "editorRepeat"; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
-                        RibbonButton { id: alarmButton; objectName: "editorAlarm"; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
-                        RibbonButton { id: durationButton; objectName: "editorDuration"; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; active: (root.e.duration || 0) > 0; menu: durationMenu }
+                        RibbonButton { id: locationButton; objectName: "editorLocation"; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; accessibleName: "Location"; active: (root.e.locations || []).length > 0; menu: locationMenu }
+                        RibbonButton { id: repeatButton; objectName: "editorRepeat"; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; accessibleName: "Repeat"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
+                        RibbonButton { id: alarmButton; objectName: "editorAlarm"; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; accessibleName: "Alerts"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
+                        RibbonButton { id: durationButton; objectName: "editorDuration"; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; accessibleName: "Duration"; active: (root.e.duration || 0) > 0; menu: durationMenu }
 
                         Menu {
                             id: alarmMenu
@@ -472,6 +484,7 @@ Item {
                     spacing: 12
                     TagField {
                         objectName: "editorTags"
+                        accessibleName: "Tags"
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignTop
                         taskId: root.e.id || 0
@@ -488,6 +501,7 @@ Item {
                         DateField {
                             id: startField
                             objectName: "editorStart"
+                            Accessible.name: "Start date"
                             implicitWidth: 112
                             iso: root.e.startIso || ""
                             value: root.e.startDate || ""
@@ -499,6 +513,7 @@ Item {
                         }
                         DateField {
                             objectName: "editorStartTime"
+                            Accessible.name: "Start time"
                             timeOnly: true
                             implicitWidth: 82
                             value: root.e.startTime || ""
@@ -512,6 +527,7 @@ Item {
                         DateField {
                             id: dueField
                             objectName: "editorDue"
+                            Accessible.name: "Due date"
                             implicitWidth: 112
                             iso: root.e.dueIso || ""
                             value: root.e.dueDate || ""
@@ -524,6 +540,7 @@ Item {
                         }
                         DateField {
                             objectName: "editorDueTime"
+                            Accessible.name: "Due time"
                             timeOnly: true
                             implicitWidth: 82
                             value: root.e.dueTime || ""
@@ -590,6 +607,7 @@ Item {
                         Plain.TextField {
                             id: newSubtask
                             objectName: "editorNewSubtask"
+                            Accessible.name: root.e.type === 1 ? "Add a task to this project" : root.e.type === 2 ? "Add a checklist item" : "Add a sub-task"
                             Layout.fillWidth: true
                             padding: 1
                             background: Item {}
@@ -712,6 +730,7 @@ Item {
                     NotesArea {
                         id: notesArea
                         objectName: "editorNotes"
+                        accessibleName: "Notes"
                         anchors.fill: parent
                         anchors.margins: 4
                         text: root.e.notes || ""
@@ -772,9 +791,9 @@ Item {
         property int minutes: 540
         Row {
             spacing: 8
-            SpinBox { id: daysBox; objectName: "alarmDays"; from: 0; to: 365; value: 1; editable: true }
+            SpinBox { id: daysBox; objectName: "alarmDays"; Accessible.name: "Days before"; Component.onCompleted: contentItem.Accessible.name = "Days before"; from: 0; to: 365; value: 1; editable: true }
             Label { text: daysBox.value === 1 ? "day before at" : "days before at"; anchors.verticalCenter: parent.verticalCenter }
-            DateField { timeOnly: true; value: "9:00 AM"; placeholderText: "Time"; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].minutes >= 0) { daysBeforeAlarm.minutes = s[0].minutes; value = s[0].label } } }
+            DateField { timeOnly: true; Accessible.name: "Alert time"; value: "9:00 AM"; placeholderText: "Time"; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].minutes >= 0) { daysBeforeAlarm.minutes = s[0].minutes; value = s[0].label } } }
         }
         onAccepted: backend.addDaysBeforeAlarm(root.e.id, daysBox.value, minutes)
     }
@@ -792,8 +811,8 @@ Item {
         property int minutes: 540
         Row {
             spacing: 8
-            DateField { id: alarmDate; iso: absoluteAlarm.iso; value: absoluteAlarm.iso; placeholderText: "Date"; onPicked: (iso) => { absoluteAlarm.iso = iso; value = iso } ; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].date) { absoluteAlarm.iso = s[0].date; value = s[0].label; if (s[0].minutes >= 0) absoluteAlarm.minutes = s[0].minutes } } }
-            DateField { timeOnly: true; value: "9:00 AM"; placeholderText: "Time"; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].minutes >= 0) { absoluteAlarm.minutes = s[0].minutes; value = s[0].label } } }
+            DateField { id: alarmDate; Accessible.name: "Alert date"; iso: absoluteAlarm.iso; value: absoluteAlarm.iso; placeholderText: "Date"; onPicked: (iso) => { absoluteAlarm.iso = iso; value = iso } ; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].date) { absoluteAlarm.iso = s[0].date; value = s[0].label; if (s[0].minutes >= 0) absoluteAlarm.minutes = s[0].minutes } } }
+            DateField { timeOnly: true; Accessible.name: "Alert time"; value: "9:00 AM"; placeholderText: "Time"; onTyped: (t) => { const s = backend.dateSuggestions(t); if (s.length && s[0].minutes >= 0) { absoluteAlarm.minutes = s[0].minutes; value = s[0].label } } }
         }
         onAccepted: backend.addAbsoluteAlarm(root.e.id, iso, minutes)
     }

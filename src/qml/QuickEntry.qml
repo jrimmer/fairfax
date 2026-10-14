@@ -630,6 +630,7 @@ Window {
                 Plain.TextField {
                     id: title_
                     objectName: "quickTitle"
+                    Accessible.name: "Title"
                     anchors.fill: parent
                     padding: 0
                     background: Item {}
@@ -900,6 +901,7 @@ Window {
                 TextInput {
                             id: tagInput
                             objectName: "quickTagInput"
+                            Accessible.name: "Tags"
                             property var matches: []
                             width: Math.max(70, contentWidth + 10)
                             height: 24
@@ -969,6 +971,7 @@ Window {
                 DateField {
                     id: startField
                     objectName: "quickStart"
+                    Accessible.name: "Start date"
                     implicitWidth: 112
                     iso: root.startIso
                     value: root.fieldDate(root.startIso)
@@ -981,6 +984,7 @@ Window {
                 DateField {
                     id: startTimeField
                     objectName: "quickStartTime"
+                    Accessible.name: "Start time"
                     timeOnly: true
                     implicitWidth: 82
                     value: root.startMinutes >= 0 ? root.timeText(root.startMinutes) : ""
@@ -994,6 +998,7 @@ Window {
                 DateField {
                     id: dueField
                     objectName: "quickDue"
+                    Accessible.name: "Due date"
                     implicitWidth: 112
                     iso: root.dueIso
                     value: root.fieldDate(root.dueIso)
@@ -1007,6 +1012,7 @@ Window {
                 DateField {
                     id: dueTimeField
                     objectName: "quickDueTime"
+                    Accessible.name: "Due time"
                     timeOnly: true
                     implicitWidth: 82
                     value: root.dueMinutes >= 0 ? root.timeText(root.dueMinutes) : ""
@@ -1028,6 +1034,7 @@ Window {
             Plain.TextArea {
                 id: notes
                 objectName: "quickNotes"
+                Accessible.name: "Notes"
                 anchors.fill: parent
                 anchors.leftMargin: 44
                 anchors.rightMargin: 16
@@ -1073,6 +1080,9 @@ Window {
                 HoverHandler { id: typeHover }
                 TapHandler { onTapped: typeMenu.popup(typeButton, 0, typeButton.height + 2) }
                 FocusScope { id: typeFocus; anchors.fill: parent; activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Type, " + ["Task", "Project", "Checklist"][root.type]
+                    Accessible.onPressAction: typeMenu.popup(typeButton, 0, typeButton.height + 2)
                     Keys.onPressed: (e) => { if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) { typeMenu.popup(typeButton, 0, typeButton.height + 2); e.accepted = true } } }
             }
             Item { Layout.fillWidth: true }
@@ -1086,6 +1096,9 @@ Window {
                 HoverHandler { id: cancelHover }
                 TapHandler { onTapped: root.hide() }
                 FocusScope { id: cancelFocus; anchors.fill: parent; activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Cancel"
+                    Accessible.onPressAction: root.hide()
                     Keys.onPressed: (e) => { if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) { root.hide(); e.accepted = true } } }
             }
             Rectangle {
@@ -1104,6 +1117,9 @@ Window {
                 ToolTip.delay: 600
                 ToolTip.text: "Return saves · Shift+Return adds another · Ctrl+Return opens"
                 FocusScope { id: saveFocus; anchors.fill: parent; activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Save"
+                    Accessible.onPressAction: if (saveButton.ready) { root.save(false); root.hide() }
                     Keys.onPressed: (e) => { if (saveButton.ready && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) && !(e.modifiers & (Qt.ShiftModifier | Qt.ControlModifier))) { root.save(false); root.hide(); e.accepted = true } } }
             }
         }
