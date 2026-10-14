@@ -18,6 +18,8 @@
 #include "store.h"
 #include "views.h"
 
+class CalendarFeed;
+
 class Backend : public QObject {
     Q_OBJECT
     Q_PROPERTY(RowModel *sidebar READ sidebar CONSTANT)
@@ -529,6 +531,18 @@ public:
     // Calendar Day Bar time blocking: the selection is due at that slot.
     Q_INVOKABLE void timeBlock(const QString &isoDate, int startMinute, int durationMinutes);
 
+    // My Day: the daily plan's sections, capacity line and planning actions.
+    // The calendar feed is the one the app shows, injected at construction.
+    void setCalendar(CalendarFeed *calendar) { m_calendar = calendar; }
+    Q_INVOKABLE QVariantMap myDaySections() const;
+    Q_INVOKABLE QVariantMap myDayCapacity() const;
+    Q_INVOKABLE void myDayAdd(const QVariantList &ids);
+    Q_INVOKABLE void myDayRemove(const QVariantList &ids);
+    Q_INVOKABLE void myDayHide(const QVariantList &ids);
+    // Puts the task in the first free gap of its length, giving it a 30-minute
+    // duration first when it has none.
+    Q_INVOKABLE void myDayBlockNext(qint64 id);
+
     // Alerts beyond the presets.
     Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);
     Q_INVOKABLE void addDaysBeforeAlarm(qint64 taskId, int days, int minutes);
@@ -564,6 +578,7 @@ signals:
     void newWindowRequested();
     void panelRequested(const QString &panel);  // "open" (Quick Open) or "settings".
     void recordingChanged();
+    void myDayChanged();  // The My Day plan or capacity moved.
     void quickEntryTextRequested(const QString &text);
     void editEnding();  // The editor is about to close: it saves what is still in its fields.
     void editFieldRequested();  // The editor is open; takePendingField() says where to go.
@@ -605,6 +620,7 @@ private:
     void saveUiState();
 
     Store *m_store;
+    CalendarFeed *m_calendar = nullptr;
     RowModel m_sidebar;
     RowModel m_tasks;
     RowModel m_tags;

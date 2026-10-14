@@ -24,6 +24,8 @@
 #include "automation.h"
 #include "exchange.h"
 #include "markdown.h"
+#include "myday.h"
+#include "calendar.h"
 #include "query.h"
 #include "searchrules.h"
 #include "recurrence.h"
@@ -3217,6 +3219,87 @@ void Backend::timeBlock(const QString &isoDate, int startMinute, int durationMin
         t.dueTime = end;
         t.duration = end - startMinute;
     });
+}
+
+// ---------------------------------------------------------------- My Day
+
+namespace {
+
+// The plain id list an invokable receives from QML.
+QVector<qint64> idList(const QVariantList &ids) {
+    QVector<qint64> out;
+    for (const QVariant &v : ids)
+        out.append(v.toLongLong());
+    return out;
+}
+
+QVariantList entryList(const QVector<MyDay::Entry> &entries) {
+    QVariantList out;
+    for (const MyDay::Entry &e : entries)
+        out << QVariantMap{{"taskId", e.taskId}, {"reason", e.reason}};
+    return out;
+}
+
+}  // namespace
+
+QVariantMap Backend::myDaySections() const {
+    const MyDay::Sections day = MyDay::sections(*m_store, QDateTime::currentDateTime());
+    QVariantMap out;
+    out["overdue"] = entryList(day.overdue);
+    out["today"] = entryList(day.today);
+    out["suggestions"] = entryList(day.suggestions);
+    return out;
+}
+
+QVariantMap Backend::myDayCapacity() const {
+    // Unit tests build a Backend with no calendar; an empty feed gives the
+    // same answer as one with no events, without a live object.
+    CalendarFeed emptyFeed;
+    const CalendarFeed &feed = m_calendar ? *m_calendar : emptyFeed;
+    const MyDay::Capacity c = MyDay::capacity(*m_store, feed, QDateTime::currentDateTime());
+    return {{"plannedMinutes", c.plannedMinutes}, {"withoutDuration", c.withoutDuration},
+            {"blockedMinutes", c.blockedMinutes}, {"freeMinutes", c.freeMinutes}, {"windowMinutes", c.windowMinutes}};
+}
+
+void Backend::myDayAdd(const QVariantList &ids) {
+    MyDay::addToToday(*m_store, idList(ids));
+    emit myDayChanged();
+}
+
+void Backend::myDayRemove(const QVariantList &ids) {
+    MyDay::removeFromToday(*m_store, idList(ids));
+    emit myDayChanged();
+}
+
+void Backend::myDayHide(const QVariantList &ids) {
+    MyDay::hideForToday(*m_store, idList(ids));
+    emit myDayChanged();
+}
+
+void Backend::myDayBlockNext(qint64 id) {
+    Task t = m_store->task(id);
+    if (!t.id || t.deleted)
+        return;
+    if (t.duration <= 0) {
+        t.duration = 30;
+        m_store->begin("Change Duration");
+        m_store->putTask(t);
+        m_store->commit();
+    }
+    CalendarFeed emptyFeed;
+    const CalendarFeed &feed = m_calendar ? *m_calendar : emptyFeed;
+    const QDateTime now = QDateTime::currentDateTime();
+    const int slot = MyDay::nextFreeSlot(*m_store, feed, now, m_store->task(id).duration);
+    if (slot < 0) {
+        setStatus("No free time left today for this task.");
+        return;
+    }
+    // timeBlock uses the selection; select just this task so one call does it.
+    m_selected = {id};
+    m_cursor = id;
+    timeBlock(now.date().toString(Qt::ISODate), slot, m_store->task(id).duration);
+    m_options.keepVisible.insert(id);
+    emit myDayChanged();
 }
 
 void Backend::addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes) {

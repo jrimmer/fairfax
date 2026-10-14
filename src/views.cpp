@@ -258,6 +258,13 @@ bool ViewBuilder::matchesFocus(const Task &t, int kind) const {
     return false;
 }
 
+bool ViewBuilder::matchesTodayList(const Task &task) const {
+    if (!Schedule::inToday(task, m_now, m_settings))
+        return false;
+    // Starred tasks reach Today even from lists excluded from it.
+    return m_store.list(task.listId).showInToday || (m_settings.todayIncludesStarred && task.starred);
+}
+
 QueryContext ViewBuilder::queryContext(const ViewOptions &o) const {
     QueryContext context;
     context.store = &m_store;

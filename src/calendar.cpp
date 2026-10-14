@@ -720,6 +720,29 @@ QVariantList CalendarFeed::freeSlots(const QString &isoDate, int fromMinute, int
     return out;
 }
 
+int CalendarFeed::freeMinutes(const QString &isoDate, int fromMinute, int toMinute) const {
+    // freeSlots drops gaps shorter than half an hour; the capacity line must
+    // count them, so this walks the same busy list without the minimum.
+    if (toMinute <= fromMinute) return 0;
+    QList<QPair<int, int>> busy;
+    for (const QVariant &v : eventsFor(isoDate)) {
+        const QVariantMap e = v.toMap();
+        if (e.value(QStringLiteral("allDay")).toBool() || e.value(QStringLiteral("declined")).toBool()) continue;
+        busy.append({e.value(QStringLiteral("start")).toInt(), e.value(QStringLiteral("end")).toInt()});
+    }
+    std::sort(busy.begin(), busy.end());
+    int free = 0;
+    int cursor = fromMinute;
+    for (const auto &[start, end] : busy) {
+        if (end <= cursor) continue;
+        if (start >= toMinute) break;
+        free += std::max(0, std::min(start, toMinute) - cursor);
+        cursor = std::max(cursor, std::min(end, toMinute));
+    }
+    free += std::max(0, toMinute - cursor);
+    return free;
+}
+
 QString CalendarFeed::error() const {
     QStringList lines;
     for (const QString &source : m_sources)

@@ -26,6 +26,8 @@ AppServices::AppServices(Store &store, const QString &themeOverride)
     QObject::connect(&backend, &Backend::taskCompleted, &sounds, [this](bool done) { if (done) sounds.complete(); else sounds.uncomplete(); });
 
     calendar.setPalette(theme.listPalette());
+    // My Day's capacity line and next-free-slot need the day's events.
+    backend.setCalendar(&calendar);
     // Per-source switches and colours, and the addresses that mark a declined
     // invitation as mine, all set before the sources so the first load is right.
     calendar.setDisabledSources(store.setting("calendar.disabled").toString().split('\n', Qt::SkipEmptyParts));

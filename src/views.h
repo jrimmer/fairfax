@@ -105,6 +105,9 @@ public:
 
     bool isPaused(const Task &task) const;
     bool isSmartList(qint64 listId) const;
+    // Whether the task reaches the Today focus list by the date rules, before
+    // the per-list "show in Today" exclusion; the caller applies that.
+    bool matchesTodayList(const Task &task) const;
     bool inSmartRange(const Task &task, const QString &range) const;
     static bool matchesFocusCondition(const Task &task, const QString &condition, const QDateTime &now,
                                       const ScheduleSettings &settings);

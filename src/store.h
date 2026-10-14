@@ -73,6 +73,10 @@ public:
     void putAttachment(const Attachment &attachment);
     bool commit();
 
+    // A setting written as part of a change, so one Ctrl+Z puts it back.
+    // Ordinary setSetting() is immediate bookkeeping and is not undoable.
+    void putSetting(const QString &key, const QVariant &value);
+
     bool canUndo() const { return !m_undo.isEmpty(); }
     bool canRedo() const { return !m_redo.isEmpty(); }
     QString undoLabel() const { return m_undo.isEmpty() ? QString() : m_undo.last().label; }
@@ -130,6 +134,7 @@ private:
     void record(const QString &table, qint64 id, const QVariantMap &before, const QVariantMap &after);
     bool write(const QVector<Edit> &edits, bool forward);
     bool writeRow(const QString &table, const QVariantMap &row);
+    bool writeSetting(const QString &key, const QVariantMap &row);
     bool deleteRow(const QString &table, qint64 id);
     void applyToCache(const QString &table, const QVariantMap &row, qint64 id);
     QVariantMap cached(const QString &table, qint64 id) const;

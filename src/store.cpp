@@ -415,6 +415,15 @@ void Store::putAttachment(const Attachment &a) {
     record("attachments", copy.id, cached("attachments", copy.id), copy.toMap());
 }
 
+void Store::putSetting(const QString &key, const QVariant &value) {
+    // Settings are not rows, so the journal carries them as a synthetic table
+    // whose one field is the value; undo writes the old text back.
+    const QVariantMap before = m_settings.contains(key) ? QVariantMap{{"value", m_settings.value(key)}} : QVariantMap{};
+    m_settings.insert(key, value);
+    const QVariantMap after{{"value", value}};
+    record("settings:" + key, 0, before, after);
+}
+
 QVector<Attachment> Store::attachmentsFor(qint64 taskId) const {
     QVector<Attachment> result;
     for (const auto &a : m_attachments)
@@ -495,6 +504,10 @@ bool Store::write(const QVector<Edit> &edits, bool forward) {
     m_db.transaction();
     bool ok = true;
     for (const auto &edit : edits) {
+        if (edit.table.startsWith(QLatin1String("settings:"))) {
+            ok = writeSetting(edit.table.mid(int(qstrlen("settings:"))), forward ? edit.after : edit.before) && ok;
+            continue;
+        }
         const QVariantMap &row = forward ? edit.after : edit.before;
         ok = (row.isEmpty() ? deleteRow(edit.table, edit.id) : writeRow(edit.table, row)) && ok;
     }
@@ -504,6 +517,20 @@ bool Store::write(const QVector<Edit> &edits, bool forward) {
         return false;
     }
     return m_db.commit();
+}
+
+bool Store::writeSetting(const QString &key, const QVariantMap &row) {
+    if (row.isEmpty()) {
+        QSqlQuery q(m_db);
+        q.prepare("DELETE FROM settings WHERE key = ?");
+        q.addBindValue(key);
+        return q.exec();
+    }
+    QSqlQuery q(m_db);
+    q.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+    q.addBindValue(key);
+    q.addBindValue(row.value("value").toString());
+    return q.exec();
 }
 
 bool Store::writeRow(const QString &table, const QVariantMap &row) {
@@ -546,7 +573,11 @@ bool Store::deleteRow(const QString &table, qint64 id) {
 }
 
 void Store::applyToCache(const QString &table, const QVariantMap &row, qint64 id) {
-    if (table == "tasks") {
+    if (table.startsWith(QLatin1String("settings:"))) {
+        const QString key = table.mid(int(qstrlen("settings:")));
+        if (row.isEmpty()) m_settings.remove(key);
+        else m_settings.insert(key, row.value("value"));
+    } else if (table == "tasks") {
         if (row.isEmpty()) m_tasks.remove(id); else m_tasks.insert(id, Task::fromMap(row));
     } else if (table == "lists") {
         if (row.isEmpty()) m_lists.remove(id); else m_lists.insert(id, TaskList::fromMap(row));

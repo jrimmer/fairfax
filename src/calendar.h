@@ -135,6 +135,10 @@ public:
     // Gaps of at least 30 minutes between timed events inside the window, as
     // {start, end, label}.
     Q_INVOKABLE QVariantList freeSlots(const QString &isoDate, int fromMinute, int toMinute) const;
+    // Total free minutes in the window: the same timed events as freeSlots,
+    // with overlapping ones merged and clipped, but no minimum gap, so short
+    // openings still count. Used by My Day's capacity line.
+    int freeMinutes(const QString &isoDate, int fromMinute, int toMinute) const;
     Q_INVOKABLE void refresh();
 
     // Feeds already-fetched iCalendar text for a source. refresh() uses it, and
