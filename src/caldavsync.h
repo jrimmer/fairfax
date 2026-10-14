@@ -79,6 +79,18 @@ public:
 
     // Tests shorten the client's retry timings.
     void setTimings(const CalDavClient::Timings &timings);
+    // Tests connect without starting a sync, so they drive the first cycle
+    // themselves.
+    void setQuietConnect(bool quiet) { m_quietConnect = quiet; }
+
+    // Runs one cycle and returns when it settles, for tests.
+    struct Result {
+        bool ok = false;
+        bool needsChoice = false;
+        int changed = 0;
+        QString error;
+    };
+    Result syncBlocking(SyncTree::FirstSync first = SyncTree::FirstSync::Merge);
 
 signals:
     void stateChanged();
@@ -87,12 +99,14 @@ signals:
 private:
     // One local change to push.
     struct Op {
-        enum Kind { Create, Update, Delete, Move } kind = Create;
         qint64 taskId = 0;
         QString href;      // Target resource, or the resource to delete.
         QString oldHref;   // Move: the resource to delete after the write.
-        QString etag;      // If-Match for Update/Delete/Move.
+        QString etag;      // If-Match for an update or delete.
+        QString oldEtag;   // Move: the If-Match for the old resource.
         Vtodo::Extra extra;
+        bool remove = false;
+        bool update = false;
         bool retried = false;
     };
     struct ListState {
@@ -179,6 +193,9 @@ private:
     bool m_localHasTasks = false;
     bool m_remoteHasTasks = false;
     int m_probeIndex = 0;
+    bool m_finished = true;
+    bool m_quietConnect = false;
+    Result m_lastResult;
     QStringList m_wipeHrefs;
     int m_wipeIndex = 0;
 

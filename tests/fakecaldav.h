@@ -66,6 +66,11 @@ public:
     QString principal = QStringLiteral("/principals/jane/");
     QString home = QStringLiteral("/calendars/jane/");
     bool syncCollection = true;   // Off: REPORT sync-collection is refused, forcing the etag fallback.
+    bool omitEtagOnPut = false;   // On: PUT answers without an ETag, so the client must fetch it.
+    bool failEtagFetchOnce = false;  // The next PROPFIND that asks only for getetag answers 500.
+    int failNextPropfind = 0;     // A one-off 500 for the next PROPFIND, to break that fetch.
+    QSet<QString> readOnlyCalendars;  // Collections whose writes answer 403.
+    int putsWithIfNoneMatch = 0;  // PUTs that carried If-None-Match, for assertions.
     QString silentOn;             // A method (PROPFIND, REPORT, PUT...) the server never answers, to provoke a timeout.
 
     // What happened, for assertions.
@@ -191,6 +196,16 @@ private:
         }
 
         if (method == "PROPFIND") {
+            if (failEtagFetchOnce && body.contains("getetag") && !body.contains("displayname")) {
+                failEtagFetchOnce = false;
+                respond(s, 500, {});
+                return;
+            }
+            if (failNextPropfind > 0) {
+                --failNextPropfind;
+                respond(s, 500, {});
+                return;
+            }
             propfind(s, path, body);
             return;
         }
@@ -220,9 +235,15 @@ private:
                 respond(s, 409, {});
                 return;
             }
+            if (readOnlyCalendars.contains(c->href)) {
+                respond(s, 403, {});
+                return;
+            }
             const bool exists = c->resources.contains(path);
             const QByteArray ifNoneMatch = s->headers.value("if-none-match");
             const QByteArray ifMatch = s->headers.value("if-match");
+            if (ifNoneMatch == "*")
+                ++putsWithIfNoneMatch;
             if (ifNoneMatch == "*" && exists) {
                 respond(s, 412, {});
                 return;
@@ -236,16 +257,23 @@ private:
             c->etags.insert(path, etag);
             bumpCtag(*c);
             noteChange(path, false);
+            const QList<QPair<QByteArray, QByteArray>> headers = omitEtagOnPut
+                ? QList<QPair<QByteArray, QByteArray>>{}
+                : QList<QPair<QByteArray, QByteArray>>{{"ETag", etag.toUtf8()}};
             if (exists)
-                respond(s, 204, {}, {{"ETag", etag.toUtf8()}});
+                respond(s, 204, {}, headers);
             else
-                respond(s, 201, {}, {{"ETag", etag.toUtf8()}, {"Location", path.toUtf8()}});
+                respond(s, 201, {}, QList<QPair<QByteArray, QByteArray>>(headers) << qMakePair(QByteArray("Location"), path.toUtf8()));
             return;
         }
         if (method == "DELETE") {
             const QString resource = findResource(path);
             if (resource.isEmpty()) {
                 respond(s, 404, {});
+                return;
+            }
+            if (c && readOnlyCalendars.contains(c->href)) {
+                respond(s, 403, {});
                 return;
             }
             const QByteArray ifMatch = s->headers.value("if-match");

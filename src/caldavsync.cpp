@@ -1,7 +1,11 @@
 #include "caldavsync.h"
 
+#include <QCoreApplication>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
+#include <QJsonObject>
+#include <QThread>
 
 #include "keyring.h"
 #include "store.h"
@@ -53,7 +57,9 @@ Vtodo::Extra extraFromMap(const QVariantMap &m) {
 
 // What a VTODO carries, without the parts that only order the local list and
 // without the link's own bookkeeping. Equal projections mean a task and its
-// snapshot would write the same resource.
+// snapshot would write the same resource. The map is normalised the way the
+// link snapshot is (through JSON), so a null date compares the same either
+// way.
 QVariantMap projection(QVariantMap map) {
     for (const char *key : {"id", "modified", "created", "sort_order", "collapsed", "series_uid", "deleted", "section_id"})
         map.remove(key);
@@ -63,7 +69,7 @@ QVariantMap projection(QVariantMap map) {
         else
             ++it;
     }
-    return map;
+    return QJsonObject::fromVariantMap(map).toVariantMap();
 }
 
 QVariantMap withMeta(const QVariantMap &projected, const QString &etag, const Vtodo::Extra &extra) {
@@ -89,15 +95,11 @@ bool remoteWins(const QDateTime &local, const QDateTime &remote) {
     return remote > local;
 }
 
-// The calendar home a created calendar goes into: the deepest directory under
-// the base URL that still looks like a collection.
-QString homeFromBase(const QUrl &base) {
-    QString path = base.path();
-    if (path.isEmpty())
-        path = QStringLiteral("/");
-    if (!path.endsWith('/'))
-        path += '/';
-    return path;
+QString parentPath(const QString &href) {
+    QString path = href;
+    if (path.endsWith('/'))
+        path.chop(1);
+    return path.section('/', 0, -2) + '/';
 }
 
 }  // namespace
@@ -172,6 +174,21 @@ void CalDavSync::setTimings(const CalDavClient::Timings &timings) {
     m_client->setTimings(timings);
 }
 
+CalDavSync::Result CalDavSync::syncBlocking(SyncTree::FirstSync first) {
+    m_finished = false;
+    m_needsChoice = false;
+    m_mode = m_store->setting("caldav.mapped", false).toBool() ? SyncTree::FirstSync::Merge : first;
+    m_busy = false;
+    syncNow();
+    QElapsedTimer timer;
+    timer.start();
+    while (!m_finished && timer.elapsed() < 20000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QThread::msleep(2);
+    }
+    return m_lastResult;
+}
+
 QString CalDavSync::accountNameFor(const QUrl &url) const {
     QString host = url.host();
     if (host.startsWith("www."))
@@ -181,7 +198,17 @@ QString CalDavSync::accountNameFor(const QUrl &url) const {
 }
 
 QString CalDavSync::homeHref() const {
-    return homeFromBase(m_url);
+    // A created calendar belongs beside the ones discovery found; without
+    // any, the account's own root is the best guess.
+    for (const CalDavClient::Calendar &c : m_calendars)
+        if (!c.href.isEmpty())
+            return parentPath(c.href);
+    QString path = m_url.path();
+    if (path.isEmpty())
+        path = QStringLiteral("/");
+    if (!path.endsWith('/'))
+        path += '/';
+    return path;
 }
 
 QString CalDavSync::calendarColor(const TaskList &list) const {
@@ -221,7 +248,8 @@ void CalDavSync::connectAccount(const QString &url, const QString &user, const Q
     m_store->removeSetting("caldav.replaceDone");
     m_store->clearSyncLinks(Provider);
     emit stateChanged();
-    syncNow();
+    if (!m_quietConnect)
+        syncNow();
 }
 
 void CalDavSync::disconnectAccount() {
@@ -246,6 +274,7 @@ void CalDavSync::setCalendarForList(qint64 listId, const QString &calendarHref) 
         return;
     if (calendarHref.isEmpty()) {
         m_store->removeSyncLink(Provider, ELists, listId);
+        emit stateChanged();
         return;
     }
     // One calendar to one list: drop any other list pointed at it.
@@ -323,7 +352,7 @@ void CalDavSync::startRun() {
     m_url = QUrl(m_store->setting("caldav.url").toString());
     m_accountName = accountName();
     m_client->setBaseUrl(m_url);
-    if (!m_cachedPassword.isEmpty() && m_passwordLooked) {
+    if (m_passwordLooked && !m_cachedPassword.isEmpty()) {
         m_client->setCredentials(m_store->setting("caldav.user").toString(), m_cachedPassword);
     } else {
         m_cachedPassword = Keyring::lookup(KeyringService, KeyringAccount);
@@ -359,13 +388,13 @@ void CalDavSync::startFirstCheck() {
         buildMapping();
         return;
     }
-    m_localHasTasks = false;
+    bool localHasTasks = false;
     for (const auto &t : m_store->tasks())
         if (!t.deleted) {
-            m_localHasTasks = true;
+            localHasTasks = true;
             break;
         }
-    if (!m_localHasTasks) {
+    if (!localHasTasks) {
         buildMapping();
         return;
     }
@@ -377,6 +406,8 @@ void CalDavSync::startFirstCheck() {
             if (m_remoteHasTasks && m_mode == SyncTree::FirstSync::Ask) {
                 m_applying = false;
                 m_busy = false;
+                m_finished = true;
+                m_lastResult = {false, true, 0, QString()};
                 m_needsChoice = true;
                 m_status = "This machine and the server both have tasks: choose how to start";
                 emit stateChanged();
@@ -405,25 +436,27 @@ void CalDavSync::startFirstCheck() {
 
 void CalDavSync::buildMapping() {
     const auto listLinks = m_store->syncLinks(Provider, ELists);
+    const QSet<qint64> excluded = SyncTree::excludedListIds(*m_store);
+
+    QSet<QString> excludedNames;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && excluded.contains(l.id))
+            excludedNames.insert(l.name.toLower());
+
     QHash<QString, qint64> hrefToList;
+    QSet<QString> excludedHrefs;
     for (const auto &link : listLinks) {
         const TaskList list = m_store->list(link.localId);
         if (!list.id || list.deleted || link.remoteId.isEmpty()) {
             m_store->removeSyncLink(Provider, ELists, link.localId);
             continue;
         }
-        hrefToList.insert(link.remoteId, link.localId);
-    }
-
-    // Excluded lists never map, and their stale links go.
-    const QSet<qint64> excluded = SyncTree::excludedListIds(*m_store);
-    for (auto it = hrefToList.begin(); it != hrefToList.end();) {
-        if (excluded.contains(it.value())) {
-            m_store->removeSyncLink(Provider, ELists, it.value());
-            it = hrefToList.erase(it);
-        } else {
-            ++it;
+        if (excluded.contains(link.localId)) {
+            excludedHrefs.insert(link.remoteId);
+            m_store->removeSyncLink(Provider, ELists, link.localId);
+            continue;
         }
+        hrefToList.insert(link.remoteId, link.localId);
     }
 
     auto accountGroup = [&]() -> qint64 {
@@ -461,17 +494,18 @@ void CalDavSync::buildMapping() {
         Store::SyncLink link{match, calendar.href, {}};
         QVariantMap snap;
         snap.insert(MappedKey, true);
-        snap.insert(CtagKey, calendar.ctag);
-        snap.insert(TokenKey, calendar.syncToken);
         link.snapshot = snap;
         m_store->setSyncLink(Provider, ELists, link);
         hrefToList.insert(calendar.href, match);
         unmapped.remove(match);
     }
 
-    // Calendars without a list become lists in a group named after the account.
+    // Calendars without a list become lists in a group named after the
+    // account, unless their name belongs to an excluded list.
     for (const CalDavClient::Calendar &calendar : m_calendars) {
         if (hrefToList.contains(calendar.href))
+            continue;
+        if (excludedHrefs.contains(calendar.href) || excludedNames.contains(calendar.displayName.toLower()))
             continue;
         TaskList list;
         list.id = m_store->nextId("lists");
@@ -485,8 +519,6 @@ void CalDavSync::buildMapping() {
         Store::SyncLink link{list.id, calendar.href, {}};
         QVariantMap snap;
         snap.insert(MappedKey, true);
-        snap.insert(CtagKey, calendar.ctag);
-        snap.insert(TokenKey, calendar.syncToken);
         link.snapshot = snap;
         m_store->setSyncLink(Provider, ELists, link);
         hrefToList.insert(calendar.href, list.id);
@@ -496,9 +528,9 @@ void CalDavSync::buildMapping() {
     m_pendingCreate.clear();
     const bool createCalendars = m_store->setting("caldav.createCalendars", true).toBool();
     for (qint64 listId : unmapped) {
-        const TaskList list = m_store->list(listId);
         if (!createCalendars)
             continue;
+        const TaskList list = m_store->list(listId);
         if (list.groupId == 0) {
             TaskList updated = list;
             updated.groupId = accountGroup();
@@ -627,7 +659,7 @@ void CalDavSync::processNextCalendar() {
     const bool dirty = m_dirty.contains(m_job.listId);
     if (!dirty && !m_job.ctag.isEmpty()) {
         for (const CalDavClient::Calendar &c : m_calendars)
-            if (c.href == m_job.href && c.ctag == m_job.ctag && !c.ctag.isEmpty()) {
+            if (c.href == m_job.href && !c.ctag.isEmpty() && c.ctag == m_job.ctag) {
                 // Nothing changed on either side: skip the calendar.
                 ++m_stateIndex;
                 processNextCalendar();
@@ -638,14 +670,18 @@ void CalDavSync::processNextCalendar() {
 }
 
 void CalDavSync::pullRemote() {
-    if (!m_job.token.isEmpty()) {
-        m_client->syncCollection(m_job.href, m_job.token,
-                                 [this](const CalDavClient::Outcome &o, const QStringList &ch, const QStringList &rm, const QString &t) {
-                                     onSyncCollection(o, ch, rm, t);
-                                 });
+    bool supportsSync = false;
+    for (const CalDavClient::Calendar &c : m_calendars)
+        if (c.href == m_job.href && !c.syncToken.isEmpty())
+            supportsSync = true;
+    if (!supportsSync) {
+        listRemoteEtags();
         return;
     }
-    listRemoteEtags();
+    m_client->syncCollection(m_job.href, m_job.token,
+                             [this](const CalDavClient::Outcome &o, const QStringList &ch, const QStringList &rm, const QString &t) {
+                                 onSyncCollection(o, ch, rm, t);
+                             });
 }
 
 void CalDavSync::onSyncCollection(const CalDavClient::Outcome &outcome, const QStringList &changed,
@@ -710,8 +746,6 @@ void CalDavSync::onMultiget(const CalDavClient::Outcome &outcome, const QMap<QSt
         fail(outcome.error);
         return;
     }
-    m_applying = true;
-    m_store->begin("CalDAV sync", false, true);
     QSet<QString> got;
     for (auto it = resources.begin(); it != resources.end(); ++it) {
         got.insert(it.key());
@@ -720,6 +754,29 @@ void CalDavSync::onMultiget(const CalDavClient::Outcome &outcome, const QMap<QSt
     for (const QString &href : m_pullRemoved)
         if (!got.contains(href))
             applyRemoteRemoval(href);
+
+    // Parents after every task exists, so a child can point at its parent.
+    m_applying = true;
+    m_store->begin("CalDAV sync", false, true);
+    for (auto it = resources.begin(); it != resources.end(); ++it) {
+        const Vtodo::Parsed parsed = Vtodo::fromIcs(it.value().data);
+        if (parsed.parentUid.isEmpty())
+            continue;
+        qint64 childId = 0, parentId = 0;
+        for (const auto &t : m_store->tasks()) {
+            if (t.deleted)
+                continue;
+            if (t.uid == parsed.uid)
+                childId = t.id;
+            if (t.uid == parsed.parentUid)
+                parentId = t.id;
+        }
+        if (childId && parentId && m_store->task(childId).parentId != parentId) {
+            Task child = m_store->task(childId);
+            child.parentId = parentId;
+            m_store->putTask(child);
+        }
+    }
     m_store->commit();
     m_applying = false;
     pushLocal();
@@ -744,11 +801,8 @@ qint64 CalDavSync::applyRemoteResource(const QString &href, const QString &etag,
             }
 
     const bool created = !id;
-    if (created) {
-        Task t;
-        t.id = m_store->nextId("tasks");
-        id = t.id;
-    }
+    if (created)
+        id = m_store->nextId("tasks");
     Task local = created ? Task() : m_store->task(id);
     if (local.deleted)
         return id;   // Its deletion is waiting to be pushed.
@@ -762,10 +816,11 @@ qint64 CalDavSync::applyRemoteResource(const QString &href, const QString &etag,
     const bool locallyChanged = created ? false : (!link || projection(local.toMap()) != projection(link->snapshot));
     if (!created && locallyChanged && !remoteWins(local.modified, remote.modified)) {
         // Local wins: it is pushed below.
-        m_dirty.insert(m_job.listId);
         return id;
     }
 
+    m_applying = true;
+    m_store->begin("CalDAV sync", false, true);
     Task merged = created ? Task() : local;
     merged.id = id;
     merged.uid = local.uid.isEmpty() ? (parsed.uid.isEmpty() ? Store::newUid() : parsed.uid) : local.uid;
@@ -789,9 +844,10 @@ qint64 CalDavSync::applyRemoteResource(const QString &href, const QString &etag,
         merged.created = remote.created.isValid() ? remote.created : QDateTime::currentDateTime();
         merged.parentId = 0;
     }
-    for (const auto &t : m_store->tasks())
-        if (!t.deleted && !parsed.parentUid.isEmpty() && t.uid == parsed.parentUid)
-            merged.parentId = t.id;
+    if (!parsed.parentUid.isEmpty())
+        for (const auto &t : m_store->tasks())
+            if (!t.deleted && t.uid == parsed.parentUid)
+                merged.parentId = t.id;
     merged.tagIds = tagIdsFor(parsed.tagNames);
     merged.locationIds = locationIdsFor(parsed.locationName);
     merged.modified = remote.modified.isValid() ? remote.modified : QDateTime::currentDateTime();
@@ -799,6 +855,8 @@ qint64 CalDavSync::applyRemoteResource(const QString &href, const QString &etag,
     m_store->putTask(merged);
     applyAlarms(id, parsed.alarms);
     storeTaskLink(id, href, etag, parsed.extra);
+    m_store->commit();
+    m_applying = false;
     ++m_in;
     return id;
 }
@@ -826,13 +884,16 @@ void CalDavSync::applyRemoteRemoval(const QString &href) {
     if (!task.deleted && locallyChanged) {
         // Edited since the last sync: upload it again as a new resource.
         m_store->removeSyncLink(Provider, ETasks, id);
-        m_dirty.insert(m_job.listId);
         return;
     }
     if (!task.deleted) {
+        m_applying = true;
+        m_store->begin("CalDAV sync", false, true);
         task.deleted = true;
         task.modified = QDateTime::currentDateTime();
         m_store->putTask(task);
+        m_store->commit();
+        m_applying = false;
         ++m_in;
     }
     m_store->removeSyncLink(Provider, ETasks, id);
@@ -876,7 +937,7 @@ void CalDavSync::pushLocal() {
         const Task task = m_store->task(link.localId);
         if (task.id && task.deleted) {
             Op op;
-            op.kind = Op::Delete;
+            op.remove = true;
             op.taskId = task.id;
             op.href = link.remoteId;
             op.etag = link.snapshot.value(EtagKey).toString();
@@ -891,11 +952,8 @@ void CalDavSync::pushLocal() {
         Op op;
         op.taskId = t.id;
         if (link == byId.constEnd()) {
-            QString uid = t.uid.isEmpty() ? Store::newUid() : t.uid;
-            op.kind = Op::Create;
+            const QString uid = t.uid.isEmpty() ? Store::newUid() : t.uid;
             op.href = m_job.href + QString::fromUtf8(QUrl::toPercentEncoding(uid)) + ".ics";
-            // A re-uploaded resource may still exist under a new uid; the
-            // If-None-Match create is retried as an update on 412.
             m_ops.append(op);
             continue;
         }
@@ -903,15 +961,16 @@ void CalDavSync::pushLocal() {
             continue;
         op.extra = extraFromMap(link->snapshot.value(ExtraKey).toMap());
         if (link->remoteId.startsWith(m_job.href)) {
-            op.kind = Op::Update;
+            op.update = true;
             op.href = link->remoteId;
             op.etag = link->snapshot.value(EtagKey).toString();
         } else {
-            op.kind = Op::Move;
-            op.oldHref = link->remoteId;
-            op.etag = link->snapshot.value(EtagKey).toString();
+            // A move: create the resource in this calendar, then delete the
+            // one in the old calendar.
             const QString uid = t.uid.isEmpty() ? Store::newUid() : t.uid;
             op.href = m_job.href + QString::fromUtf8(QUrl::toPercentEncoding(uid)) + ".ics";
+            op.oldHref = link->remoteId;
+            op.oldEtag = link->snapshot.value(EtagKey).toString();
         }
         m_ops.append(op);
     }
@@ -927,41 +986,38 @@ void CalDavSync::nextOp() {
 }
 
 void CalDavSync::runOp(const Op &op) {
-    const Task task = m_store->task(op.taskId);
-    const QByteArray body = (op.kind == Op::Delete) ? QByteArray() : Vtodo::toIcs(*m_store, task, op.extra);
-
-    if (op.kind == Op::Delete) {
+    if (op.remove) {
         m_client->remove(op.href, op.etag, [this, op](const CalDavClient::Outcome &o) { onRemove(op, o); });
         return;
     }
+    const Task task = m_store->task(op.taskId);
+    const QByteArray body = Vtodo::toIcs(*m_store, task, op.extra);
+
     // A linked resource with an unknown etag is not new: learn the etag from
     // the listing first. Never send If-None-Match: * for one.
-    if ((op.kind == Op::Update || op.kind == Op::Move) && op.etag.isEmpty()) {
-        const QString calendarHref = op.kind == Op::Move ? QUrl(op.oldHref).path().section('/', 0, -2) + '/' : m_job.href;
-        const QString href = op.kind == Op::Move ? op.oldHref : op.href;
-        m_client->listEtags(calendarHref, [this, op, body, href](const CalDavClient::Outcome &o, const QMap<QString, QString> &etags) {
-            if (!o.ok || !etags.contains(href) || etags.value(href).isEmpty()) {
-                // The resource is gone, or its etag is still unknown: try the
-                // write as a fresh create only when it is really gone.
-                if (o.ok && !etags.contains(href)) {
-                    Op fresh = op;
-                    fresh.kind = Op::Create;
-                    fresh.oldHref.clear();
-                    fresh.etag.clear();
-                    m_client->put(fresh.href, body, QString(), [this, fresh](const CalDavClient::Outcome &o2, const QString &e) {
-                        onPut(fresh, o2, e);
-                    });
-                    return;
-                }
-                ++m_opIndex;
-                nextOp();
+    if (op.update && op.etag.isEmpty()) {
+        m_client->listEtags(m_job.href, [this, op, body](const CalDavClient::Outcome &o, const QMap<QString, QString> &etags) {
+            if (o.ok && etags.contains(op.href) && !etags.value(op.href).isEmpty()) {
+                Op resolved = op;
+                resolved.etag = etags.value(op.href);
+                m_client->put(resolved.href, body, resolved.etag, [this, resolved](const CalDavClient::Outcome &o2, const QString &e) {
+                    onPut(resolved, o2, e);
+                });
                 return;
             }
-            Op resolved = op;
-            resolved.etag = etags.value(href);
-            m_client->put(resolved.href, body, resolved.etag, [this, resolved](const CalDavClient::Outcome &o2, const QString &e) {
-                onPut(resolved, o2, e);
-            });
+            if (o.ok && !etags.contains(op.href)) {
+                // The resource is gone: upload it fresh.
+                Op fresh = op;
+                fresh.update = false;
+                m_client->put(fresh.href, body, QString(), [this, fresh](const CalDavClient::Outcome &o2, const QString &e) {
+                    onPut(fresh, o2, e);
+                });
+                return;
+            }
+            // The etag is still unknown: leave it for the next sync rather
+            // than risk creating a duplicate.
+            ++m_opIndex;
+            nextOp();
         });
         return;
     }
@@ -987,12 +1043,9 @@ void CalDavSync::onPut(const Op &op, const CalDavClient::Outcome &outcome, const
         return;
     }
     storeTaskLink(op.taskId, op.href, etag, op.extra);
-    if (op.kind == Op::Move) {
+    if (!op.oldHref.isEmpty()) {
         // The resource now lives in the new calendar; remove the old one.
-        m_client->remove(op.oldHref, op.etag, [this, op](const CalDavClient::Outcome &o) {
-            if (o.ok)
-                m_store->removeSyncLink(Provider, ETasks, op.taskId);
-        });
+        m_client->remove(op.oldHref, op.oldEtag, [](const CalDavClient::Outcome &) {});
     }
     ++m_out;
     ++m_opIndex;
@@ -1024,9 +1077,13 @@ void CalDavSync::onRemove(const Op &op, const CalDavClient::Outcome &outcome) {
                 m_store->removeSyncLink(Provider, ETasks, op.taskId);
             } else {
                 // The remote edit is newer: it comes back locally.
+                m_applying = true;
+                m_store->begin("CalDAV sync", false, true);
                 local.deleted = false;
                 local.modified = parsed.task.modified.isValid() ? parsed.task.modified : QDateTime::currentDateTime();
                 m_store->putTask(local);
+                m_store->commit();
+                m_applying = false;
                 storeTaskLink(op.taskId, op.href, resource.etag, parsed.extra);
             }
             ++m_opIndex;
@@ -1058,7 +1115,7 @@ void CalDavSync::resolvePutConflict(const Op &op) {
         if (resources.isEmpty()) {
             // Deleted on the server meanwhile: upload it fresh.
             Op fresh = op;
-            fresh.kind = Op::Create;
+            fresh.update = false;
             fresh.etag.clear();
             fresh.retried = true;
             const QByteArray body = Vtodo::toIcs(*m_store, local, op.extra);
@@ -1078,6 +1135,7 @@ void CalDavSync::resolvePutConflict(const Op &op) {
         }
         // Local is still newer: retry once against the fresh etag.
         Op retry = op;
+        retry.update = true;
         retry.etag = resource.etag;
         retry.retried = true;
         const QByteArray body = Vtodo::toIcs(*m_store, local, op.extra);
@@ -1088,6 +1146,8 @@ void CalDavSync::resolvePutConflict(const Op &op) {
 }
 
 void CalDavSync::afterCalendar() {
+    if (m_stateIndex < m_states.size())
+        m_states[m_stateIndex] = m_job;
     ++m_stateIndex;
     processNextCalendar();
 }
@@ -1115,6 +1175,8 @@ void CalDavSync::onCtagsRefreshed(const CalDavClient::Outcome &outcome, const QL
 void CalDavSync::finishOk() {
     m_applying = false;
     m_busy = false;
+    m_finished = true;
+    m_lastResult = {true, false, m_in + m_out, QString()};
     m_store->setSetting("caldav.lastSync", QDateTime::currentDateTime().toString(Qt::ISODate));
     const QString summary = QStringLiteral("Synced %1 calendars, %2 tasks changed").arg(m_states.size()).arg(m_in + m_out);
     m_status = m_writeError.isEmpty() ? summary : m_writeError;
@@ -1129,6 +1191,8 @@ void CalDavSync::finishOk() {
 void CalDavSync::fail(const QString &error) {
     m_applying = false;
     m_busy = false;
+    m_finished = true;
+    m_lastResult = {false, false, 0, error};
     m_status = error.isEmpty() ? QStringLiteral("CalDAV sync failed") : error;
     emit stateChanged();
     if (m_again) {
