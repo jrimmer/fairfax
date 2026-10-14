@@ -4,8 +4,6 @@
 // exactly what ships. Nothing here touches the network beyond the loopback or
 // the real keyring (the keyring is in memory, see main.cpp).
 
-#include <QFileInfo>
-
 #include "settingskit.h"
 #include "mailkit.h"
 #include "../fakecaldav.h"
@@ -21,6 +19,10 @@ namespace {
 // `quiet` connects without a sync so a test can drive the first cycle itself.
 void connectCalDav(App &app, FakeCalDav &server, bool quiet = false, const QString &password = "app-password") {
     app.services().caldavSync->setQuietConnect(quiet);
+    // Automatic sync would fire its own debounced run while a test is driving
+    // the pane, moving the controls under the clicks; every run here is
+    // started explicitly.
+    app.store().setSetting("sync.auto", false);
     QQuickWindow *sw = nullptr;
     openSettings(app, sw);
     selectPane(sw, "Sync");
@@ -47,6 +49,9 @@ void syncNow(App &app) {
     control("caldavSyncNow", button);
     QVERIFY(button);
     click(button);
+    // The click can be lost while the pane is still settling; wait until the
+    // run it starts really begins, then for that run to finish.
+    QTRY_VERIFY_WITH_TIMEOUT(app.services().caldavSync->busy(), 5000);
     QTRY_VERIFY_WITH_TIMEOUT(!app.services().caldavSync->busy(), 20000);
 }
 
@@ -230,6 +235,8 @@ private slots:
         QVERIFY(s.start());
         App *app = s.app.get();
         fastTimings(*app);
+        app->store().setSetting("sync.auto", false);
+        app->services().caldavSync->setQuietConnect(true);
         QQuickWindow *sw = nullptr;
         openSettings(*app, sw);
         selectPane(sw, "Sync");
@@ -257,6 +264,7 @@ private slots:
         QVERIFY(s.restart());
         app = s.app.get();
         fastTimings(*app);
+        app->store().setSetting("sync.auto", false);
         openSettings(*app, sw);
         selectPane(sw, "Sync");
         QVERIFY(app->services().caldavSync->configured());

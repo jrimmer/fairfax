@@ -858,8 +858,11 @@ Window {
                                 readonly property var mapped: caldavSync ? caldavSync.mappings : []
                                 readonly property int mappedIndex: { for (let i = 0; i < mapped.length; ++i) if (mapped[i].listId === modelData.id) return i; return -1 }
                                 readonly property string mappedHref: mappedIndex >= 0 ? mapped[mappedIndex].calendarHref : ""
+                                readonly property int calendarIndex: calendarList.findIndex(c => c.href === mappedHref)
                                 model: ["Don't sync"].concat(calendarList.map(c => c.name)).concat(["New calendar"])
-                                currentIndex: mappedHref === "" ? 0 : Math.max(0, 1 + calendarList.findIndex(c => c.href === mappedHref))
+                                // A mapped calendar the server no longer lists shows blank, not "Don't sync",
+                                // so the row never claims a list is unmapped while it is still paired.
+                                currentIndex: mappedHref === "" ? 0 : (calendarIndex < 0 ? -1 : 1 + calendarIndex)
                                 onActivated: (i) => {
                                     if (i === 0)
                                         caldavSync.setCalendarForList(modelData.id, "")
