@@ -247,10 +247,7 @@ bool ViewBuilder::matchesFocus(const Task &t, int kind) const {
     const TaskList list = m_store.list(t.listId);
     switch (kind) {
     case Source::All: return !t.completed && list.showInAll;
-    case Source::Today:
-        if (!Schedule::inToday(t, m_now, m_settings)) return false;
-        // Starred tasks reach Today even from lists excluded from it.
-        return list.showInToday || (m_settings.todayIncludesStarred && t.starred);
+    case Source::Today: return matchesTodayList(t);
     case Source::Starred: return !t.completed && t.starred;
     case Source::Scheduled: return !t.completed && Schedule::isScheduled(t, m_now);
     case Source::Done: return t.completed && list.showInDone;
@@ -258,11 +255,13 @@ bool ViewBuilder::matchesFocus(const Task &t, int kind) const {
     return false;
 }
 
-bool ViewBuilder::matchesTodayList(const Task &task) const {
-    if (!Schedule::inToday(task, m_now, m_settings))
-        return false;
+bool ViewBuilder::listShowsInToday(const Task &task) const {
     // Starred tasks reach Today even from lists excluded from it.
     return m_store.list(task.listId).showInToday || (m_settings.todayIncludesStarred && task.starred);
+}
+
+bool ViewBuilder::matchesTodayList(const Task &task) const {
+    return Schedule::inToday(task, m_now, m_settings) && listShowsInToday(task);
 }
 
 QueryContext ViewBuilder::queryContext(const ViewOptions &o) const {

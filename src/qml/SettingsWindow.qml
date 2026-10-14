@@ -535,6 +535,35 @@ Window {
                         }
                     }
                     Toggle { key: "tasks.quickLook"; fallback: true; label: "Enable Quick Look for tasks"; note: "Space on a task opens a zoomed-in view of it." }
+
+                    // My Day: the daily planning screen. The work day bounds the
+                    // capacity window its header reports, and the prompt offers
+                    // to plan once on the first launch of the day.
+                    Label { text: "My Day"; font.bold: true; Layout.topMargin: 8 }
+                    Toggle { key: "myday.enabled"; fallback: true; label: "Enable My Day" }
+                    RowLayout {
+                        Label { text: "Work day from … to …"; Layout.preferredWidth: 220 }
+                        ComboBox {
+                            objectName: "setting:myday.workStart"
+                            Accessible.name: "Work day start"
+                            enabled: root.bool("myday.enabled", true)
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            model: root.timeSteps.map(m => root.timeLabel(m))
+                            currentIndex: Math.max(0, root.timeSteps.indexOf(Number(root.value("myday.workStart", 540))))
+                            onActivated: (i) => backend.setSetting("myday.workStart", root.timeSteps[i])
+                        }
+                        Label { text: "to"; enabled: root.bool("myday.enabled", true) }
+                        ComboBox {
+                            objectName: "setting:myday.workEnd"
+                            Accessible.name: "Work day end"
+                            enabled: root.bool("myday.enabled", true)
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            model: root.timeSteps.map(m => root.timeLabel(m))
+                            currentIndex: Math.max(0, root.timeSteps.indexOf(Number(root.value("myday.workEnd", 1020))))
+                            onActivated: (i) => backend.setSetting("myday.workEnd", root.timeSteps[i])
+                        }
+                    }
+                    Toggle { key: "myday.prompt"; fallback: false; label: "Offer to plan on the first launch of the day"; enabled: root.bool("myday.enabled", true) }
                 }
 
                 // Today & Lists

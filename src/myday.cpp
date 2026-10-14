@@ -1,5 +1,6 @@
 #include "myday.h"
 
+#include <QLocale>
 #include <QSet>
 #include <QTime>
 #include <algorithm>
@@ -43,15 +44,15 @@ QString hiddenSetting(const QDate &day, const QSet<QString> &uids) {
 // Project children are planned in their own right; checklist items are not, so
 // only the checklist row shows. Lists hidden from Today drop out of every
 // section, except for a starred task when Today itself would still take it.
-bool excluded(const Store &store, const ViewBuilder &views, const ScheduleSettings &settings,
-              const QSet<QString> &hidden, const Task &t) {
+// That per-list rule is ViewBuilder's, shared with Source::Today.
+bool excluded(const Store &store, const ViewBuilder &views, const QSet<QString> &hidden, const Task &t) {
     if (t.deleted || t.completed)
         return true;
     if (hidden.contains(t.uid))
         return true;
     if (!views.listVisible(t.listId))
         return true;
-    if (!store.list(t.listId).showInToday && !(settings.todayIncludesStarred && t.starred))
+    if (!views.listShowsInToday(t))
         return true;
     if (t.parentId) {
         const Task parent = store.task(t.parentId);
@@ -92,7 +93,7 @@ QString suggestionReason(const Store &store, const Task &t, const QDateTime &now
     if (t.startDate == today)
         return QStringLiteral("Starts today");
     if (t.dueDate == today.addDays(1) || t.dueDate == today.addDays(2))
-        return QStringLiteral("Due ") + t.dueDate.toString(QStringLiteral("ddd"));
+        return QStringLiteral("Due ") + QLocale(QLocale::English, QLocale::UnitedKingdom).toString(t.dueDate, QStringLiteral("ddd"));
     for (const Alarm &a : store.alarmsFor(t.id)) {
         if (a.deleted || a.kind != Alarm::Absolute || !a.at.isValid())
             continue;
@@ -154,7 +155,7 @@ Sections sections(const Store &store, const QDateTime &now) {
     // Overdue: everything past its deadline, oldest first.
     QVector<Task> overdue;
     for (const auto &t : store.tasks()) {
-        if (excluded(store, views, settings, hidden, t))
+        if (excluded(store, views, hidden, t))
             continue;
         if (!Schedule::isOverdue(t, now, settings))
             continue;
@@ -174,7 +175,7 @@ Sections sections(const Store &store, const QDateTime &now) {
     // the section above.
     QVector<Task> todayTasks;
     for (const auto &t : store.tasks()) {
-        if (placed.contains(t.id) || excluded(store, views, settings, hidden, t))
+        if (placed.contains(t.id) || excluded(store, views, hidden, t))
             continue;
         if (!views.matchesTodayList(t))
             continue;
@@ -189,7 +190,7 @@ Sections sections(const Store &store, const QDateTime &now) {
     // Suggestions: every task once, first matching reason.
     QVector<QPair<Task, QString>> suggestions;
     for (const auto &t : store.tasks()) {
-        if (placed.contains(t.id) || excluded(store, views, settings, hidden, t))
+        if (placed.contains(t.id) || excluded(store, views, hidden, t))
             continue;
         const QString reason = suggestionReason(store, t, now);
         if (reason.isEmpty())

@@ -105,8 +105,13 @@ public:
 
     bool isPaused(const Task &task) const;
     bool isSmartList(qint64 listId) const;
-    // Whether the task reaches the Today focus list by the date rules, before
-    // the per-list "show in Today" exclusion; the caller applies that.
+    // Whether the task's list admits it into Today: the per-list "show in
+    // Today" exclusion, which lets a starred task through when Today takes
+    // starred tasks. This is the part Source::Today adds on top of
+    // Schedule::inToday, shared so callers need not re-derive it.
+    bool listShowsInToday(const Task &task) const;
+    // Whether the task reaches the Today focus list: Schedule::inToday and the
+    // per-list exclusion above, exactly as Source::Today matches.
     bool matchesTodayList(const Task &task) const;
     bool inSmartRange(const Task &task, const QString &range) const;
     static bool matchesFocusCondition(const Task &task, const QString &condition, const QDateTime &now,

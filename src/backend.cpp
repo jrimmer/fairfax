@@ -3280,16 +3280,13 @@ void Backend::myDayBlockNext(qint64 id) {
     Task t = m_store->task(id);
     if (!t.id || t.deleted)
         return;
-    if (t.duration <= 0) {
-        t.duration = 30;
-        m_store->begin("Change Duration");
-        m_store->putTask(t);
-        m_store->commit();
-    }
     CalendarFeed emptyFeed;
     const CalendarFeed &feed = m_calendar ? *m_calendar : emptyFeed;
     const QDateTime now = QDateTime::currentDateTime();
-    const int slot = MyDay::nextFreeSlot(*m_store, feed, now, m_store->task(id).duration);
+    // A task with no duration gets a 30-minute default. timeBlock sets the
+    // duration itself, so this and the block are one undoable change.
+    const int duration = t.duration > 0 ? t.duration : 30;
+    const int slot = MyDay::nextFreeSlot(*m_store, feed, now, duration);
     if (slot < 0) {
         setStatus("No free time left today for this task.");
         return;
@@ -3297,7 +3294,7 @@ void Backend::myDayBlockNext(qint64 id) {
     // timeBlock uses the selection; select just this task so one call does it.
     m_selected = {id};
     m_cursor = id;
-    timeBlock(now.date().toString(Qt::ISODate), slot, m_store->task(id).duration);
+    timeBlock(now.date().toString(Qt::ISODate), slot, duration);
     m_options.keepVisible.insert(id);
     emit myDayChanged();
 }
