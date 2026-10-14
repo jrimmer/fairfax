@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "caldavsync.h"
+#include "diagnostics.h"
 #include "fakecaldav.h"
 #include "keyring.h"
 #include "store.h"
@@ -608,6 +609,142 @@ private slots:
         QVERIFY2(r.ok, qPrintable(r.error));
         QVERIFY(a.sync->status().contains("No permission to write"));
         QVERIFY(find(*a.store, "Cannot go up"));
+    }
+
+    // Stages a server-side edit of a synced task and returns its local id.
+    qint64 stageSyncedTask(Account &a, const QString &title, qint64 list) {
+        addTask(*a.store, title, list);
+        if (!a.sync->syncBlocking().ok)
+            return 0;
+        return find(*a.store, title);
+    }
+
+    static void putRemote(FakeCalDav &server, Store &store, qint64 id, const QString &title, int secondsFromNow) {
+        Task remoteTask = store.task(id);
+        remoteTask.title = title;
+        remoteTask.modified = QDateTime::currentDateTime().addSecs(secondsFromNow);
+        server.editFromAnotherClient(QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("t.ics"),
+                                     Vtodo::toIcs(store, remoteTask));
+        repoint(store, id, QStringLiteral("/calendars/jane/tasks/t.ics"));
+    }
+
+    static void addAlert(Store &s, qint64 taskId, int minutes = 60) {
+        Alarm al;
+        al.id = s.nextId("alarms");
+        al.taskId = taskId;
+        al.kind = Alarm::Absolute;
+        al.at = QDateTime(QDate(2031, 5, 4), QTime(9, 0)).addSecs(minutes * 60);
+        s.begin("Add Alert");
+        s.putAlarm(al);
+        s.commit();
+    }
+
+    void alertOnlyChangesAreSynced() {
+        Account a = makeAccount();
+        const qint64 list = addList(*a.store, "Tasks");
+        connect(a, *m_server);
+        QVERIFY(a.sync->syncBlocking().ok);
+        const qint64 id = stageSyncedTask(a, "Alerted", list);
+        QVERIFY(id);
+        const QString href = a.store->syncLinks("caldav", "tasks").constBegin()->remoteId;
+        QVERIFY(!QString::fromUtf8(m_server->tasks()->resources.value(href)).contains("VALARM"));
+
+        addAlert(*a.store, id);
+        QVERIFY(a.sync->syncBlocking().ok);
+        QVERIFY(QString::fromUtf8(m_server->tasks()->resources.value(href)).contains("VALARM"));
+
+        a.store->begin("Remove Alert");
+        for (Alarm al : a.store->alarmsFor(id)) {
+            al.deleted = true;
+            a.store->putAlarm(al);
+        }
+        a.store->commit();
+        QVERIFY(a.sync->syncBlocking().ok);
+        QVERIFY(!QString::fromUtf8(m_server->tasks()->resources.value(href)).contains("VALARM"));
+    }
+
+    void remoteEditAfterLocalAlertFollowsNewestWins() {
+        for (const bool remoteNewer : {true, false}) {
+            m_server = std::make_unique<FakeCalDav>();
+            Account a = makeAccount();
+            const qint64 list = addList(*a.store, "Tasks");
+            connect(a, *m_server);
+            QVERIFY(a.sync->syncBlocking().ok);
+            const qint64 id = stageSyncedTask(a, "Alerted", list);
+            QVERIFY(id);
+            putRemote(*m_server, *a.store, id, "Remote edit", remoteNewer ? 3600 : -3600);
+            addAlert(*a.store, id);
+            QVERIFY(a.sync->syncBlocking().ok);
+            const QString body = QString::fromUtf8(m_server->tasks()->resources.value(QStringLiteral("/calendars/jane/tasks/t.ics")));
+            if (remoteNewer) {
+                QVERIFY(find(*a.store, "Remote edit"));
+                QVERIFY(a.store->alarmsFor(id).isEmpty());
+                QVERIFY(!body.contains("VALARM"));
+            } else {
+                QCOMPARE(a.store->alarmsFor(id).size(), 1);
+                QVERIFY(body.contains("VALARM"));
+            }
+        }
+    }
+
+    void conflictIsRecordedInDiagnostics() {
+        Account a = makeAccount();
+        const qint64 list = addList(*a.store, "Tasks");
+        connect(a, *m_server);
+        QVERIFY(a.sync->syncBlocking().ok);
+        const qint64 id = stageSyncedTask(a, "The task", list);
+        QVERIFY(id);
+        const QString uid = a.store->task(id).uid;
+        putRemote(*m_server, *a.store, id, "Remote edit", -60);
+        Task mine = a.store->task(id);
+        mine.title = "Local edit";
+        mine.modified = QDateTime::currentDateTime().addSecs(60);
+        edit(*a.store, mine);
+        Diagnostics::clear();
+        QVERIFY(a.sync->syncBlocking().ok);
+        bool found = false;
+        for (const QString &line : Diagnostics::recent())
+            if (line.contains("CalDAV conflict") && line.contains(uid) && line.contains("local wins"))
+                found = true;
+        QVERIFY2(found, qPrintable(Diagnostics::recent().join('\n')));
+    }
+
+    void replaceLocalTwiceMakesTwoBackups() {
+        Account fresh = makeAccount();
+        const qint64 list = addList(*fresh.store, "Tasks");
+        connect(fresh, *m_server);
+        m_server->editFromAnotherClient(QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("remote.ics"), TaskTwo);
+        const QString backups = QFileInfo(fresh.store->path()).absolutePath() + "/backups";
+        for (int round = 1; round <= 2; ++round) {
+            addTask(*fresh.store, QString("Local %1").arg(round), list);
+            fresh.store->clearSyncLinks("caldav");
+            fresh.store->removeSetting("caldav.mapped");
+            const auto ask = fresh.sync->syncBlocking(SyncTree::FirstSync::Ask);
+            QVERIFY2(ask.needsChoice, qPrintable(fresh.sync->status()));
+            fresh.sync->chooseFirstSync("local");
+            QTRY_VERIFY_WITH_TIMEOUT(!fresh.sync->busy(), 8000);
+            QVERIFY(!find(*fresh.store, QString("Local %1").arg(round)));
+            QCOMPARE(QDir(backups).entryList(QDir::Files).size(), round);
+        }
+    }
+
+    void failedBackupLeavesLocalDataUntouched() {
+        Account fresh = makeAccount();
+        const qint64 list = addList(*fresh.store, "Tasks");
+        connect(fresh, *m_server);
+        addTask(*fresh.store, "Local only", list);
+        m_server->editFromAnotherClient(QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("remote.ics"), TaskTwo);
+        // A file where the backups folder belongs makes the backup fail.
+        QFile blocker(QFileInfo(fresh.store->path()).absolutePath() + "/backups");
+        QVERIFY(blocker.open(QIODevice::WriteOnly));
+        blocker.close();
+        const auto ask = fresh.sync->syncBlocking(SyncTree::FirstSync::Ask);
+        QVERIFY(ask.needsChoice);
+        fresh.sync->chooseFirstSync("local");
+        QTRY_VERIFY_WITH_TIMEOUT(!fresh.sync->busy(), 8000);
+        QVERIFY(find(*fresh.store, "Local only"));
+        QVERIFY(!find(*fresh.store, "Second"));
+        QVERIFY2(fresh.sync->status().contains("back up"), qPrintable(fresh.sync->status()));
     }
 };
 

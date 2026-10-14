@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QThread>
 
+#include "diagnostics.h"
 #include "keyring.h"
 #include "store.h"
 #include "theme.h"
@@ -70,6 +71,33 @@ QVariantMap projection(QVariantMap map) {
             ++it;
     }
     return QJsonObject::fromVariantMap(map).toVariantMap();
+}
+
+// A task as the resource would carry it: its fields plus its live alerts, as
+// a sorted list so their order does not matter. Alerts live in their own
+// table, so without them an alert-only change would look like no change.
+QVariantMap localState(const Store &store, const Task &task) {
+    QVariantMap map = projection(task.toMap());
+    QStringList alarms;
+    for (const Alarm &a : store.alarmsFor(task.id))
+        alarms << QStringLiteral("%1|%2|%3").arg(a.kind).arg(a.offset).arg(a.at.isValid() ? a.at.toString(Qt::ISODate) : QString());
+    alarms.sort();
+    map.insert(QStringLiteral("alarms"), alarms);
+    return QJsonObject::fromVariantMap(map).toVariantMap();
+}
+
+// The time of the newest local edit, counting alerts, which keep their own.
+QDateTime localModified(const Store &store, const Task &task) {
+    QDateTime newest = task.modified;
+    for (const Alarm &a : store.alarmsFor(task.id))
+        if (a.modified.isValid() && (!newest.isValid() || a.modified > newest))
+            newest = a.modified;
+    return newest;
+}
+
+void noteConflict(const QString &uid, const QDateTime &local, const QDateTime &remote, bool remoteWon) {
+    Diagnostics::note(QStringLiteral("CalDAV conflict on %1: local %2, remote %3, %4 wins")
+                          .arg(uid, local.toString(Qt::ISODate), remote.toString(Qt::ISODate), remoteWon ? "remote" : "local"));
 }
 
 QVariantMap withMeta(const QVariantMap &projected, const QString &etag, const Vtodo::Extra &extra) {
@@ -414,10 +442,19 @@ void CalDavSync::startFirstCheck() {
                 return;
             }
             if (m_remoteHasTasks && m_mode == SyncTree::FirstSync::ReplaceLocal) {
-                const QString name = QStringLiteral("Fairfax_(CalDAV)_before-sync.db");
-                const QString path = QFileInfo(m_store->path()).absolutePath() + "/backups/" + name;
-                QDir().mkpath(QFileInfo(path).absolutePath());
-                m_store->backupTo(path);
+                const QString dir = QFileInfo(m_store->path()).absolutePath() + "/backups/";
+                const QString stamp = QDateTime::currentDateTime().toString("yyyy-MM-dd-HH_mm_ss");
+                QString backupPath = dir + QStringLiteral("Fairfax_(CalDAV)_%1_before-sync.db").arg(stamp);
+                // VACUUM INTO refuses an existing file, so two within a second get a suffix.
+                for (int n = 2; QFileInfo::exists(backupPath); ++n)
+                    backupPath = dir + QStringLiteral("Fairfax_(CalDAV)_%1-%2_before-sync.db").arg(stamp).arg(n);
+                QString backupError;
+                if (!m_store->backupTo(backupPath, &backupError)) {
+                    // Without a copy, Replace Local would lose this machine's tasks.
+                    m_mode = SyncTree::FirstSync::Ask;
+                    fail(QStringLiteral("Could not back up before replacing local tasks, nothing changed: %1").arg(backupError));
+                    return;
+                }
                 SyncTree::wipeLocal(*m_store);
             }
             buildMapping();
@@ -813,10 +850,12 @@ qint64 CalDavSync::applyRemoteResource(const QString &href, const QString &etag,
             link = &l;
             break;
         }
-    const bool locallyChanged = created ? false : (!link || projection(local.toMap()) != projection(link->snapshot));
-    if (!created && locallyChanged && !remoteWins(local.modified, remote.modified)) {
-        // Local wins: it is pushed below.
-        return id;
+    const bool locallyChanged = created ? false : (!link || localState(*m_store, local) != projection(link->snapshot));
+    if (!created && locallyChanged) {
+        const bool remoteWon = remoteWins(localModified(*m_store, local), remote.modified);
+        noteConflict(local.uid, localModified(*m_store, local), remote.modified, remoteWon);
+        if (!remoteWon)
+            return id;   // Local wins: it is pushed below.
     }
 
     m_applying = true;
@@ -880,7 +919,7 @@ void CalDavSync::applyRemoteRemoval(const QString &href) {
             link = &l;
             break;
         }
-    const bool locallyChanged = link && projection(task.toMap()) != projection(link->snapshot);
+    const bool locallyChanged = link && localState(*m_store, task) != projection(link->snapshot);
     if (!task.deleted && locallyChanged) {
         // Edited since the last sync: upload it again as a new resource.
         m_store->removeSyncLink(Provider, ETasks, id);
@@ -917,7 +956,7 @@ void CalDavSync::computeDirty() {
         if (!mapped.contains(t.listId))
             continue;
         const auto link = byId.constFind(t.id);
-        if (link == byId.constEnd() || projection(t.toMap()) != projection(link->snapshot))
+        if (link == byId.constEnd() || localState(*m_store, t) != projection(link->snapshot))
             m_dirty.insert(t.listId);
     }
 }
@@ -957,7 +996,7 @@ void CalDavSync::pushLocal() {
             m_ops.append(op);
             continue;
         }
-        if (projection(t.toMap()) == projection(link->snapshot))
+        if (localState(*m_store, t) == projection(link->snapshot))
             continue;
         op.extra = extraFromMap(link->snapshot.value(ExtraKey).toMap());
         if (link->remoteId.startsWith(m_job.href)) {
@@ -1071,7 +1110,7 @@ void CalDavSync::onRemove(const Op &op, const CalDavClient::Outcome &outcome) {
             const CalDavClient::Resource resource = resources.begin().value();
             const Vtodo::Parsed parsed = Vtodo::fromIcs(resource.data);
             Task local = m_store->task(op.taskId);
-            if (!remoteWins(local.modified, parsed.task.modified)) {
+            if (!remoteWins(localModified(*m_store, local), parsed.task.modified)) {
                 // The deletion is newer: delete again with the fresh etag.
                 m_client->remove(op.href, resource.etag, [](const CalDavClient::Outcome &) {});
                 m_store->removeSyncLink(Provider, ETasks, op.taskId);
@@ -1126,7 +1165,7 @@ void CalDavSync::resolvePutConflict(const Op &op) {
         }
         const CalDavClient::Resource resource = resources.begin().value();
         const Vtodo::Parsed parsed = Vtodo::fromIcs(resource.data);
-        if (remoteWins(local.modified, parsed.task.modified)) {
+        if (remoteWins(localModified(*m_store, local), parsed.task.modified)) {
             // Adopt the server's version and stop.
             applyRemoteResource(op.href, resource.etag, resource.data);
             ++m_opIndex;
@@ -1134,6 +1173,7 @@ void CalDavSync::resolvePutConflict(const Op &op) {
             return;
         }
         // Local is still newer: retry once against the fresh etag.
+        noteConflict(local.uid, localModified(*m_store, local), parsed.task.modified, false);
         Op retry = op;
         retry.update = true;
         retry.etag = resource.etag;
@@ -1207,7 +1247,7 @@ void CalDavSync::storeTaskLink(qint64 taskId, const QString &href, const QString
     Store::SyncLink link;
     link.localId = taskId;
     link.remoteId = href;
-    link.snapshot = withMeta(projection(m_store->task(taskId).toMap()), etag, extra);
+    link.snapshot = withMeta(localState(*m_store, m_store->task(taskId)), etag, extra);
     m_store->setSyncLink(Provider, ETasks, link);
 }
 
