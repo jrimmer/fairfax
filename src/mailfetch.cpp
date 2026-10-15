@@ -433,12 +433,15 @@ QString MailFetch::statusLine() const {
 }
 
 void MailFetch::setState(State state, const QString &error) {
+    const bool newError = state == State::Error && !error.isEmpty() && error != m_lastError;
     m_state = state;
     if (state == State::Error)
         m_lastError = error;
     else if (state != State::Off)
         m_lastError.clear();
     emit stateChanged();
+    if (newError)
+        emit errorOccurred(error);
 }
 
 // -------------------------------------------------------------- scheduling

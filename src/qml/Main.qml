@@ -95,6 +95,15 @@ ApplicationWindow {
     QuickEntry { id: quickEntry }
     SettingsWindow { id: settings }
 
+    // Announcements a screen reader cannot see otherwise: completions, moves,
+    // deletes, undo and redo, copy and paste. Sync and mail failures are
+    // assertive, since they need attention now.
+    Connections {
+        target: backend
+        function onAnnounce(message) { win.contentItem.Accessible.announce(message, Accessible.Polite) }
+        function onAnnounceAssertive(message) { win.contentItem.Accessible.announce(message, Accessible.Assertive) }
+    }
+
     // Selecting Done with 500+ completed tasks and auto-delete off asks once
     // whether to open the setting, as the reference app does.
     Connections {

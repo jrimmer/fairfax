@@ -8,6 +8,7 @@
 
 #include <QDateTime>
 #include <QObject>
+#include <QSet>
 #include <QVector>
 
 class SyncHub : public QObject {
@@ -22,7 +23,9 @@ public:
     explicit SyncHub(QObject *parent = nullptr) : QObject(parent) {}
 
     // `name` is how the provider appears in the tooltip ("Git", "Todoist").
-    void add(QObject *provider, const QString &name);
+    // `announceFailures` is false for the mail connector, which reports its
+    // own errors as "Mail: ..." rather than as a sync failure.
+    void add(QObject *provider, const QString &name, bool announceFailures = true);
 
     bool active() const;       // At least one provider is set up.
     bool busy() const;
@@ -34,6 +37,14 @@ public:
 
 signals:
     void changed();
+    // A provider's cycle ended in failure: its status is the reason. Main.qml
+    // announces it assertively, since a screen reader user cannot see the
+    // sidebar's warning mark.
+    void syncFailed(const QString &reason);
+
+private slots:
+    // One provider's state changed; a failure that just appeared is announced.
+    void onProviderStateChanged();
 
 private:
     struct Entry {
@@ -43,4 +54,5 @@ private:
     static bool configured(const QObject *p);
     static bool statusFailed(const QObject *p);
     QVector<Entry> m_entries;
+    QSet<QObject *> m_failureReported;  // Providers whose current failure is already announced.
 };

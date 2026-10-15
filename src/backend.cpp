@@ -888,6 +888,13 @@ void Backend::toggleComplete(qint64 id) {
     }
     m_store->commit();
     emit taskCompleted(!allDone);
+    // One task is named; several are counted, as the visible toast does.
+    if (ids.size() == 1)
+        emit announce(allDone ? QStringLiteral("Reopened: %1").arg(m_store->task(ids.first()).title)
+                              : QStringLiteral("Completed: %1").arg(m_store->task(ids.first()).title));
+    else
+        emit announce(allDone ? QStringLiteral("Reopened %1 tasks").arg(ids.size())
+                              : QStringLiteral("Completed %1 tasks").arg(ids.size()));
     if (!allDone) {
         bool anyOpen = false;
         for (const auto &row : m_tasks.rows())
@@ -1071,6 +1078,14 @@ void Backend::deleteSelection() {
     for (auto id : ids)
         deleteTree(id);
     m_store->commit();
+    // A Cut announces itself in cutSelection(); naming the task here as well
+    // would say it twice.
+    if (!m_cutting) {
+        if (ids.size() == 1)
+            emit announce(QStringLiteral("Deleted: %1").arg(m_store->task(ids.first()).title));
+        else
+            emit announce(QStringLiteral("Deleted %1 tasks").arg(ids.size()));
+    }
     m_selected = next ? QVector<qint64>{next} : QVector<qint64>{};
     m_cursor = m_anchor = next;
     rebuild();
@@ -1136,6 +1151,7 @@ void Backend::moveSelectionToList(qint64 listId) {
     for (auto id : ids)
         move(id);
     m_store->commit();
+    emit announce(QStringLiteral("Moved to %1").arg(m_store->list(listId).name));
 }
 
 void Backend::collectTree(const Task &task, QVector<Task> &into) const {
@@ -1163,6 +1179,7 @@ void Backend::copySelectionToList(qint64 listId) {
     }
     m_store->commit();
     setStatus(QStringLiteral("Copied to %1").arg(m_store->list(listId).name));
+    emit announce(QStringLiteral("Copied to %1").arg(m_store->list(listId).name));
 }
 
 void Backend::newFromSelection(int type) {
@@ -2364,12 +2381,14 @@ void Backend::undo() {
     if (!m_store->undo())
         return;
     setStatus("Undo " + m_store->redoLabel());
+    emit announce(QStringLiteral("Undone: %1").arg(m_store->redoLabel()));
 }
 
 void Backend::redo() {
     if (!m_store->redo())
         return;
     setStatus("Redo " + m_store->undoLabel());
+    emit announce(QStringLiteral("Redone: %1").arg(m_store->undoLabel()));
 }
 
 
@@ -2867,6 +2886,8 @@ void Backend::copySelection() {
     m_clipTasks = trees;
     QGuiApplication::clipboard()->setText(m_clipText);
     setStatus(ids.size() == 1 ? "Copied" : QStringLiteral("Copied %1 tasks").arg(ids.size()));
+    if (!m_cutting)
+        emit announce(ids.size() == 1 ? QStringLiteral("Copied 1 task") : QStringLiteral("Copied %1 tasks").arg(ids.size()));
 }
 
 void Backend::cutSelection() {
@@ -2875,8 +2896,12 @@ void Backend::cutSelection() {
     if (count == 0)
         return;
     copySelection();
+    // The copy's own announcement is suppressed; the cut says it once.
+    m_cutting = true;
     deleteSelection();
+    m_cutting = false;
     setStatus(count == 1 ? "Cut" : QStringLiteral("Cut %1 tasks").arg(count));
+    emit announce(count == 1 ? QStringLiteral("Cut 1 task") : QStringLiteral("Cut %1 tasks").arg(count));
 }
 
 void Backend::pasteTasks() {
@@ -3015,6 +3040,7 @@ void Backend::pasteText(const QString &text) {
     m_cursor = m_anchor = created.last();
     rebuild();
     emit selectionChanged();
+    emit announce(created.size() == 1 ? QStringLiteral("Pasted 1 task") : QStringLiteral("Pasted %1 tasks").arg(created.size()));
 }
 
 void Backend::dropMail(qint64 taskId, const QString &path) {

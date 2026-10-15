@@ -133,6 +133,9 @@ signals:
     void optionsChanged();
     void oauthChanged();
     void checked(int imported);   // A pass over the mailbox ended without error.
+    // The connector entered its error state with a reason. Main.qml announces
+    // it as "Mail: ..." assertively; the hub's own failure line is suppressed.
+    void errorOccurred(const QString &message);
 
 private:
     struct Config {

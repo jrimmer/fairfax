@@ -18,7 +18,15 @@ AppServices::AppServices(Store &store, const QString &themeOverride)
                      [this] { theme.setScheme(this->store.setting("appearance.scheme", "system").toString()); });
     NotesHighlighter::registerType();
     mail = std::make_unique<MailFetch>(&store);
-    syncHub.add(mail.get(), "Mail");
+    // The mail connector reports its own errors as "Mail: ..."; the hub is
+    // told not to duplicate them as a sync failure.
+    syncHub.add(mail.get(), "Mail", false);
+    QObject::connect(mail.get(), &MailFetch::errorOccurred, &backend, [this](const QString &message) {
+        backend.screenReaderAnnounceUrgent(QStringLiteral("Mail: %1").arg(message));
+    });
+    QObject::connect(&syncHub, &SyncHub::syncFailed, &backend, [this](const QString &reason) {
+        backend.screenReaderAnnounceUrgent(QStringLiteral("Sync failed: %1").arg(reason));
+    });
 
     sounds.setEnabled(store.setting("general.sounds", true).toBool());
     QObject::connect(&backend, &Backend::settingsChanged, &sounds,

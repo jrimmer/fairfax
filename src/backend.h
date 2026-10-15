@@ -409,6 +409,10 @@ public:
     Q_INVOKABLE void setRecordingShortcut(bool on);
     Q_INVOKABLE void requestQuickEntry() { emit quickEntryRequested(); }
     void requestQuickEntryWith(const QString &text) { emit quickEntryTextRequested(text); }
+    // AppServices wires the sync hub's and the mail connector's failures here,
+    // so a screen reader hears them without the sidebar being visible.
+    void screenReaderAnnounce(const QString &message) { emit announce(message); }
+    void screenReaderAnnounceUrgent(const QString &message) { emit announceAssertive(message); }
     QList<qint64> selectedIds() const { return QList<qint64>(m_selected.cbegin(), m_selected.cend()); }
     Q_INVOKABLE QString shareableLink(qint64 taskId) const;
     Q_INVOKABLE QString licenseText() const;
@@ -583,6 +587,12 @@ signals:
     void editEnding();  // The editor is about to close: it saves what is still in its fields.
     void editFieldRequested();  // The editor is open; takePendingField() says where to go.
     void windowRequested();
+    // What a screen reader should say for a change it would otherwise miss:
+    // a completion, a move, a delete, undo and redo, copy and paste. Sync
+    // and mail failures are urgent enough to interrupt; announceAssertive
+    // asks Main.qml for the assertive politeness instead of the polite one.
+    void announce(const QString &message);
+    void announceAssertive(const QString &message);
 
 private:
     SortSpec sortSpec() const;
@@ -654,6 +664,8 @@ private:
     // What the last Copy or Cut put on the clipboard, to restore on paste.
     QString m_clipText;
     QVector<Task> m_clipTasks;
+    // True while a Cut's own Copy runs, so only the delete is announced.
+    bool m_cutting = false;
     QString m_status;
     QTimer m_clock;
     QTimer m_backupTimer;

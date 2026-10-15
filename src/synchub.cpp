@@ -3,12 +3,31 @@
 #include <QMetaObject>
 #include <QStringList>
 
-void SyncHub::add(QObject *provider, const QString &name) {
+void SyncHub::add(QObject *provider, const QString &name, bool announceFailures) {
     if (!provider)
         return;
     m_entries.append({provider, name});
     connect(provider, SIGNAL(stateChanged()), this, SIGNAL(changed()));
+    // A failure that just appeared is announced once, with the reason the
+    // sidebar would colour and tooltip. A provider that was already failing
+    // when it was added, or that reports the same failure again, is not
+    // repeated.
+    if (announceFailures)
+        connect(provider, SIGNAL(stateChanged()), this, SLOT(onProviderStateChanged()));
     emit changed();
+}
+
+void SyncHub::onProviderStateChanged() {
+    auto *provider = sender();
+    if (!provider)
+        return;
+    const bool failing = configured(provider) && !provider->property("busy").toBool() && statusFailed(provider);
+    if (failing && !m_failureReported.contains(provider)) {
+        m_failureReported.insert(provider);
+        emit syncFailed(provider->property("status").toString());
+    } else if (!failing) {
+        m_failureReported.remove(provider);
+    }
 }
 
 bool SyncHub::configured(const QObject *p) {
