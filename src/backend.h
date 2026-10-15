@@ -36,6 +36,10 @@ class Backend : public QObject {
     Q_PROPERTY(QString sourceSubtitle READ sourceSubtitle NOTIFY viewChanged)
     Q_PROPERTY(int sourceColor READ sourceColor NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsFocus READ sourceIsFocus NOTIFY viewChanged)
+    Q_PROPERTY(bool sourceIsMyDay READ sourceIsMyDay NOTIFY viewChanged)
+    Q_PROPERTY(bool myDayEnabled READ myDayEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(QVariantMap myDayCapacityMap READ myDayCapacityMap NOTIFY myDayChanged)
+    Q_PROPERTY(QVariantList defaultViewChoices READ defaultViewChoices NOTIFY dataChanged)
     Q_PROPERTY(int sortField READ sortField NOTIFY viewChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY viewChanged)
     Q_PROPERTY(bool separated READ separated NOTIFY viewChanged)
@@ -127,6 +131,10 @@ public:
     QString sourceSubtitle() const;
     int sourceColor() const;
     bool sourceIsFocus() const { return m_source.isFocus(); }
+    bool sourceIsMyDay() const { return m_source.kind == Source::MyDay; }
+    bool myDayEnabled() const;
+    QVariantMap myDayCapacityMap() const { return myDayCapacity(); }
+    QVariantList defaultViewChoices() const;
     int sortField() const { return sortSpec().field; }
     bool sortAscending() const { return sortSpec().ascending; }
     bool separated() const { return sortSpec().separated; }
@@ -188,6 +196,9 @@ public:
     // Filters to a span of days, as dragged across the mini calendar.
     Q_INVOKABLE void setDayRange(const QString &fromIso, const QString &toIso);
     Q_INVOKABLE QVariantList monthDays(int year, int month) const;
+
+    // Which view a fresh launch opens: the stored ui.defaultView choice,
+    // resolved against the lists that still exist. Falls back to Today.
 
     // Selection and editing.
     Q_INVOKABLE void selectTask(qint64 id, int mode = 0);  // 0 replace, 1 extend range, 2 toggle.
@@ -546,6 +557,8 @@ public:
     // Puts the task in the first free gap of its length, giving it a 30-minute
     // duration first when it has none.
     Q_INVOKABLE void myDayBlockNext(qint64 id);
+    // Expands the capped Overdue or Suggestions section of My Day.
+    Q_INVOKABLE void myDayExpand(const QString &section);
 
     // Alerts beyond the presets.
     Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);
@@ -622,6 +635,7 @@ private:
     void rebuild();
     bool putManualSort();
     void rebuildSidebar(const ViewBuilder &views);
+    void rebuildMyDayTasks(const ViewBuilder &views);
     bool doneWarningDue() const;
     void rebuildTasks(const ViewBuilder &views);
     void rebuildTags(const ViewBuilder &views);
@@ -655,6 +669,9 @@ private:
     qint64 m_editing = 0;
     qint64 m_newTask = 0;
     int m_settingsRevision = 0;
+    // My Day's capped sections, expanded for this session only.
+    bool m_myDayOverdueExpanded = false;
+    bool m_myDaySuggestionsExpanded = false;
     qint64 m_noDetectTask = 0;
     bool m_hasHidden = false;
     QVariantMap m_editor;

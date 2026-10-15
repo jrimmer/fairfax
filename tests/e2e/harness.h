@@ -311,15 +311,27 @@ class App {
 public:
     // `reopen` boots on an existing database (a restart) instead of a new one;
     // `withSync` starts the sync providers, which offscreen runs otherwise leave out.
-    explicit App(const std::function<Seed(Store &)> &seed = seedWorld, const QString &reopen = QString(), bool withSync = false) {
+    // `reopen` boots on an existing database (a restart) instead of a new one;
+    // `withSync` starts the sync providers, which offscreen runs otherwise leave out;
+    // `lastView` (the default) seeds ui.defaultView = "last" so every test that
+    // predates My Day lands on the view it always did. A test that proves the
+    // real fresh-database default passes lastView = false.
+    explicit App(const std::function<Seed(Store &)> &seed = seedWorld, const QString &reopen = QString(), bool withSync = false,
+                 bool lastView = true) {
         PopupFocusGuard::install();
         QStandardPaths::setTestModeEnabled(true);
         QVERIFY2(m_dir.isValid(), "temporary directory");
         QString error;
         m_dbPath = reopen.isEmpty() ? m_dir.filePath("e2e.db") : reopen;
         QVERIFY2(m_store.open(m_dbPath, &error), qPrintable(error));
-        if (seed)
+        if (seed) {
             ids = seed(m_store);
+            // My Day is on by default, so a fresh store would open on it and
+            // every existing test would land somewhere new. Keep them on the
+            // view they always had unless a test asks otherwise.
+            if (lastView && !m_store.setting("ui.defaultView").isValid())
+                m_store.setSetting("ui.defaultView", "last");
+        }
         m_services = std::make_unique<AppServices>(m_store, QString());
         m_services->backend.ensureDefaults();
         m_services->startSync(true, !withSync);

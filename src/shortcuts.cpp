@@ -128,6 +128,7 @@ QList<Command> buildCommands() {
 
     // ---- View
     add("view.inbox", "View", "Inbox", {"Ctrl+0"});
+    add("view.myDay", "View", "My Day", {"Ctrl+Shift+P"});
     add("view.all", "View", "All", {"Ctrl+1"});
     add("view.today", "View", "Today", {"Ctrl+2"});
     add("view.starred", "View", "Starred", {"Ctrl+3"});

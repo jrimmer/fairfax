@@ -471,6 +471,11 @@ int main(int argc, char *argv[]) {
     QString error;
     const bool opened = store.open(dbPath, &error);
 
+    // The demo and the screenshot runs open on Today, as they always did,
+    // rather than on the new fresh-database default of My Day.
+    if (cli.isSet(demoOption))
+        store.setSetting("ui.defaultView", "last");
+
     AppServices services(store, cli.value(themeOption));
     Theme &theme = services.theme;
     Backend &backend = services.backend;

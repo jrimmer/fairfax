@@ -204,6 +204,7 @@ ApplicationWindow {
     AppShortcut { sequences: backend.shortcutMap["task.newSubtask"] || []; enabled: !backend.recordingShortcut; onActivated: backend.newTask(0, true) }
     AppShortcut { sequences: backend.shortcutMap["task.newList"] || []; enabled: !backend.recordingShortcut; onActivated: { backend.newList(); sidebar.renameSelected() } }
     AppShortcut { sequences: backend.shortcutMap["view.inbox"] || []; enabled: !backend.recordingShortcut; onActivated: sidebar.selectInbox() }
+    AppShortcut { sequences: backend.shortcutMap["view.myDay"] || []; enabled: !backend.recordingShortcut && backend.myDayEnabled; onActivated: backend.selectSource("myday") }
     AppShortcut { sequences: backend.shortcutMap["view.all"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("all") }
     AppShortcut { sequences: backend.shortcutMap["view.today"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("today") }
     AppShortcut { sequences: backend.shortcutMap["view.starred"] || []; enabled: !backend.recordingShortcut; onActivated: backend.selectSource("starred") }

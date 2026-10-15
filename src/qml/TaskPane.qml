@@ -31,6 +31,14 @@ Item {
     }
 
     function focusList() { list.forceActiveFocus() }
+
+    // "6h 30m" from a minute count, for the My Day capacity line.
+    function formatMinutes(total) {
+        const h = Math.floor(total / 60), m = total % 60
+        if (h === 0) return m + "m"
+        if (m === 0) return h + "h"
+        return h + "h " + m + "m"
+    }
     function openSearchBuilder() {
         if (backend.sourceIsSmart) editSmartQuery()
         else searchBuilder.openAt(search)
@@ -158,6 +166,39 @@ Item {
                 font.pixelSize: backend.fontSize + 5
                 Layout.alignment: Qt.AlignBaseline
             }
+            // My Day's capacity line: planned against the free time left today.
+            RowLayout {
+                objectName: "myDayCapacity"
+                visible: backend.sourceIsMyDay
+                spacing: 6
+                Layout.alignment: Qt.AlignBaseline
+                readonly property int planned: Number(backend.myDayCapacityMap.plannedMinutes || 0)
+                readonly property int free: Number(backend.myDayCapacityMap.freeMinutes || 0)
+                readonly property int without: Number(backend.myDayCapacityMap.withoutDuration || 0)
+                readonly property bool over: planned > free
+                readonly property bool amber: !over && free > 0 && planned > free * 0.85
+                Text {
+                    text: root.formatMinutes(parent.planned) + " planned"
+                    color: parent.over ? theme.overdue : parent.amber ? theme.priorityMedium : theme.muted
+                    font.pixelSize: backend.fontSize + 1
+                }
+                Text {
+                    text: "·"
+                    color: theme.faint
+                    font.pixelSize: backend.fontSize + 1
+                }
+                Text {
+                    text: root.formatMinutes(parent.free) + " free"
+                    color: parent.over ? theme.overdue : parent.amber ? theme.priorityMedium : theme.muted
+                    font.pixelSize: backend.fontSize + 1
+                }
+                Text {
+                    visible: parent.without > 0
+                    text: "· " + parent.without + " without a duration"
+                    color: theme.faint
+                    font.pixelSize: backend.fontSize - 1
+                }
+            }
             Item { Layout.fillWidth: true }
             Text {
                 visible: backend.selectionSummary !== "" && root.width > 640
@@ -243,6 +284,8 @@ Item {
         }
 
         // Today's calendar events, above Today (or every list, by setting).
+        // While in My Day mode this compact bar is only for a narrow window;
+        // the wide window shows the expanded timeline in the utility panel.
         DayBar {
             objectName: "dayBar"
             Layout.fillWidth: true
@@ -250,7 +293,9 @@ Item {
             Layout.rightMargin: root.contentMargin
             Layout.bottomMargin: 6
             visible: !!calendar && calendar.sources.length > 0 && backend.search === ""
-                     && (backend.sourceKey === "today" || ((backend.settingsRevision, backend.settingFlag("calendar.inLists", false)) && !backend.sourceIsSmart && !backend.sourceKey.startsWith("project:")))
+                     && (backend.sourceKey === "today"
+                         || (backend.sourceIsMyDay && (root.Window.width < 900 || !root.utilityVisible))
+                         || ((backend.settingsRevision, backend.settingFlag("calendar.inLists", false)) && !backend.sourceIsSmart && !backend.sourceKey.startsWith("project:") && !backend.sourceIsMyDay))
         }
 
         ListView {
@@ -275,7 +320,32 @@ Item {
                 required property var model
                 required property int index
                 width: ListView.view.width
-                sourceComponent: model.kind === "section" ? sectionComponent : model.editing ? editorComponent : rowComponent
+                sourceComponent: model.kind === "section" ? sectionComponent
+                               : model.kind === "myDayMore" ? moreComponent
+                               : model.editing ? editorComponent : rowComponent
+            }
+
+            Component {
+                id: moreComponent
+                Item {
+                    objectName: "myDayMore:" + (model.row && model.row.sectionKey ? model.row.sectionKey : "")
+                    height: 30
+                    Accessible.role: Accessible.Button
+                    Accessible.name: model.row && model.row.title ? model.row.title : "More"
+                    Accessible.onPressAction: backend.myDayExpand(model.row.sectionKey)
+                    Text {
+                        x: root.contentMargin + 32
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: model.row && model.row.title ? model.row.title : ""
+                        color: theme.accent
+                        font.pixelSize: backend.fontSize - 1
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: backend.myDayExpand(model.row.sectionKey)
+                    }
+                }
             }
 
             Component {

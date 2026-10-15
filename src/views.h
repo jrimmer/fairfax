@@ -17,7 +17,7 @@
 #include "store.h"
 
 struct Source {
-    enum Kind { All = 0, Today = 1, Starred = 2, Scheduled = 3, Done = 4, List = 5, Project = 6 };
+    enum Kind { All = 0, Today = 1, Starred = 2, Scheduled = 3, Done = 4, List = 5, Project = 6, MyDay = 7 };
     int kind = Today;
     qint64 id = 0;
 
