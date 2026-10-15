@@ -498,6 +498,52 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayTimeline") != nullptr, 5000);
         QVERIFY(!findItem("dayBar"));
     }
+
+    // The capacity line follows a work-hours change at once, without waiting
+    // for a store change or the minute timer.
+    void capacityFollowsAWorkWindowSettingChange() {
+        QTemporaryDir dir;
+        App app(seedMyDay);
+        QVERIFY(app.ok);
+        QVERIFY(!writeCalendar(dir.path()).isEmpty());
+        app.services().calendar.setClock([] { return QDateTime(QDate::currentDate(), QTime(9, 0)); });
+        app.services().calendar.setSources({dir.path() + "/myday.ics"});
+        QVERIFY(app.openSource("myday"));
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().myDayCapacityMap().value("freeMinutes").toInt(), 7 * 60, 5000);
+        // The window starts at 10:00 now: the 10:00-11:00 event still takes an
+        // hour, but an hour less of the day is free.
+        app.backend().setSetting("myday.workStart", 10 * 60);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().myDayCapacityMap().value("freeMinutes").toInt(), 6 * 60, 5000);
+    }
+
+    // A typed search filters every section in My Day, as it does in a list.
+    void searchFiltersTheSections() {
+        App app(seedMyDay);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QVERIFY(tk::waitItem(QString("taskRow:%1").arg(app.ids.buyMilk)));
+        QVERIFY(tk::waitItem(QString("taskRow:%1").arg(app.ids.electricity)));
+        app.backend().setSearch("milk");
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.buyMilk) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.electricity) == nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.shelf) == nullptr, 5000);
+        app.backend().setSearch(QString());
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.electricity) != nullptr, 5000);
+    }
+
+    // My Day orders its own sections, so it shows no sort controls, and the
+    // tag-search field never sits above the timeline.
+    void myDayShowsNoSortControls() {
+        App app(seedMyDay);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QCOMPARE(findItem("sortButton"), nullptr);
+        QCOMPARE(findItem("sortReverse"), nullptr);
+        QCOMPARE(findItem("tagSearch"), nullptr);
+        // Leaving My Day brings them back.
+        QVERIFY(app.openSource("all"));
+        QVERIFY(tk::waitItem("sortButton"));
+    }
 };
 
 REGISTER_TEST(E2EMyDay)

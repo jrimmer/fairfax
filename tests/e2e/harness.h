@@ -310,8 +310,6 @@ public:
 class App {
 public:
     // `reopen` boots on an existing database (a restart) instead of a new one;
-    // `withSync` starts the sync providers, which offscreen runs otherwise leave out.
-    // `reopen` boots on an existing database (a restart) instead of a new one;
     // `withSync` starts the sync providers, which offscreen runs otherwise leave out;
     // `lastView` (the default) seeds ui.defaultView = "last" so every test that
     // predates My Day lands on the view it always did. A test that proves the
