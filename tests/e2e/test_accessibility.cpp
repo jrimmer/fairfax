@@ -202,29 +202,21 @@ QList<QQuickItem *> visibleInteractive() {
     return out;
 }
 
-// The interactive items that will be named by a later slice. Each pattern is
-// matched against an item's objectName and class name: a plain prefix by
-// startsWith (so "taskRow:" covers every task row), and a pattern containing
-// '*' as a wildcard. Every entry is removed by the slice that names the
-// control. The ObjectName patterns are deliberately specific, so a new
-// offender cannot hide behind a broad prefix.
+// No interactive item is excused any more: every slice has named its share,
+// so the guard judges every control it finds. The list stays as the guard's
+// proof that nothing is left waiting to be named, and a later control added
+// without a name fails the guard rather than hiding here.
 const QVector<QString> &pendingAccessibility() {
-    static const QVector<QString> pending{
-        // slice 5: anything left
-        "quickUnit:", "quickWeekday:",
-        "utilityTabLocations", "utilityTabTags",
-        "quickCustomDone", "quickPriority", "quickList",
-        "quickAttach", "quickLocation", "quickRepeat", "quickAlarm", "quickDuration",
-        "calTitle", "searchClear", "commandChip:", "commandInput",
-    };
+    static const QVector<QString> pending{};
     return pending;
 }
 
-// Whether an item is excused for a later slice. A named pattern is matched
-// against the item's objectName and class; an anonymous helper item (one with
-// no objectName) is matched by the nearest named ancestor only, so one
-// not-yet-named component is excused without a broader subtree behind it.
+// Whether an item is excused: never now, since the list is empty. The check
+// stays so the guard has one place that turns an entry into an excuse if a
+// later change ever needs one.
 bool pending(const QQuickItem *item) {
+    if (pendingAccessibility().isEmpty())
+        return false;
     QStringList names{item->objectName()};
     if (item->objectName().isEmpty())
         for (QQuickItem *p = item->parentItem(); p; p = p->parentItem())
@@ -316,6 +308,53 @@ private slots:
         App app;
         QVERIFY(app.ok);
         checkState("main window");
+    }
+
+    static QString regionOf(QQuickItem *f) {
+        for (QQuickItem *i = f; i; i = i->parentItem()) {
+            if (i->objectName() == "editorCard") return "editor";
+            if (i->objectName() == "taskList") return "tasklist";
+            if (shortClass(i) == "UtilityPanel") return "utility";
+            if (i->objectName() == "miniCalendar") return "sidebar-cal";
+            if (shortClass(i) == "Sidebar") return "sidebar";
+            if (shortClass(i) == "TaskPane") return "taskpane";
+        }
+        return "other";
+    }
+
+    void exploreTabOrder() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(tk::openEditor(app, app.ids.buyMilk));
+        auto describe = [&](QQuickItem *f) {
+            return regionOf(f) + ":" + (f ? f->objectName() : QString("?"));
+        };
+        QQuickItem *list = tk::waitItem("taskList");
+        list->forceActiveFocus(Qt::TabFocusReason);
+        QStringList seen; seen << describe(app.window->activeFocusItem());
+        QStringList bad;
+        for (int i = 0; i < 400; ++i) {
+            QTest::keyClick(app.window, Qt::Key_Tab);
+            QQuickItem *f = app.window->activeFocusItem();
+            QString d = describe(f);
+            if (seen.last() != d) seen << d;
+            if (f && !f->isVisible() && bad.size() < 20) bad << d;
+        }
+        qInfo().noquote() << "FWD" << seen.join(" -> ");
+        qInfo().noquote() << "FWD_BAD" << bad.join(",");
+        list = tk::waitItem("taskList");
+        list->forceActiveFocus(Qt::TabFocusReason);
+        seen.clear(); seen << describe(app.window->activeFocusItem());
+        bad.clear();
+        for (int i = 0; i < 400; ++i) {
+            QTest::keyClick(app.window, Qt::Key_Backtab);
+            QQuickItem *f = app.window->activeFocusItem();
+            QString d = describe(f);
+            if (seen.last() != d) seen << d;
+            if (f && !f->isVisible() && bad.size() < 20) bad << d;
+        }
+        qInfo().noquote() << "BWD" << seen.join(" -> ");
+        qInfo().noquote() << "BWD_BAD" << bad.join(",");
     }
 
     void editorIsNamed() {

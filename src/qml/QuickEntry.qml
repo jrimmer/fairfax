@@ -393,7 +393,8 @@ Window {
         }
     }
 
-    // A compact text toggle in the inline editors.
+    // A compact text toggle in the inline editors. Its accessible name is its
+    // visible text, so quickUnit/quickWeekday/quickCustomDone read aloud.
     component Seg: Rectangle {
         id: seg
         property string text
@@ -402,10 +403,19 @@ Window {
         implicitWidth: segText.implicitWidth + 16
         implicitHeight: 24
         radius: 6
+        activeFocusOnTab: true
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: seg.text
+        Accessible.checkable: true
+        Accessible.checked: seg.on
+        Accessible.onPressAction: seg.clicked()
         color: on ? Qt.alpha(theme.accent, 0.28) : segHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.1) : theme.mix(theme.raised, theme.foreground, 0.05)
         Text { id: segText; anchors.centerIn: parent; text: seg.text; color: seg.on ? theme.foreground : theme.muted; font.pixelSize: backend.fontSize - 1 }
         HoverHandler { id: segHover }
         TapHandler { onTapped: seg.clicked() }
+        Keys.onSpacePressed: seg.clicked()
+        Keys.onReturnPressed: seg.clicked()
+        Keys.onEnterPressed: seg.clicked()
     }
 
     component ClearButton: Item {

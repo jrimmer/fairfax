@@ -71,6 +71,9 @@ ColumnLayout {
             color: theme.muted
             font.pixelSize: 11
             font.weight: Font.DemiBold
+            Accessible.role: Accessible.Button
+            Accessible.name: text + ", go to the current month"
+            Accessible.onPressAction: root.shown = new Date()
             MouseArea { anchors.fill: parent; onClicked: root.shown = new Date() }
         }
         // Back to today, only once today's month is out of view.

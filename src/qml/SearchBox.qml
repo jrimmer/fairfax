@@ -67,7 +67,8 @@ Item {
             font: input.font
         }
     }
-    // The ✕ at the field's end clears the search, as Escape does.
+    // The ✕ at the field's end clears the search, as Escape does. It joins the
+    // tab order so a keyboard user can reach it; its name says what it clears.
     Icon {
         objectName: "searchClear"
         visible: root.expanded && input.text !== ""
@@ -77,6 +78,13 @@ Item {
         name: "close"
         size: 12
         color: theme.muted
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: "Clear search"
+        Accessible.onPressAction: { backend.search = ""; root.opened = false; root.finished() }
+        Keys.onSpacePressed: { backend.search = ""; root.opened = false; root.finished() }
+        Keys.onReturnPressed: { backend.search = ""; root.opened = false; root.finished() }
+        Keys.onEnterPressed: { backend.search = ""; root.opened = false; root.finished() }
         MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { backend.search = ""; root.opened = false; root.finished() } }
     }
 }
