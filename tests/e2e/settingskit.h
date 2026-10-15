@@ -680,6 +680,9 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         // My Day: E2EMyDay drives the sidebar item, the shortcut, the screen and
         // the Default View setting through the UI.
         {"ui.defaultView", "E2EMyDay::defaultViewComboChangesTheLaunchView"},
+        // The once-a-day prompt's switch has a table row for persistence; its
+        // effect is driven by E2EMyDay::promptIsAskedOnceADay.
+        {"myday.prompt", "E2EMyDay::promptIsAskedOnceADay"},
         // The Shortcuts pane stores each remappable command under this prefix.
         {"shortcuts.", "E2EShortcuts::rebindAppCommandPersists"},
     };

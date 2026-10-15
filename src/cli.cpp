@@ -265,6 +265,7 @@ int shorthand(Store &store, const QStringList &args, QTextStream &out, QTextStre
                "frfx done <n> [<n>…]    complete tasks by number\n"
                "frfx find <words>       search everything (the reference app search syntax works)\n"
                "frfx open               open Fairfax\n"
+               "fairfax ctl myday       open My Day in the running window\n"
                "frfx add <task>         add a task that starts with one of these words\n";
         return 0;
     }
