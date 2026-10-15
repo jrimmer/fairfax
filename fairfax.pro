@@ -35,6 +35,8 @@ macx {
 }
 win32 {
     CONFIG += windows
+    # The Credential Manager (src/keyring.cpp).
+    LIBS += -ladvapi32
     # Made by bin/build-windows.ps1, either with ImageMagick or with the app's
     # own --render-icon option (which is why the script may build twice).
     exists($$PWD/pkgbuild/windows/fairfax.ico) {

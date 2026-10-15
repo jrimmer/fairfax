@@ -6,6 +6,12 @@
 #include <QProcess>
 #include <QStandardPaths>
 
+#if defined(Q_OS_WIN)
+#include <string>
+#include <windows.h>
+#include <wincred.h>
+#endif
+
 namespace {
 
 struct Result {
@@ -34,8 +40,69 @@ Result run(const QString &program, const QStringList &args, const QByteArray &in
 }
 
 #if defined(Q_OS_WIN)
+// Where secrets lived before they moved to the Credential Manager; read once
+// to migrate, then removed.
 QString secretFile(const QString &service, const QString &account) {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/secrets/" + service + "-" + account;
+}
+
+// A generic credential holds at most CRED_MAX_CREDENTIAL_BLOB_SIZE (2560)
+// bytes, so a longer secret (an OAuth token set) is split across "name",
+// "name#2", "name#3" and so on.
+constexpr int ChunkBytes = 2048;
+
+std::wstring targetName(const QString &service, const QString &account, int part) {
+    QString name = service + QLatin1Char(':') + account;
+    if (part > 1)
+        name += QLatin1Char('#') + QString::number(part);
+    return name.toStdWString();
+}
+
+bool writePart(const std::wstring &target, const QString &account, const QByteArray &bytes) {
+    const std::wstring user = account.toStdWString();
+    CREDENTIALW c{};
+    c.Type = CRED_TYPE_GENERIC;
+    c.TargetName = const_cast<LPWSTR>(target.c_str());
+    c.UserName = const_cast<LPWSTR>(user.c_str());
+    c.CredentialBlobSize = DWORD(bytes.size());
+    c.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char *>(bytes.constData()));
+    c.Persist = CRED_PERSIST_LOCAL_MACHINE;  // This user, this machine; never roams.
+    return CredWriteW(&c, 0) == TRUE;
+}
+
+bool readPart(const std::wstring &target, QByteArray *out) {
+    PCREDENTIALW c = nullptr;
+    if (!CredReadW(target.c_str(), CRED_TYPE_GENERIC, 0, &c))
+        return false;
+    *out = QByteArray(reinterpret_cast<const char *>(c->CredentialBlob), int(c->CredentialBlobSize));
+    CredFree(c);
+    return true;
+}
+
+// Removes part `from` and every later one.
+void deleteParts(const QString &service, const QString &account, int from) {
+    for (int part = from; CredDeleteW(targetName(service, account, part).c_str(), CRED_TYPE_GENERIC, 0); ++part) {
+    }
+}
+
+bool storeCredential(const QString &service, const QString &account, const QString &secret) {
+    const QByteArray bytes = secret.toUtf8();
+    int part = 1;
+    for (qsizetype at = 0; at == 0 || at < bytes.size(); at += ChunkBytes, ++part)
+        if (!writePart(targetName(service, account, part), account, bytes.mid(at, ChunkBytes)))
+            return false;
+    deleteParts(service, account, part);  // Leftovers from a longer secret stored before.
+    return true;
+}
+
+bool lookupCredential(const QString &service, const QString &account, QString *secret) {
+    QByteArray all, chunk;
+    if (!readPart(targetName(service, account, 1), &all))
+        return false;
+    for (int part = 2; readPart(targetName(service, account, part), &chunk); ++part)
+        all += chunk;
+    *secret = QString::fromUtf8(all);
+    return true;
 }
 #endif
 
@@ -66,15 +133,11 @@ bool store(const QString &service, const QString &account, const QString &secret
     }
     return true;
 #elif defined(Q_OS_WIN)
-    const QString path = secretFile(service, account);
-    QDir().mkpath(QFileInfo(path).absolutePath());
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (error) *error = "Couldn't write " + path;
+    if (!storeCredential(service, account, secret)) {
+        if (error) *error = "Couldn't store the secret in the Windows Credential Manager.";
         return false;
     }
-    f.write(secret.toUtf8());
-    f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    QFile::remove(secretFile(service, account));  // Never leave an old copy behind.
     return true;
 #else
     const Result r = run("secret-tool", {"store", "--label=Fairfax " + account, "service", service, "account", account},
@@ -98,8 +161,19 @@ QString lookup(const QString &service, const QString &account) {
     const Result r = run("security", {"find-generic-password", "-s", service, "-a", account, "-w"});
     return r.code == 0 ? r.out : QString();
 #elif defined(Q_OS_WIN)
+    QString secret;
+    if (lookupCredential(service, account, &secret))
+        return secret;
+    // A secret saved by an older version as a file: move it into the
+    // Credential Manager, and remove the file once that worked.
     QFile f(secretFile(service, account));
-    return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).trimmed() : QString();
+    if (!f.open(QIODevice::ReadOnly))
+        return QString();
+    secret = QString::fromUtf8(f.readAll()).trimmed();
+    f.close();
+    if (storeCredential(service, account, secret))
+        QFile::remove(secretFile(service, account));
+    return secret;
 #else
     const Result r = run("secret-tool", {"lookup", "service", service, "account", account});
     return r.code == 0 ? r.out : QString();
@@ -114,6 +188,7 @@ void clear(const QString &service, const QString &account) {
 #if defined(Q_OS_MACOS)
     run("security", {"delete-generic-password", "-s", service, "-a", account});
 #elif defined(Q_OS_WIN)
+    deleteParts(service, account, 1);
     QFile::remove(secretFile(service, account));
 #else
     run("secret-tool", {"clear", "service", service, "account", account});

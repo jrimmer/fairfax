@@ -50,3 +50,6 @@ HEADERS += mailkit.h ../fakeimap.h ../loopback.h
 # CalDAV sync end-to-end tests: Settings > Sync and the provider against a fake CalDAV server.
 SOURCES += test_caldav.cpp
 HEADERS += ../fakecaldav.h
+
+# The Credential Manager (src/keyring.cpp).
+win32: LIBS += -ladvapi32

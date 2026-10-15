@@ -182,6 +182,12 @@ Signing in the workflow happens only when these repository secrets exist
 - The Dock badge and the login item (SMAppService) are not done on macOS.
 - Windows on arm64 has not been tried.
 - No PowerShell completions for `frfx`.
+- Secrets (account passwords and tokens) are kept in the Windows Credential
+  Manager, as generic credentials named `fairfax:<account>`; a secret saved by
+  an older build as a file moves there the first time it is read. On macOS they
+  go in the Keychain through the `security` tool, which takes the secret on its
+  command line, so another local user could glimpse it in the process list
+  while it is being saved; a later version should use the Security framework.
 
 ## When something fails
 
