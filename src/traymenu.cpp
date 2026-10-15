@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QFont>
+#include <QHash>
 #include <QIcon>
 #include <QLocale>
 #include <QPainter>
@@ -9,6 +10,7 @@
 
 #include "model.h"
 #include "schedule.h"
+#include "shortcuts.h"
 #include "store.h"
 #include "views.h"
 
@@ -148,10 +150,24 @@ QList<TrayEntry> entries(const Store &store, const QDateTime &now, bool canSync)
                 return true;
         return false;
     };
+    // Each command's binding, in the platform's own spelling (⌘ on macOS),
+    // as the overlay and Settings show it; the entry label carries it after a
+    // tab, which QMenu right-aligns. `first` is the command, `second` the
+    // shortcut id (empty for one with no binding).
     const QList<QPair<QString, QString>> commands{
         {"new", QStringLiteral("New Task…")},      {"open", QStringLiteral("Open Fairfax")},
         {"find", QStringLiteral("Find a Task…")},  {"sync", QStringLiteral("Sync Now")},
         {"settings", QStringLiteral("Settings…")},
+    };
+    const QHash<QString, QString> shortcutIds{
+        // The tray commands carry the binding that does the same thing in the
+        // window: "new" opens Quick Entry, "find" opens Quick Open.
+        {"new", "app.quickEntry"}, {"find", "view.quickOpen"}, {"sync", "app.sync"},
+        {"settings", "app.settings"}, {"quit", "app.quit"},
+    };
+    auto withShortcut = [&](const QString &command, const QString &label) {
+        const QString text = Shortcuts::nativeText(Shortcuts::current(store, shortcutIds.value(command)));
+        return text.isEmpty() ? label : label + '\t' + text;
     };
     int added = 0;
     for (const auto &command : commands) {
@@ -162,7 +178,7 @@ QList<TrayEntry> entries(const Store &store, const QDateTime &now, bool canSync)
         TrayEntry entry;
         entry.kind = TrayEntry::Command;
         entry.command = command.first;
-        entry.label = command.second;
+        entry.label = withShortcut(command.first, command.second);
         out.append(entry);
         ++added;
     }
@@ -174,7 +190,7 @@ QList<TrayEntry> entries(const Store &store, const QDateTime &now, bool canSync)
     TrayEntry quit;
     quit.kind = TrayEntry::Command;
     quit.command = "quit";
-    quit.label = QStringLiteral("Quit Fairfax");
+    quit.label = withShortcut("quit", QStringLiteral("Quit Fairfax"));
     out.append(quit);
     return out;
 }

@@ -260,7 +260,9 @@ private slots:
         m_store->setSetting("tray.commands", "new,find");
         auto list = entries(true);
         QCOMPARE(commands(list), QStringList({"new", "find", "quit"}));
-        QCOMPARE(list.last().label, QStringLiteral("Quit Fairfax"));
+        // Command labels carry the binding in the platform's own spelling
+        // (QKeySequence::NativeText), after a tab QMenu right-aligns.
+        QCOMPARE(list.last().label, QStringLiteral("Quit Fairfax\tCtrl+Q"));
 
         m_store->setSetting("tray.commands", "settings");
         list = entries(true);
