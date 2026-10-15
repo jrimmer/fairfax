@@ -67,6 +67,8 @@ RowLayout {
                         Keys.onReturnPressed: backend.removeTag(root.taskId, modelData.id)
                         Keys.onEnterPressed: backend.removeTag(root.taskId, modelData.id)
                         MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: backend.removeTag(root.taskId, modelData.id) }
+                        // A focus ring only for keyboard focus, so the mouse look is unchanged.
+                        Rectangle { anchors.fill: parent; anchors.margins: -3; radius: 4; color: "transparent"; border.width: parent.activeFocus ? 2 : 0; border.color: theme.accent }
                     }
                 }
             }

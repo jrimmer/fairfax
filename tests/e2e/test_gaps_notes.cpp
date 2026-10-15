@@ -289,6 +289,22 @@ private slots:
         QVERIFY(closeEditor(app));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).notes, QString("@{Book the studio}"), 5000);
     }
+    // Tab on a picker row finishes the link as Return does, leaving the notes.
+    void taskLinkPickerChosenWithTab() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.buyMilk;
+        QVERIFY(openEditor(app, id));
+        QVERIFY(tk::typeIn("notesText", "@{Book"));
+        QObject *picker = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((picker = findObject("linkPicker")) != nullptr && picker->property("opened").toBool(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("linkPickerRow:0") != nullptr, 5000);
+        app.press(Qt::Key_Tab);
+        QTRY_COMPARE_WITH_TIMEOUT(notesText(), QString("@{Book the studio}"), 5000);
+        QVERIFY(closeEditor(app));
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).notes, QString("@{Book the studio}"), 5000);
+    }
 };
 
 REGISTER_TEST(E2EGapsNotes)

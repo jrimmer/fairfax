@@ -222,6 +222,7 @@ Popup {
         TextField {
             id: input
             objectName: "commandInput"
+            Accessible.name: root.titles[root.kind] || ""
             Layout.fillWidth: true
             Layout.margins: 10
             Layout.topMargin: 4
@@ -268,6 +269,9 @@ Popup {
                     height: 26
                     radius: 13
                     color: chipMouse.containsMouse ? theme.selection : theme.mix(theme.raised, theme.foreground, 0.07)
+                    Accessible.role: Accessible.Button
+                    Accessible.name: modelData.label
+                    Accessible.onPressAction: root.acceptChip(index)
                     Text {
                         id: chipText
                         anchors.centerIn: parent

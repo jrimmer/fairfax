@@ -35,7 +35,14 @@ Item {
         radius: 6
         color: mouse.pressed ? theme.mix(theme.background, theme.foreground, 0.14)
              : mouse.containsMouse ? theme.mix(theme.background, theme.foreground, 0.07) : "transparent"
-        // A focus ring only for keyboard focus, so the mouse look is unchanged.
+    }
+    // A focus ring only for keyboard focus, so the mouse look is unchanged.
+    Rectangle {
+        anchors.fill: parent
+        radius: 6
+        color: "transparent"
+        objectName: root.objectName !== "" ? root.objectName + "Ring" : "iconButtonRing"
+        visible: root.activeFocus
         border.width: root.activeFocus ? 2 : 0
         border.color: theme.accent
     }

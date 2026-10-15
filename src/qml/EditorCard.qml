@@ -385,7 +385,7 @@ Item {
                             color: backend.recordingTaskId === root.e.id ? theme.overdue : theme.muted
                             onClicked: backend.toggleRecording(root.e.id)
                         }
-                        RibbonButton { icon: "image"; tip: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
+                        RibbonButton { objectName: "editorAttach"; icon: "image"; tip: "Attach a File"; accessibleName: "Attach a File"; active: (root.e.attachments || []).length > 0; onClicked: filePicker.open("Attach a file to “" + root.e.title + "”", "attach:" + root.e.id) }
                         RibbonButton { id: locationButton; objectName: "editorLocation"; icon: "pin"; tint: theme.start; tip: "Location (Ctrl+G)"; accessibleName: "Location"; active: (root.e.locations || []).length > 0; menu: locationMenu }
                         RibbonButton { id: repeatButton; objectName: "editorRepeat"; icon: "repeat"; tint: theme.duration; tip: "Repeat (Ctrl+;)"; accessibleName: "Repeat"; active: !!root.e.repeat; enabled: !root.e.isChecklistItem; lit: repeatEditor.visible; onClicked: repeatEditor.openAt(repeatButton) }
                         RibbonButton { id: alarmButton; objectName: "editorAlarm"; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; accessibleName: "Alerts"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }

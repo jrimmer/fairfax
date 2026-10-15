@@ -71,6 +71,9 @@ ColumnLayout {
             color: theme.muted
             font.pixelSize: 11
             font.weight: Font.DemiBold
+            Accessible.role: Accessible.Button
+            Accessible.name: text + ", go to the current month"
+            Accessible.onPressAction: root.shown = new Date()
             MouseArea { anchors.fill: parent; onClicked: root.shown = new Date() }
         }
         // Back to today, only once today's month is out of view.
@@ -171,7 +174,9 @@ ColumnLayout {
                     radius: 10
                     // Ten steps of tint: one task is the lightest, ten or more the deepest.
                     color: cell.busy && root.style === "heat" ? Qt.alpha(theme.accent, 0.04 + 0.026 * Math.min(10, cell.busy)) : "transparent"
-                    border.width: cell.filtered ? 1.5 : 0
+                    // The filtered day keeps its 1.5 px ring; a focused one grows
+                    // to the 2 px keyboard ring, so the mouse look is unchanged.
+                    border.width: cell.filtered ? 1.5 : cell.activeFocus ? 2 : 0
                     border.color: theme.accent
                 }
                 // Dots: one per task, up to three; red on past days, whose open
