@@ -905,13 +905,22 @@ void Backend::toggleComplete(qint64 id) {
 }
 
 void Backend::setCompleted(bool done) {
+    const auto ids = targetIds();
     const QDateTime now = QDateTime::currentDateTime();
     m_store->begin(done ? "Mark as Completed" : "Mark as Not Completed");
-    for (auto i : targetIds()) {
+    for (auto i : ids) {
         m_options.keepVisible.insert(i);
         completeTask(m_store->task(i), done, now);
     }
     m_store->commit();
+    if (ids.isEmpty())
+        return;
+    if (ids.size() == 1)
+        emit announce(done ? QStringLiteral("Completed: %1").arg(m_store->task(ids.first()).title)
+                           : QStringLiteral("Reopened: %1").arg(m_store->task(ids.first()).title));
+    else
+        emit announce(done ? QStringLiteral("Completed %1 tasks").arg(ids.size())
+                           : QStringLiteral("Reopened %1 tasks").arg(ids.size()));
 }
 
 void Backend::setPriority(int priority, qint64 id) {

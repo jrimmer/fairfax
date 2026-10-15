@@ -17,6 +17,7 @@
 #include "misckit.h"
 #include "settingskit.h"
 #include "smartkit.h"
+#include "mailkit.h"
 #include "../testregistry.h"
 
 using namespace e2e;
@@ -123,6 +124,58 @@ QQuickItem *focusOn(const QString &name) {
         item->forceActiveFocus(Qt::TabFocusReason);
     return item;
 }
+
+// Captures the announcements a screen reader would hear, and the politeness
+// each arrived with. Qt Quick turns Accessible.announce() into a
+// QAccessibleAnnouncementEvent, the same event a native app posts, so the
+// test sees exactly what Orca would. Only one update handler can be installed
+// at a time, so the current one goes back in the destructor.
+class AnnouncementLog {
+public:
+    struct Entry {
+        QString message;
+        QAccessible::AnnouncementPoliteness politeness;
+    };
+
+    AnnouncementLog() {
+        m_previous = QAccessible::installUpdateHandler(&AnnouncementLog::handle);
+        s_active = this;
+    }
+    ~AnnouncementLog() {
+        QAccessible::installUpdateHandler(m_previous);
+        s_active = nullptr;
+    }
+
+    QList<Entry> entries;
+
+    // The politeness of a captured message that contains `part`, and NoRole
+    // as a sentinel when nothing matched.
+    QAccessible::AnnouncementPoliteness politenessOf(const QString &part) const {
+        for (const Entry &e : entries)
+            if (e.message.contains(part))
+                return e.politeness;
+        return QAccessible::AnnouncementPoliteness::Polite;
+    }
+    bool saw(const QString &part) const {
+        for (const Entry &e : entries)
+            if (e.message.contains(part))
+                return true;
+        return false;
+    }
+
+private:
+    static void handle(QAccessibleEvent *event) {
+        if (!s_active || !event || event->type() != QAccessible::Announcement)
+            return;
+        auto *announcement = dynamic_cast<QAccessibleAnnouncementEvent *>(event);
+        if (announcement)
+            s_active->entries.append({announcement->message(), announcement->politeness()});
+    }
+    QAccessible::UpdateHandler m_previous = nullptr;
+    static AnnouncementLog *s_active;
+};
+
+AnnouncementLog *AnnouncementLog::s_active = nullptr;
 
 
 // Every visible interactive item under `root`, in any window. An item that
@@ -912,6 +965,124 @@ private slots:
         checkState("quick entry");
         quick->close();
         QTRY_VERIFY_WITH_TIMEOUT(windowTitled("Quick Entry") == nullptr, 5000);
+    }
+
+    // ------------------------------------------------------- announcements
+
+    // Completing, reopening and completing a whole selection each say what
+    // happened, with the task's title or the count.
+    void completionAndReopenAreAnnounced() {
+        App app;
+        QVERIFY(app.ok);
+        AnnouncementLog log;
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+
+        // One task, completed and reopened.
+        app.backend().toggleComplete(app.ids.buyMilk);
+        QVERIFY(waitUntil([&] { return log.saw("Completed: Buy milk"); }));
+        QCOMPARE(log.entries.last().politeness, QAccessible::AnnouncementPoliteness::Polite);
+        app.backend().setCompleted(false);
+        QVERIFY(waitUntil([&] { return log.saw("Reopened: Buy milk"); }));
+
+        // Three tasks at once read as a count.
+        QVERIFY(tk::selectRow(app, app.ids.buyMilk));
+        tk::clickWith(app.row(app.ids.electricity), Qt::ControlModifier);
+        tk::clickWith(app.row(app.ids.plants), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 3, 5000);
+        app.backend().toggleComplete();
+        QVERIFY(waitUntil([&] { return log.saw("Completed 3 tasks"); }));
+    }
+
+    // Moving, deleting, copying and pasting name what changed.
+    void moveDeleteCopyAndPasteAreAnnounced() {
+        App app;
+        QVERIFY(app.ok);
+        AnnouncementLog log;
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+
+        app.backend().moveSelectionToList(app.ids.work);
+        QVERIFY(waitUntil([&] { return log.saw("Moved to Work"); }));
+
+        // Back to Home for the delete and paste below. Buy milk has left, so
+        // the shelf stands in for it.
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        QVERIFY(tk::selectRow(app, app.ids.shelf));
+        app.backend().deleteSelection();
+        QVERIFY(waitUntil([&] { return log.saw("Deleted: Fix the shelf"); }));
+
+        // Copy two tasks, then paste them back.
+        QVERIFY(tk::selectRow(app, app.ids.plants));
+        tk::clickWith(app.row(app.ids.electricity), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 2, 5000);
+        app.backend().copySelection();
+        QVERIFY(waitUntil([&] { return log.saw("Copied 2 tasks"); }));
+        app.backend().pasteTasks();
+        QVERIFY(waitUntil([&] { return log.saw("Pasted 2 tasks"); }));
+    }
+
+    // Undo and redo say the action's own name.
+    void undoAndRedoAreAnnounced() {
+        App app;
+        QVERIFY(app.ok);
+        AnnouncementLog log;
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+
+        app.backend().toggleComplete(app.ids.buyMilk);
+        QVERIFY(waitUntil([&] { return app.task(app.ids.buyMilk).completed; }));
+        app.backend().undo();
+        QVERIFY(waitUntil([&] { return log.saw("Undone: Mark as Completed"); }));
+        QVERIFY(!app.task(app.ids.buyMilk).completed);
+        app.backend().redo();
+        QVERIFY(waitUntil([&] { return log.saw("Redone: Mark as Completed"); }));
+        QVERIFY(app.task(app.ids.buyMilk).completed);
+    }
+
+    // A sync that fails is announced assertively, with the provider's reason.
+    void syncFailureIsAnnouncedAssertively() {
+        auto seed = [](Store &store) {
+            // A WebDAV server that will never be reached, so a run fails at once.
+            store.setSetting("webdav.url", "ftp://example.invalid/dav/");
+            store.setSetting("webdav.user", "alice");
+            store.setSetting("sync.auto", false);
+            return seedWorld(store);
+        };
+        App app(seed, QString(), true);
+        QVERIFY(app.ok);
+        QVERIFY(app.services().webDavSync);
+        QVERIFY(app.services().webDavSync->configured());
+        AnnouncementLog log;
+
+        app.services().webDavSync->syncNow();
+        QVERIFY(waitUntil([&] { return log.saw("Sync failed: "); }));
+        for (const auto &e : log.entries)
+            if (e.message.startsWith("Sync failed: "))
+                QCOMPARE(e.politeness, QAccessible::AnnouncementPoliteness::Assertive);
+    }
+
+    // A mail connector error is announced assertively as "Mail: ...".
+    void mailErrorIsAnnouncedAssertively() {
+        FakeImap server;
+        server.add("INBOX", plusMail("One", "m1"));
+        App app;
+        QVERIFY(app.ok);
+        AnnouncementLog log;
+        auto *mail = app.services().mail.get();
+        QVERIFY(mail);
+        mail->setOption("mail.account", "other");
+        mail->setOption("mail.address", "jane@example.org");
+        mail->setOption("mail.host", "127.0.0.1");
+        mail->setOption("mail.port", QString::number(server.port()));
+        mail->setOption("mail.security", "none");
+        mail->setOption("mail.user", "jane");
+        mail->setOption("mail.toFilter", "jane+fairfax@example.org");
+        mail->setPassword("wrong");
+        mail->setOption("mail.enabled", "true");
+
+        mail->fetchNow();
+        QVERIFY(waitUntil([&] { return log.saw("Mail: "); }, 10000));
+        for (const auto &e : log.entries)
+            if (e.message.startsWith("Mail: "))
+                QCOMPARE(e.politeness, QAccessible::AnnouncementPoliteness::Assertive);
     }
 };
 
