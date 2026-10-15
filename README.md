@@ -177,8 +177,8 @@ suggestion says why it is there (starred, starting today, an alert today). The t
 followed by the date and a capacity line such as `6h 30m planned · 5h free` (plus
 `· 3 without a duration` when some tasks have none), red when the plan is over the free
 time left in the work day and amber above 85%. The right pane shows the day's expanded
-timeline; drag a row onto it to block out time, or drag the timeline onto a row on a narrow
-window, where the compact Day Bar moves above the list instead. *Add to today* sets a task's
+timeline; drag a row onto it to block out time, or drop the row on the compact Day Bar on a
+narrow window, where it moves above the list instead. *Add to today* sets a task's
 due date when it has none or one in the past, and its start date when its deadline is later;
 *remove from today* pushes a today date to tomorrow.
 
