@@ -892,7 +892,8 @@ private slots:
         QCOMPARE(backend.sourceKey(), QString("all"));
     }
 
-    // A chosen list opens on it, and one that has been deleted falls back to Today.
+    // A chosen list opens on it, and one that has been deleted or archived
+    // falls back to Today.
     void defaultViewOpensAChosenList() {
         QTemporaryDir dir;
         Store store;
@@ -908,6 +909,35 @@ private slots:
         store.putList(l);
         store.commit();
         QCOMPARE(Backend(&store).sourceKey(), QString("today"));
+
+        // An archived list is not offered by the Settings combo, so the
+        // resolver falls back the same way.
+        Store archived;
+        QVERIFY(archived.open(dir.filePath("a.db")));
+        Backend ensure(&archived);
+        ensure.ensureDefaults();
+        const qint64 other = archived.lists().keys().first();
+        TaskList al = archived.list(other);
+        al.archived = true;
+        archived.begin("archive", false);
+        archived.putList(al);
+        archived.commit();
+        archived.setSetting("ui.defaultView", QStringLiteral("list:%1").arg(other));
+        QCOMPARE(Backend(&archived).sourceKey(), QString("today"));
+    }
+
+    // Remembering My Day while it is off falls back to Today, so the feature
+    // being off leaves the launch as it was before My Day existed.
+    void lastMyDayWithFeatureOffFallsBackToToday() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "last");
+        store.setSetting("ui.source", "myday");
+        store.setSetting("myday.enabled", false);
+        Backend backend(&store);
+        QCOMPARE(backend.sourceKey(), QString("today"));
+        QVERIFY(!backend.sourceIsMyDay());
     }
 
     void exactMatchMeansWholeWords() {
