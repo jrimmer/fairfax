@@ -113,7 +113,7 @@ Rectangle {
         TextField {
             id: search
             objectName: "tagSearch"
-            visible: root.searchActive && root.tab === 0
+            visible: root.searchActive && root.tab === 0 && !backend.sourceIsMyDay
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 12

@@ -219,12 +219,14 @@ Item {
             FocusButton {}
             IconButton {
                 objectName: "sortReverse"
+                visible: !backend.sourceIsMyDay
                 icon: backend.sortAscending ? "arrowDown" : "arrowUp"
                 size: 15
                 tip: "Reverse Sort"
                 onClicked: backend.toggleSortDirection()
             }
-            SortButton {}
+            // My Day has its own section order, so it offers no sort control.
+            Loader { active: !backend.sourceIsMyDay; sourceComponent: SortButton {} }
         }
 
         // A Smart List shows its saved search, editable in place; a typed

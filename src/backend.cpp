@@ -4029,6 +4029,10 @@ void Backend::setSetting(const QString &key, const QVariant &value) {
     rebuild();
     emit settingsChanged();
     emit viewChanged();
+    // A setting can change what the Default view combo offers (My Day on or
+    // off) and the My Day capacity window, so tell the panes as well.
+    emit dataChanged();
+    emit myDayChanged();
 }
 
 // -------------------------------------------------------------- shortcuts
@@ -4595,8 +4599,33 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
 
 void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
     // My Day's own sections, as rows the shared TaskRow draws. Each capped
-    // section ends in a row that expands it for this session.
-    const MyDay::Sections day = MyDay::sections(*m_store, QDateTime::currentDateTime());
+    // section ends in a row that expands it for this session. A typed search
+    // filters every section, the same query language the lists use.
+    const QDateTime now = QDateTime::currentDateTime();
+    MyDay::Sections day = MyDay::sections(*m_store, now);
+    const Query search = Query::parse(m_options.search);
+    if (!search.isEmpty()) {
+        QueryContext context;
+        context.store = m_store;
+        context.now = now;
+        context.settings = scheduleSettings();
+        context.soundex = m_options.soundex;
+        context.rangeFrom = m_options.dayFilterFrom;
+        context.rangeTo = m_options.dayFilterTo.isValid() ? m_options.dayFilterTo : m_options.dayFilterFrom;
+        context.isPaused = [&views](const Task &t) { return views.isPaused(t); };
+        auto matches = [&](const QVector<MyDay::Entry> &in) {
+            QVector<MyDay::Entry> out;
+            for (const MyDay::Entry &e : in) {
+                const Task t = m_store->task(e.taskId);
+                if (t.id && search.matches(t, context))
+                    out.append(e);
+            }
+            return out;
+        };
+        day.overdue = matches(day.overdue);
+        day.today = matches(day.today);
+        day.suggestions = matches(day.suggestions);
+    }
     QVector<QVariantMap> rows;
     QVector<qint64> order;
 

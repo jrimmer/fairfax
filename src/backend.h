@@ -197,9 +197,6 @@ public:
     Q_INVOKABLE void setDayRange(const QString &fromIso, const QString &toIso);
     Q_INVOKABLE QVariantList monthDays(int year, int month) const;
 
-    // Which view a fresh launch opens: the stored ui.defaultView choice,
-    // resolved against the lists that still exist. Falls back to Today.
-
     // Selection and editing.
     Q_INVOKABLE void selectTask(qint64 id, int mode = 0);  // 0 replace, 1 extend range, 2 toggle.
     Q_INVOKABLE void moveCursor(int delta, bool extend = false);
