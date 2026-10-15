@@ -168,6 +168,10 @@ const QHash<QString, QString> &exemptions() {
         {"Space", "E2EMiscKeys:spaceOpensQuickLook"},
         {"Ctrl+S", "E2EMiscKeys:ctrlSSyncsNow"},
         {"Ctrl+Shift+P", "test_myday.cpp:itemAndShortcutOpenMyDayAndAnotherLeaves"},
+        {"a", "test_myday.cpp:planKeysDoNothingOutsideMyDay"},
+        {"b", "test_myday.cpp:planKeysDoNothingOutsideMyDay"},
+        {"h", "test_myday.cpp:planKeysDoNothingOutsideMyDay"},
+        {"r", "test_myday.cpp:planKeysDoNothingOutsideMyDay"},
         {"+", "E2EMiscKeys:plusRaisesPriorityLikeEquals"},
     };
     return map;

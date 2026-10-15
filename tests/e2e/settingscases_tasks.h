@@ -360,7 +360,8 @@ inline void addTaskCases(QVector<SettingCase> &v) {
         }
         {
             K c{"myday.prompt", "Tasks", "setting:myday.prompt", K::Check, false};
-            // The once-a-day prompt itself is a later slice; the switch persists.
+            // The once-a-day prompt is driven by E2EMyDay::promptIsAskedOnceADay.
+            c.slot = "E2EMyDay::promptIsAskedOnceADay";
             v << c;
         }
 }

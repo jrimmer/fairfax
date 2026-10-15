@@ -6,9 +6,11 @@
 
 #include <QFile>
 
+#include "automation.h"
 #include "misckit.h"
 #include "settingskit.h"
 #include "../testregistry.h"
+#include "myday.h"
 
 using namespace e2e;
 using namespace e2e::mk;
@@ -90,6 +92,88 @@ Seed seedMyDayOff(Store &store) {
     return s;
 }
 
+// The prompt on, and no day planned yet: the first launch of the day asks.
+// The launch view is Today so the test can tell the prompt's answer apart from
+// a fresh database's My Day default.
+Seed seedMyDayPromptOn(Store &store) {
+    Seed s = seedMyDay(store);
+    store.setSetting("myday.prompt", true);
+    store.setSetting("myday.lastPlanned", QString());
+    store.setSetting("ui.defaultView", "today");
+    return s;
+}
+
+// The prompt on, but today is already marked planned: it stays quiet.
+Seed seedMyDayPromptPlanned(Store &store) {
+    Seed s = seedMyDayPromptOn(store);
+    store.setSetting("myday.lastPlanned", QDate::currentDate().toString(Qt::ISODate));
+    return s;
+}
+
+// A few dated tasks for the plan keys: two suggestions (starred, and one due
+// in two days) and one already due today.
+struct PlanWorld {
+    qint64 suggestionStar = 0, suggestionLater = 0, alreadyToday = 0;
+};
+PlanWorld &planWorld() {
+    static PlanWorld w;
+    return w;
+}
+Seed seedPlanKeys(Store &store) {
+    const Seed s = seedWorld(store);
+    const QDate today = QDate::currentDate();
+    PlanWorld w;
+    store.begin("Seed plan keys", false);
+    auto task = [&](const QString &title, const std::function<void(Task &)> &fn) {
+        Task t;
+        t.id = store.nextId("tasks");
+        t.listId = s.home;
+        t.title = title;
+        t.order = t.id;
+        fn(t);
+        store.putTask(t);
+        return t.id;
+    };
+    w.suggestionStar = task("Starred suggestion", [](Task &t) { t.starred = true; });
+    w.suggestionLater = task("Due in two days", [&](Task &t) { t.dueDate = today.addDays(2); });
+    w.alreadyToday = task("Already today", [&](Task &t) { t.dueDate = today; });
+    store.commit();
+    planWorld() = w;
+    return s;
+}
+
+// Three undated, unstarred tasks with known durations for the B key.
+struct BlockWorld {
+    qint64 first = 0, second = 0, third = 0;
+};
+BlockWorld &blockWorld() {
+    static BlockWorld w;
+    return w;
+}
+Seed seedBlockKeys(Store &store) {
+    const Seed s = seedWorld(store);
+    BlockWorld w;
+    const QDate today = QDate::currentDate();
+    store.begin("Seed block keys", false);
+    auto task = [&](const QString &title, int duration) {
+        Task t;
+        t.id = store.nextId("tasks");
+        t.listId = s.home;
+        t.title = title;
+        t.duration = duration;
+        t.dueDate = today;   // Already today, so it is on screen to be selected.
+        t.order = t.id;
+        store.putTask(t);
+        return t.id;
+    };
+    w.first = task("Block one", 60);
+    w.second = task("Block two", 45);
+    w.third = task("Block three", 0);   // No duration: B gives it 30 minutes.
+    store.commit();
+    blockWorld() = w;
+    return s;
+}
+
 // An .ics with one event today, 10:00-11:00, as the calendar e2e tests write.
 QString writeCalendar(const QString &dir, const QString &name = "myday.ics", int endHour = 11) {
     const QString path = dir + "/" + name;
@@ -105,6 +189,13 @@ QString writeCalendar(const QString &dir, const QString &name = "myday.ics", int
     f.write(text.toUtf8());
     return path;
 }
+
+// Pins My Day's clock for the life of a test, as the calendar tests pin
+// theirs, so "today" and the work-day window do not move under the test.
+struct ClockPin {
+    explicit ClockPin(const QDateTime &at) { MyDay::setClock([at] { return at; }); }
+    ~ClockPin() { MyDay::setClock({}); }
+};
 
 // The joined text under the capacity RowLayout.
 QString capacityText() {
@@ -348,6 +439,8 @@ private slots:
     // duration, using a local .ics the way the calendar tests do.
     void capacityLineCountsTheDay() {
         QTemporaryDir dir;
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedMyDay);
         QVERIFY(app.ok);
         const QString path = writeCalendar(dir.path());
@@ -376,6 +469,8 @@ private slots:
     // event appears and the free time shrinks without leaving My Day.
     void capacityFollowsCalendarRefresh() {
         QTemporaryDir dir;
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedMyDay);
         QVERIFY(app.ok);
         QVERIFY(!writeCalendar(dir.path(), "one.ics").isEmpty());
@@ -453,6 +548,8 @@ private slots:
     // today with a due time and the drop's duration.
     void dropOnTimelineTimeBlocks() {
         QTemporaryDir dir;
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(8, 0)));
         App app(seedMyDay);
         QVERIFY(app.ok);
         const QString path = writeCalendar(dir.path());
@@ -503,6 +600,8 @@ private slots:
     // for a store change or the minute timer.
     void capacityFollowsAWorkWindowSettingChange() {
         QTemporaryDir dir;
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedMyDay);
         QVERIFY(app.ok);
         QVERIFY(!writeCalendar(dir.path()).isEmpty());
@@ -548,6 +647,233 @@ private slots:
         // Leaving My Day brings them back.
         QVERIFY(app.openSource("all"));
         QVERIFY(tk::waitItem("sortButton"));
+    }
+
+    // A moves a suggestion to Already today. A task whose deadline is later
+    // keeps it and gains start = today instead.
+    void addKeyMovesASuggestionToToday() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedPlanKeys);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        const PlanWorld &w = planWorld();
+        revealTaskInList(app, w.suggestionStar);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(w.suggestionStar) != nullptr, 5000);
+        QVERIFY(tk::selectRow(app, w.suggestionStar));
+        app.press(Qt::Key_A);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(w.suggestionStar).dueDate, today, 5000);
+        // It is now in Already today, with no reason chip.
+        QTRY_COMPARE_WITH_TIMEOUT(reasonOf(w.suggestionStar), QString(), 5000);
+
+        // The later-deadline task keeps its deadline and starts today.
+        revealTaskInList(app, w.suggestionLater);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(w.suggestionLater) != nullptr, 5000);
+        QVERIFY(tk::selectRow(app, w.suggestionLater));
+        app.press(Qt::Key_A);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(w.suggestionLater).startDate, today, 5000);
+        QCOMPARE(app.task(w.suggestionLater).dueDate, today.addDays(2));
+
+        // Ctrl+Z undoes each, last change first.
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(w.suggestionLater).startDate.isValid(), 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(w.suggestionStar).dueDate != today, 5000);
+    }
+
+    // B blocks three selected tasks into consecutive free slots around a
+    // seeded calendar event; a task with no duration gets 30 minutes.
+    void blockKeyPacksThreeTasksIntoConsecutiveSlots() {
+        QTemporaryDir dir;
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedBlockKeys);
+        QVERIFY(app.ok);
+        const QString path = writeCalendar(dir.path());
+        QVERIFY(!path.isEmpty());
+        app.services().calendar.setClock([today] { return QDateTime(today, QTime(9, 0)); });
+        app.services().calendar.setSources({path});
+        QVERIFY(app.openSource("myday"));
+        const BlockWorld &w = blockWorld();
+        // Select all three in order: one, two, three.
+        revealTaskInList(app, w.first);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(w.first) != nullptr, 5000);
+        QVERIFY(tk::selectRow(app, w.first));
+        tk::clickWith(app.row(w.second), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 2, 5000);
+        tk::clickWith(app.row(w.third), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 3, 5000);
+        app.press(Qt::Key_B);
+        // The 60-minute block fills 9:00-10:00 (the event is 10:00-11:00), the
+        // 45-minute one starts at 11:00, and the 30-minute default at 11:45:
+        // each task goes into the next free slot, in selection order.
+        auto blocked = [&](qint64 id) { return app.task(id).dueTime >= 0 && app.task(id).dueDate == today; };
+        QTRY_VERIFY_WITH_TIMEOUT(blocked(w.first), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(blocked(w.second), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(blocked(w.third), 5000);
+        QCOMPARE(app.task(w.first).dueTime, 10 * 60);
+        QCOMPARE(app.task(w.first).duration, 60);
+        QCOMPARE(app.task(w.second).dueTime, 11 * 60 + 45);
+        QCOMPARE(app.task(w.second).duration, 45);
+        QCOMPARE(app.task(w.third).duration, 30);
+        QCOMPARE(app.task(w.third).dueTime, 12 * 60 + 15);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!blocked(w.third), 5000);
+    }
+
+    // R moves a today task to tomorrow, and says so in the status line.
+    void removeKeyPushesTodayToTomorrow() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedPlanKeys);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        const qint64 id = planWorld().alreadyToday;
+        revealTaskInList(app, id);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        QVERIFY(tk::selectRow(app, id));
+        app.press(Qt::Key_R);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().statusMessage(), QString("Moved to tomorrow"), 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+    }
+
+    // H hides a suggestion for today; the next date brings it back.
+    void hideKeyHidesForTodayOnly() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedPlanKeys);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        const qint64 id = planWorld().suggestionStar;
+        revealTaskInList(app, id);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        QVERIFY(tk::selectRow(app, id));
+        app.press(Qt::Key_H);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+
+        // Hide again, then move the pinned clock to tomorrow: it is back.
+        QVERIFY(tk::selectRow(app, id));
+        app.press(Qt::Key_H);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
+        MyDay::setClock([today] { return QDateTime(today.addDays(1), QTime(9, 0)); });
+        app.backend().selectSource("today");
+        app.backend().selectSource("myday");
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+    }
+
+    // The plan keys do nothing outside My Day: A, B, R and H leave a list alone.
+    void planKeysDoNothingOutsideMyDay() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedPlanKeys);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        const qint64 id = planWorld().suggestionStar;
+        QVERIFY(tk::selectRow(app, id));
+        const Task before = app.task(id);
+        for (Qt::Key k : {Qt::Key_A, Qt::Key_B, Qt::Key_R, Qt::Key_H}) {
+            app.press(k);
+            QTest::qWait(50);
+            const Task after = app.task(id);
+            QCOMPARE(after.dueDate, before.dueDate);
+            QCOMPARE(after.startDate, before.startDate);
+            QCOMPARE(after.dueTime, before.dueTime);
+            QCOMPARE(after.duration, before.duration);
+            QVERIFY(app.row(id) != nullptr);
+        }
+        QVERIFY(app.store().setting("myday.hidden").toString().isEmpty());
+    }
+
+    // The prompt shows once on the first show of the day when it is enabled.
+    // Esc and Return both mark the day planned; Return opens plan mode.
+    void promptIsAskedOnceADay() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        Session s;
+        s.seed = seedMyDayPromptOn;
+        s.lastView = false;
+        QVERIFY(s.start());
+        App &app = *s;
+        QObject *prompt = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((prompt = findObject("myDayPrompt")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(prompt->property("visible").toBool(), 5000);
+        // Return opens My Day and marks the day planned.
+        QTest::keyClick(app.window, Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(!prompt->property("visible").toBool(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("myday"), 5000);
+        QCOMPARE(MyDay::lastPlanned(app.store()), today);
+
+        // A relaunch the same day is quiet.
+        QVERIFY(s.restart());
+        QVERIFY(findObject("myDayPrompt") != nullptr);
+        QTest::qWait(300);
+        QVERIFY(!findObject("myDayPrompt")->property("visible").toBool());
+    }
+
+    // Esc declines the prompt and still marks the day planned, without opening
+    // My Day. With the setting off, or the day already planned, it never asks.
+    void promptEscapeAndTheOffCases() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        {
+            Session s;
+            s.seed = seedMyDayPromptOn;
+            s.lastView = false;
+            QVERIFY(s.start());
+            App &app = *s;
+            QObject *prompt = nullptr;
+            QTRY_VERIFY_WITH_TIMEOUT((prompt = findObject("myDayPrompt")) != nullptr, 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(prompt->property("visible").toBool(), 5000);
+            const QString before = app.backend().sourceKey();
+            QTest::keyClick(app.window, Qt::Key_Escape);
+            QTRY_VERIFY_WITH_TIMEOUT(!prompt->property("visible").toBool(), 5000);
+            QCOMPARE(MyDay::lastPlanned(app.store()), today);
+            QCOMPARE(app.backend().sourceKey(), before);
+            QVERIFY(!app.backend().sourceIsMyDay());
+        }
+        {
+            // Prompt off: never shown.
+            Session s;
+            s.seed = [](Store &st) {
+                Seed ids = seedMyDay(st);
+                st.setSetting("myday.prompt", false);
+                return ids;
+            };
+            s.lastView = false;
+            QVERIFY(s.start());
+            QVERIFY(findObject("myDayPrompt") != nullptr);
+            QTest::qWait(300);
+            QVERIFY(!findObject("myDayPrompt")->property("visible").toBool());
+            QVERIFY(!MyDay::lastPlanned(s->store()).isValid());
+        }
+        {
+            // Already planned today: never shown.
+            Session s;
+            s.seed = seedMyDayPromptPlanned;
+            s.lastView = false;
+            QVERIFY(s.start());
+            QVERIFY(findObject("myDayPrompt") != nullptr);
+            QTest::qWait(300);
+            QVERIFY(!findObject("myDayPrompt")->property("visible").toBool());
+        }
+    }
+
+    // `fairfax ctl myday` opens a running window in My Day mode; the automation
+    // command behind it selects the source.
+    void ctlMyDayOpensMyDayMode() {
+        App app(seedMyDay);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("all"));
+        QStringList keys;
+        Automation automation(app.store());
+        automation.selectSource = [&](const QString &k) { keys << k; };
+        QVERIFY(automation.run("myday", {})["ok"].toBool());
+        QCOMPARE(keys, QStringList{"myday"});
+        QVERIFY(Automation::commandNames().contains("myday"));
     }
 };
 

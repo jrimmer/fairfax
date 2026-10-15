@@ -143,6 +143,10 @@ ApplicationWindow {
             wrapMode: Text.Wrap
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
+        // Return opens My Day and Escape declines, whatever activation the
+        // platform gives a dialog button. Enabled only while the prompt is up.
+        Shortcut { sequences: ["Return", "Enter"]; enabled: myDayPrompt.visible; onActivated: myDayPrompt.accept() }
+        Shortcut { sequences: ["Escape"]; enabled: myDayPrompt.visible; onActivated: myDayPrompt.reject() }
         Component.onCompleted: {
             standardButton(Dialog.Ok).text = "Open My Day"
             standardButton(Dialog.Cancel).text = "Not today"
