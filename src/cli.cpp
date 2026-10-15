@@ -6,6 +6,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QLocalSocket>
 #include <QProcess>
 #include <cstdio>
 #if defined(Q_OS_WIN)
@@ -34,6 +35,27 @@ bool isShorthandName(const QString &argv0, bool windowsStyle) {
         return info.fileName() == QLatin1String("frfx");  // No extension on Unix.
     // Windows: `frfx` or `frfx.exe`, in any letter case.
     return info.completeBaseName().compare(QLatin1String("frfx"), Qt::CaseInsensitive) == 0;
+}
+
+QString socketName(const QString &dbPath) {
+    // One instance per user and database, matching main()'s own socket. An
+    // empty path means the default database, which carries no hash.
+    const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME", "user"));
+    const QString key = dbPath.isEmpty() ? QStringLiteral("default") : dbPath;
+    return QStringLiteral("fairfax-%1").arg(user) + "-" + QString::number(qHash(key));
+}
+
+bool sendToRunning(const QString &dbPath, const QString &request, QString *error) {
+    QLocalSocket client;
+    client.connectToServer(socketName(dbPath));
+    if (!client.waitForConnected(300)) {
+        if (error)
+            *error = QStringLiteral("Fairfax isn't running; open it first.");
+        return false;
+    }
+    client.write(request.toUtf8());
+    client.waitForBytesWritten(300);
+    return true;
 }
 
 }  // namespace Cli

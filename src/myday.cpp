@@ -135,6 +135,21 @@ QList<QPair<int, int>> busyIntervals(const Store &store, const CalendarFeed &cal
 
 namespace MyDay {
 
+namespace {
+
+std::function<QDateTime()> &clockFn() {
+    static std::function<QDateTime()> fn = [] { return QDateTime::currentDateTime(); };
+    return fn;
+}
+
+}  // namespace
+
+QDateTime now() { return clockFn()(); }
+
+void setClock(std::function<QDateTime()> clock) {
+    clockFn() = clock ? std::move(clock) : [] { return QDateTime::currentDateTime(); };
+}
+
 QDate lastPlanned(const Store &store) {
     return QDate::fromString(store.setting("myday.lastPlanned").toString(), Qt::ISODate);
 }
@@ -245,7 +260,7 @@ Capacity capacity(const Store &store, const CalendarFeed &calendar, const QDateT
 void addToToday(Store &store, const QList<qint64> &ids) {
     if (ids.isEmpty())
         return;
-    const QDate today = QDate::currentDate();
+    const QDate today = now().date();
     store.begin(QStringLiteral("Add to My Day"));
     for (qint64 id : ids) {
         if (!store.tasks().contains(id))
@@ -267,7 +282,7 @@ void addToToday(Store &store, const QList<qint64> &ids) {
 void removeFromToday(Store &store, const QList<qint64> &ids) {
     if (ids.isEmpty())
         return;
-    const QDate today = QDate::currentDate(), tomorrow = today.addDays(1);
+    const QDate today = now().date(), tomorrow = today.addDays(1);
     store.begin(QStringLiteral("Remove from My Day"));
     for (qint64 id : ids) {
         if (!store.tasks().contains(id))
@@ -288,7 +303,7 @@ void removeFromToday(Store &store, const QList<qint64> &ids) {
 void hideForToday(Store &store, const QList<qint64> &ids) {
     if (ids.isEmpty())
         return;
-    const QDate today = QDate::currentDate();
+    const QDate today = now().date();
     QSet<QString> hidden = hiddenUids(store, today);
     for (qint64 id : ids) {
         const Task t = store.task(id);

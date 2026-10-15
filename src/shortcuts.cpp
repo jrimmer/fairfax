@@ -84,6 +84,12 @@ QList<Command> buildCommands() {
     add("list.quit", "Task list (bare keys)", "Quit", {"Q"}, Context::List);
     add("list.revealNames", "Task list (bare keys)", "Reveal list names (hold)", {"Alt"}, Context::List, true);
 
+    // ---- My Day (plan mode; the bare keys act only while My Day is open)
+    add("myday.add", "My Day", "Add to My Day", {"A"}, Context::List);
+    add("myday.block", "My Day", "Block out time", {"B"}, Context::List);
+    add("myday.remove", "My Day", "Remove from My Day", {"R"}, Context::List);
+    add("myday.hide", "My Day", "Hide for today", {"H"}, Context::List);
+
     // ---- New & edit
     add("task.new", "New & edit", "New task", {"Ctrl+N"});
     add("task.newProject", "New & edit", "New project", {"Ctrl+Alt+N"});

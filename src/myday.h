@@ -12,11 +12,18 @@
 #include <QList>
 #include <QString>
 #include <QVector>
+#include <functional>
 
 class Store;
 class CalendarFeed;
 
 namespace MyDay {
+
+// The clock My Day reads. It is the wall clock unless a test replaces it,
+// exactly as CalendarFeed does for the day bar, so a whole day's planning can
+// be exercised against a fixed instant.
+QDateTime now();
+void setClock(std::function<QDateTime()> clock);
 
 // One task in one section, with the short reason the row shows (empty for
 // Already today).

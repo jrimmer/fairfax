@@ -1440,6 +1440,14 @@ struct Automation::Impl {
         return QJsonObject{{"selected", true}, {"collection_id", "focus:" + focus}};
     }
 
+    QJsonObject openMyDay(const QJsonObject &args) {
+        needSelect();
+        if (!s.setting("myday.enabled", true).toBool())
+            fail("invalid_arguments", "My Day is switched off.");
+        a.selectSource("myday");
+        return QJsonObject{{"selected", true}, {"source", "myday"}};
+    }
+
     QJsonObject openTaskCmd(const QJsonObject &args) {
         const Task t = findTask(args["task_id"]);
         if (!a.openTask)
@@ -1546,6 +1554,7 @@ const QList<Command> &commands() {
         c << Command{"select_list_group", "Show a list group in the Fairfax window.", {{"list_group_id", str("List group id.")}}, {"list_group_id"}, &I::selectListGroup};
         c << Command{"select_smart_list", "Show a Smart List in the Fairfax window.", {{"smart_list_id", str("Smart List id.")}}, {"smart_list_id"}, &I::selectSmartList};
         c << Command{"select_focus", "Show a focus list in the Fairfax window.", {{"focus", enumStr("Focus list.", kFocusNames)}}, {"focus"}, &I::selectFocus};
+        c << Command{"myday", "Open My Day in the Fairfax window.", {}, {}, &I::openMyDay};
         c << Command{"open_task", "Open a task in the Fairfax window.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::openTaskCmd};
         return c;
     }();
@@ -1792,6 +1801,11 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
 
     if (action == "showall") return showSource("all");
     if (action == "showtoday") return showSource("today");
+    if (action == "showmyday") {
+        if (!s.setting("myday.enabled", true).toBool())
+            fail("invalid_arguments", "My Day is switched off.");
+        return showSource("myday");
+    }
     if (action == "showstarred") return showSource("starred");
     if (action == "showscheduled") return showSource("scheduled");
     if (action == "launch") return finish({});

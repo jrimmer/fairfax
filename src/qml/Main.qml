@@ -105,8 +105,7 @@ ApplicationWindow {
     }
 
     // Selecting Done with 500+ completed tasks and auto-delete off asks once
-    // whether to open the setting, as the reference app does.
-    Connections {
+    // whether to open the setting, as the reference app does.    Connections {
         target: backend
         function onDoneWarningRequested() { if (win.active) doneWarning.open() }
     }
@@ -125,6 +124,45 @@ ApplicationWindow {
         onClosed: win.focusList()
     }
     ExportDialog { id: exportDialog; objectName: "exportDialog"; owner: "main" }
+
+    // The once-a-day offer to plan, shown the first time the window appears
+    // that day. Both answers mark the day planned (backend.myDayPromptAnswered),
+    // so it is asked once; Return opens My Day, Esc declines. With the window
+    // starting hidden in the tray nothing pops up until it is shown.
+    ThemedDialog {
+        id: myDayPrompt
+        objectName: "myDayPrompt"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(420, parent.width - 40)
+        title: "Plan your day?"
+        Label {
+            text: "My Day gathers what is overdue, what is already due today and what suits the day.\nOpen My Day to plan it, or leave it for now."
+            wrapMode: Text.Wrap
+        }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Component.onCompleted: {
+            standardButton(Dialog.Ok).text = "Open My Day"
+            standardButton(Dialog.Cancel).text = "Not today"
+        }
+        onAccepted: backend.myDayPromptAnswered(true)
+        onRejected: backend.myDayPromptAnswered(false)
+        onClosed: win.focusList()
+    }
+    // When the day rolls over while the app stays open, the next time the
+    // window is shown (or the minute timer ticks with it visible) asks again.
+    function maybePlanMyDay() {
+        if (!win.visible || startHidden) return
+        if (!backend.myDayPromptDue()) return
+        if (myDayPrompt.visible) return
+        myDayPrompt.open()
+    }
+    onVisibleChanged: if (visible) maybePlanMyDay()
+    Connections {
+        target: backend
+        function onClockChanged() { win.maybePlanMyDay() }
+    }
 
     // Files picked for a task's attachments.
     Connections {

@@ -557,6 +557,21 @@ public:
     Q_INVOKABLE void myDayBlockNext(qint64 id);
     // Expands the capped Overdue or Suggestions section of My Day.
     Q_INVOKABLE void myDayExpand(const QString &section);
+    // Plan-mode keys: the list's selected tasks as a plain id list, and the
+    // four bare-key actions A, B, R and H. They act only while My Day is on
+    // screen; elsewhere they do nothing.
+    Q_INVOKABLE QVariantList selectedTaskIds() const;
+    Q_INVOKABLE void myDayAddSelection();
+    Q_INVOKABLE void myDayBlockSelection();
+    Q_INVOKABLE void myDayRemoveSelection();
+    Q_INVOKABLE void myDayHideSelection();
+    // Called when My Day is opened by any route: marks today as planned so the
+    // once-a-day prompt does not ask again.
+    void markMyDayPlanned();
+    // The first launch of the day: true when the prompt should be offered on
+    // the next window show.
+    Q_INVOKABLE bool myDayPromptDue() const;
+    Q_INVOKABLE void myDayPromptAnswered(bool planned);
 
     // Alerts beyond the presets.
     Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);
@@ -626,6 +641,8 @@ private:
     double nextOrder(qint64 listId, qint64 parentId) const;
     void setStatus(const QString &message);
     void applyParsed(Task &task, const ParsedEntry &parsed);
+    // Moves the selection into My Day's first free slot, one task at a time.
+    void blockSelectionNext();
     QStringList listNames() const;
     QStringList locationNames() const;
     QString focusSettingKey() const { return "focus." + m_source.key(); }

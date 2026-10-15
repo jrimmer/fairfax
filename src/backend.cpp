@@ -362,6 +362,9 @@ void Backend::selectSource(const QString &key) {
     else
         m_inheritFrom = 0;
     m_source = next;
+    // Opening My Day by any route also settles the day's prompt.
+    if (next.kind == Source::MyDay)
+        markMyDayPlanned();
     if (next.kind == Source::Done && doneWarningDue()) {
         m_store->setSetting("lists.doneWarned", true);
         emit doneWarningRequested();
@@ -3354,7 +3357,7 @@ void Backend::myDayExpand(const QString &section) {
 }
 
 QVariantMap Backend::myDaySections() const {
-    const MyDay::Sections day = MyDay::sections(*m_store, QDateTime::currentDateTime());
+    const MyDay::Sections day = MyDay::sections(*m_store, MyDay::now());
     QVariantMap out;
     out["overdue"] = entryList(day.overdue);
     out["today"] = entryList(day.today);
@@ -3381,7 +3384,7 @@ QVariantMap Backend::myDayCapacity() const {
     // same answer as one with no events, without a live object.
     CalendarFeed emptyFeed;
     const CalendarFeed &feed = m_calendar ? *m_calendar : emptyFeed;
-    const MyDay::Capacity c = MyDay::capacity(*m_store, feed, QDateTime::currentDateTime());
+    const MyDay::Capacity c = MyDay::capacity(*m_store, feed, MyDay::now());
     return {{"plannedMinutes", c.plannedMinutes}, {"withoutDuration", c.withoutDuration},
             {"blockedMinutes", c.blockedMinutes}, {"freeMinutes", c.freeMinutes}, {"windowMinutes", c.windowMinutes}};
 }
@@ -3407,7 +3410,7 @@ void Backend::myDayBlockNext(qint64 id) {
         return;
     CalendarFeed emptyFeed;
     const CalendarFeed &feed = m_calendar ? *m_calendar : emptyFeed;
-    const QDateTime now = QDateTime::currentDateTime();
+    const QDateTime now = MyDay::now();
     // A task with no duration gets a 30-minute default. timeBlock sets the
     // duration itself, so this and the block are one undoable change.
     const int duration = t.duration > 0 ? t.duration : 30;
@@ -3422,6 +3425,53 @@ void Backend::myDayBlockNext(qint64 id) {
     timeBlock(now.date().toString(Qt::ISODate), slot, duration);
     m_options.keepVisible.insert(id);
     emit myDayChanged();
+}
+
+QVariantList Backend::selectedTaskIds() const {
+    QVariantList out;
+    for (qint64 id : targetIds())
+        out << id;
+    return out;
+}
+
+void Backend::myDayAddSelection() { myDayAdd(selectedTaskIds()); }
+
+void Backend::myDayBlockSelection() {
+    // Each task goes into the next free slot, so the blocks come out
+    // consecutively: the one before is busy by the time the next is placed.
+    // myDayBlockNext selects the task it blocks, so put the selection back at
+    // the end.
+    const QVector<qint64> ids = targetIds();
+    for (qint64 id : ids)
+        myDayBlockNext(id);
+    if (!ids.isEmpty()) {
+        m_selected = ids;
+        rebuild();
+        emit selectionChanged();
+    }
+}
+
+void Backend::myDayRemoveSelection() {
+    myDayRemove(selectedTaskIds());
+    setStatus(QStringLiteral("Moved to tomorrow"));
+}
+
+void Backend::myDayHideSelection() { myDayHide(selectedTaskIds()); }
+
+void Backend::markMyDayPlanned() { MyDay::markPlanned(*m_store, MyDay::now().date()); }
+
+bool Backend::myDayPromptDue() const {
+    if (!m_store->setting("myday.enabled", true).toBool())
+        return false;
+    if (!m_store->setting("myday.prompt", false).toBool())
+        return false;
+    return MyDay::lastPlanned(*m_store) != MyDay::now().date();
+}
+
+void Backend::myDayPromptAnswered(bool planned) {
+    markMyDayPlanned();
+    if (planned && !sourceIsMyDay())
+        selectSource("myday");
 }
 
 void Backend::addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes) {
@@ -4601,7 +4651,7 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
     // My Day's own sections, as rows the shared TaskRow draws. Each capped
     // section ends in a row that expands it for this session. A typed search
     // filters every section, the same query language the lists use.
-    const QDateTime now = QDateTime::currentDateTime();
+    const QDateTime now = MyDay::now();
     MyDay::Sections day = MyDay::sections(*m_store, now);
     const Query search = Query::parse(m_options.search);
     if (!search.isEmpty()) {

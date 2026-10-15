@@ -313,6 +313,17 @@ int runHeadless(int argc, char *argv[]) {
         return 0;
     }
     Automation automation(store);
+    if (mode == "myday") {
+        // Open the running window in My Day mode, as the sidebar item and
+        // Ctrl+Shift+P do. Without an instance there is nowhere to show it.
+        QString sendError;
+        if (!Cli::sendToRunning(dbPath, "myday\n", &sendError)) {
+            err << "fairfax ctl myday: " << sendError << Qt::endl;
+            return 1;
+        }
+        out << "Opening My Day." << Qt::endl;
+        return 0;
+    }
     int status = 0;
     if (mode == "mcp") {
         McpServer server(automation, "0.1.0");
@@ -571,7 +582,10 @@ int main(int argc, char *argv[]) {
                     }
                     if (request == "quick")
                         backend.requestQuickEntry();
-                    else if (request.startsWith("url "))
+                    else if (request == "myday") {
+                        backend.selectSource("myday");
+                        backend.requestWindow();
+                    } else if (request.startsWith("url "))
                         handleUrl(QString::fromUtf8(request.mid(4)));
                     else if (request == "open")
                         backend.requestPanel("open");

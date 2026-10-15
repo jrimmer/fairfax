@@ -9,6 +9,7 @@
 //   frfx find dentist                     search everything (the reference app syntax works)
 //   frfx open                             bring up the app
 //   fairfax import-mail [FILE.eml …]      tasks from emails (see mailtask.h)
+//   fairfax ctl myday                     open My Day in the running window
 //
 // Changes land in the database the app uses; an open window shows them
 // within a couple of seconds.
@@ -40,5 +41,15 @@ constexpr bool kWindowsNames = false;
 #endif
 bool isShorthandName(const QString &argv0, bool windowsStyle = kWindowsNames);
 int shorthand(Store &store, const QStringList &args, QTextStream &out, QTextStream &err);
+
+// The local socket the running window listens on, one per user and database.
+// An empty `dbPath` means the default database; main() hashes the --db path it
+// was given, and ctl resolves the same path through databasePath().
+QString socketName(const QString &dbPath);
+
+// Sends one request to the running window ("myday", "show", "open", …).
+// Returns false with `error` set when no instance is listening, so a headless
+// `fairfax ctl myday` can say so instead of doing nothing.
+bool sendToRunning(const QString &dbPath, const QString &request, QString *error = nullptr);
 
 }  // namespace Cli

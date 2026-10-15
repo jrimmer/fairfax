@@ -557,6 +557,12 @@ Item {
         case "list.tagSearch": root.tagSearch(); return true
         case "list.overlay": root.help(); return true
         case "list.quit": Qt.quit(); return true
+        // My Day's plan keys act only while the My Day screen is open; in an
+        // ordinary list they keep doing nothing.
+        case "myday.add": if (backend.sourceIsMyDay) backend.myDayAddSelection(); return backend.sourceIsMyDay
+        case "myday.block": if (backend.sourceIsMyDay) backend.myDayBlockSelection(); return backend.sourceIsMyDay
+        case "myday.remove": if (backend.sourceIsMyDay) backend.myDayRemoveSelection(); return backend.sourceIsMyDay
+        case "myday.hide": if (backend.sourceIsMyDay) backend.myDayHideSelection(); return backend.sourceIsMyDay
         }
         return false
     }
