@@ -102,6 +102,12 @@ Rectangle {
             Layout.rightMargin: 12
             Layout.fillHeight: true
         }
+        // Entering My Day hides the tab strip; reset to the tags tab so the
+        // Locations list can never show under the Day title.
+        Connections {
+            target: backend
+            function onViewChanged() { if (backend.sourceIsMyDay) root.tab = 0 }
+        }
 
         // Tag Search.
         TextField {
@@ -323,7 +329,7 @@ Rectangle {
         // ------------------------------------------------------- locations
         ListView {
             id: placeList
-            visible: root.tab === 1
+            visible: root.tab === 1 && !backend.sourceIsMyDay
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true

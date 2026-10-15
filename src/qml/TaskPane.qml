@@ -160,7 +160,8 @@ Item {
                 MouseArea { anchors.fill: parent; onClicked: root.command("jump") }
             }
             Text {
-                visible: backend.sourceKey === "today"
+                objectName: "paneDate"
+                visible: backend.sourceKey === "today" || backend.sourceIsMyDay
                 text: backend.sourceSubtitle
                 color: theme.muted
                 font.pixelSize: backend.fontSize + 5
