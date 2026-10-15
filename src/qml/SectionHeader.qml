@@ -124,4 +124,19 @@ Item {
         MenuSeparator {}
         MenuItem { text: "Delete Section"; onTriggered: backend.deleteSection(root.r.sectionId) }
     }
+
+    // A focus ring only for keyboard focus, so the mouse look is unchanged.
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: root.margin - 6
+        anchors.rightMargin: root.margin - 6
+        anchors.bottom: parent.bottom
+        height: 30
+        radius: 6
+        color: "transparent"
+        border.width: root.activeFocus ? 2 : 0
+        border.color: theme.accent
+        visible: root.activeFocus
+    }
 }

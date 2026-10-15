@@ -168,6 +168,11 @@ Rectangle {
         selectionColor: theme.selection
 
         onActiveFocusChanged: if (!activeFocus) { linkPicker.close(); root.commit() }
+        // Notes is the last field of the editor: Tab and Shift+Tab step out to
+        // the next and previous control in the window's chain, so the editor
+        // never traps the keyboard.
+        Keys.onTabPressed: (e) => { e.accepted = true; const n = area.nextItemInFocusChain(true); if (n) n.forceActiveFocus(Qt.TabFocusReason) }
+        Keys.onBacktabPressed: (e) => { e.accepted = true; const p = area.nextItemInFocusChain(false); if (p) p.forceActiveFocus(Qt.BacktabFocusReason) }
         Keys.onEscapePressed: {
             if (linkPicker.opened) { linkPicker.close(); return }
             root.commit()

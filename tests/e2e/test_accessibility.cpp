@@ -1,18 +1,21 @@
 // End-to-end accessibility guard: walks the visible items of every window the
 // app can show and reports every interactive one that a screen reader could
-// not name. New controls are added to pendingAccessibility() only while the
-// slice that names them is still to come; by the last slice the list is empty.
+// not name. Every slice named its share and the last one emptied the pending
+// list, so the guard now judges every control it finds.
 //
-// Run against main before this slice, with nothing excused and every window
-// state probed, the guard found 809 offenders across those states (about 160
-// distinct items). The shared components named by this slice remove the ones
-// they cover; the rest sit in pendingAccessibility().
+// Run against main before the five slices, with nothing excused and every
+// window state probed, the guard found 809 offenders across those states
+// (about 160 distinct items); the slices named them all.
+//
+// This slice also covers focus: Tab and Shift+Tab walk the regions and the
+// editor's fields in visual order, a custom control shows its focus ring only
+// when the keyboard brought it the focus, and focus never lands on a hidden
+// item.
 
 #include <QAccessible>
 #include <QMetaEnum>
 #include <QQuickItem>
 #include <QQuickWindow>
-#include <QRegularExpression>
 
 #include "misckit.h"
 #include "settingskit.h"
@@ -202,50 +205,9 @@ QList<QQuickItem *> visibleInteractive() {
     return out;
 }
 
-// No interactive item is excused any more: every slice has named its share,
-// so the guard judges every control it finds. The list stays as the guard's
-// proof that nothing is left waiting to be named, and a later control added
-// without a name fails the guard rather than hiding here.
-const QVector<QString> &pendingAccessibility() {
-    static const QVector<QString> pending{};
-    return pending;
-}
-
-// Whether an item is excused: never now, since the list is empty. The check
-// stays so the guard has one place that turns an entry into an excuse if a
-// later change ever needs one.
-bool pending(const QQuickItem *item) {
-    if (pendingAccessibility().isEmpty())
-        return false;
-    QStringList names{item->objectName()};
-    if (item->objectName().isEmpty())
-        for (QQuickItem *p = item->parentItem(); p; p = p->parentItem())
-            if (!p->objectName().isEmpty()) {
-                names << p->objectName();
-                break;
-            }
-    const QString type = shortClass(item);
-    for (const QString &p : pendingAccessibility()) {
-        if (p.contains('*')) {
-            const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(p));
-            if (re.match(type).hasMatch())
-                return true;
-            for (const QString &n : names)
-                if (re.match(n).hasMatch())
-                    return true;
-        } else {
-            if (type.startsWith(p))
-                return true;
-            for (const QString &n : names)
-                if (n.startsWith(p))
-                    return true;
-        }
-    }
-    return false;
-}
-
-// The items that are interactive but not named and not excused for a later
-// slice, one line each.
+// The items that are interactive but not named, one line each. Every slice
+// has named its share and the pending list is gone, so this judges every
+// control the guard finds: a new control added without a name fails here.
 QStringList guardOffenders() {
     QStringList out;
     QSet<QQuickItem *> seen;
@@ -253,8 +215,6 @@ QStringList guardOffenders() {
         if (seen.contains(item))
             continue;
         seen.insert(item);
-        if (pending(item))
-            continue;
         const Report r = reportOf(item);
         if (acceptable(r))
             continue;
@@ -316,45 +276,94 @@ private slots:
             if (i->objectName() == "taskList") return "tasklist";
             if (shortClass(i) == "UtilityPanel") return "utility";
             if (i->objectName() == "miniCalendar") return "sidebar-cal";
+            if (i->objectName() == "searchBox") return "search";
             if (shortClass(i) == "Sidebar") return "sidebar";
             if (shortClass(i) == "TaskPane") return "taskpane";
         }
         return "other";
     }
 
-    void exploreTabOrder() {
+    // From the task list, Tab and Shift+Tab step through the main regions in
+    // visual order: sidebar, search, task list, editor (when open), utility.
+    // The cycle repeats, so the first visit of each region is a rotation of
+    // that order and the sequence closes where it began.
+    void tabVisitsRegionsInOrder() {
         App app;
         QVERIFY(app.ok);
-        QVERIFY(tk::openEditor(app, app.ids.buyMilk));
-        auto describe = [&](QQuickItem *f) {
-            return regionOf(f) + ":" + (f ? f->objectName() : QString("?"));
+        QStringList hidden;
+        auto cycle = [&](Qt::Key key) {
+            QQuickItem *list = tk::waitItem("taskList");
+            list->forceActiveFocus(Qt::TabFocusReason);
+            QStringList regions;
+            QString last;
+            for (int i = 0; i < 160; ++i) {
+                QQuickItem *f = app.window->activeFocusItem();
+                if (!f) { hidden << "nothing"; break; }
+                if (!f->isVisible()) hidden << regionOf(f) + ":" + f->objectName();
+                QString r = regionOf(f);
+                if (r == "sidebar-cal") r = "sidebar";
+                // The toolbar sits in the task pane between the sidebar and the
+                // search field; it is not a region of its own.
+                if (r != "taskpane" && r != "other" && r != last) { regions << r; last = r; }
+                QTest::keyClick(app.window, key);
+            }
+            return regions;
         };
-        QQuickItem *list = tk::waitItem("taskList");
-        list->forceActiveFocus(Qt::TabFocusReason);
-        QStringList seen; seen << describe(app.window->activeFocusItem());
-        QStringList bad;
-        for (int i = 0; i < 400; ++i) {
+
+        // With the editor open the regions are sidebar, search, task list,
+        // editor and utility, left to right. From the task list, Tab visits
+        // the regions to its right and then wraps: editor, utility, sidebar,
+        // search. Shift+Tab walks the other way.
+        QVERIFY(tk::openEditor(app, app.ids.buyMilk));
+        // Each entry is the run of that region starting at the task list.
+        const QList<QPair<Qt::Key, QStringList>> expected{
+            {Qt::Key_Tab, {"tasklist", "editor", "utility", "sidebar", "search"}},
+            {Qt::Key_Backtab, {"tasklist", "search", "sidebar", "utility", "editor"}},
+        };
+        for (const auto &[key, order] : expected) {
+            QStringList seen = cycle(key);
+            const int n = order.size();
+            QVERIFY2(seen.size() >= n, qPrintable(seen.join(", ")));
+            const int at = seen.indexOf("tasklist");
+            QVERIFY2(at >= 0, qPrintable(seen.join(", ")));
+            QCOMPARE(seen.mid(at, n), order);
+        }
+        QVERIFY2(hidden.isEmpty(), qPrintable("keyboard focus on invisible: " + hidden.join(", ")));
+    }
+
+    // A custom control that takes the keyboard shows a focus ring when Tab
+    // brings it the focus, and the ring is gone once it is clicked: the mouse
+    // look is unchanged.
+    void focusRingShowsForKeyboardOnly() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(mk::homeWith(app, app.ids.buyMilk));
+
+        // Tab reaches the toolbar's IconButtons. Start from the sidebar's
+        // hide button and walk forward to the reverse-sort toggle.
+        QQuickItem *start = tk::waitItem("hideSidebar");
+        start->forceActiveFocus(Qt::TabFocusReason);
+        QQuickItem *button = nullptr;
+        for (int i = 0; i < 200 && !button; ++i) {
             QTest::keyClick(app.window, Qt::Key_Tab);
             QQuickItem *f = app.window->activeFocusItem();
-            QString d = describe(f);
-            if (seen.last() != d) seen << d;
-            if (f && !f->isVisible() && bad.size() < 20) bad << d;
+            if (f && f->objectName() == "sortReverse")
+                button = f;
         }
-        qInfo().noquote() << "FWD" << seen.join(" -> ");
-        qInfo().noquote() << "FWD_BAD" << bad.join(",");
-        list = tk::waitItem("taskList");
-        list->forceActiveFocus(Qt::TabFocusReason);
-        seen.clear(); seen << describe(app.window->activeFocusItem());
-        bad.clear();
-        for (int i = 0; i < 400; ++i) {
-            QTest::keyClick(app.window, Qt::Key_Backtab);
-            QQuickItem *f = app.window->activeFocusItem();
-            QString d = describe(f);
-            if (seen.last() != d) seen << d;
-            if (f && !f->isVisible() && bad.size() < 20) bad << d;
-        }
-        qInfo().noquote() << "BWD" << seen.join(" -> ");
-        qInfo().noquote() << "BWD_BAD" << bad.join(",");
+        QVERIFY2(button, "sortReverse reached by Tab");
+        QVERIFY(button->property("activeFocus").toBool());
+        QQuickItem *ring = findItem("sortReverseRing");
+        QVERIFY2(ring, "sortReverse has a focus ring");
+        QVERIFY2(ring->isVisible(), "the ring shows for keyboard focus");
+
+        // Clicking drops keyboard focus, and the ring with it.
+        const bool asc = app.backend().sortAscending();
+        tk::clickNamed("sortReverse");
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sortAscending(), !asc, 5000);
+        QVERIFY(!button->property("activeFocus").toBool());
+        ring = findItem("sortReverseRing", false);
+        QVERIFY2(ring, "sortReverse ring still exists");
+        QVERIFY2(!ring->isVisible(), "the ring is not shown for a mouse click");
     }
 
     void editorIsNamed() {

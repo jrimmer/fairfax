@@ -410,6 +410,8 @@ Window {
         Accessible.checked: seg.on
         Accessible.onPressAction: seg.clicked()
         color: on ? Qt.alpha(theme.accent, 0.28) : segHover.hovered ? theme.mix(theme.raised, theme.foreground, 0.1) : theme.mix(theme.raised, theme.foreground, 0.05)
+        // A focus ring only for keyboard focus, so the mouse look is unchanged.
+        Rectangle { anchors.fill: parent; radius: 6; color: "transparent"; border.width: seg.activeFocus ? 2 : 0; border.color: theme.accent }
         Text { id: segText; anchors.centerIn: parent; text: seg.text; color: seg.on ? theme.foreground : theme.muted; font.pixelSize: backend.fontSize - 1 }
         HoverHandler { id: segHover }
         TapHandler { onTapped: seg.clicked() }

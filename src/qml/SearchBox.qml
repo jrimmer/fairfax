@@ -5,6 +5,7 @@ import QtQuick.Controls
 // list as you type; Escape clears it and returns to the list.
 Item {
     id: root
+    objectName: "searchBox"
 
     // Opened by the user (Ctrl+F, the magnifier); a search that is set some
     // other way, such as from the presets menu, shows the field too.
@@ -24,6 +25,7 @@ Item {
         border.color: input.activeFocus ? theme.accent : "transparent"
     }
     Icon {
+        objectName: "searchButton"
         x: 7
         anchors.verticalCenter: parent.verticalCenter
         name: "search"
@@ -37,6 +39,8 @@ Item {
         Keys.onReturnPressed: { root.opened = true; input.forceActiveFocus() }
         Keys.onEnterPressed: { root.opened = true; input.forceActiveFocus() }
         MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { root.opened = true; input.forceActiveFocus() } }
+        // A focus ring only for keyboard focus, so the mouse look is unchanged.
+        Rectangle { anchors.fill: parent; anchors.margins: -3; radius: 4; color: "transparent"; border.width: parent.activeFocus ? 2 : 0; border.color: theme.accent }
     }
     TextInput {
         id: input
@@ -86,5 +90,7 @@ Item {
         Keys.onReturnPressed: { backend.search = ""; root.opened = false; root.finished() }
         Keys.onEnterPressed: { backend.search = ""; root.opened = false; root.finished() }
         MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: { backend.search = ""; root.opened = false; root.finished() } }
+        // A focus ring only for keyboard focus, so the mouse look is unchanged.
+        Rectangle { anchors.fill: parent; anchors.margins: -3; radius: 4; color: "transparent"; border.width: parent.activeFocus ? 2 : 0; border.color: theme.accent }
     }
 }

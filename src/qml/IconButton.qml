@@ -36,6 +36,8 @@ Item {
         color: mouse.pressed ? theme.mix(theme.background, theme.foreground, 0.14)
              : mouse.containsMouse ? theme.mix(theme.background, theme.foreground, 0.07) : "transparent"
         // A focus ring only for keyboard focus, so the mouse look is unchanged.
+        objectName: root.objectName !== "" ? root.objectName + "Ring" : "iconButtonRing"
+        visible: root.activeFocus
         border.width: root.activeFocus ? 2 : 0
         border.color: theme.accent
     }
