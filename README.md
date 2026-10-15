@@ -180,7 +180,11 @@ time left in the work day and amber above 85%. The right pane shows the day's ex
 timeline; drag a row onto it to block out time, or drop the row on the compact Day Bar on a
 narrow window, where it moves above the list instead. *Add to today* sets a task's
 due date when it has none or one in the past, and its start date when its deadline is later;
-*remove from today* pushes a today date to tomorrow.
+*remove from today* pushes a today date to tomorrow. The plan keys act only while My Day is
+open: `a` adds the selection to today, `b` blocks it out in the next free slots (`30` minutes
+for a task with no duration), `r` removes it to tomorrow, and `h` hides a suggestion for the
+rest of the day. They are in Settings → Shortcuts under *My Day* and can be rebound; in an
+ordinary list those bare keys do nothing. `fairfax ctl myday` opens a running window on My Day.
 
 Settings → Tasks has the switches: *Enable My Day*, the work day's start and end (which the
 capacity line measures against), and *Offer to plan on the first launch of the day* (the
