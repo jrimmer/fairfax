@@ -861,6 +861,25 @@ private slots:
         QCOMPARE(backend.sourceKey(), QString("myday"));
     }
 
+    // Ctrl+N in My Day keeps the new task in the pane so its editor shows,
+    // like Today does, instead of silently dropping it from every section.
+    void newTaskInMyDayShowsItsEditor() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "myday");
+        Backend backend(&store);
+        backend.ensureDefaults();
+        backend.selectSource("myday");
+        backend.newTask();
+        const qint64 id = backend.editingTaskId();
+        QVERIFY(id > 0);
+        bool editingRow = false;
+        for (const auto &row : backend.tasks()->rows())
+            editingRow = editingRow || (row.value("editing").toBool() && row.value("taskId").toLongLong() == id);
+        QVERIFY(editingRow);
+    }
+
     // With My Day off, the fresh default falls back to Today.
     void myDayOffOpensOnToday() {
         QTemporaryDir dir;

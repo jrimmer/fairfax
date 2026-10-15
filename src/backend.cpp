@@ -4650,6 +4650,21 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
     addSection("overdue", "Overdue", "overdue", day.overdue, m_myDayOverdueExpanded ? 0 : 7);
     addSection("today", "Already today", "progress", day.today, 0);
     addSection("suggestions", "Suggestions", "", day.suggestions, m_myDaySuggestionsExpanded ? 0 : 15);
+    // The sections only hold planned tasks; a brand-new task (Ctrl+N) and
+    // other just-touched ones the user expects to see stay in the pane like
+    // rebuildTasks keeps them, so the editor is never silently dropped.
+    QSet<qint64> placed;
+    for (const auto &e : day.overdue + day.today + day.suggestions)
+        placed.insert(e.taskId);
+    for (const auto &t : m_store->tasks()) {
+        if (!m_options.keepVisible.contains(t.id) || placed.contains(t.id) || t.deleted)
+            continue;
+        QVariantMap map = taskRow(t, TaskRow{}, views);
+        map["reason"] = QString();
+        rows.append(map);
+        if (!order.contains(t.id))
+            order.append(t.id);
+    }
     m_visibleOrder = order;
     m_tasks.setRows(rows);
     m_hasHidden = false;
