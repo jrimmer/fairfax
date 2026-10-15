@@ -547,8 +547,9 @@ public:
     Q_INVOKABLE void timeBlock(const QString &isoDate, int startMinute, int durationMinutes);
 
     // My Day: the daily plan's sections, capacity line and planning actions.
-    // The calendar feed is the one the app shows, injected at construction.
-    void setCalendar(CalendarFeed *calendar) { m_calendar = calendar; }
+    // The calendar feed is the one the app shows, injected at construction;
+    // its changes refresh the capacity line, which reads the day's events.
+    void setCalendar(CalendarFeed *calendar);
     Q_INVOKABLE QVariantMap myDaySections() const;
     Q_INVOKABLE QVariantMap myDayCapacity() const;
     Q_INVOKABLE void myDayAdd(const QVariantList &ids);

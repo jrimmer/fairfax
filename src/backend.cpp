@@ -39,7 +39,7 @@ const QStringList TaskRoles{
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
     "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
-    "isFirst", "reason", "inSection",
+    "isFirst", "reason",
 };
 const QStringList SidebarRoles{"kind", "sourceKey", "title", "icon", "overdue", "undone", "color", "dot",
                                "selected", "depth", "expandable", "expanded", "collapsed", "excluded",
@@ -54,8 +54,14 @@ QDate isoDate(const QString &text) { return QDate::fromString(text, Qt::ISODate)
 // falls back to Today.
 Source resolveDefaultView(const Store &store) {
     const QString choice = store.setting("ui.defaultView", "myday").toString();
-    if (choice.isEmpty() || choice == QLatin1String("last"))
-        return Source::fromKey(store.setting("ui.source", "today").toString());
+    if (choice.isEmpty() || choice == QLatin1String("last")) {
+        const Source last = Source::fromKey(store.setting("ui.source", "today").toString());
+        // My Day off means nothing changed anywhere: a remembered My Day view
+        // falls back to Today rather than opening a feature that is off.
+        if (last.kind == Source::MyDay && !store.setting("myday.enabled", true).toBool())
+            return Source{Source::Today, 0};
+        return last;
+    }
     if (choice == QLatin1String("myday"))
         return store.setting("myday.enabled", true).toBool() ? Source{Source::MyDay, 0} : Source{Source::Today, 0};
     if (choice == QLatin1String("today")) return Source{Source::Today, 0};
@@ -71,7 +77,9 @@ Source resolveDefaultView(const Store &store) {
     }
     if (choice.startsWith(QLatin1String("list:"))) {
         const qint64 id = choice.mid(5).toLongLong();
-        if (id && store.lists().contains(id) && !store.list(id).deleted)
+        // The Settings combo lists neither deleted nor archived lists, so the
+        // resolver must agree and fall back to Today for either.
+        if (id && store.lists().contains(id) && !store.list(id).deleted && !store.list(id).archived)
             return Source{Source::List, id};
     }
     return Source{Source::Today, 0};
@@ -3354,6 +3362,20 @@ QVariantMap Backend::myDaySections() const {
     return out;
 }
 
+void Backend::setCalendar(CalendarFeed *calendar) {
+    m_calendar = calendar;
+    if (!calendar)
+        return;
+    // The day's events move the capacity line and the next free slot; recompute
+    // as soon as a calendar refresh lands, not only on the minute timer.
+    connect(calendar, &CalendarFeed::changed, this, [this] {
+        if (m_source.kind == Source::MyDay) {
+            rebuild();
+            emit myDayChanged();
+        }
+    });
+}
+
 QVariantMap Backend::myDayCapacity() const {
     // Unit tests build a Backend with no calendar; an empty feed gives the
     // same answer as one with no events, without a live object.
@@ -4592,8 +4614,7 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
         if (entries.size() > shown) {
             const int more = entries.size() - shown;
             rows.append({{"key", "more:" + key}, {"kind", "myDayMore"}, {"sectionKey", key},
-                         {"title", key == "suggestions" ? QStringLiteral("Show more") : (more == 1 ? QStringLiteral("1 more") : QString::number(more) + QStringLiteral(" more"))},
-                         {"inSection", true}});
+                         {"title", key == "suggestions" ? QStringLiteral("Show more") : (more == 1 ? QStringLiteral("1 more") : QString::number(more) + QStringLiteral(" more"))}});
         }
     };
 
