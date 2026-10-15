@@ -39,7 +39,7 @@ const QStringList TaskRoles{
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
     "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
-    "isFirst",
+    "isFirst", "reason",
 };
 const QStringList SidebarRoles{"kind", "sourceKey", "title", "icon", "overdue", "undone", "color", "dot",
                                "selected", "depth", "expandable", "expanded", "collapsed", "excluded",
@@ -48,6 +48,42 @@ const QStringList TagRoles{"kind", "tagId", "groupId", "title", "count", "paused
 const QStringList PlaceRoles{"kind", "locationId", "title", "address", "count", "paused", "filtered"};
 
 QDate isoDate(const QString &text) { return QDate::fromString(text, Qt::ISODate); }
+
+// The view a fresh launch opens. ui.defaultView holds it; "last" restores
+// ui.source. A chosen list that no longer exists, or My Day while disabled,
+// falls back to Today.
+Source resolveDefaultView(const Store &store) {
+    const QString choice = store.setting("ui.defaultView", "myday").toString();
+    if (choice.isEmpty() || choice == QLatin1String("last")) {
+        const Source last = Source::fromKey(store.setting("ui.source", "today").toString());
+        // My Day off means nothing changed anywhere: a remembered My Day view
+        // falls back to Today rather than opening a feature that is off.
+        if (last.kind == Source::MyDay && !store.setting("myday.enabled", true).toBool())
+            return Source{Source::Today, 0};
+        return last;
+    }
+    if (choice == QLatin1String("myday"))
+        return store.setting("myday.enabled", true).toBool() ? Source{Source::MyDay, 0} : Source{Source::Today, 0};
+    if (choice == QLatin1String("today")) return Source{Source::Today, 0};
+    if (choice == QLatin1String("all")) return Source{Source::All, 0};
+    if (choice == QLatin1String("starred")) return Source{Source::Starred, 0};
+    if (choice == QLatin1String("scheduled")) return Source{Source::Scheduled, 0};
+    if (choice == QLatin1String("done")) return Source{Source::Done, 0};
+    if (choice == QLatin1String("inbox")) {
+        for (const auto &l : store.lists())
+            if (!l.deleted && l.kind == ListKind::Inbox)
+                return Source{Source::List, l.id};
+        return Source{Source::Today, 0};
+    }
+    if (choice.startsWith(QLatin1String("list:"))) {
+        const qint64 id = choice.mid(5).toLongLong();
+        // The Settings combo lists neither deleted nor archived lists, so the
+        // resolver must agree and fall back to Today for either.
+        if (id && store.lists().contains(id) && !store.list(id).deleted && !store.list(id).archived)
+            return Source{Source::List, id};
+    }
+    return Source{Source::Today, 0};
+}
 
 QString focusKey(int kind) { return Source{kind, 0}.key(); }
 
@@ -65,7 +101,7 @@ bool isBareUrl(const QString &text) {
 
 Backend::Backend(Store *store, QObject *parent)
     : QObject(parent), m_store(store), m_sidebar(SidebarRoles), m_tasks(TaskRoles), m_tags(TagRoles), m_places(PlaceRoles) {
-    m_source = Source::fromKey(m_store->setting("ui.source", "today").toString());
+    m_source = resolveDefaultView(*m_store);
     for (const auto &key : m_store->setting("ui.collapsedSections").toString().split('|', Qt::SkipEmptyParts))
         m_options.collapsedSections.insert(key);
     for (const auto &id : m_store->setting("ui.expandedLists").toString().split(',', Qt::SkipEmptyParts))
@@ -85,6 +121,7 @@ Backend::Backend(Store *store, QObject *parent)
     connect(m_store, &Store::changed, this, [this] {
         rebuild();
         emit dataChanged();
+        emit myDayChanged();
     });
 
     // Overdue and scheduled states move with the clock, so the views are
@@ -98,6 +135,7 @@ Backend::Backend(Store *store, QObject *parent)
             emit clockChanged();
         }
         rebuild();
+        emit myDayChanged();
     });
     m_clock.start();
 
@@ -193,7 +231,7 @@ QString Backend::sourceTitle() const {
 }
 
 QString Backend::sourceSubtitle() const {
-    if (m_source.kind == Source::Today)
+    if (m_source.kind == Source::Today || m_source.kind == Source::MyDay)
         return English.toString(QDate::currentDate(), "ddd, d MMMM");
     if (m_source.kind == Source::Project)
         return m_store->list(m_store->task(m_source.id).listId).name;
@@ -312,6 +350,8 @@ QStringList Backend::tagNames() const {
 
 void Backend::selectSource(const QString &key) {
     const Source next = Source::fromKey(key);
+    if (next.kind == Source::MyDay && !myDayEnabled())
+        return;
     if (next == m_source)
         return;
     endEdit();
@@ -3277,6 +3317,42 @@ QVariantList entryList(const QVector<MyDay::Entry> &entries) {
 
 }  // namespace
 
+bool Backend::myDayEnabled() const { return m_store->setting("myday.enabled", true).toBool(); }
+
+QVariantList Backend::defaultViewChoices() const {
+    // The Settings > General "Default view" combo: My Day (only while it is
+    // on), Last viewed, the focus lists, Inbox, then every list by name.
+    QVariantList out;
+    if (myDayEnabled())
+        out << QVariantMap{{"name", "My Day"}, {"id", "myday"}};
+    out << QVariantMap{{"name", "Last viewed"}, {"id", "last"}};
+    out << QVariantMap{{"name", "Today"}, {"id", "today"}};
+    out << QVariantMap{{"name", "All"}, {"id", "all"}};
+    out << QVariantMap{{"name", "Starred"}, {"id", "starred"}};
+    out << QVariantMap{{"name", "Scheduled"}, {"id", "scheduled"}};
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind == ListKind::Inbox)
+            out << QVariantMap{{"name", "Inbox"}, {"id", "inbox"}};
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    for (const auto &l : views.orderedLists()) {
+        if (l.kind == ListKind::Inbox)
+            continue;
+        out << QVariantMap{{"name", l.name}, {"id", QStringLiteral("list:%1").arg(l.id)}};
+    }
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && !l.archived && l.kind == ListKind::Smart)
+            out << QVariantMap{{"name", l.name + " (Smart List)"}, {"id", QStringLiteral("list:%1").arg(l.id)}};
+    return out;
+}
+
+void Backend::myDayExpand(const QString &section) {
+    if (section == "overdue") m_myDayOverdueExpanded = true;
+    else if (section == "suggestions") m_myDaySuggestionsExpanded = true;
+    else return;
+    rebuild();
+    emit myDayChanged();
+}
+
 QVariantMap Backend::myDaySections() const {
     const MyDay::Sections day = MyDay::sections(*m_store, QDateTime::currentDateTime());
     QVariantMap out;
@@ -3284,6 +3360,20 @@ QVariantMap Backend::myDaySections() const {
     out["today"] = entryList(day.today);
     out["suggestions"] = entryList(day.suggestions);
     return out;
+}
+
+void Backend::setCalendar(CalendarFeed *calendar) {
+    m_calendar = calendar;
+    if (!calendar)
+        return;
+    // The day's events move the capacity line and the next free slot; recompute
+    // as soon as a calendar refresh lands, not only on the minute timer.
+    connect(calendar, &CalendarFeed::changed, this, [this] {
+        if (m_source.kind == Source::MyDay) {
+            rebuild();
+            emit myDayChanged();
+        }
+    });
 }
 
 QVariantMap Backend::myDayCapacity() const {
@@ -3939,6 +4029,10 @@ void Backend::setSetting(const QString &key, const QVariant &value) {
     rebuild();
     emit settingsChanged();
     emit viewChanged();
+    // A setting can change what the Default view combo offers (My Day on or
+    // off) and the My Day capacity window, so tell the panes as well.
+    emit dataChanged();
+    emit myDayChanged();
 }
 
 // -------------------------------------------------------------- shortcuts
@@ -4295,7 +4389,10 @@ void Backend::rebuild() {
     // which reads it as it is built.
     rebuildEditor();
     rebuildSidebar(views);
-    rebuildTasks(views);
+    if (m_source.kind == Source::MyDay)
+        rebuildMyDayTasks(views);
+    else
+        rebuildTasks(views);
     rebuildTags(views);
     rebuildPlaces(views);
 }
@@ -4321,6 +4418,10 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
     };
 
     // The GTD Inbox, when present, sits in its own group above the focus lists.
+    // My Day is the first entry of the views list, above everything else.
+    if (myDayEnabled())
+        rows.append({{"key", "myday"}, {"kind", "focus"}, {"sourceKey", "myday"}, {"title", "My Day"},
+                     {"icon", "sun"}, {"overdue", 0}, {"undone", 0}, {"selected", m_source.key() == "myday"}});
     for (const auto &l : lists) {
         if (l.kind != ListKind::Inbox)
             continue;
@@ -4494,6 +4595,79 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         {"hasLocation", !t.locationIds.isEmpty()},
         {"hasAttachment", !m_store->attachmentsFor(t.id).isEmpty()},
     };
+}
+
+void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
+    // My Day's own sections, as rows the shared TaskRow draws. Each capped
+    // section ends in a row that expands it for this session. A typed search
+    // filters every section, the same query language the lists use.
+    const QDateTime now = QDateTime::currentDateTime();
+    MyDay::Sections day = MyDay::sections(*m_store, now);
+    const Query search = Query::parse(m_options.search);
+    if (!search.isEmpty()) {
+        QueryContext context;
+        context.store = m_store;
+        context.now = now;
+        context.settings = scheduleSettings();
+        context.soundex = m_options.soundex;
+        context.rangeFrom = m_options.dayFilterFrom;
+        context.rangeTo = m_options.dayFilterTo.isValid() ? m_options.dayFilterTo : m_options.dayFilterFrom;
+        context.isPaused = [&views](const Task &t) { return views.isPaused(t); };
+        auto matches = [&](const QVector<MyDay::Entry> &in) {
+            QVector<MyDay::Entry> out;
+            for (const MyDay::Entry &e : in) {
+                const Task t = m_store->task(e.taskId);
+                if (t.id && search.matches(t, context))
+                    out.append(e);
+            }
+            return out;
+        };
+        day.overdue = matches(day.overdue);
+        day.today = matches(day.today);
+        day.suggestions = matches(day.suggestions);
+    }
+    QVector<QVariantMap> rows;
+    QVector<qint64> order;
+
+    auto addSection = [&](const QString &key, const QString &title, const QString &tone, const QVector<MyDay::Entry> &entries, int cap) {
+        rows.append({{"key", "s:" + key}, {"kind", "section"}, {"sectionKey", key}, {"title", title},
+                     {"tone", tone}, {"count", entries.size()}, {"isFirst", rows.isEmpty()}});
+        const int shown = cap > 0 ? qMin(cap, entries.size()) : entries.size();
+        for (int i = 0; i < shown; ++i) {
+            QVariantMap map = taskRow(m_store->task(entries.at(i).taskId), TaskRow{}, views);
+            map["reason"] = entries.at(i).reason;
+            rows.append(map);
+            if (!order.contains(entries.at(i).taskId))
+                order.append(entries.at(i).taskId);
+        }
+        if (entries.size() > shown) {
+            const int more = entries.size() - shown;
+            rows.append({{"key", "more:" + key}, {"kind", "myDayMore"}, {"sectionKey", key},
+                         {"title", key == "suggestions" ? QStringLiteral("Show more") : (more == 1 ? QStringLiteral("1 more") : QString::number(more) + QStringLiteral(" more"))}});
+        }
+    };
+
+    addSection("overdue", "Overdue", "overdue", day.overdue, m_myDayOverdueExpanded ? 0 : 7);
+    addSection("today", "Already today", "progress", day.today, 0);
+    addSection("suggestions", "Suggestions", "", day.suggestions, m_myDaySuggestionsExpanded ? 0 : 15);
+    // The sections only hold planned tasks; a brand-new task (Ctrl+N) and
+    // other just-touched ones the user expects to see stay in the pane like
+    // rebuildTasks keeps them, so the editor is never silently dropped.
+    QSet<qint64> placed;
+    for (const auto &e : day.overdue + day.today + day.suggestions)
+        placed.insert(e.taskId);
+    for (const auto &t : m_store->tasks()) {
+        if (!m_options.keepVisible.contains(t.id) || placed.contains(t.id) || t.deleted)
+            continue;
+        QVariantMap map = taskRow(t, TaskRow{}, views);
+        map["reason"] = QString();
+        rows.append(map);
+        if (!order.contains(t.id))
+            order.append(t.id);
+    }
+    m_visibleOrder = order;
+    m_tasks.setRows(rows);
+    m_hasHidden = false;
 }
 
 void Backend::rebuildTasks(const ViewBuilder &views) {

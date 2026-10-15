@@ -29,6 +29,7 @@ struct Session {
     std::unique_ptr<App> app;
     Seed ids;
     bool withSync = false;
+    bool lastView = true;   // Seed ui.defaultView = "last" for the pre-My-Day landing view.
     bool started = false;
     qint64 taskBaseline = 0, alarmBaseline = 0;   // The highest ids of the seeded world.
 
@@ -58,7 +59,7 @@ struct Session {
 
     bool start() {
         app.reset();
-        app = std::make_unique<App>(started ? std::function<Seed(Store &)>() : seed, dir.filePath("e2e.db"), withSync);
+        app = std::make_unique<App>(started ? std::function<Seed(Store &)>() : seed, dir.filePath("e2e.db"), withSync, lastView);
         if (!app->ok)
             return false;
         if (!started) {
@@ -150,7 +151,13 @@ inline void control(const QString &name, QQuickItem *&out) {
         last = now;
         return still && (inside || !needInside);
     };
-    QTRY_VERIFY2_WITH_TIMEOUT(settled(), qPrintable(name + " never stopped moving"), 5000);
+    // The first wait also holds out for the width pass: a pane that starts
+    // far too wide can park a control at an x outside the window, and the
+    // scroll decision below must not run on that geometry (the row would
+    // look inside, no scroll would happen, and the finished layout would
+    // leave it below the fold).
+    QTRY_VERIFY2_WITH_TIMEOUT(settled() && centreOf(out).x() >= 0 && centreOf(out).x() < out->window()->width(),
+                              qPrintable(name + " never stopped moving"), 5000);
     for (QQuickItem *p = out->parentItem(); p; p = p->parentItem()) {
         if (!p->inherits("QQuickFlickable"))
             continue;
@@ -670,6 +677,9 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"mail.googleClientId", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
         {"mail.msClientId", "E2EMailOAuth::yourOwnClientIdThenSignInWithMicrosoft"},
         {"mail.oauth", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
+        // My Day: E2EMyDay drives the sidebar item, the shortcut, the screen and
+        // the Default View setting through the UI.
+        {"ui.defaultView", "E2EMyDay::defaultViewComboChangesTheLaunchView"},
         // The Shortcuts pane stores each remappable command under this prefix.
         {"shortcuts.", "E2EShortcuts::rebindAppCommandPersists"},
     };

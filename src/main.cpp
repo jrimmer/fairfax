@@ -471,6 +471,14 @@ int main(int argc, char *argv[]) {
     QString error;
     const bool opened = store.open(dbPath, &error);
 
+    // The demo and the selftest open on Today, as they always did, rather than
+    // on the new fresh-database default of My Day. The database is a throwaway
+    // one, so seeding the choice there is harmless. A screenshot run can point
+    // at a real database, so it is moved to Today without writing a setting:
+    // a screenshot must not change the owner's saved Default view.
+    if (cli.isSet(demoOption))
+        store.setSetting("ui.defaultView", "last");
+
     AppServices services(store, cli.value(themeOption));
     Theme &theme = services.theme;
     Backend &backend = services.backend;
@@ -515,6 +523,10 @@ int main(int argc, char *argv[]) {
             calendar.setSources(store.setting("calendar.sources").toString().split('\n', Qt::SkipEmptyParts));
         }
         backend.ensureDefaults();
+        // A screenshot of a real database lands on Today without touching the
+        // stored Default view choice; --source and --shot-eval can still move it.
+        if (cli.isSet(shotOption) && !cli.isSet(demoOption))
+            backend.selectSource("today");
         if (cli.isSet(sourceOption))
             backend.selectSource(cli.value(sourceOption));
     }

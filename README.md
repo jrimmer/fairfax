@@ -168,6 +168,27 @@ offers your lists and `frfx done <Tab>` your open tasks.
   the badge colour can be configured in Settings > General.
 - **Undo.** Every change is undoable with Ctrl+Z.
 
+## My Day
+
+My Day is a daily plan built from the dates a task already has, not a separate field, so it
+survives every sync. Press `Ctrl+Shift+P` or click *My Day*, the first item in the sidebar
+above All, to open it. The screen gathers *Overdue*, *Already today* and *Suggestions*; each
+suggestion says why it is there (starred, starting today, an alert today). The title is
+followed by the date and a capacity line such as `6h 30m planned · 5h free` (plus
+`· 3 without a duration` when some tasks have none), red when the plan is over the free
+time left in the work day and amber above 85%. The right pane shows the day's expanded
+timeline; drag a row onto it to block out time, or drop the row on the compact Day Bar on a
+narrow window, where it moves above the list instead. *Add to today* sets a task's
+due date when it has none or one in the past, and its start date when its deadline is later;
+*remove from today* pushes a today date to tomorrow.
+
+Settings → Tasks has the switches: *Enable My Day*, the work day's start and end (which the
+capacity line measures against), and *Offer to plan on the first launch of the day* (the
+once-a-day prompt). With My Day off, the sidebar item, its shortcut and the prompt are gone
+and nothing else changes. The launch view is Settings → General → *Default view*: My Day
+(the default), Last viewed, Today, All, Starred, Scheduled, Inbox, or any list or Smart List
+by name.
+
 ## Accessibility
 
 Fairfax works with Orca on GNOME and with any other screen reader Qt reports to. Every
@@ -215,6 +236,7 @@ the table spells them Ctrl and Alt.
 | `Ctrl+.` | Complete or reopen |
 | `Ctrl+D` | Duplicate |
 | `Ctrl+1`…`Ctrl+5`, `Ctrl+0` | All, Today, Starred, Scheduled, Done; Inbox |
+| `Ctrl+Shift+P` | My Day |
 | `Ctrl+↑` / `Ctrl+↓` | Previous / next list |
 | `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Move the task up / down |
 | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` | Collapse / expand every project |

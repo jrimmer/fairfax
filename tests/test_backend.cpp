@@ -17,6 +17,9 @@ class BackendTest : public QObject {
         std::unique_ptr<Backend> backend;
         Fixture() {
             store.open(dir.filePath("t.db"));
+            // These tests are about the panes and actions, not the landing
+            // view; keep them on the old behaviour (restore ui.source).
+            store.setSetting("ui.defaultView", "last");
             backend = std::make_unique<Backend>(&store);
             backend->ensureDefaults();
         }
@@ -486,6 +489,7 @@ private slots:
         {
             Store store;
             QVERIFY(store.open(dir.filePath("t.db")));
+            store.setSetting("ui.defaultView", "last");
             Backend first(&store);
             first.ensureDefaults();
             first.selectSource("list:" + QString::number(store.lists().keys().first()));
@@ -496,6 +500,7 @@ private slots:
         }
         Store store;
         QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "last");
         Backend backend(&store);
         bool hasList = false, hasTask = false;
         for (const auto &row : backend.sidebar()->rows())
@@ -523,6 +528,7 @@ private slots:
         QTemporaryDir dir;
         Store store;
         QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "last");
         {
             Backend seed(&store);
             seed.ensureDefaults();
@@ -841,8 +847,116 @@ private slots:
         Fixture f;
         QVERIFY(!f.backend->soundex());
         f.backend->setSoundex(true);
+        f.store.setSetting("ui.defaultView", "last");
         Backend again(&f.store);
         QVERIFY(again.soundex());
+    }
+
+    // A fresh database opens on My Day, the new default view.
+    void freshStoreOpensOnMyDay() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        Backend backend(&store);
+        QCOMPARE(backend.sourceKey(), QString("myday"));
+    }
+
+    // Ctrl+N in My Day keeps the new task in the pane so its editor shows,
+    // like Today does, instead of silently dropping it from every section.
+    void newTaskInMyDayShowsItsEditor() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "myday");
+        Backend backend(&store);
+        backend.ensureDefaults();
+        backend.selectSource("myday");
+        backend.newTask();
+        const qint64 id = backend.editingTaskId();
+        QVERIFY(id > 0);
+        bool editingRow = false;
+        for (const auto &row : backend.tasks()->rows())
+            editingRow = editingRow || (row.value("editing").toBool() && row.value("taskId").toLongLong() == id);
+        QVERIFY(editingRow);
+    }
+
+    // With My Day off, the fresh default falls back to Today.
+    void myDayOffOpensOnToday() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("myday.enabled", false);
+        Backend backend(&store);
+        QCOMPARE(backend.sourceKey(), QString("today"));
+    }
+
+    // "last" restores the previous source, as the app did before this slice.
+    void defaultViewLastRestoresTheSource() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "last");
+        store.setSetting("ui.source", "starred");
+        Backend backend(&store);
+        QCOMPARE(backend.sourceKey(), QString("starred"));
+    }
+
+    // A chosen focus list opens on it.
+    void defaultViewOpensAChosenFocusList() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "all");
+        Backend backend(&store);
+        QCOMPARE(backend.sourceKey(), QString("all"));
+    }
+
+    // A chosen list opens on it, and one that has been deleted or archived
+    // falls back to Today.
+    void defaultViewOpensAChosenList() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        Backend seed(&store);
+        seed.ensureDefaults();
+        const qint64 list = store.lists().keys().first();
+        store.setSetting("ui.defaultView", QStringLiteral("list:%1").arg(list));
+        QCOMPARE(Backend(&store).sourceKey(), QStringLiteral("list:%1").arg(list));
+        TaskList l = store.list(list);
+        l.deleted = true;
+        store.begin("delete", false);
+        store.putList(l);
+        store.commit();
+        QCOMPARE(Backend(&store).sourceKey(), QString("today"));
+
+        // An archived list is not offered by the Settings combo, so the
+        // resolver falls back the same way.
+        Store archived;
+        QVERIFY(archived.open(dir.filePath("a.db")));
+        Backend ensure(&archived);
+        ensure.ensureDefaults();
+        const qint64 other = archived.lists().keys().first();
+        TaskList al = archived.list(other);
+        al.archived = true;
+        archived.begin("archive", false);
+        archived.putList(al);
+        archived.commit();
+        archived.setSetting("ui.defaultView", QStringLiteral("list:%1").arg(other));
+        QCOMPARE(Backend(&archived).sourceKey(), QString("today"));
+    }
+
+    // Remembering My Day while it is off falls back to Today, so the feature
+    // being off leaves the launch as it was before My Day existed.
+    void lastMyDayWithFeatureOffFallsBackToToday() {
+        QTemporaryDir dir;
+        Store store;
+        QVERIFY(store.open(dir.filePath("t.db")));
+        store.setSetting("ui.defaultView", "last");
+        store.setSetting("ui.source", "myday");
+        store.setSetting("myday.enabled", false);
+        Backend backend(&store);
+        QCOMPARE(backend.sourceKey(), QString("today"));
+        QVERIFY(!backend.sourceIsMyDay());
     }
 
     void exactMatchMeansWholeWords() {

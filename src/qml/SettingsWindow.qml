@@ -327,6 +327,21 @@ Window {
                         Hint { text: "The number on the badge comes from Alerts > Badge shows." }
                     }
                     RowLayout {
+                        Label { text: "Default view"; Layout.preferredWidth: 160 }
+                        ComboBox {
+                            objectName: "setting:ui.defaultView"
+                            Accessible.name: "Default view"
+                            // My Day appears only while it is on; a deleted list's
+                            // entry disappears here and falls back to Today.
+                            textRole: "name"
+                            valueRole: "id"
+                            model: backend.defaultViewChoices
+                            implicitContentWidthPolicy: ComboBox.WidestText
+                            currentIndex: Math.max(0, model.findIndex(c => c.id === String(root.value("ui.defaultView", "myday"))))
+                            onActivated: (i) => backend.setSetting("ui.defaultView", model[i].id)
+                        }
+                    }
+                    RowLayout {
                         Label { text: "Week starts on"; Layout.preferredWidth: 160 }
                         ComboBox {
                             objectName: "setting:general.weekStart"
@@ -564,6 +579,7 @@ Window {
                         }
                     }
                     Toggle { key: "myday.prompt"; fallback: false; label: "Offer to plan on the first launch of the day"; enabled: root.bool("myday.enabled", true) }
+                    Hint { text: "My Day is a daily plan built from dates, not a separate field: add to today sets a task's due date (or its start date when its deadline is later), and the capacity line counts the durations of today's tasks against the free time left between the work day's ends." }
                 }
 
                 // Today & Lists

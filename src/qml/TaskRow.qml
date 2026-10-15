@@ -213,6 +213,23 @@ Item {
         height: root.lineHeight
         spacing: 10
 
+        // My Day's reason for a row in Overdue or Suggestions: a muted chip.
+        Rectangle {
+            objectName: "myDayReason:" + (root.r.taskId || 0)
+            visible: !!root.r.reason
+            anchors.verticalCenter: parent.verticalCenter
+            width: reasonText.implicitWidth + 12
+            height: reasonText.implicitHeight + 4
+            radius: height / 2
+            color: theme.mix(theme.background, theme.foreground, 0.08)
+            Text {
+                id: reasonText
+                anchors.centerIn: parent
+                text: root.r.reason || ""
+                color: theme.muted
+                font.pixelSize: backend.fontSize - 3
+            }
+        }
         // List name, always in focus lists when chosen in Settings, or while
         // Alt is held.
         Text {

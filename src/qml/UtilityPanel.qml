@@ -78,16 +78,42 @@ Rectangle {
             Layout.rightMargin: 16
             spacing: 6
             Item { Layout.fillWidth: true }
-            IconButton { objectName: "utilityTabTags"; icon: "tag"; checked: root.tab === 0; tip: "Tags"; onClicked: root.tab = 0 }
-            IconButton { objectName: "utilityTabLocations"; icon: "pin"; checked: root.tab === 1; tip: "Locations"; onClicked: root.tab = 1 }
+            // My Day replaces the tags panel with the expanded Day Bar.
+            Text {
+                visible: backend.sourceIsMyDay
+                text: "Day"
+                color: theme.foreground
+                font.pixelSize: backend.fontSize + 1
+                font.weight: Font.Bold
+            }
             Item { Layout.fillWidth: true }
+            IconButton { objectName: "utilityTabTags"; visible: !backend.sourceIsMyDay; icon: "tag"; checked: root.tab === 0; tip: "Tags"; onClicked: root.tab = 0 }
+            IconButton { objectName: "utilityTabLocations"; visible: !backend.sourceIsMyDay; icon: "pin"; checked: root.tab === 1; tip: "Locations"; onClicked: root.tab = 1 }
+            Item { Layout.fillWidth: true }
+        }
+
+        // My Day: the expanded timeline, with the tasks' blocks on it.
+        DayBar {
+            objectName: "myDayTimeline"
+            visible: backend.sourceIsMyDay && !!calendar && calendar.sources.length > 0
+            forceExpanded: true
+            Layout.fillWidth: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            Layout.fillHeight: true
+        }
+        // Entering My Day hides the tab strip; reset to the tags tab so the
+        // Locations list can never show under the Day title.
+        Connections {
+            target: backend
+            function onViewChanged() { if (backend.sourceIsMyDay) root.tab = 0 }
         }
 
         // Tag Search.
         TextField {
             id: search
             objectName: "tagSearch"
-            visible: root.searchActive && root.tab === 0
+            visible: root.searchActive && root.tab === 0 && !backend.sourceIsMyDay
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 12
@@ -102,7 +128,7 @@ Rectangle {
         // ------------------------------------------------------------ tags
         ListView {
             id: tagList
-            visible: root.tab === 0
+            visible: root.tab === 0 && !backend.sourceIsMyDay
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -303,7 +329,7 @@ Rectangle {
         // ------------------------------------------------------- locations
         ListView {
             id: placeList
-            visible: root.tab === 1
+            visible: root.tab === 1 && !backend.sourceIsMyDay
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true

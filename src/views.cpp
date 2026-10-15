@@ -9,7 +9,7 @@
 namespace {
 
 const QLocale English(QLocale::English, QLocale::UnitedKingdom);
-const char *SourceNames[] = {"all", "today", "starred", "scheduled", "done", "list", "project"};
+const char *SourceNames[] = {"all", "today", "starred", "scheduled", "done", "list", "project", "myday"};
 
 QString dayTitle(const QDate &date, const QDate &today) {
     const qint64 days = today.daysTo(date);
@@ -49,10 +49,14 @@ struct Placement {
 }  // namespace
 
 QString Source::key() const {
+    if (kind == MyDay)
+        return QStringLiteral("myday");
     return kind >= List ? QStringLiteral("%1:%2").arg(SourceNames[kind]).arg(id) : QString(SourceNames[kind]);
 }
 
 Source Source::fromKey(const QString &key) {
+    if (key == QLatin1String("myday"))
+        return Source{MyDay, 0};
     const auto parts = key.split(':');
     for (int k = All; k <= Project; ++k) {
         if (parts.value(0) == SourceNames[k])
@@ -239,6 +243,7 @@ QString ViewBuilder::sourceTitle(const Source &s) const {
     case Source::Done: return QStringLiteral("Done");
     case Source::List: return m_store.list(s.id).name;
     case Source::Project: return m_store.task(s.id).title;
+    case Source::MyDay: return QStringLiteral("My Day");
     }
     return {};
 }
@@ -251,6 +256,7 @@ bool ViewBuilder::matchesFocus(const Task &t, int kind) const {
     case Source::Starred: return !t.completed && t.starred;
     case Source::Scheduled: return !t.completed && Schedule::isScheduled(t, m_now);
     case Source::Done: return t.completed && list.showInDone;
+    case Source::MyDay: return false;  // My Day has its own pane, not a filter over this list.
     }
     return false;
 }

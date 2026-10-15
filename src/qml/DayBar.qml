@@ -13,6 +13,10 @@ Item {
     id: root
 
     property bool expanded: false
+    // The My Day utility panel wants the timeline always open without
+    // touching the remembered expanded state of the list's own bar.
+    property bool forceExpanded: false
+    readonly property bool isExpanded: expanded || forceExpanded
     // Days away from today that the bar shows; 0 is today.
     property int dayOffset: 0
     // Today's date, kept current by the minute timer independently of dayOffset
@@ -222,7 +226,7 @@ Item {
                 objectName: "dayBarToggle"
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.expanded = !root.expanded
+                onClicked: if (!root.forceExpanded) root.expanded = !root.expanded
             }
 
             // Browse other days: a "Today" link appears once away from today.
@@ -392,16 +396,16 @@ Item {
         // The expanded hour grid.
         Flickable {
             id: grid
-            visible: root.expanded
+            visible: root.isExpanded
             width: parent.width
-            height: root.expanded ? 360 : 0
+            height: root.isExpanded ? 360 : 0
             contentWidth: width
             contentHeight: root.hourCount * root.rowHeight + 8
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
             readonly property real labelWidth: 48
-            readonly property var slots: root.expanded && root.events
+            readonly property var slots: root.isExpanded && root.events
                 ? calendar.freeSlots(root.isoDate, root.isToday ? Math.max(root.firstMinute, root.nowMinute) : root.firstMinute, root.lastMinute) : []
 
             function yFor(minute) { return (minute - root.firstMinute) / 60 * root.rowHeight + 4 }
