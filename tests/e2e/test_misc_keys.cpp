@@ -167,6 +167,7 @@ const QHash<QString, QString> &exemptions() {
         {"Escape", "E2EMiscKeys:returnEditsAndEscapeFinishes"},
         {"Space", "E2EMiscKeys:spaceOpensQuickLook"},
         {"Ctrl+S", "E2EMiscKeys:ctrlSSyncsNow"},
+        {"Ctrl+Shift+P", "test_myday.cpp:itemAndShortcutOpenMyDayAndAnotherLeaves"},
         {"+", "E2EMiscKeys:plusRaisesPriorityLikeEquals"},
     };
     return map;

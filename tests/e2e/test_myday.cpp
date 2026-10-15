@@ -91,14 +91,16 @@ Seed seedMyDayOff(Store &store) {
 }
 
 // An .ics with one event today, 10:00-11:00, as the calendar e2e tests write.
-QString writeCalendar(const QString &dir) {
-    const QString path = dir + "/myday.ics";
+QString writeCalendar(const QString &dir, const QString &name = "myday.ics", int endHour = 11) {
+    const QString path = dir + "/" + name;
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly))
         return {};
     const QString today = QDate::currentDate().toString("yyyyMMdd");
+    const QString end = QString("%1%2").arg(endHour, 2, 10, QLatin1Char('0')).arg("0000");
     QString text = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//e2e//EN\r\n";
-    text += QString("BEGIN:VEVENT\r\nUID:a@e2e\r\nDTSTAMP:20270101T000000Z\r\nDTSTART:%1T100000\r\nDTEND:%1T110000\r\nSUMMARY:Standup\r\nEND:VEVENT\r\n").arg(today);
+    text += QString("BEGIN:VEVENT\r\nUID:a@e2e\r\nDTSTAMP:20270101T000000Z\r\nDTSTART:%1T100000\r\nDTEND:%1T%2\r\nSUMMARY:Standup\r\nEND:VEVENT\r\n")
+                .arg(today, end);
     text += "END:VCALENDAR\r\n";
     f.write(text.toUtf8());
     return path;
@@ -185,6 +187,11 @@ private slots:
         QCOMPARE(app.backend().sourceKey(), QString("myday"));
         QVERIFY(app.backend().sourceIsMyDay());
         QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("My Day"), 5000);
+        // The header shows the date beside the title, as Today's does.
+        QQuickItem *date = findItem("paneDate");
+        QVERIFY(date);
+        QVERIFY(date->property("visible").toBool());
+        QCOMPARE(date->property("text").toString(), app.backend().sourceSubtitle());
 
         QVERIFY(app.openSource("all"));
         QVERIFY(!app.backend().sourceIsMyDay());
@@ -212,6 +219,60 @@ private slots:
         s.lastView = false;
         QVERIFY(s.start());
         QCOMPARE(s->backend().sourceKey(), QString("today"));
+    }
+
+    // A remembered My Day view with My Day switched off opens on Today: the
+    // feature being off leaves the launch as it was before My Day existed.
+    void lastMyDayWithFeatureOffOpensToday() {
+        Session s;
+        s.seed = seedMyDay;
+        QVERIFY(s.start());
+        QVERIFY(s->openSource("myday"));
+        s->backend().setSetting("ui.defaultView", "last");
+        QVERIFY(s.restart());
+        QCOMPARE(s->backend().sourceKey(), QString("myday"));
+        // Now switch My Day off and relaunch: today, not a disabled feature.
+        QVERIFY(s.start());
+        s->backend().setSetting("myday.enabled", false);
+        QVERIFY(s.restart());
+        QCOMPARE(s->backend().sourceKey(), QString("today"));
+        QVERIFY(!s->backend().sourceIsMyDay());
+    }
+
+    // The Default view combo in Settings > General is the real control: it
+    // changes the choice the next launch opens on.
+    void defaultViewComboChangesTheLaunchView() {
+        Session s;
+        s.lastView = false;
+        QVERIFY(s.start());
+        QQuickWindow *sw = nullptr;
+        openSettings(*s, sw);
+        selectPane(sw, "General");
+        // My Day is first while it is on; Today sits two below it.
+        chooseCombo("setting:ui.defaultView", 2);
+        QCOMPARE(s->backend().setting("ui.defaultView").value("value").toString(), QString("today"));
+        closeSettings(*s);
+        QVERIFY(s.restart());
+        QCOMPARE(s->backend().sourceKey(), QString("today"));
+
+        // A chosen list is in the combo by name, and the next launch opens it.
+        QVERIFY(s->openSource("myday"));
+        openSettings(*s, sw);
+        selectPane(sw, "General");
+        QQuickItem *combo = findItem("setting:ui.defaultView");
+        QVERIFY(combo);
+        int home = -1;
+        for (int i = 0; i < combo->property("count").toInt() && home < 0; ++i) {
+            QString label;
+            QMetaObject::invokeMethod(combo, "textAt", Q_RETURN_ARG(QString, label), Q_ARG(int, i));
+            if (label == "Home")
+                home = i;
+        }
+        QVERIFY2(home >= 0, "no Home entry in the Default view combo");
+        chooseCombo("setting:ui.defaultView", home);
+        closeSettings(*s);
+        QVERIFY(s.restart());
+        QCOMPARE(s->backend().sourceKey(), lk(s.ids.home));
     }
 
     // "last" restores the view the app was last on.
@@ -309,6 +370,23 @@ private slots:
         app.store().commit();
         QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("1h 30m planned"), 5000);
         QCOMPARE(app.backend().myDayCapacityMap().value("plannedMinutes").toInt(), 90);
+    }
+
+    // The capacity line follows an asynchronous calendar refresh: a second
+    // event appears and the free time shrinks without leaving My Day.
+    void capacityFollowsCalendarRefresh() {
+        QTemporaryDir dir;
+        App app(seedMyDay);
+        QVERIFY(app.ok);
+        QVERIFY(!writeCalendar(dir.path(), "one.ics").isEmpty());
+        app.services().calendar.setClock([] { return QDateTime(QDate::currentDate(), QTime(9, 0)); });
+        app.services().calendar.setSources({dir.path() + "/one.ics"});
+        QVERIFY(app.openSource("myday"));
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().myDayCapacityMap().value("freeMinutes").toInt(), 7 * 60, 5000);
+        // A two-hour event replaces the one-hour one.
+        QVERIFY(!writeCalendar(dir.path(), "two.ics", 12).isEmpty());
+        app.services().calendar.setSources({dir.path() + "/two.ics"});
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().myDayCapacityMap().value("freeMinutes").toInt(), 6 * 60, 5000);
     }
 
     // Overdue is capped at seven with an "n more" row that expands it, and

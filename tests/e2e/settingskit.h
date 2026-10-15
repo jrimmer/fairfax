@@ -673,7 +673,7 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"mail.oauth", "E2EMailOAuth::importClientJsonThenSignInWithGoogle"},
         // My Day: E2EMyDay drives the sidebar item, the shortcut, the screen and
         // the Default View setting through the UI.
-        {"ui.defaultView", "E2EMyDay::itemAndShortcutOpenMyDayAndAnotherLeaves"},
+        {"ui.defaultView", "E2EMyDay::defaultViewComboChangesTheLaunchView"},
         // The Shortcuts pane stores each remappable command under this prefix.
         {"shortcuts.", "E2EShortcuts::rebindAppCommandPersists"},
     };
