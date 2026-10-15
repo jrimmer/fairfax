@@ -43,13 +43,13 @@ bool isShorthandName(const QString &argv0, bool windowsStyle = kWindowsNames);
 int shorthand(Store &store, const QStringList &args, QTextStream &out, QTextStream &err);
 
 // The local socket the running window listens on, one per user and database.
-// An empty `dbPath` means the default database; main() hashes the --db path it
-// was given, and ctl resolves the same path through databasePath().
-QString socketName(const QString &dbPath);
+// `dbKey` is the raw --db argument main() was given (empty for the default
+// database), because the running instance hashes exactly that.
+QString socketName(const QString &dbKey);
 
 // Sends one request to the running window ("myday", "show", "open", …).
 // Returns false with `error` set when no instance is listening, so a headless
 // `fairfax ctl myday` can say so instead of doing nothing.
-bool sendToRunning(const QString &dbPath, const QString &request, QString *error = nullptr);
+bool sendToRunning(const QString &dbKey, const QString &request, QString *error = nullptr);
 
 }  // namespace Cli

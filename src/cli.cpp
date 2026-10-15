@@ -37,17 +37,17 @@ bool isShorthandName(const QString &argv0, bool windowsStyle) {
     return info.completeBaseName().compare(QLatin1String("frfx"), Qt::CaseInsensitive) == 0;
 }
 
-QString socketName(const QString &dbPath) {
-    // One instance per user and database, matching main()'s own socket. An
-    // empty path means the default database, which carries no hash.
+QString socketName(const QString &dbKey) {
+    // One instance per user and database, matching main()'s own socket: the
+    // default database has no suffix, a --db database carries its hash.
     const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME", "user"));
-    const QString key = dbPath.isEmpty() ? QStringLiteral("default") : dbPath;
-    return QStringLiteral("fairfax-%1").arg(user) + "-" + QString::number(qHash(key));
+    return QStringLiteral("fairfax-%1").arg(user)
+           + (dbKey.isEmpty() ? QString() : "-" + QString::number(qHash(dbKey)));
 }
 
-bool sendToRunning(const QString &dbPath, const QString &request, QString *error) {
+bool sendToRunning(const QString &dbKey, const QString &request, QString *error) {
     QLocalSocket client;
-    client.connectToServer(socketName(dbPath));
+    client.connectToServer(socketName(dbKey));
     if (!client.waitForConnected(300)) {
         if (error)
             *error = QStringLiteral("Fairfax isn't running; open it first.");

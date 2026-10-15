@@ -211,6 +211,10 @@ int runHeadless(int argc, char *argv[]) {
 #endif
     }
     const QString dbPath = databasePath(args);
+    // The running window names its socket after the raw --db argument, so ctl
+    // must too: capturing it before the argument is removed below.
+    const int dbAt = args.indexOf("--db");
+    const QString dbKey = (dbAt >= 0 && dbAt + 1 < args.size()) ? args.at(dbAt + 1) : QString();
     if (const int i = args.indexOf("--db"); i >= 0)
         args.remove(i, qMin<qsizetype>(2, args.size() - i));
     Store store;
@@ -313,11 +317,11 @@ int runHeadless(int argc, char *argv[]) {
         return 0;
     }
     Automation automation(store);
-    if (mode == "myday") {
+    if (mode == "ctl" && args.value(2) == "myday") {
         // Open the running window in My Day mode, as the sidebar item and
         // Ctrl+Shift+P do. Without an instance there is nowhere to show it.
         QString sendError;
-        if (!Cli::sendToRunning(dbPath, "myday\n", &sendError)) {
+        if (!Cli::sendToRunning(dbKey, "myday\n", &sendError)) {
             err << "fairfax ctl myday: " << sendError << Qt::endl;
             return 1;
         }
