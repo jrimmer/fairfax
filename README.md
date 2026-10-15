@@ -168,6 +168,20 @@ offers your lists and `frfx done <Tab>` your open tasks.
   the badge colour can be configured in Settings > General.
 - **Undo.** Every change is undoable with Ctrl+Z.
 
+## Accessibility
+
+Fairfax works with Orca on GNOME and with any other screen reader Qt reports to. Every
+button, row, field, menu entry and dialog carries a name and a role, the task list, sidebar
+and calendar answer the keyboard, and a focus ring shows only on keyboard focus. As you move
+around, Orca reads the task list, the sidebar counts, the editor's fields, the Settings
+panes, the search builder rules and each popup's title.
+
+Changes a screen reader would otherwise miss are spoken as they happen: completing or
+reopening a task ("Completed: Call Sam", or "Completed 3 tasks" for a selection), moving it
+to another list, deleting, undoing and redoing, and copying or pasting tasks. A sync or mail
+failure interrupts assertively ("Sync failed: …", "Mail: …"), since the sidebar's warning
+mark is not visible to a screen reader user.
+
 ## Keyboard
 
 the reference app's ⌘ is Ctrl here, since Super belongs to Hyprland. The bare keys work while the task
