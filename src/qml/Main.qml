@@ -105,7 +105,8 @@ ApplicationWindow {
     }
 
     // Selecting Done with 500+ completed tasks and auto-delete off asks once
-    // whether to open the setting, as the reference app does.    Connections {
+    // whether to open the setting, as the reference app does.
+    Connections {
         target: backend
         function onDoneWarningRequested() { if (win.active) doneWarning.open() }
     }
@@ -150,6 +151,10 @@ ApplicationWindow {
         onRejected: backend.myDayPromptAnswered(false)
         onClosed: win.focusList()
     }
+    // The first show of the day is a plain launch, where visible is already
+    // true and no visibleChanged fires; onVisibleChanged covers a window that
+    // starts in the tray and is shown later, and onCompleted the normal case.
+    Component.onCompleted: Qt.callLater(win.maybePlanMyDay)
     // When the day rolls over while the app stays open, the next time the
     // window is shown (or the minute timer ticks with it visible) asks again.
     function maybePlanMyDay() {

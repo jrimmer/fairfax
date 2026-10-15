@@ -641,8 +641,6 @@ private:
     double nextOrder(qint64 listId, qint64 parentId) const;
     void setStatus(const QString &message);
     void applyParsed(Task &task, const ParsedEntry &parsed);
-    // Moves the selection into My Day's first free slot, one task at a time.
-    void blockSelectionNext();
     QStringList listNames() const;
     QStringList locationNames() const;
     QString focusSettingKey() const { return "focus." + m_source.key(); }
