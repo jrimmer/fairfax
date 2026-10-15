@@ -25,7 +25,7 @@ Item {
         border.color: input.activeFocus ? theme.accent : "transparent"
     }
     Icon {
-        objectName: "searchButton"
+        objectName: "searchIcon"
         x: 7
         anchors.verticalCenter: parent.verticalCenter
         name: "search"
