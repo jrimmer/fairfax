@@ -531,15 +531,20 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(app.row(app.ids.electricity) != nullptr, 5000);
     }
 
-    // My Day orders its own sections, so it shows no sort controls, and the
-    // tag-search field never sits above the timeline.
+    // My Day orders its own sections, so it shows no sort controls, and a
+    // tag search cannot sit over the timeline.
     void myDayShowsNoSortControls() {
         App app(seedMyDay);
         QVERIFY(app.ok);
+        // Start a tag search on a list first, then enter My Day.
+        QVERIFY(app.openSource("all"));
+        QVERIFY(tk::waitItem("sortButton"));
+        app.press(Qt::Key_Slash);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("tagSearch") != nullptr, 5000);
         QVERIFY(app.openSource("myday"));
         QCOMPARE(findItem("sortButton"), nullptr);
         QCOMPARE(findItem("sortReverse"), nullptr);
-        QCOMPARE(findItem("tagSearch"), nullptr);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("tagSearch") == nullptr, 5000);
         // Leaving My Day brings them back.
         QVERIFY(app.openSource("all"));
         QVERIFY(tk::waitItem("sortButton"));
