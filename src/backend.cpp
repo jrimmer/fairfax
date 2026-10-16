@@ -3550,13 +3550,12 @@ QString Backend::agentDiagnostics() const {
 }
 
 void Backend::dismissProposal(qint64 id) {
-    if (!m_store->proposals().isEmpty() && id) {
-        bool found = false;
-        for (const Proposal &p : m_store->proposals())
-            if (p.id == id) found = true;
-        if (!found)
-            return;
-    }
+    bool found = false;
+    for (const Proposal &p : m_store->proposals())
+        if (p.id == id)
+            found = true;
+    if (!found)
+        return;
     m_store->begin("Dismiss Suggestion", false);
     m_store->removeProposal(id);
     m_store->commit();

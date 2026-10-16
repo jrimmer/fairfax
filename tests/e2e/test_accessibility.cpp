@@ -1169,6 +1169,37 @@ private slots:
         app.backend().dismissProposal(q.id);
         QVERIFY(waitUntil([&] { return log.saw("Suggestion dismissed"); }));
     }
+
+    // The proposal sheet's controls are all named: the rows, the per-row Apply
+    // and Dismiss buttons, and the sheet's own footer.
+    void proposalSheetIsNamed() {
+        auto seed = [](Store &store) {
+            Seed ids = seedWorld(store);
+            store.setSetting("agent.enabled", true);
+            return ids;
+        };
+        App app(seed);
+        QVERIFY(app.ok);
+        Proposal p;
+        p.kind = "set-due-date";
+        p.payload = {{"taskId", app.ids.shelf}, {"due", "2026-08-01"}};
+        app.store().begin("add proposal");
+        p.id = app.store().nextId("proposals");
+        app.store().putProposal(p);
+        app.store().commit();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 1, 5000);
+
+        QQuickItem *button = tk::waitItem("suggestionsButton");
+        QVERIFY(button);
+        QTest::mouseMove(app.window, centreOf(button));
+        QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, centreOf(button));
+        QQuickItem *list = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((list = findItem("proposalList")) != nullptr, 5000);
+        QCOMPARE(list->property("count").toInt(), 1);
+        settleWindow(app.window);
+        checkState("proposal sheet");
+        QVERIFY(tk::clickNamed("proposalClose"));
+    }
 };
 
 REGISTER_TEST(E2EAccessibility)
