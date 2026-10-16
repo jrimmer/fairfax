@@ -10,6 +10,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 
+#include "myday.h"
 #include "schedule.h"
 #include "store.h"
 
@@ -176,6 +177,11 @@ AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_s
         }
     });
     m_nagTimer.start();
+    // My Day's end-of-day reminder: checked every half-minute, so it lands at
+    // the work day's end while the app is running. It fires once a day.
+    m_myDayTimer.setInterval(30 * 1000);
+    connect(&m_myDayTimer, &QTimer::timeout, this, &AlarmService::checkMyDayReview);
+    m_myDayTimer.start();
     // Alarms that came due while Fairfax wasn't running go off now.
     QTimer::singleShot(1500, this, &AlarmService::check);
 }
@@ -226,6 +232,37 @@ void AlarmService::schedule() {
     m_timer.start(int(wait));
 }
 
+void AlarmService::checkMyDayReview() {
+    const QDateTime now = MyDay::now();
+    if (!MyDay::shutdownPromptDue(*m_store, now))
+        return;
+    // Marked before showing, so a second tick cannot double-fire while the
+    // notification is up.
+    MyDay::markShutdownPrompted(*m_store, now.date());
+    showReviewNotification();
+}
+
+void AlarmService::showReviewNotification() {
+    const QString title = QStringLiteral("Review your day");
+    const QString body = QStringLiteral("My Day: finish off what is still today.");
+    // Test hook: what would have been shown, whatever the platform does with it.
+    emit notified(title, body, 0);
+#if !defined(Q_OS_LINUX)
+    emit showFallback(title, body, 0);
+#else
+    QDBusMessage call = QDBusMessage::createMethodCall(Service, Path, Interface, "Notify");
+    QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-fairfax.myday"},
+                      {"desktop-entry", "fairfax"}};
+    QStringList actions{"default", "Open", "myday-review", "Review today"};
+    call << QStringLiteral("Fairfax") << uint(0) << QStringLiteral("fairfax") << title << body << actions << hints << int(0);
+    const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
+    if (reply.isValid())
+        m_reviewNotifications.insert(reply.value());
+    else
+        qWarning("fairfax: couldn't show the review reminder: %s", qPrintable(reply.error().message()));
+#endif
+}
+
 void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment) {
     const ScheduleSettings settings;
     QString body = Schedule::dueHint(t, QDateTime::currentDateTime(), settings);
@@ -237,6 +274,8 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     const QString teaser = AlarmTimes::notesTeaser(t.notes);
     if (!teaser.isEmpty())
         body += (body.isEmpty() ? "" : "\n") + teaser;
+    // Test hook: what would have been shown, whatever the platform does with it.
+    emit notified(t.title, body, t.id);
 
 #if !defined(Q_OS_LINUX)
     emit showFallback(t.title, body, t.id);
@@ -370,6 +409,10 @@ void AlarmService::onClosed(uint id, uint reason) {
 }
 
 void AlarmService::onAction(uint id, const QString &key) {
+    if (key == "myday-review" || m_reviewNotifications.remove(id)) {
+        emit myDayReviewRequested();
+        return;
+    }
     if (!m_notifications.contains(id))
         return;
     const qint64 alarmId = m_notifications.take(id);

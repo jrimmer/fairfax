@@ -627,6 +627,12 @@ int main(int argc, char *argv[]) {
         });
         QObject::connect(alarms.get(), &AlarmService::completeTask, &backend, [&backend](qint64 id) { backend.toggleComplete(id); });
         QObject::connect(alarms.get(), &AlarmService::performAction, &backend, [&backend](qint64 id) { backend.performAction(id); });
+        // The end-of-day reminder opens the shutdown review when clicked.
+        QObject::connect(alarms.get(), &AlarmService::myDayReviewRequested, &backend, [&backend] {
+            backend.selectSource("myday");
+            backend.myDayReview();
+            backend.requestWindow();
+        });
         app.setQuitOnLastWindowClosed(!store.setting("general.keepRunning", true).toBool());
     }
 

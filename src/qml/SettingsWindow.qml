@@ -579,6 +579,7 @@ Window {
                         }
                     }
                     Toggle { key: "myday.prompt"; fallback: false; label: "Offer to plan on the first launch of the day"; enabled: root.bool("myday.enabled", true) }
+                    Toggle { key: "myday.shutdownPrompt"; fallback: false; label: "Remind me to review the day when work ends"; enabled: root.bool("myday.enabled", true) }
                     Hint { text: "My Day is a daily plan built from dates, not a separate field: add to today sets a task's due date (or its start date when its deadline is later), and the capacity line counts the durations of today's tasks against the free time left between the work day's ends." }
                 }
 

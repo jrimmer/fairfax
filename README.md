@@ -186,6 +186,15 @@ for a task with no duration), `r` removes it to tomorrow, and `h` hides a sugges
 rest of the day. They are in Settings → Shortcuts under *My Day* and can be rebound; in an
 ordinary list those bare keys do nothing. `fairfax ctl myday` opens a running window on My Day.
 
+The day does not only start with a plan: after the work day's end (or any time through
+*Review today* in the plan header) My Day opens its shutdown review. It lists the tasks
+still due today, and the header reports `Completed today: N · planned Xh Ym, done Xh Ym`,
+where *done* sums the durations of the tasks completed today. `y` moves a task to
+tomorrow, `d` picks a date, `r` sends it back to its list, and Return (or *Finish*) leaves
+the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
+posts a "Review your day" notification at the work day's end that opens the review when
+clicked; it fires once a day.
+
 Settings → Tasks has the switches: *Enable My Day*, the work day's start and end (which the
 capacity line measures against), and *Offer to plan on the first launch of the day* (the
 once-a-day prompt). With My Day off, the sidebar item, its shortcut and the prompt are gone

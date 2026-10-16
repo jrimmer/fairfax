@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QHash>
 #include <QObject>
+#include <QSet>
 #include <QTimer>
 #include <QVector>
 #include <optional>
@@ -74,6 +75,11 @@ public:
     QVector<Alarm> due(const QDateTime &now) const;
     void check();
 
+    // My Day's end-of-day reminder, setting `myday.shutdownPrompt`: at the
+    // work day's end it shows "Review your day" once, through the same
+    // notification path as an alarm. Clicking it opens the shutdown review.
+    void checkMyDayReview();
+
 signals:
     void openTask(qint64 taskId);
     void completeTask(qint64 taskId);
@@ -82,10 +88,16 @@ signals:
     // Where there's no freedesktop notification service (macOS, Windows),
     // alarms are shown through this instead, by the tray icon.
     void showFallback(const QString &title, const QString &body, qint64 taskId);
+    // The end-of-day reminder was clicked: open My Day's shutdown review.
+    void myDayReviewRequested();
+    // Test hook: every notification this service shows, so a test can assert
+    // what would have appeared without a notification daemon.
+    void notified(const QString &title, const QString &body, qint64 taskId);
 
 private:
     void schedule();
     void notify(const Alarm &alarm, const Task &task, const QDateTime &moment);
+    void showReviewNotification();
     void markFired(const Alarm &alarm, const QDateTime &moment);
     void snooze(qint64 alarmId, const QDateTime &until);
     void closeStale();
@@ -103,7 +115,9 @@ private:
     Store *m_store;
     QTimer m_timer;
     QHash<uint, qint64> m_notifications;  // Notification id → alarm id.
+    QSet<uint> m_reviewNotifications;     // Notification ids that are the end-of-day reminder.
     QHash<qint64, QDateTime> m_nagging;   // Alarm id → when to remind again.
     QTimer m_nagTimer;
+    QTimer m_myDayTimer;
     bool m_connected = false;
 };

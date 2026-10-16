@@ -42,6 +42,27 @@ struct Sections {
 // sections. Empty while `myday.enabled` is off.
 Sections sections(const Store &store, const QDateTime &now);
 
+// The shutdown review's numbers. completedCount is how many tasks were
+// completed today; plannedMinutes is the open Already today set's durations,
+// as the capacity line counts them; doneMinutes is the durations of the tasks
+// completed today. Empty while `myday.enabled` is off.
+struct Summary {
+    int completedCount = 0;
+    int plannedMinutes = 0;
+    int doneMinutes = 0;
+};
+Summary summary(const Store &store, const QDateTime &now);
+
+// Whether the work day is over at `now`: the shutdown review is what opening
+// My Day lands on after this. False while `myday.enabled` is off.
+bool workEnded(const Store &store, const QDateTime &now);
+
+// The end-of-day reminder, setting `myday.shutdownPrompt` (default false): due
+// when My Day is on and the setting is on, the work day is over, and the
+// reminder has not already fired today. It fires only once a day.
+bool shutdownPromptDue(const Store &store, const QDateTime &now);
+void markShutdownPrompted(Store &store, const QDate &day);
+
 // What the header line reports:
 //  - plannedMinutes: the durations of Already today's tasks (a project's
 //    sub-tasks count once each, a parent project itself does not);
@@ -75,5 +96,8 @@ int nextFreeSlot(const Store &store, const CalendarFeed &calendar, const QDateTi
 // plan.
 QDate lastPlanned(const Store &store);
 void markPlanned(Store &store, const QDate &day);
+
+// Bookkeeping: the once-a-day end-of-day reminder remembers the day it fired.
+QDate lastShutdownPrompted(const Store &store);
 
 }  // namespace MyDay

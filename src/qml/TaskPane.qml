@@ -170,7 +170,7 @@ Item {
             // My Day's capacity line: planned against the free time left today.
             RowLayout {
                 objectName: "myDayCapacity"
-                visible: backend.sourceIsMyDay
+                visible: backend.sourceIsMyDay && !backend.myDayShutdown
                 spacing: 6
                 Layout.alignment: Qt.AlignBaseline
                 readonly property int planned: Number(backend.myDayCapacityMap.plannedMinutes || 0)
@@ -199,6 +199,46 @@ Item {
                     color: theme.faint
                     font.pixelSize: backend.fontSize - 1
                 }
+            }
+            // The shutdown review's summary line: completed today, planned and
+            // done minutes.
+            RowLayout {
+                objectName: "myDaySummary"
+                visible: backend.sourceIsMyDay && backend.myDayShutdown
+                spacing: 6
+                Layout.alignment: Qt.AlignBaseline
+                readonly property int completed: Number(backend.myDaySummaryMap.completedCount || 0)
+                readonly property int planned: Number(backend.myDaySummaryMap.plannedMinutes || 0)
+                readonly property int done: Number(backend.myDaySummaryMap.doneMinutes || 0)
+                Text {
+                    text: "Completed today: " + parent.completed
+                    color: theme.muted
+                    font.pixelSize: backend.fontSize + 1
+                }
+                Text { text: "·"; color: theme.faint; font.pixelSize: backend.fontSize + 1 }
+                Text {
+                    text: "planned " + root.formatMinutes(parent.planned) + ", done " + root.formatMinutes(parent.done)
+                    color: theme.muted
+                    font.pixelSize: backend.fontSize + 1
+                }
+            }
+            // The plan header's "Review today" opens the shutdown review at
+            // any time; its "Finish" (or Return) leaves it.
+            Button {
+                objectName: "myDayReview"
+                visible: backend.sourceIsMyDay && !backend.myDayShutdown
+                text: "Review today"
+                flat: true
+                font.pixelSize: backend.fontSize - 1
+                onClicked: backend.myDayReview()
+            }
+            Button {
+                objectName: "myDayFinish"
+                visible: backend.sourceIsMyDay && backend.myDayShutdown
+                text: "Finish"
+                flat: true
+                font.pixelSize: backend.fontSize - 1
+                onClicked: backend.myDayFinishReview()
             }
             Item { Layout.fillWidth: true }
             Text {
@@ -491,6 +531,9 @@ Item {
         if (k === Qt.Key_Down) { backend.moveCursor(1, shift); return done() }
         if (k === Qt.Key_Up) { backend.moveCursor(-1, shift); return done() }
         if (k === Qt.Key_Return || k === Qt.Key_Enter) {
+            // The shutdown review finishes on Return, before the editor's
+            // Return; the Finish button does the same when it has the focus.
+            if (backend.sourceIsMyDay && backend.myDayShutdown) { backend.myDayFinishReview(); return done() }
             // the reference app's option: Return creates a new task and Ctrl+Return edits.
             const returnCreates = backend.settingFlag("tasks.returnCreates", false)
             if (returnCreates !== !!ctrl) backend.newTask(0); else backend.beginEdit()

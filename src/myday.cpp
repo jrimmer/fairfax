@@ -156,6 +156,24 @@ QDate lastPlanned(const Store &store) {
 
 void markPlanned(Store &store, const QDate &day) { store.setSetting("myday.lastPlanned", day.toString(Qt::ISODate)); }
 
+QDate lastShutdownPrompted(const Store &store) {
+    return QDate::fromString(store.setting("myday.lastShutdownPrompted").toString(), Qt::ISODate);
+}
+
+bool shutdownPromptDue(const Store &store, const QDateTime &now) {
+    if (!enabled(store))
+        return false;
+    if (!store.setting("myday.shutdownPrompt", false).toBool())
+        return false;
+    if (!workEnded(store, now))
+        return false;
+    return lastShutdownPrompted(store) != now.date();
+}
+
+void markShutdownPrompted(Store &store, const QDate &day) {
+    store.setSetting("myday.lastShutdownPrompted", day.toString(Qt::ISODate));
+}
+
 Sections sections(const Store &store, const QDateTime &now) {
     Sections out;
     if (!enabled(store))
@@ -220,6 +238,42 @@ Sections sections(const Store &store, const QDateTime &now) {
     }
 
     return out;
+}
+
+Summary summary(const Store &store, const QDateTime &now) {
+    Summary out;
+    if (!enabled(store))
+        return out;
+
+    const QDate today = now.date();
+    const Sections day = sections(store, now);
+    for (const Entry &e : day.today) {
+        const Task t = store.task(e.taskId);
+        if (!t.id || t.type == TaskType::Project || t.duration <= 0)
+            continue;
+        out.plannedMinutes += t.duration;
+    }
+
+    // Done counts every task completed today; the minutes only those with a
+    // duration. A project's own duration is not time spent, so it is left out
+    // of the sum, as the capacity line leaves it out.
+    for (const auto &t : store.tasks()) {
+        if (t.deleted || !t.completed || !t.completedAt.isValid())
+            continue;
+        if (t.completedAt.date() != today)
+            continue;
+        ++out.completedCount;
+        if (t.type != TaskType::Project && t.duration > 0)
+            out.doneMinutes += t.duration;
+    }
+    return out;
+}
+
+bool workEnded(const Store &store, const QDateTime &now) {
+    if (!enabled(store))
+        return false;
+    const int nowMinute = now.time().hour() * 60 + now.time().minute();
+    return nowMinute >= workEnd(store);
 }
 
 Capacity capacity(const Store &store, const CalendarFeed &calendar, const QDateTime &now) {

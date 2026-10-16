@@ -352,8 +352,16 @@ void Backend::selectSource(const QString &key) {
     const Source next = Source::fromKey(key);
     if (next.kind == Source::MyDay && !myDayEnabled())
         return;
-    if (next == m_source)
+    if (next == m_source) {
+        // Pressing My Day again from within My Day after the work day's end
+        // opens the shutdown review, as the shortcut does at that hour.
+        if (next.kind == Source::MyDay && !m_myDayShutdown && MyDay::workEnded(*m_store, MyDay::now())) {
+            m_myDayShutdown = true;
+            rebuild();
+            emit viewChanged();
+        }
         return;
+    }
     endEdit();
     // Remember the Smart List a project is opened from, for "Inherit Search
     // in Project View".
@@ -362,6 +370,12 @@ void Backend::selectSource(const QString &key) {
     else
         m_inheritFrom = 0;
     m_source = next;
+    // Leaving My Day closes its shutdown review; entering it opens the review
+    // when the work day is over.
+    if (next.kind == Source::MyDay)
+        m_myDayShutdown = MyDay::workEnded(*m_store, MyDay::now());
+    else
+        m_myDayShutdown = false;
     // Opening My Day by any route also settles the day's prompt.
     if (next.kind == Source::MyDay)
         markMyDayPlanned();
@@ -3389,6 +3403,27 @@ QVariantMap Backend::myDayCapacity() const {
             {"blockedMinutes", c.blockedMinutes}, {"freeMinutes", c.freeMinutes}, {"windowMinutes", c.windowMinutes}};
 }
 
+QVariantMap Backend::myDaySummary() const {
+    const MyDay::Summary s = MyDay::summary(*m_store, MyDay::now());
+    return {{"completedCount", s.completedCount}, {"plannedMinutes", s.plannedMinutes}, {"doneMinutes", s.doneMinutes}};
+}
+
+void Backend::myDayReview() {
+    if (!myDayEnabled() || m_source.kind != Source::MyDay)
+        return;
+    m_myDayShutdown = true;
+    rebuild();
+    emit viewChanged();
+}
+
+void Backend::myDayFinishReview() {
+    if (!m_myDayShutdown)
+        return;
+    m_myDayShutdown = false;
+    rebuild();
+    emit viewChanged();
+}
+
 void Backend::myDayAdd(const QVariantList &ids) {
     MyDay::addToToday(*m_store, idList(ids));
     emit myDayChanged();
@@ -4697,9 +4732,15 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
         }
     };
 
-    addSection("overdue", "Overdue", "overdue", day.overdue, m_myDayOverdueExpanded ? 0 : 7);
-    addSection("today", "Already today", "progress", day.today, 0);
-    addSection("suggestions", "Suggestions", "", day.suggestions, m_myDaySuggestionsExpanded ? 0 : 15);
+    if (m_myDayShutdown) {
+        // The shutdown review lists only the open Already today tasks, each
+        // with its one-key choices Y, D and R.
+        addSection("today", "Still today", "progress", day.today, 0);
+    } else {
+        addSection("overdue", "Overdue", "overdue", day.overdue, m_myDayOverdueExpanded ? 0 : 7);
+        addSection("today", "Already today", "progress", day.today, 0);
+        addSection("suggestions", "Suggestions", "", day.suggestions, m_myDaySuggestionsExpanded ? 0 : 15);
+    }
     // The sections only hold planned tasks; a brand-new task (Ctrl+N) and
     // other just-touched ones the user expects to see stay in the pane like
     // rebuildTasks keeps them, so the editor is never silently dropped.

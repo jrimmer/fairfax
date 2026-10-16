@@ -38,7 +38,11 @@ class Backend : public QObject {
     Q_PROPERTY(bool sourceIsFocus READ sourceIsFocus NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsMyDay READ sourceIsMyDay NOTIFY viewChanged)
     Q_PROPERTY(bool myDayEnabled READ myDayEnabled NOTIFY settingsChanged)
+    // The shutdown review: My Day opened after the work day's end, or through
+    // "Review today" at any time.
+    Q_PROPERTY(bool myDayShutdown READ myDayShutdown NOTIFY viewChanged)
     Q_PROPERTY(QVariantMap myDayCapacityMap READ myDayCapacityMap NOTIFY myDayChanged)
+    Q_PROPERTY(QVariantMap myDaySummaryMap READ myDaySummaryMap NOTIFY myDayChanged)
     Q_PROPERTY(QVariantList defaultViewChoices READ defaultViewChoices NOTIFY dataChanged)
     Q_PROPERTY(int sortField READ sortField NOTIFY viewChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY viewChanged)
@@ -133,7 +137,9 @@ public:
     bool sourceIsFocus() const { return m_source.isFocus(); }
     bool sourceIsMyDay() const { return m_source.kind == Source::MyDay; }
     bool myDayEnabled() const;
+    bool myDayShutdown() const { return m_source.kind == Source::MyDay && m_myDayShutdown; }
     QVariantMap myDayCapacityMap() const { return myDayCapacity(); }
+    QVariantMap myDaySummaryMap() const { return myDaySummary(); }
     QVariantList defaultViewChoices() const;
     int sortField() const { return sortSpec().field; }
     bool sortAscending() const { return sortSpec().ascending; }
@@ -549,6 +555,12 @@ public:
     void setCalendar(CalendarFeed *calendar);
     Q_INVOKABLE QVariantMap myDaySections() const;
     Q_INVOKABLE QVariantMap myDayCapacity() const;
+    // The shutdown review's numbers: how many tasks were completed today, the
+    // open plan's minutes and the completed tasks' minutes.
+    Q_INVOKABLE QVariantMap myDaySummary() const;
+    // Enters and leaves the shutdown review of the My Day screen.
+    Q_INVOKABLE void myDayReview();
+    Q_INVOKABLE void myDayFinishReview();
     Q_INVOKABLE void myDayAdd(const QVariantList &ids);
     Q_INVOKABLE void myDayRemove(const QVariantList &ids);
     Q_INVOKABLE void myDayHide(const QVariantList &ids);
@@ -685,6 +697,8 @@ private:
     // My Day's capped sections, expanded for this session only.
     bool m_myDayOverdueExpanded = false;
     bool m_myDaySuggestionsExpanded = false;
+    // Whether the My Day screen is showing the shutdown review.
+    bool m_myDayShutdown = false;
     qint64 m_noDetectTask = 0;
     bool m_hasHidden = false;
     QVariantMap m_editor;
