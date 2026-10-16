@@ -10,6 +10,8 @@
 //
 // It lives in the test's event loop; wait for results with QTRY_*.
 
+#include <cstdio>
+
 #include <QBuffer>
 #include <QByteArray>
 #include <QMap>
@@ -419,6 +421,9 @@ private:
             s->send(out + "\r\n");
             ok("SEARCH completed");
         } else if (sub == "FETCH") {
+            fprintf(stderr, "DIAG FETCH rest='%s' uids=[", rest.toUtf8().constData());
+            for (const Msg &m : f.messages) fprintf(stderr, "%lld,", (long long)m.uid);
+            fprintf(stderr, "] selected='%s'\n", t.value(2).toUtf8().constData());
             const QString items = rest.mid(rest.indexOf('(')).toUpper();
             int index = 0;
             for (const Msg &m : f.messages) {
@@ -435,9 +440,14 @@ private:
             ok("FETCH completed");
         } else if (sub == "STORE") {
             const QString flag = rest.mid(rest.indexOf('(') + 1).section(')', 0, 0);
+            fprintf(stderr, "DIAG STORE rest='%s' flag='%s' set='%s' uids=[", rest.toUtf8().constData(), flag.toUtf8().constData(), t.value(2).toUtf8().constData());
+            for (const Msg &m : f.messages) fprintf(stderr, "%lld,", (long long)m.uid);
+            fprintf(stderr, "]\n");
             for (Msg &m : f.messages)
                 if (inSet(t.value(2), m.uid, f))
                     m.flags.insert(flag);
+            for (const Msg &m : f.messages)
+                fprintf(stderr, "DIAG STORE after uid=%lld seen=%d deleted=%d\n", (long long)m.uid, m.flags.contains("\\Seen"), m.flags.contains("\\Deleted"));
             ok("STORE completed");
         } else if (sub == "MOVE" || sub == "COPY") {
             if (sub == "MOVE" && !capabilities.contains("MOVE")) {
@@ -461,11 +471,17 @@ private:
                     f.messages.removeAt(i--);
                 }
             }
+            fprintf(stderr, "DIAG %s done, INBOX now holds:", sub.toUtf8().constData());
+            for (const Msg &m : folders[s->selected].messages) fprintf(stderr, " %lld", (long long)m.uid);
+            fprintf(stderr, "\n");
             ok(sub + " completed");
         } else if (sub == "EXPUNGE") {
             for (int i = 0; i < f.messages.size(); ++i)
                 if (inSet(t.value(2), f.messages[i].uid, f) && f.messages[i].flags.contains("\\Deleted"))
                     f.messages.removeAt(i--);
+            fprintf(stderr, "DIAG EXPUNGE done, folder now holds:");
+            for (const Msg &m : f.messages) fprintf(stderr, " %lld", (long long)m.uid);
+            fprintf(stderr, "\n");
             ok("EXPUNGE completed");
         } else {
             s->send(tag + " BAD Unknown UID command\r\n");
