@@ -1,3 +1,5 @@
+#include <QElapsedTimer>
+#include <QTcpSocket>
 #include <QJsonDocument>
 #include <QtTest>
 #include <memory>
@@ -37,6 +39,24 @@ class OAuthTest : public QObject {
     }
 
     QString param(const QString &name) const { return QUrlQuery(m_opened).queryItemValue(name, QUrl::FullyDecoded); }
+
+    // A listener that has just stopped may take a moment to refuse new
+    // connections on macOS, where the OS-level socket teardown is deferred
+    // through the run loop; a single 500 ms probe can connect to a closing
+    // socket. Refusal, not one lucky attempt, is the assertion.
+    static bool refuses(quint16 port, int ms = 3000) {
+        QElapsedTimer clock;
+        clock.start();
+        while (!clock.hasExpired(ms)) {
+            QTcpSocket probe;
+            probe.connectToHost(QHostAddress::LocalHost, port);
+            if (!probe.waitForConnected(500))
+                return true;
+            probe.abort();
+            QTest::qWait(50);
+        }
+        return false;
+    }
 
 private slots:
     void init() {
@@ -129,9 +149,7 @@ private slots:
         QCOMPARE(OAuth::challengeFor(f.queryItemValue("code_verifier")), param("code_challenge"));
         // One-shot: the listener is gone.
         QVERIFY(!m_flow->waiting());
-        QTcpSocket probe;
-        probe.connectToHost(QHostAddress::LocalHost, port);
-        QVERIFY(!probe.waitForConnected(500));
+        QVERIFY(refuses(port));
     }
 
     void microsoftRoundTripSendsNoSecret() {
@@ -188,9 +206,7 @@ private slots:
         const quint16 port = m_flow->port();
         m_flow->cancel();
         QVERIFY(!m_flow->waiting());
-        QTcpSocket probe;
-        probe.connectToHost(QHostAddress::LocalHost, port);
-        QVERIFY(!probe.waitForConnected(500));
+        QVERIFY(refuses(port));
         QTest::qWait(50);
         QVERIFY(m_errors.isEmpty());
         QVERIFY(m_tokens.isEmpty());

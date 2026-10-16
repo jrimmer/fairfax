@@ -78,6 +78,11 @@ Flow::Flow(QObject *parent) : QObject(parent), m_server(this), m_limit(this) {
 void Flow::stop() {
     m_limit.stop();
     m_server.close();
+    // A connection that already sits in the accept queue is ours to end;
+    // the one-shot listener answers nobody, whatever the platform did with
+    // the listen socket's teardown.
+    while (QTcpSocket *pending = m_server.nextPendingConnection())
+        pending->abort();
 }
 
 void Flow::cancel() {
