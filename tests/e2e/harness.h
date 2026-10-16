@@ -120,12 +120,22 @@ inline QQuickItem *findItem(const QString &name, bool visibleOnly = true) {
 }
 
 // A visible item whose `text` property is exactly `text`: menu entries, labels.
-// `type` narrows by base class (e.g. "QQuickMenuItem") when a label would clash.
+// A menu entry can carry its shortcut as one text property ("Label\tCtrl+Shift+E"),
+// so when nothing matches exactly, a menu item is also matched by the label
+// before its tab. `type` narrows by base class (e.g. "QQuickMenuItem").
 inline QQuickItem *findText(const QString &text, const char *type = nullptr) {
+    auto visible = [&](QQuickItem *i) {
+        return i->width() > 0 && (!type || i->inherits(type)) && i->metaObject()->indexOfProperty("text") >= 0;
+    };
     for (QQuickWindow *w : quickWindows())
         if (QQuickItem *item = findIn(w->contentItem(), [&](QQuickItem *i) {
-                return i->width() > 0 && (!type || i->inherits(type))
-                       && i->metaObject()->indexOfProperty("text") >= 0 && i->property("text").toString() == text;
+                return visible(i) && i->property("text").toString() == text;
+            }))
+            return item;
+    for (QQuickWindow *w : quickWindows())
+        if (QQuickItem *item = findIn(w->contentItem(), [&](QQuickItem *i) {
+                return visible(i) && i->inherits("QQuickMenuItem")
+                       && i->property("text").toString().section('\t', 0, 0) == text;
             }))
             return item;
     return nullptr;
