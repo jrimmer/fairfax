@@ -196,15 +196,19 @@ Item {
             // My Day's capacity line: planned against the free time left today.
             RowLayout {
                 objectName: "myDayCapacity"
-                visible: backend.sourceIsMyDay && !backend.myDayShutdown
+                visible: backend.sourceIsMyDay && !backend.myDayShutdown && (planned > 0 || without > 0)
                 spacing: 6
                 Layout.alignment: Qt.AlignBaseline
+                // A RowLayout has no baseline of its own; report the first
+                // text's so the row aligns with the date and the button.
+                baselineOffset: plannedLabel.y + plannedLabel.baselineOffset
                 readonly property int planned: Number(backend.myDayCapacityMap.plannedMinutes || 0)
                 readonly property int free: Number(backend.myDayCapacityMap.freeMinutes || 0)
                 readonly property int without: Number(backend.myDayCapacityMap.withoutDuration || 0)
                 readonly property bool over: planned > free
                 readonly property bool amber: !over && free > 0 && planned > free * 0.85
                 Text {
+                    id: plannedLabel
                     text: root.formatMinutes(parent.planned) + " planned"
                     color: parent.over ? theme.overdue : parent.amber ? theme.priorityMedium : theme.muted
                     font.pixelSize: backend.fontSize + 1
@@ -255,6 +259,7 @@ Item {
                 visible: backend.sourceIsMyDay && !backend.myDayShutdown
                 text: "Review today"
                 flat: true
+                Layout.alignment: Qt.AlignBaseline
                 font.pixelSize: backend.fontSize - 1
                 onClicked: backend.myDayReview()
             }
@@ -263,6 +268,7 @@ Item {
                 visible: backend.sourceIsMyDay && backend.myDayShutdown
                 text: "Finish"
                 flat: true
+                Layout.alignment: Qt.AlignBaseline
                 font.pixelSize: backend.fontSize - 1
                 onClicked: backend.myDayFinishReview()
             }
@@ -454,9 +460,11 @@ Item {
             }
 
             Text {
+                objectName: "paneEmptyState"
                 anchors.centerIn: parent
                 visible: backend.tasks.count === 0
                 text: backend.search ? "No tasks match “" + backend.search + "”"
+                    : backend.sourceIsMyDay ? "Nothing planned for today"
                     : backend.sourceKey === "today" ? "Nothing due today"
                     : backend.sourceKey === "done" ? "Nothing completed yet" : "No tasks"
                 color: theme.faint

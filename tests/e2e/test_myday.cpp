@@ -92,6 +92,41 @@ Seed seedMyDayOff(Store &store) {
     return s;
 }
 
+// A world with one list and no tasks at all: every My Day section is empty.
+Seed seedBareWorld(Store &store) {
+    Seed s;
+    store.begin("Bare", false);
+    TaskList l;
+    l.id = store.nextId("lists");
+    l.name = "Home";
+    l.order = 1;
+    store.putList(l);
+    s.home = l.id;
+    store.commit();
+    return s;
+}
+
+// One task due today with no duration: Already today, and the capacity line
+// shows because a task without a duration is still something to measure.
+qint64 &onePlannedTask() {
+    static qint64 id = 0;
+    return id;
+}
+Seed seedOnePlanned(Store &store) {
+    Seed s = seedBareWorld(store);
+    store.begin("One planned", false);
+    Task t;
+    t.id = store.nextId("tasks");
+    t.listId = s.home;
+    t.title = "Today only";
+    t.dueDate = QDate::currentDate();
+    t.order = t.id;
+    store.putTask(t);
+    store.commit();
+    onePlannedTask() = t.id;
+    return s;
+}
+
 // The prompt on, and no day planned yet: the first launch of the day asks.
 // The launch view is Today so the test can tell the prompt's answer apart from
 // a fresh database's My Day default.
@@ -257,6 +292,19 @@ QString capacityText() {
         return false;
     });
     return parts.join(' ');
+}
+
+// A visible item's baseline in scene coordinates: a Text lays its baseline
+// baselineOffset down from its top, and a RowLayout that reports one does the
+// same, so three differently-sized items can be compared.
+qreal baselineSceneY(QQuickItem *item) {
+    return item->mapToScene(QPointF(0, item->baselineOffset())).y();
+}
+
+// The text of the pane's centred empty state, or empty when it is not shown.
+QString emptyStateText() {
+    QQuickItem *t = findItem("paneEmptyState");
+    return t ? t->property("text").toString() : QString();
 }
 
 // Scrolls the task list to a task, creating its delegate if it is far below.
@@ -483,6 +531,126 @@ private slots:
         QCOMPARE(reasonOf(w.alerted), QString("Alert 14:00"));
         // The section headings, in order.
         QCOMPARE(sectionTitles(), (QStringList{"OVERDUE", "ALREADY TODAY", "SUGGESTIONS"}));
+    }
+
+    // An empty section emits no heading row, and a completely empty day shows
+    // the pane's own empty-state message instead of three bare headings.
+    void emptySectionsAreHiddenAndTheDayExplainsItself() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedBareWorld);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QCOMPARE(app.backend().tasks()->rowCount(), 0);
+        // No section headings at all, and the message names the day.
+        QCOMPARE(sectionTitles(), QStringList{});
+        QTRY_COMPARE_WITH_TIMEOUT(emptyStateText(), QString("Nothing planned for today"), 5000);
+        // An empty day has nothing to measure.
+        QVERIFY(!findItem("myDayCapacity"));
+        // A typed search that matches nothing keeps the existing wording.
+        app.backend().setSearch("zzz");
+        QTRY_COMPARE_WITH_TIMEOUT(emptyStateText(), QString("No tasks match “zzz”"), 5000);
+        app.backend().setSearch(QString());
+        QTRY_COMPARE_WITH_TIMEOUT(emptyStateText(), QString("Nothing planned for today"), 5000);
+    }
+
+    // A task in the plan brings its section heading and the capacity line back;
+    // hiding it (H) takes both away again.
+    void onePlannedTaskShowsTheSectionAndCapacityAgain() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedOnePlanned);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), QStringList{"ALREADY TODAY"}, 5000);
+        QQuickItem *cap = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((cap = findItem("myDayCapacity")) != nullptr, 5000);
+        QVERIFY(cap->property("visible").toBool());
+        // It reads the task without a duration, not a zero capacity line.
+        QVERIFY(capacityText().contains("without a duration"));
+        // Hide it: the section and the capacity line go, the empty state returns.
+        QVERIFY(tk::selectRow(app, onePlannedTask()));
+        app.press(Qt::Key_H);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(onePlannedTask()) == nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(sectionTitles().isEmpty(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("myDayCapacity"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(emptyStateText(), QString("Nothing planned for today"), 5000);
+    }
+
+    // On an empty day the capacity line hides (planned and without-duration are
+    // both zero); the moment a duration lands in the plan it shows again.
+    void capacityZeroStateHidesAndReturns() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedBareWorld);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QCOMPARE(app.backend().myDayCapacityMap().value("plannedMinutes").toInt(), 0);
+        QCOMPARE(app.backend().myDayCapacityMap().value("withoutDuration").toInt(), 0);
+        QVERIFY(!findItem("myDayCapacity"));
+        // Add a due-today task with a duration: the line appears.
+        Task t;
+        t.id = app.store().nextId("tasks");
+        t.listId = app.ids.home;
+        t.title = "Half an hour";
+        t.dueDate = today;
+        t.duration = 30;
+        t.order = t.id;
+        app.store().begin("add");
+        app.store().putTask(t);
+        app.store().commit();
+        QQuickItem *cap = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((cap = findItem("myDayCapacity")) != nullptr, 5000);
+        QVERIFY(cap->property("visible").toBool());
+        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("30m planned"), 5000);
+    }
+
+    // The pane date, the capacity line and the Review today button share one
+    // baseline, at the wide and the narrow window the harness uses.
+    void headerMetadataSharesOneBaseline() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedOnePlanned);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QQuickItem *cap = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((cap = findItem("myDayCapacity")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayReview") != nullptr, 5000);
+        QTest::qWait(300);
+        auto assertAligned = [&] {
+            QQuickItem *date = findItem("paneDate");
+            QQuickItem *cap2 = findItem("myDayCapacity");
+            QQuickItem *review = findItem("myDayReview");
+            QVERIFY2(date && cap2 && review, "missing a header metadata item");
+            const qreal b = baselineSceneY(date);
+            QVERIFY2(qAbs(baselineSceneY(cap2) - b) < 1.5,
+                     qPrintable(QString("capacity baseline %1 vs date %2").arg(baselineSceneY(cap2)).arg(b)));
+            QVERIFY2(qAbs(baselineSceneY(review) - b) < 1.5,
+                     qPrintable(QString("button baseline %1 vs date %2").arg(baselineSceneY(review)).arg(b)));
+        };
+        assertAligned();
+        app.window->resize(720, 760);
+        QTest::qWait(300);
+        assertAligned();
+    }
+
+    // The right pane's Day title only shows with calendar sources; without any
+    // an empty My Day leaves no floating "Day" behind.
+    void utilityDayTitleFollowsCalendarSources() {
+        QTemporaryDir dir;
+        App app(seedBareWorld);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        // No sources: neither the title nor the timeline.
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("utilityDayTitle") == nullptr, 5000);
+        QVERIFY(findItem("myDayTimeline") == nullptr);
+        // A local .ics, as the calendar tests write: both come back.
+        const QString path = writeCalendar(dir.path());
+        QVERIFY(!path.isEmpty());
+        app.services().calendar.setSources({path});
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("utilityDayTitle") != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayTimeline") != nullptr, 5000);
+        QCOMPARE(findItem("utilityDayTitle")->property("text").toString(), QString("Day"));
     }
 
     // The capacity line names planned and free time, and changes with a task's

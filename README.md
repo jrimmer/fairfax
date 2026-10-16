@@ -173,7 +173,9 @@ offers your lists and `frfx done <Tab>` your open tasks.
 My Day is a daily plan built from the dates a task already has, not a separate field, so it
 survives every sync. Press `Ctrl+Shift+P` or click *My Day*, the first item in the sidebar
 above All, to open it. The screen gathers *Overdue*, *Already today* and *Suggestions*; each
-suggestion says why it is there (starred, starting today, an alert today). The title is
+suggestion says why it is there (starred, starting today, an alert today). A section with
+nothing in it is hidden, and an empty day shows *Nothing planned for today* rather than bare
+headings. The title is
 followed by the date and a capacity line such as `6h 30m planned · 5h free` (plus
 `· 3 without a duration` when some tasks have none), red when the plan is over the free
 time left in the work day and amber above 85%. The right pane shows the day's expanded

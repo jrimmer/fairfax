@@ -4863,6 +4863,10 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
     QVector<qint64> order;
 
     auto addSection = [&](const QString &key, const QString &title, const QString &tone, const QVector<MyDay::Entry> &entries, int cap) {
+        // An empty section says nothing: no heading row, no "more" row. A
+        // completely empty day is then the pane's own centred empty state.
+        if (entries.isEmpty())
+            return;
         rows.append({{"key", "s:" + key}, {"kind", "section"}, {"sectionKey", key}, {"title", title},
                      {"tone", tone}, {"count", entries.size()}, {"isFirst", rows.isEmpty()}});
         const int shown = cap > 0 ? qMin(cap, entries.size()) : entries.size();

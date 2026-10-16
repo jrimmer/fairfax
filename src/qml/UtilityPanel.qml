@@ -78,9 +78,12 @@ Rectangle {
             Layout.rightMargin: 16
             spacing: 6
             Item { Layout.fillWidth: true }
-            // My Day replaces the tags panel with the expanded Day Bar.
+            // My Day replaces the tags panel with the expanded Day Bar. The
+            // title only belongs there when the timeline actually shows, so an
+            // empty right pane does not leave a floating "Day".
             Text {
-                visible: backend.sourceIsMyDay
+                objectName: "utilityDayTitle"
+                visible: backend.sourceIsMyDay && !!calendar && calendar.sources.length > 0
                 text: "Day"
                 color: theme.foreground
                 font.pixelSize: backend.fontSize + 1
