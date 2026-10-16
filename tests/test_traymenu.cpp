@@ -262,7 +262,11 @@ private slots:
         QCOMPARE(commands(list), QStringList({"new", "find", "quit"}));
         // Command labels carry the binding in the platform's own spelling
         // (QKeySequence::NativeText), after a tab QMenu right-aligns.
+#ifdef Q_OS_MACOS
+        QCOMPARE(list.last().label, QStringLiteral("Quit Fairfax\t⌘Q"));
+#else
         QCOMPARE(list.last().label, QStringLiteral("Quit Fairfax\tCtrl+Q"));
+#endif
 
         m_store->setSetting("tray.commands", "settings");
         list = entries(true);
