@@ -13,6 +13,7 @@
 
 #include "agent.h"
 #include "backend.h"
+#include "diagnostics.h"
 #include "model.h"
 #include "store.h"
 #include "testregistry.h"
@@ -24,6 +25,8 @@ struct Fixture {
     QTemporaryDir dir;
     Store store;
     qint64 listId = 0;
+    qint64 workId = 0;
+    qint64 tagId = 0;
     qint64 taskId = 0;
 
     Fixture() {
@@ -33,6 +36,15 @@ struct Fixture {
         list.id = store.nextId("lists");
         list.name = "Home";
         store.putList(list);
+        TaskList work;
+        work.id = store.nextId("lists");
+        work.name = "Work";
+        work.order = 1;
+        store.putList(work);
+        Tag garden;
+        garden.id = store.nextId("tags");
+        garden.name = "garden";
+        store.putTag(garden);
         Task task;
         task.id = store.nextId("tasks");
         task.listId = list.id;
@@ -41,6 +53,8 @@ struct Fixture {
         store.putTask(task);
         store.commit();
         listId = list.id;
+        workId = work.id;
+        tagId = garden.id;
         taskId = task.id;
     }
 };
@@ -89,6 +103,37 @@ QByteArray queryAnswer(const QString &query) {
     QJsonObject choice{{QStringLiteral("message"), message}};
     QJsonObject root{{QStringLiteral("choices"), QJsonArray{choice}}};
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+// A chat completion wrapping an arbitrary answer object, as a model would
+// answer a triage or priority request.
+QByteArray wrappedAnswer(const QJsonObject &content) {
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("assistant")},
+                        {QStringLiteral("content"), QString::fromUtf8(QJsonDocument(content).toJson(QJsonDocument::Compact))}};
+    QJsonObject choice{{QStringLiteral("message"), message}};
+    QJsonObject root{{QStringLiteral("choices"), QJsonArray{choice}}};
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+// A triage answer for `taskId`, with the named list and tags and a due date.
+QByteArray triageAnswer(qint64 taskId, const QString &list, const QStringList &tags, const QString &due, int priority) {
+    QJsonArray tagArray;
+    for (const QString &t : tags)
+        tagArray.append(t);
+    QJsonObject row{{QStringLiteral("taskId"), taskId},
+                    {QStringLiteral("list"), list},
+                    {QStringLiteral("tags"), tagArray},
+                    {QStringLiteral("due"), due},
+                    {QStringLiteral("priority"), priority}};
+    return wrappedAnswer(QJsonObject{{QStringLiteral("triage"), QJsonArray{row}}});
+}
+
+// A priority answer for one or more (taskId, priority) pairs.
+QByteArray priorityAnswer(const QList<QPair<qint64, int>> &choices) {
+    QJsonArray rows;
+    for (const auto &c : choices)
+        rows.append(QJsonObject{{QStringLiteral("taskId"), c.first}, {QStringLiteral("priority"), c.second}});
+    return wrappedAnswer(QJsonObject{{QStringLiteral("priorities"), rows}});
 }
 
 }  // namespace
@@ -482,6 +527,245 @@ private slots:
         QVERIFY(!f.store.task(f.taskId).dueDate.isValid());
         // A missing proposal is refused too.
         QVERIFY(!backend.applyProposal(123456));
+    }
+
+    // The triage request carries the Inbox tasks as JSON and names the real
+    // list and tag choices, never anything invented.
+    void triageRequestNamesTasksAndRealChoices() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        QVariantList tasks;
+        tasks.append(QVariantMap{{"taskId", f.taskId}, {"title", "Buy milk"}, {"notes", "semi-skimmed"}});
+        const QStringList lists{"Home", "Work"};
+        const QStringList tags{"garden", "errand"};
+        const QJsonObject root = parse(agent.buildTriageRequest(tasks, lists, tags));
+        const QJsonArray messages = root.value("messages").toArray();
+        QCOMPARE(messages.size(), 2);
+        const QString system = messages.at(0).toObject().value("content").toString();
+        QVERIFY2(system.contains("triage"), qPrintable(system));
+        QVERIFY2(system.contains("taskId"), qPrintable(system));
+        const QJsonObject user = parse(messages.at(1).toObject().value("content").toString().toUtf8());
+        const QJsonArray sentTasks = user.value("tasks").toArray();
+        QCOMPARE(sentTasks.size(), 1);
+        QCOMPARE(sentTasks.first().toObject().value("title").toString(), QString("Buy milk"));
+        QCOMPARE(sentTasks.first().toObject().value("notes").toString(), QString("semi-skimmed"));
+        QCOMPARE(user.value("lists").toArray().size(), 2);
+        QCOMPARE(user.value("tags").toArray().size(), 2);
+        // The buildTriageRequest helper and the system prompt agree.
+        QVERIFY(AgentService::triageSystemPrompt().contains("never invent"));
+    }
+
+    // The priority request includes each task's current priority as ground truth.
+    void priorityRequestIncludesCurrentPriorities() {
+        Fixture f;
+        AgentService agent(&f.store);
+        QVariantList tasks;
+        tasks.append(QVariantMap{{"taskId", f.taskId}, {"title", "Buy milk"}, {"notes", ""}, {"priority", 2}});
+        const QJsonObject root = parse(agent.buildPriorityRequest(tasks));
+        const QString system = root.value("messages").toArray().at(0).toObject().value("content").toString();
+        QVERIFY2(system.contains("priorities"), qPrintable(system));
+        const QJsonObject user = parse(root.value("messages").toArray().at(1).toObject().value("content").toString().toUtf8());
+        QCOMPARE(user.value("tasks").toArray().first().toObject().value("priority").toInt(), 2);
+    }
+
+    // An inbox triage request over a real store names only real lists and tags.
+    void inboxTriageBuildsFromTheStore() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        // Add an Inbox and a task in it.
+        f.store.begin("inbox", false);
+        TaskList inbox;
+        inbox.id = f.store.nextId("lists");
+        inbox.name = "Inbox";
+        inbox.kind = ListKind::Inbox;
+        f.store.putList(inbox);
+        Task t;
+        t.id = f.store.nextId("tasks");
+        t.listId = inbox.id;
+        t.title = "Unfiled thought";
+        t.order = t.id;
+        f.store.putTask(t);
+        f.store.commit();
+        Backend backend(&f.store);
+        AgentService agent(&f.store);
+        backend.setAgent(&agent);
+        const QVariantList tasks = backend.inboxTriageTasks();
+        QCOMPARE(tasks.size(), 1);
+        QCOMPARE(tasks.first().toMap().value("title").toString(), QString("Unfiled thought"));
+        // The request actually built names only the store's real lists and tags.
+        FakeTransport transport;
+        agent.setTransport(std::ref(transport));
+        backend.triageInbox();
+        QCOMPARE(transport.requests.size(), 1);
+        const QJsonObject root = parse(transport.requests.first());
+        const QJsonObject user = parse(root.value("messages").toArray().at(1).toObject().value("content").toString().toUtf8());
+        QStringList lists;
+        for (const QJsonValue &v : user.value("lists").toArray())
+            lists << v.toString();
+        QVERIFY2(lists.contains("Home"), qPrintable(lists.join(',')));
+        QVERIFY2(lists.contains("Work"), qPrintable(lists.join(',')));
+        QStringList tags;
+        for (const QJsonValue &v : user.value("tags").toArray())
+            tags << v.toString();
+        QVERIFY2(tags.contains("garden"), qPrintable(tags.join(',')));
+    }
+
+    // With the feature off neither collection call sends anything, even though
+    // the tasks are there.
+    void disabledCollectionCallsSendNothing() {
+        Fixture f;
+        AgentService agent(&f.store);
+        Backend backend(&f.store);
+        backend.setAgent(&agent);
+        FakeTransport transport;
+        agent.setTransport(std::ref(transport));
+        backend.triageInbox();
+        QVariantList tasks;
+        tasks.append(QVariantMap{{"taskId", f.taskId}, {"title", "Buy milk"}, {"notes", ""}});
+        agent.triageInbox(tasks, {"Home"}, {"garden"});
+        agent.suggestPriorities(tasks);
+        QCOMPARE(transport.requests.size(), 0);
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
+    // A triage answer becomes one "triage" proposal per row, with the choices
+    // validated against the request.
+    void triageAnswerParsesIntoProposals() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        QCOMPARE(agent.ingestTriage(triageAnswer(f.taskId, "Work", {"garden"}, "friday", 2), {"Home", "Work"}, {"garden"}), 1);
+        const QVector<Proposal> stored = f.store.proposals();
+        QCOMPARE(stored.size(), 1);
+        QCOMPARE(stored.first().kind, QString("triage"));
+        QCOMPARE(stored.first().payload.value("list").toString(), QString("Work"));
+        QCOMPARE(stored.first().payload.value("tags").toStringList(), QStringList{"garden"});
+        QCOMPARE(stored.first().payload.value("due").toString(), QString("friday"));
+        QCOMPARE(stored.first().payload.value("priority").toInt(), 2);
+
+        // A transport error creates nothing.
+        QCOMPARE(agent.ingestTriage("{}", {"Home"}, {}), -1);
+        QVERIFY(!agent.lastError().isEmpty());
+        QCOMPARE(f.store.proposals().size(), 1);
+    }
+
+    // An invented list or tag is dropped with a note, never created.
+    void triageAnswerDropsUnknownNames() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        Diagnostics::clear();
+        QCOMPARE(agent.ingestTriage(triageAnswer(f.taskId, "Atlantis", {"dragon", "garden"}, "", 0), {"Home", "Work"}, {"garden"}), 1);
+        const QVector<Proposal> stored = f.store.proposals();
+        QCOMPARE(stored.size(), 1);
+        // The unknown list is gone, the known tag kept.
+        QVERIFY(!stored.first().payload.contains("list"));
+        QCOMPARE(stored.first().payload.value("tags").toStringList(), QStringList{"garden"});
+        // No tag was invented in the store.
+        for (const auto &t : f.store.tags())
+            QVERIFY(t.name != "dragon");
+        bool sawList = false, sawTag = false;
+        for (const QString &line : Diagnostics::recent()) {
+            if (line.contains("Atlantis")) sawList = true;
+            if (line.contains("dragon")) sawTag = true;
+        }
+        QVERIFY2(sawList, qPrintable(Diagnostics::recent().join('\n')));
+        QVERIFY2(sawTag, qPrintable(Diagnostics::recent().join('\n')));
+    }
+
+    // A triage proposal applies through the real Backend methods: the task
+    // moves, is tagged and gets a parsed due date and priority.
+    void triageProposalAppliesRealChanges() {
+        Fixture f;
+        Backend backend(&f.store);
+        Proposal p;
+        p.kind = "triage";
+        p.payload = {{"taskId", f.taskId}, {"list", "Work"}, {"tags", QStringList{"garden"}},
+                     {"due", "friday"}, {"priority", 3}};
+        f.store.begin("add proposal", false);
+        p.id = f.store.nextId("proposals");
+        f.store.putProposal(p);
+        f.store.commit();
+
+        QVERIFY(backend.applyProposal(p.id));
+        const Task after = f.store.task(f.taskId);
+        QCOMPARE(after.listId, f.workId);
+        QCOMPARE(after.tagIds, QList<qint64>{f.tagId});
+        QCOMPARE(after.priority, 3);        // The English date went through the real parser, so it is a valid,
+        // future QDate, never the raw string.
+        QVERIFY(after.dueDate.isValid());
+        QVERIFY(after.dueDate >= QDate::currentDate());
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
+    // A triage row with an unreadable due date still moves and tags, and the
+    // date is left alone rather than written raw.
+    void triageIgnoresUnreadableDueDate() {
+        Fixture f;
+        Backend backend(&f.store);
+        Proposal p;
+        p.kind = "triage";
+        p.payload = {{"taskId", f.taskId}, {"list", "Work"}, {"due", "blursday-ish"}};
+        f.store.begin("add proposal", false);
+        p.id = f.store.nextId("proposals");
+        f.store.putProposal(p);
+        f.store.commit();
+
+        QVERIFY(backend.applyProposal(p.id));
+        QCOMPARE(f.store.task(f.taskId).listId, f.workId);
+        QVERIFY(!f.store.task(f.taskId).dueDate.isValid());
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
+    // A priority answer becomes "priority" proposals; applying one calls
+    // setPriority for that task only.
+    void priorityProposalAppliesSetPriority() {
+        Fixture f;
+        Backend backend(&f.store);
+        AgentService agent(&f.store);
+        backend.selectTask(f.taskId);
+        // selectedPriorityTasks names the selection, current priority and all.
+        QCOMPARE(backend.selectedPriorityTasks().size(), 1);
+        QCOMPARE(backend.selectedPriorityTasks().first().toMap().value("taskId").toLongLong(), f.taskId);
+        QCOMPARE(backend.selectedPriorityTasks().first().toMap().value("priority").toInt(), 0);
+        agent.ingestPriorities(priorityAnswer({{f.taskId, 3}}));
+        QCOMPARE(f.store.proposals().size(), 1);
+        QVERIFY(backend.applyProposal(f.store.proposals().first().id));
+        QCOMPARE(f.store.task(f.taskId).priority, 3);
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
+    // A priority answer wrapping several tasks creates one proposal each and
+    // no proposal for a row with no priority.
+    void priorityAnswerParsesIntoProposals() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        QJsonArray rows;
+        rows.append(QJsonObject{{"taskId", f.taskId}, {"priority", 1}});
+        rows.append(QJsonObject{{"taskId", 9999}, {"priority", 3}});
+        rows.append(QJsonObject{{"taskId", 1234}});  // No priority: skipped.
+        QCOMPARE(agent.ingestPriorities(wrappedAnswer(QJsonObject{{"priorities", rows}})), 2);
+        QCOMPARE(f.store.proposals().size(), 2);
+        QCOMPARE(f.store.proposals().first().kind, QString("priority"));
+        QCOMPARE(f.store.proposals().first().payload.value("priority").toInt(), 1);
+    }
+
+    // Applying a priority row for a missing task is refused and leaves the
+    // queue alone.
+    void priorityProposalRefusesMissingTask() {
+        Fixture f;
+        Backend backend(&f.store);
+        Proposal p;
+        p.kind = "priority";
+        p.payload = {{"taskId", 9999}, {"priority", 3}};
+        f.store.begin("add proposal", false);
+        p.id = f.store.nextId("proposals");
+        f.store.putProposal(p);
+        f.store.commit();
+        QVERIFY(!backend.applyProposal(p.id));
+        QCOMPARE(f.store.proposals().size(), 1);
     }
 };
 

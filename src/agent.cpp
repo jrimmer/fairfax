@@ -32,6 +32,21 @@ const char *Schema = R"({
 // The schema a query compile answers with: one object holding the query string.
 const char *QuerySchema = R"({"query": "type: hiprio"})";
 
+// The schema an inbox triage answers with: one "triage" array, one row per
+// task. A row's list and tags must name the choices the request supplied.
+const char *TriageSchema = R"({
+  "triage": [
+    {"taskId": 12, "list": "Home", "tags": ["errand"], "due": "friday", "priority": 2}
+  ]
+})";
+
+// The schema a priority suggestion answers with: one "priorities" array.
+const char *PrioritySchema = R"({
+  "priorities": [
+    {"taskId": 12, "priority": 2}
+  ]
+})";
+
 // The Fairfax query grammar, shipped to the model so it compiles into the real
 // language rather than inventing one. The keyword set mirrors src/query.cpp;
 // the value lists name the presets the type: filter understands.
@@ -128,6 +143,28 @@ QString AgentService::systemPrompt() {
 
 QString AgentService::queryGrammar() { return QString::fromUtf8(QueryGrammar); }
 
+QString AgentService::triageSystemPrompt() {
+    return QStringLiteral(
+        "You triage the open tasks of a task manager's Inbox. For each task, choose a list to move "
+        "it to, tags to add, a due date and a priority. Answer with one JSON object and nothing else, "
+        "matching this schema:\n%1\n"
+        "Each row carries the task's \"taskId\" and holds only the changes you suggest. Use only list "
+        "and tag names given in the request: never invent a name. The \"due\" value is an English "
+        "phrase such as \"friday\", \"tomorrow\", \"next week\" or \"in 3 days\", or omitted for no "
+        "date. \"priority\" is 0 for none, 1 for low, 2 for medium and 3 for high. Do not explain the JSON.")
+        .arg(QString::fromUtf8(TriageSchema));
+}
+
+QString AgentService::prioritySystemPrompt() {
+    return QStringLiteral(
+        "You suggest a priority for each of a task manager's selected tasks. Each task's current "
+        "priority is given as a guide to the user's habits. Answer with one JSON object and nothing "
+        "else, matching this schema:\n%1\n"
+        "Each row carries the task's \"taskId\" and a \"priority\": 0 for none, 1 for low, 2 for medium "
+        "and 3 for high. Do not explain the JSON.")
+        .arg(QString::fromUtf8(PrioritySchema));
+}
+
 QString AgentService::querySystemPrompt() {
     return QStringLiteral(
         "You translate a plain-English question about a task list into a Fairfax search query. "
@@ -155,6 +192,55 @@ QByteArray AgentService::buildQueryRequest(const QString &prompt) const {
     QJsonObject root;
     root.insert("model", model());
     root.insert("messages", QJsonArray{system, user});
+    root.insert("stream", false);
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+QByteArray AgentService::buildTriageRequest(const QVariantList &tasks, const QStringList &listNames, const QStringList &tagNames) const {
+    QJsonArray taskArray;
+    for (const QVariant &v : tasks) {
+        const QVariantMap t = v.toMap();
+        taskArray.append(QJsonObject{{QStringLiteral("taskId"), t.value("taskId").toLongLong()},
+                                     {QStringLiteral("title"), t.value("title").toString()},
+                                     {QStringLiteral("notes"), t.value("notes").toString()}});
+    }
+    QJsonArray lists;
+    for (const QString &name : listNames)
+        lists.append(name);
+    QJsonArray tags;
+    for (const QString &name : tagNames)
+        tags.append(name);
+    QJsonObject user;
+    user.insert("tasks", taskArray);
+    user.insert("lists", lists);
+    user.insert("tags", tags);
+    const QString prompt = QString::fromUtf8(QJsonDocument(user).toJson(QJsonDocument::Compact));
+    QJsonObject system{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), triageSystemPrompt()}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), prompt}};
+    QJsonObject root;
+    root.insert("model", model());
+    root.insert("messages", QJsonArray{system, message});
+    root.insert("stream", false);
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+QByteArray AgentService::buildPriorityRequest(const QVariantList &tasks) const {
+    QJsonArray taskArray;
+    for (const QVariant &v : tasks) {
+        const QVariantMap t = v.toMap();
+        taskArray.append(QJsonObject{{QStringLiteral("taskId"), t.value("taskId").toLongLong()},
+                                     {QStringLiteral("title"), t.value("title").toString()},
+                                     {QStringLiteral("notes"), t.value("notes").toString()},
+                                     {QStringLiteral("priority"), t.value("priority").toInt()}});
+    }
+    QJsonObject user;
+    user.insert("tasks", taskArray);
+    const QString prompt = QString::fromUtf8(QJsonDocument(user).toJson(QJsonDocument::Compact));
+    QJsonObject system{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), prioritySystemPrompt()}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), prompt}};
+    QJsonObject root;
+    root.insert("model", model());
+    root.insert("messages", QJsonArray{system, message});
     root.insert("stream", false);
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
@@ -211,6 +297,21 @@ void AgentService::compileQuery(const QString &prompt) {
     if (trimmed.isEmpty())
         return;
     send(buildQueryRequest(trimmed), trimmed, Mode::Query);
+}
+
+void AgentService::triageInbox(const QVariantList &tasks, const QStringList &listNames, const QStringList &tagNames) {
+    // The same guard: no triage, no transport, no network while off.
+    if (!enabled() || tasks.isEmpty())
+        return;
+    m_triageLists = listNames;
+    m_triageTags = tagNames;
+    send(buildTriageRequest(tasks, listNames, tagNames), QStringLiteral("Triage %1 Inbox task(s)").arg(tasks.size()), Mode::Triage);
+}
+
+void AgentService::suggestPriorities(const QVariantList &tasks) {
+    if (!enabled() || tasks.isEmpty())
+        return;
+    send(buildPriorityRequest(tasks), QStringLiteral("Suggest priorities for %1 task(s)").arg(tasks.size()), Mode::Priorities);
 }
 
 void AgentService::send(const QByteArray &body, const QString &message, Mode mode) {
@@ -274,6 +375,18 @@ void AgentService::finish(int status, const QByteArray &body, const QString &err
         Diagnostics::note(QStringLiteral("Agent: request failed with HTTP %1").arg(status));
     } else if (m_mode == Mode::Query) {
         finishQuery(body);
+    } else if (m_mode == Mode::Triage) {
+        const int count = ingestTriage(body, m_triageLists, m_triageTags);
+        if (count < 0)
+            m_lastError = m_lastError.isEmpty() ? QStringLiteral("The model's answer held no triage.") : m_lastError;
+        else
+            m_lastError.clear();
+    } else if (m_mode == Mode::Priorities) {
+        const int count = ingestPriorities(body);
+        if (count < 0)
+            m_lastError = m_lastError.isEmpty() ? QStringLiteral("The model's answer held no priorities.") : m_lastError;
+        else
+            m_lastError.clear();
     } else {
         const int count = ingest(body);
         if (count < 0)
@@ -371,6 +484,94 @@ QJsonObject AgentService::proposalRoot(const QByteArray &body) const {
     if (object.isEmpty())
         return {};
     return QJsonDocument::fromJson(object).object();
+}
+
+QJsonObject AgentService::answerRoot(const QByteArray &body) const {
+    // The response may be an OpenAI chat completion whose assistant message
+    // holds the JSON, or the JSON object itself; prose around it is allowed.
+    const QByteArray content = assistantContent(body);
+    QJsonObject root = QJsonDocument::fromJson(content).object();
+    if (root.isEmpty()) {
+        const QByteArray object = firstJsonObject(content);
+        if (!object.isEmpty())
+            root = QJsonDocument::fromJson(object).object();
+    }
+    return root;
+}
+
+int AgentService::ingestTriage(const QByteArray &body, const QStringList &listNames, const QStringList &tagNames) {
+    const QJsonObject root = answerRoot(body);
+    if (root.isEmpty() || !root.contains("triage")) {
+        m_lastError = QStringLiteral("The model's answer held no triage.");
+        Diagnostics::note(QStringLiteral("Agent: ") + m_lastError);
+        return -1;
+    }
+    QList<Proposal> proposals;
+    for (const QJsonValue &value : root.value("triage").toArray()) {
+        const QJsonObject item = value.toObject();
+        const qint64 taskId = item.value("taskId").toVariant().toLongLong();
+        if (!taskId)
+            continue;
+        QVariantMap payload{{QStringLiteral("taskId"), taskId}};
+        // A list name the model invented is dropped with a note, never created.
+        const QString wantedList = item.value("list").toString().trimmed();
+        QString list;
+        for (const QString &name : listNames)
+            if (!wantedList.isEmpty() && name.compare(wantedList, Qt::CaseInsensitive) == 0)
+                list = name;
+        if (!wantedList.isEmpty() && list.isEmpty())
+            Diagnostics::note(QStringLiteral("Agent: ignored unknown list \"%1\"").arg(wantedList));
+        if (!list.isEmpty())
+            payload.insert(QStringLiteral("list"), list);
+        QStringList tags;
+        for (const QJsonValue &tagValue : item.value("tags").toArray()) {
+            const QString wanted = tagValue.toString().trimmed();
+            if (wanted.isEmpty())
+                continue;
+            QString known;
+            for (const QString &name : tagNames)
+                if (name.compare(wanted, Qt::CaseInsensitive) == 0)
+                    known = name;
+            if (known.isEmpty())
+                Diagnostics::note(QStringLiteral("Agent: ignored unknown tag \"%1\"").arg(wanted));
+            else if (!tags.contains(known))
+                tags << known;
+        }
+        if (!tags.isEmpty())
+            payload.insert(QStringLiteral("tags"), tags);
+        const QString due = item.value("due").toString().trimmed();
+        if (!due.isEmpty())
+            payload.insert(QStringLiteral("due"), due);
+        if (item.value("priority").isDouble() || item.value("priority").isString())
+            payload.insert(QStringLiteral("priority"), qBound(0, item.value("priority").toVariant().toInt(), 3));
+        Proposal p;
+        p.kind = QStringLiteral("triage");
+        p.payload = payload;
+        proposals.append(p);
+    }
+    return storeProposals(proposals);
+}
+
+int AgentService::ingestPriorities(const QByteArray &body) {
+    const QJsonObject root = answerRoot(body);
+    if (root.isEmpty() || !root.contains("priorities")) {
+        m_lastError = QStringLiteral("The model's answer held no priorities.");
+        Diagnostics::note(QStringLiteral("Agent: ") + m_lastError);
+        return -1;
+    }
+    QList<Proposal> proposals;
+    for (const QJsonValue &value : root.value("priorities").toArray()) {
+        const QJsonObject item = value.toObject();
+        const qint64 taskId = item.value("taskId").toVariant().toLongLong();
+        if (!taskId || !(item.value("priority").isDouble() || item.value("priority").isString()))
+            continue;
+        Proposal p;
+        p.kind = QStringLiteral("priority");
+        p.payload = {{QStringLiteral("taskId"), taskId},
+                     {QStringLiteral("priority"), qBound(0, item.value("priority").toVariant().toInt(), 3)}};
+        proposals.append(p);
+    }
+    return storeProposals(proposals);
 }
 
 int AgentService::ingest(const QByteArray &body, const QString &transportError) {

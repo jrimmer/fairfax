@@ -3514,6 +3514,70 @@ void Backend::myDayPromptAnswered(bool planned) {
 
 bool Backend::agentEnabled() const { return m_store->setting("agent.enabled", false).toBool(); }
 
+bool Backend::sourceIsInbox() const {
+    if (m_source.kind != Source::List)
+        return false;
+    const auto it = m_store->lists().constFind(m_source.id);
+    return it != m_store->lists().cend() && !it->deleted && it->kind == ListKind::Inbox;
+}
+
+// The open tasks of the Inbox, as the triage request names them.
+QVariantList Backend::inboxTriageTasks() const {
+    qint64 inboxId = 0;
+    for (const auto &l : m_store->lists())
+        if (!l.deleted && l.kind == ListKind::Inbox)
+            inboxId = l.id;
+    QVariantList out;
+    if (!inboxId)
+        return out;
+    QVector<Task> tasks;
+    for (const auto &t : m_store->tasks())
+        if (!t.deleted && !t.completed && t.listId == inboxId)
+            tasks.append(t);
+    std::sort(tasks.begin(), tasks.end(), [](const Task &a, const Task &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    for (const Task &t : tasks)
+        out.append(QVariantMap{{"taskId", t.id}, {"title", t.title}, {"notes", t.notes}});
+    return out;
+}
+
+// The selected tasks, with their current priorities as ground truth of the
+// user's habits.
+QVariantList Backend::selectedPriorityTasks() const {
+    QVariantList out;
+    for (qint64 id : targetIds()) {
+        const Task t = m_store->task(id);
+        if (t.id && !t.deleted)
+            out.append(QVariantMap{{"taskId", t.id}, {"title", t.title}, {"notes", t.notes}, {"priority", t.priority}});
+    }
+    return out;
+}
+
+void Backend::triageInbox() {
+    if (!m_agent || !agentEnabled())
+        return;  // The off-switch: no request, no transport, no network.
+    const QVariantList tasks = inboxTriageTasks();
+    if (tasks.isEmpty()) {
+        setStatus("The Inbox has no open tasks to triage.");
+        return;
+    }
+    m_agent->triageInbox(tasks, listNames(), tagNames());
+    m_reviewRequested = true;
+}
+
+void Backend::suggestPriorities() {
+    if (!m_agent || !agentEnabled())
+        return;
+    const QVariantList tasks = selectedPriorityTasks();
+    if (tasks.isEmpty()) {
+        setStatus("Select a task first.");
+        return;
+    }
+    m_agent->suggestPriorities(tasks);
+    m_reviewRequested = true;
+}
+
 void Backend::setAgent(AgentService *agent) {
     m_agent = agent;
     if (!agent)
@@ -3521,8 +3585,16 @@ void Backend::setAgent(AgentService *agent) {
     connect(agent, &AgentService::proposalsChanged, this, [this] {
         emit proposalsChanged();
         emit dataChanged();
+        if (m_reviewRequested) {
+            m_reviewRequested = false;
+            emit reviewRequested();
+        }
     });
     connect(agent, &AgentService::compileChanged, this, [this] { emit compileChanged(); });
+    // A triage or priority call that fails opens no sheet; clear the intent
+    // once the engine is no longer busy so a later queue change is not mistaken
+    // for it.
+    connect(agent, &AgentService::busyChanged, this, [this, agent] { if (!agent->busy()) m_reviewRequested = false; });
     // A compile that finished leaves the query ready to run; putting it in the
     // search field is what makes it editable and saveable.
     connect(agent, &AgentService::queryCompiled, this, [this] { applyCompiledQuery(); });
@@ -3612,6 +3684,10 @@ bool Backend::applyProposal(qint64 id) {
         emit announce(QStringLiteral("Ran the recorded query"));
         return true;
     }
+    if (found.kind == QLatin1String("triage"))
+        return applyTriageProposal(found);
+    if (found.kind == QLatin1String("priority"))
+        return applyPriorityProposal(found);
     if (found.kind != QLatin1String("set-due-date")) {
         setStatus(QStringLiteral("Cannot apply an unknown suggestion kind: %1").arg(found.kind));
         Diagnostics::note(QStringLiteral("Agent: refused unknown proposal kind \"%1\"").arg(found.kind));
@@ -3632,6 +3708,84 @@ bool Backend::applyProposal(qint64 id) {
     m_store->removeProposal(id);
     m_store->commit();
     setStatus(QString("Applied suggestion to \u201c%1\u201d").arg(m_store->task(taskId).title));
+    emit announce(QString("Applied: %1").arg(m_store->task(taskId).title));
+    return true;
+}
+
+// A triage row changes one task through the ordinary selection methods: the
+// list move, the tags, the due date (read by the real date parser, never
+// written raw) and the priority. The proposal is removed only when the task
+// exists; the whole change is one undo step per method, as the menu entries are.
+bool Backend::applyTriageProposal(const Proposal &proposal) {
+    const qint64 taskId = proposal.payload.value("taskId").toLongLong();
+    if (!taskId || !m_store->tasks().contains(taskId) || m_store->task(taskId).deleted) {
+        setStatus("That task is no longer there.");
+        return false;
+    }
+    const QString listName = proposal.payload.value("list").toString();
+    const QStringList tags = proposal.payload.value("tags").toStringList();
+    const QString due = proposal.payload.value("due").toString();
+    const QVariant priority = proposal.payload.value("priority");
+
+    if (!listName.isEmpty()) {
+        qint64 listId = 0;
+        for (const auto &l : m_store->lists())
+            if (!l.deleted && !l.archived && l.kind != ListKind::Smart && l.name.compare(listName, Qt::CaseInsensitive) == 0)
+                listId = l.id;
+        if (!listId) {
+            setStatus(QStringLiteral("That suggestion names an unknown list: %1").arg(listName));
+            return false;
+        }
+        setTaskList(taskId, listId);
+    }
+    if (!tags.isEmpty()) {
+        // tagSelection acts on the selection; make it this one task.
+        const auto saved = m_selected;
+        m_selected = {taskId};
+        tagSelection(tags.join(','), false);
+        m_selected = saved;
+    }
+    if (!due.isEmpty()) {
+        // The English phrase the model wrote goes through the real parser, so
+        // a raw string never reaches the dueDate field.
+        const auto parsed = DateParse::best(due, QDateTime::currentDateTime());
+        if (parsed.date.isValid() || parsed.minutes >= 0) {
+            const QDate date = parsed.date.isValid() ? parsed.date : QDate::currentDate();
+            setDue(taskId, date.toString(Qt::ISODate), parsed.minutes >= 0 ? parsed.minutes : -2);
+        } else {
+            Diagnostics::note(QStringLiteral("Agent: ignored unreadable due date \"%1\"").arg(due));
+        }
+    }
+    if (priority.isValid()) {
+        const auto saved = m_selected;
+        m_selected = {taskId};
+        setPriority(priority.toInt());
+        m_selected = saved;
+    }
+
+    m_store->begin("Apply Suggestion", false);
+    m_store->removeProposal(proposal.id);
+    m_store->commit();
+    setStatus(QString("Applied triage to \u201c%1\u201d").arg(m_store->task(taskId).title));
+    emit announce(QString("Applied: %1").arg(m_store->task(taskId).title));
+    return true;
+}
+
+// A priority row calls setPriority for one task.
+bool Backend::applyPriorityProposal(const Proposal &proposal) {
+    const qint64 taskId = proposal.payload.value("taskId").toLongLong();
+    if (!taskId || !m_store->tasks().contains(taskId) || m_store->task(taskId).deleted) {
+        setStatus("That task is no longer there.");
+        return false;
+    }
+    const auto saved = m_selected;
+    m_selected = {taskId};
+    setPriority(proposal.payload.value("priority").toInt());
+    m_selected = saved;
+    m_store->begin("Apply Suggestion", false);
+    m_store->removeProposal(proposal.id);
+    m_store->commit();
+    setStatus(QString("Applied priority to \u201c%1\u201d").arg(m_store->task(taskId).title));
     emit announce(QString("Applied: %1").arg(m_store->task(taskId).title));
     return true;
 }

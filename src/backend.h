@@ -38,6 +38,9 @@ class Backend : public QObject {
     Q_PROPERTY(int sourceColor READ sourceColor NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsFocus READ sourceIsFocus NOTIFY viewChanged)
     Q_PROPERTY(bool sourceIsMyDay READ sourceIsMyDay NOTIFY viewChanged)
+    // True while a GTD Inbox list is the selected source: the toolbar's
+    // Triage Inbox action shows only then.
+    Q_PROPERTY(bool sourceIsInbox READ sourceIsInbox NOTIFY viewChanged)
     Q_PROPERTY(bool myDayEnabled READ myDayEnabled NOTIFY settingsChanged)
     // The shutdown review: My Day opened after the work day's end, or through
     // "Review today" at any time.
@@ -146,6 +149,7 @@ public:
     int sourceColor() const;
     bool sourceIsFocus() const { return m_source.isFocus(); }
     bool sourceIsMyDay() const { return m_source.kind == Source::MyDay; }
+    bool sourceIsInbox() const;
     bool myDayEnabled() const;
     bool myDayShutdown() const { return m_source.kind == Source::MyDay && m_myDayShutdown; }
     QVariantMap myDayCapacityMap() const { return myDayCapacity(); }
@@ -609,6 +613,13 @@ public:
     // query, and apply the finished query to the search field. With the
     // feature off the ask does nothing at all.
     Q_INVOKABLE void askQuery(const QString &prompt);
+    // Inbox triage and priority suggestions: the engine's two collection calls.
+    // Both build their request from real store data (the open Inbox tasks, the
+    // selection) and do nothing while the feature is off.
+    Q_INVOKABLE QVariantList inboxTriageTasks() const;
+    Q_INVOKABLE void triageInbox();
+    Q_INVOKABLE QVariantList selectedPriorityTasks() const;
+    Q_INVOKABLE void suggestPriorities();
     Q_INVOKABLE void applyCompiledQuery();
     QString compiledQuery() const;
     QString compiledHint() const;
@@ -655,6 +666,7 @@ signals:
     void recordingChanged();
     void myDayChanged();  // The My Day plan or capacity moved.
     void proposalsChanged();  // The agent's suggestion queue changed.
+    void reviewRequested();   // A collection call finished; open the review sheet.
     void compileChanged();    // The plain-English compile state changed.
     void quickEntryTextRequested(const QString &text);
     void editEnding();  // The editor is about to close: it saves what is still in its fields.
@@ -679,6 +691,10 @@ private:
     void archiveChildren(qint64 parentId, qint64 copyId);
     // Rescheduling a project sets its completed children back to active.
     void reopenChildren(const Task &project);
+    // Applies one triage or priority proposal through the ordinary Backend
+    // methods, removing the proposal when the change lands.
+    bool applyTriageProposal(const Proposal &proposal);
+    bool applyPriorityProposal(const Proposal &proposal);
     void deleteTree(qint64 id);
     qint64 duplicateTree(const Task &task, qint64 parentId, qint64 listId);
     void collectTree(const Task &task, QVector<Task> &into) const;
@@ -706,6 +722,7 @@ private:
     Store *m_store;
     CalendarFeed *m_calendar = nullptr;
     AgentService *m_agent = nullptr;
+    bool m_reviewRequested = false;  // Open the review sheet when proposals land.
     RowModel m_sidebar;
     RowModel m_tasks;
     RowModel m_tags;

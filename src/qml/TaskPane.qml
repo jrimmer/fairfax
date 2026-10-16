@@ -143,6 +143,14 @@ Item {
                 }
             }
             IconButton { objectName: "toggleUtility"; icon: "panel"; tip: root.utilityVisible ? "Hide Tags (Ctrl+Alt+→)" : "Show Tags (Ctrl+Alt+→)"; onClicked: root.toggleUtility() }
+            // Inbox triage: only while the agent is on and the Inbox is open.
+            IconButton {
+                objectName: "triageInboxButton"
+                visible: backend.agentEnabled && backend.sourceIsInbox
+                icon: "inbox"
+                tip: "Triage Inbox"
+                onClicked: backend.triageInbox()
+            }
             // The proposal engine's review sheet, only while the agent is on
             // and something is waiting.
             IconButton {

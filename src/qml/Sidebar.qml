@@ -831,6 +831,7 @@ Rectangle {
                 onClicked: (m) => {
                     if (item.row.sourceKey) backend.selectSource(item.row.sourceKey)
                     if (m.button === Qt.RightButton && item.isList) listMenu.popup()
+                    if (m.button === Qt.RightButton && item.row.icon === "inbox") inboxMenu.popup()
                     if (m.button === Qt.RightButton && item.row.kind === "smart") smartMenu.popup()
                 }
                 onDoubleClicked: if (item.isList || item.row.kind === "smart") root.renamingListId = item.row.listId
@@ -854,6 +855,20 @@ Rectangle {
                 onRename: root.renamingListId = item.row.listId
                 onEditList: editListDialog.edit(item.row.listId)
                 onCustomColor: root.pickColor(theme.listColor(item.row.color || 0), (code) => backend.setListColor(item.row.listId, code))
+            }
+            // The Inbox focus list's own menu: the agent's triage action and
+            // the list's edit dialog. The triage entry shows only while the
+            // agent is on, so the off-switch removes it.
+            Menu {
+                id: inboxMenu
+                MenuItem {
+                    objectName: "triageInboxMenu"
+                    visible: backend.agentEnabled
+                    text: "Triage Inbox"
+                    onTriggered: backend.triageInbox()
+                }
+                MenuSeparator { visible: backend.agentEnabled }
+                MenuItem { text: "Edit List…"; onTriggered: editListDialog.edit(item.row.listId) }
             }
             Menu {
                 id: smartMenu

@@ -195,6 +195,9 @@ ApplicationWindow {
         target: backend
         function onQuickEntryRequested() { quickEntry.summon() }
         function onQuickEntryTextRequested(text) { quickEntry.summon(); quickEntry.prefill(text) }
+        // A triage or priority call finished: show the review sheet so the
+        // proposals are walked one by one.
+        function onReviewRequested() { proposalSheet.openSheet() }
         function onPanelRequested(panel) {
             if (panel === "open") win.openCommand("open")
             else if (panel === "settings") { settings.show(); settings.raise(); settings.requestActivate() }

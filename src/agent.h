@@ -16,6 +16,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantMap>
 #include <functional>
 
@@ -66,6 +67,17 @@ public:
     // kept as a one-line hint; the ask and its result are recorded as a
     // "query" proposal. Also does nothing while disabled.
     Q_INVOKABLE void compileQuery(const QString &prompt);
+    // Inbox triage: asks the model to propose a list, tags, due date and
+    // priority for every open Inbox task. `tasks` is a list of
+    // {taskId, title, notes}; listNames and tagNames are the only choices, so
+    // a name the model invents is dropped rather than created. One proposal of
+    // kind "triage" per task. Nothing is sent while disabled.
+    Q_INVOKABLE void triageInbox(const QVariantList &tasks, const QStringList &listNames, const QStringList &tagNames);
+    // Suggest priorities: proposes None/Low/Medium/High for the selected tasks.
+    // `tasks` is a list of {taskId, title, notes, priority}, the current
+    // priority included so the model learns the user's habits. One proposal of
+    // kind "priority" per task. Nothing is sent while disabled.
+    Q_INVOKABLE void suggestPriorities(const QVariantList &tasks);
     // Abandons the request in flight; a late answer is ignored.
     Q_INVOKABLE void cancel();
     bool busy() const { return m_busy; }
@@ -83,6 +95,11 @@ public:
     // The query-compile request body and system prompt, for tests.
     QByteArray buildQueryRequest(const QString &prompt) const;
     static QString querySystemPrompt();
+    // The triage and priority request bodies and system prompts, for tests.
+    QByteArray buildTriageRequest(const QVariantList &tasks, const QStringList &listNames, const QStringList &tagNames) const;
+    QByteArray buildPriorityRequest(const QVariantList &tasks) const;
+    static QString triageSystemPrompt();
+    static QString prioritySystemPrompt();
     // The query grammar the compile prompt names, as one static string.
     static QString queryGrammar();
     // The chat-completions URL for a configured base URL.
@@ -92,6 +109,13 @@ public:
     // Returns -1 and sets lastError for a response that carries no usable
     // JSON or when `transportError` is set.
     int ingest(const QByteArray &body, const QString &transportError = QString());
+    // Parses a triage answer into "triage" proposals, one per row. A list or
+    // tag name not among the choices is dropped with a Diagnostics note rather
+    // than invented. Returns the count, or -1 for an unreadable answer.
+    int ingestTriage(const QByteArray &body, const QStringList &listNames, const QStringList &tagNames);
+    // Parses a priority answer into "priority" proposals. Returns the count, or
+    // -1 for an unreadable answer.
+    int ingestPriorities(const QByteArray &body);
     // The first balanced JSON object in `text`, ignoring prose around it.
     static QByteArray firstJsonObject(const QByteArray &text);
 
@@ -107,7 +131,7 @@ signals:
 
 private:
     // What the request in flight is for: proposals or a query compile.
-    enum class Mode { Proposals, Query };
+    enum class Mode { Proposals, Query, Triage, Priorities };
 
     void send(const QByteArray &body, const QString &message, Mode mode);
     void finish(int status, const QByteArray &body, const QString &error);
@@ -118,6 +142,9 @@ private:
     // The assistant message's content, or the whole body when there is none.
     static QByteArray assistantContent(const QByteArray &body);
     QJsonObject proposalRoot(const QByteArray &body) const;
+    // The JSON object an answer carries, whether it is a chat completion or the
+    // object itself, prose around it allowed.
+    QJsonObject answerRoot(const QByteArray &body) const;
     std::function<void()> sendOverNetwork(const QUrl &url, const QByteArray &body, int timeoutMs, Response done);
 
     Store *m_store;
@@ -134,6 +161,9 @@ private:
     QString m_compiledQuery;
     QString m_compiledHint;
     QString m_compileError;
+    // The choices a triage answer is validated against, kept from the request.
+    QStringList m_triageLists;
+    QStringList m_triageTags;
     QNetworkAccessManager *m_network = nullptr;
     QNetworkReply *m_reply = nullptr;
 };

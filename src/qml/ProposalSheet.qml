@@ -33,7 +33,26 @@ Popup {
         }
         if (p.kind === "query")
             return "Ask: “" + (payload.prompt || "?") + "” → " + (payload.query || "?")
+        if (p.kind === "triage") {
+            const task = backend.taskInfo(Number(payload.taskId || 0))
+            const title = task && task.title ? task.title : "task " + payload.taskId
+            const parts = []
+            if (payload.list) parts.push("to “" + payload.list + "”")
+            if (payload.tags && payload.tags.length) parts.push("tags " + payload.tags.join(", "))
+            if (payload.due) parts.push("due " + payload.due)
+            if (payload.priority !== undefined && payload.priority !== null) parts.push(priorityName(payload.priority))
+            return "Triage “" + title + "”: " + (parts.length ? parts.join(", ") : "no change")
+        }
+        if (p.kind === "priority") {
+            const task = backend.taskInfo(Number(payload.taskId || 0))
+            const title = task && task.title ? task.title : "task " + payload.taskId
+            return "Set priority of “" + title + "” to " + priorityName(payload.priority)
+        }
         return p.kind + " " + JSON.stringify(payload)
+    }
+
+    function priorityName(value) {
+        return value === 0 ? "None" : value === 1 ? "Low" : value === 2 ? "Medium" : value === 3 ? "High" : String(value)
     }
 
     // The list is reassigned when the queue changes, so the sheet follows an

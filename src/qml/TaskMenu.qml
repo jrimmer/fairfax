@@ -108,6 +108,15 @@ Menu {
         MenuItem { text: "Increase Priority"; onTriggered: backend.bumpPriority(1) }
         MenuItem { text: "Decrease Priority"; onTriggered: backend.bumpPriority(-1) }
     }
+    // The agent's priority suggestion, only while the feature is on and more
+    // than one task is selected; it proposes, it changes nothing itself. The
+    // review sheet opens on Backend.reviewRequested when the answer lands.
+    MenuItem {
+        objectName: "suggestPriorities"
+        visible: backend.agentEnabled && backend.selectionCount > 1
+        text: "Suggest Priorities"
+        onTriggered: backend.suggestPriorities()
+    }
     MenuItem { text: root.row.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.row.starred ? 0 : 1) }
     MenuSeparator {}
     Menu {
