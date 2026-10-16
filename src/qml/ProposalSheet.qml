@@ -45,8 +45,6 @@ Popup {
 
     function openSheet() {
         reload()
-        if (items.length === 0)
-            return
         list.currentIndex = 0
         open()
         list.forceActiveFocus()
