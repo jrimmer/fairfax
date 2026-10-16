@@ -646,6 +646,13 @@ private slots:
         click(copy);
         QTRY_VERIFY_WITH_TIMEOUT(QGuiApplication::clipboard()->text().contains("Tasks: 8 open, 1 completed"), 5000);
         QVERIFY(QGuiApplication::clipboard()->text().startsWith("Fairfax "));
+
+        // The agent block shows the last request/response pair and its error,
+        // and says the feature is off on a fresh database.
+        QQuickItem *agentBlock = nullptr;
+        control("diagAgent", agentBlock);
+        QVERIFY(agentBlock->property("text").toString().contains("Agent: off"));
+        QVERIFY(agentBlock->property("text").toString().contains("Last request: (none)"));
     }
 };
 
