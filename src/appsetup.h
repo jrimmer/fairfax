@@ -8,6 +8,7 @@
 
 #include <QString>
 
+#include "agent.h"
 #include "backend.h"
 #include "caldavsync.h"
 #include "calendar.h"
@@ -39,6 +40,7 @@ public:
     Store &store;
     Theme theme;
     Backend backend;
+    AgentService agent;
     Sounds sounds;
     CalendarFeed calendar;
     FilePicker filePicker;

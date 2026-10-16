@@ -924,6 +924,41 @@ Window {
 
                     Label { text: "Exclusions"; font.bold: true; Layout.topMargin: 16 }
                     Hint { Layout.topMargin: 0; text: "Right-click a list and choose Don't Sync This List to keep it, and its tasks, on this machine only. Git, folder, WebDAV, Todoist and CalDAV sync all skip it." }
+
+                    // The proposal engine: opt-in, local model by default.
+                    Label { text: "Suggestions"; font.bold: true; Layout.topMargin: 18 }
+                    Hint {
+                        Layout.topMargin: 0
+                        text: "Let a model propose changes you review before anything is applied. Nothing is sent anywhere until this is on; the default points at a model running on this machine (Ollama's OpenAI-compatible port), and every proposal is accepted or rejected by you. Suggestions live in the task pane's toolbar."
+                    }
+                    Toggle { key: "agent.enabled"; fallback: false; label: "Offer suggested changes" }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: "Model server"; Layout.preferredWidth: 160; enabled: root.bool("agent.enabled", false) }
+                        TextField {
+                            objectName: "setting:agent.baseUrl"
+                            Accessible.name: "Model server"
+                            Layout.fillWidth: true
+                            placeholderText: "http://127.0.0.1:11434/v1"
+                            enabled: root.bool("agent.enabled", false)
+                            text: String(root.value("agent.baseUrl", "http://127.0.0.1:11434/v1"))
+                            onEditingFinished: backend.setSetting("agent.baseUrl", text.trim())
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: "Model"; Layout.preferredWidth: 160; enabled: root.bool("agent.enabled", false) }
+                        TextField {
+                            objectName: "setting:agent.model"
+                            Accessible.name: "Model"
+                            Layout.fillWidth: true
+                            placeholderText: "llama3.2"
+                            enabled: root.bool("agent.enabled", false)
+                            text: { backend.settingsRevision; return String(root.value("agent.model", "")) }
+                            onEditingFinished: backend.setSetting("agent.model", text.trim())
+                        }
+                    }
+                    Hint { visible: !root.bool("agent.enabled", false); Layout.topMargin: 0; text: "Turn on Offer suggested changes to set the model server and model." }
                 }
 
                 // Mail to Fairfax

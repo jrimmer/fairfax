@@ -78,6 +78,7 @@ ApplicationWindow {
             onQuickLook: quickLook.toggle()
             onTagSearch: { if (!win.utilityVisible) win.utilityShown = true; utility.focusSearch() }
             onHelp: help.toggle()
+            onProposalsRequested: proposalSheet.openSheet()
         }
 
         Rectangle { Layout.fillHeight: true; implicitWidth: 1; color: theme.divider; visible: utility.visible }
@@ -201,6 +202,7 @@ ApplicationWindow {
         function onWindowRequested() { win.show(); win.raise(); win.requestActivate() }
     }
     QuickLook { id: quickLook; objectName: "quickLook"; onClosed: win.focusList() }
+    ProposalSheet { id: proposalSheet }
     ShortcutOverlay { id: help; objectName: "shortcutOverlay"; onClosed: win.focusList() }
 
     // Errors and confirmations, e.g. "Undo Change Due Date".

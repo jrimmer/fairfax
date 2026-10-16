@@ -11,7 +11,7 @@
 #include "synctree.h"
 
 AppServices::AppServices(Store &store, const QString &themeOverride)
-    : store(store), theme(themeOverride), backend(&store)
+    : store(store), theme(themeOverride), backend(&store), agent(&store)
 {
     theme.setScheme(store.setting("appearance.scheme", "system").toString());
     QObject::connect(&backend, &Backend::settingsChanged, &theme,
@@ -36,6 +36,8 @@ AppServices::AppServices(Store &store, const QString &themeOverride)
     calendar.setPalette(theme.listPalette());
     // My Day's capacity line and next-free-slot need the day's events.
     backend.setCalendar(&calendar);
+    // The proposal engine's review actions and count.
+    backend.setAgent(&agent);
     // Per-source switches and colours, and the addresses that mark a declined
     // invitation as mine, all set before the sources so the first load is right.
     calendar.setDisabledSources(store.setting("calendar.disabled").toString().split('\n', Qt::SkipEmptyParts));
@@ -95,6 +97,7 @@ void AppServices::install(QQmlEngine &engine, const QString &storeError, bool st
     context->setContextProperty("mailFetch", mail.get());
     context->setContextProperty("syncHub", &syncHub);
     context->setContextProperty("calendar", &calendar);
+    context->setContextProperty("agent", &agent);
     context->setContextProperty("sounds", &sounds);
     context->setContextProperty("theme", &theme);
     context->setContextProperty("backend", &backend);

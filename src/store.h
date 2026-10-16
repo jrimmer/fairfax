@@ -35,6 +35,8 @@ public:
     const QHash<qint64, ListSection> &sections() const { return m_sections; }
     QVector<ListSection> sectionsOf(qint64 listId) const;  // In order.
     const QHash<qint64, Attachment> &attachments() const { return m_attachments; }
+    // Pending agent proposals, oldest first, as the review sheet shows them.
+    QVector<Proposal> proposals() const;
     QVector<Attachment> attachmentsFor(qint64 taskId) const;
     QString attachmentsFolder() const;
     QVector<Alarm> alarmsFor(qint64 taskId) const;
@@ -71,6 +73,8 @@ public:
     void putLocation(const Location &location);
     void putSection(const ListSection &section);
     void putAttachment(const Attachment &attachment);
+    void putProposal(const Proposal &proposal);
+    void removeProposal(qint64 id);
     bool commit();
 
     // A setting written as part of a change, so one Ctrl+Z puts it back.
@@ -153,6 +157,7 @@ private:
     QHash<qint64, Location> m_locations;
     QHash<qint64, ListSection> m_sections;
     QHash<qint64, Attachment> m_attachments;
+    QHash<qint64, Proposal> m_proposals;
     QHash<QString, qint64> m_maxIds;
     QHash<QString, QVariant> m_settings;
     bool m_inChange = false;

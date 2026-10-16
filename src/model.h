@@ -262,3 +262,16 @@ struct ListSection {
     static ListSection fromMap(const QVariantMap &map);
 };
 
+// One pending suggestion from the agent, as the review sheet shows it. The
+// payload is whatever the kind needs; it is stored as JSON text in the
+// proposals table, so a review survives a restart.
+struct Proposal {
+    qint64 id = 0;
+    QString kind;
+    QVariantMap payload;
+    QDateTime created;
+
+    QVariantMap toMap() const;
+    static Proposal fromMap(const QVariantMap &map);
+};
+

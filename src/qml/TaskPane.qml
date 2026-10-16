@@ -16,6 +16,7 @@ Item {
     signal quickLook()
     signal help()
     signal tagSearch()
+    signal proposalsRequested()
     property bool altHeld: false
 
     // The sequence -> command id map the bare-key handler looks a press up in,
@@ -127,6 +128,16 @@ Item {
                 }
             }
             IconButton { objectName: "toggleUtility"; icon: "panel"; tip: root.utilityVisible ? "Hide Tags (Ctrl+Alt+→)" : "Show Tags (Ctrl+Alt+→)"; onClicked: root.toggleUtility() }
+            // The proposal engine's review sheet, only while the agent is on
+            // and something is waiting.
+            IconButton {
+                objectName: "suggestionsButton"
+                visible: backend.agentEnabled
+                icon: "checklist"
+                tip: backend.proposalCount > 0 ? backend.proposalCount + " Suggested Change(s)" : "Suggested Changes"
+                checked: backend.proposalCount > 0
+                onClicked: root.proposalsRequested()
+            }
         }
 
         // Title and sort bar.

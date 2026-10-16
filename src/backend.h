@@ -18,6 +18,7 @@
 #include "store.h"
 #include "views.h"
 
+class AgentService;
 class CalendarFeed;
 
 class Backend : public QObject {
@@ -43,6 +44,10 @@ class Backend : public QObject {
     Q_PROPERTY(bool myDayShutdown READ myDayShutdown NOTIFY viewChanged)
     Q_PROPERTY(QVariantMap myDayCapacityMap READ myDayCapacityMap NOTIFY myDayChanged)
     Q_PROPERTY(QVariantMap myDaySummaryMap READ myDaySummaryMap NOTIFY myDayChanged)
+    // The agent's suggestion queue: whether the feature is on, and how many
+    // proposals wait for review.
+    Q_PROPERTY(bool agentEnabled READ agentEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(int proposalCount READ proposalCount NOTIFY proposalsChanged)
     Q_PROPERTY(QVariantList defaultViewChoices READ defaultViewChoices NOTIFY dataChanged)
     Q_PROPERTY(int sortField READ sortField NOTIFY viewChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY viewChanged)
@@ -140,6 +145,8 @@ public:
     bool myDayShutdown() const { return m_source.kind == Source::MyDay && m_myDayShutdown; }
     QVariantMap myDayCapacityMap() const { return myDayCapacity(); }
     QVariantMap myDaySummaryMap() const { return myDaySummary(); }
+    bool agentEnabled() const;
+    int proposalCount() const { return m_store->proposals().size(); }
     QVariantList defaultViewChoices() const;
     int sortField() const { return sortSpec().field; }
     bool sortAscending() const { return sortSpec().ascending; }
@@ -585,6 +592,15 @@ public:
     Q_INVOKABLE bool myDayPromptDue() const;
     Q_INVOKABLE void myDayPromptAnswered(bool planned);
 
+    // The proposal engine's review actions. Applying routes by kind to the
+    // Backend's ordinary methods, so every write goes through the same
+    // surface MCP exposes; an unknown kind is refused, not crashed.
+    void setAgent(AgentService *agent);
+    Q_INVOKABLE QVariantList proposals() const;
+    Q_INVOKABLE bool applyProposal(qint64 id);
+    Q_INVOKABLE void dismissProposal(qint64 id);
+    Q_INVOKABLE void dismissAllProposals();
+
     // Alerts beyond the presets.
     Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);
     Q_INVOKABLE void addDaysBeforeAlarm(qint64 taskId, int days, int minutes);
@@ -621,6 +637,7 @@ signals:
     void panelRequested(const QString &panel);  // "open" (Quick Open) or "settings".
     void recordingChanged();
     void myDayChanged();  // The My Day plan or capacity moved.
+    void proposalsChanged();  // The agent's suggestion queue changed.
     void quickEntryTextRequested(const QString &text);
     void editEnding();  // The editor is about to close: it saves what is still in its fields.
     void editFieldRequested();  // The editor is open; takePendingField() says where to go.
@@ -670,6 +687,7 @@ private:
 
     Store *m_store;
     CalendarFeed *m_calendar = nullptr;
+    AgentService *m_agent = nullptr;
     RowModel m_sidebar;
     RowModel m_tasks;
     RowModel m_tags;

@@ -1,5 +1,7 @@
 #include "model.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QStringList>
 
 namespace {
@@ -292,5 +294,20 @@ ListSection ListSection::fromMap(const QVariantMap &m) {
     s.modified = stampFrom(m.value("modified"));
     s.deleted = m.value("deleted").toBool();
     return s;
+}
+
+QVariantMap Proposal::toMap() const {
+    return {{"id", id}, {"kind", kind},
+            {"payload", QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(payload)).toJson(QJsonDocument::Compact))},
+            {"created", stampValue(created)}};
+}
+
+Proposal Proposal::fromMap(const QVariantMap &m) {
+    Proposal p;
+    p.id = m.value("id").toLongLong();
+    p.kind = m.value("kind").toString();
+    p.payload = QJsonDocument::fromJson(m.value("payload").toString().toUtf8()).object().toVariantMap();
+    p.created = stampFrom(m.value("created"));
+    return p;
 }
 

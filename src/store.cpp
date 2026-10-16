@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 7;
+constexpr int SchemaVersion = 8;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -27,7 +27,7 @@ const char *SyncColumns = R"(
     remote_id TEXT
 )";
 
-const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections"};
+const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections", "proposals"};
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
 
@@ -220,6 +220,15 @@ bool Store::migrate(QString *error) {
         QStringLiteral("ALTER TABLE list_groups ADD COLUMN color INTEGER NOT NULL DEFAULT -1"),
     };
 
+    // Version 8 adds the agent's proposal queue.
+    const QStringList version8{
+        QStringLiteral(R"(CREATE TABLE IF NOT EXISTS proposals (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL DEFAULT '',
+            payload TEXT NOT NULL DEFAULT '',
+            created INTEGER))"),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -235,6 +244,8 @@ bool Store::migrate(QString *error) {
         steps += version6;
     if (version < 7)
         steps += version7;
+    if (version < 8)
+        steps += version8;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();
@@ -259,6 +270,7 @@ void Store::reload() {
     m_locations.clear();
     m_attachments.clear();
     m_sections.clear();
+    m_proposals.clear();
     m_settings.clear();
     load();
     emit changed();
@@ -415,6 +427,27 @@ void Store::putAttachment(const Attachment &a) {
     record("attachments", copy.id, cached("attachments", copy.id), copy.toMap());
 }
 
+void Store::putProposal(const Proposal &p) {
+    Proposal copy = p;
+    if (!copy.created.isValid())
+        copy.created = QDateTime::currentDateTime();
+    record("proposals", copy.id, cached("proposals", copy.id), copy.toMap());
+}
+
+void Store::removeProposal(qint64 id) {
+    record("proposals", id, cached("proposals", id), {});
+}
+
+QVector<Proposal> Store::proposals() const {
+    QVector<Proposal> result;
+    for (const auto &p : m_proposals)
+        result.append(p);
+    std::sort(result.begin(), result.end(), [](const Proposal &a, const Proposal &b) {
+        return a.created != b.created ? a.created < b.created : a.id < b.id;
+    });
+    return result;
+}
+
 void Store::putSetting(const QString &key, const QVariant &value) {
     // Settings are not rows, so the journal carries them as a synthetic table
     // whose one field is the value; undo writes the old text back.
@@ -543,9 +576,12 @@ bool Store::writeRow(const QString &table, const QVariantMap &row) {
         if (c != "id")
             updates << QStringLiteral("%1 = excluded.%1").arg(c);
     }
-    columns << "dirty";
-    placeholders << "1";
-    updates << "dirty = 1";
+    // The proposals table carries no sync bookkeeping, so no dirty flag.
+    if (table != QLatin1String("proposals")) {
+        columns << "dirty";
+        placeholders << "1";
+        updates << "dirty = 1";
+    }
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("INSERT INTO %1 (%2) VALUES (%3) ON CONFLICT(id) DO UPDATE SET %4")
                   .arg(table, columns.join(", "), placeholders.join(", "), updates.join(", ")));
@@ -595,12 +631,13 @@ void Store::applyToCache(const QString &table, const QVariantMap &row, qint64 id
         if (row.isEmpty()) m_attachments.remove(id); else m_attachments.insert(id, Attachment::fromMap(row));
     } else if (table == "sections") {
         if (row.isEmpty()) m_sections.remove(id); else m_sections.insert(id, ListSection::fromMap(row));
+    } else if (table == "proposals") {
+        if (row.isEmpty()) m_proposals.remove(id); else m_proposals.insert(id, Proposal::fromMap(row));
     }
 }
 
 QVariantMap Store::cached(const QString &table, qint64 id) const {
-    if (table == "tasks" && m_tasks.contains(id)) return m_tasks.value(id).toMap();
-    if (table == "lists" && m_lists.contains(id)) return m_lists.value(id).toMap();
+    if (table == "tasks" && m_tasks.contains(id)) return m_tasks.value(id).toMap();    if (table == "lists" && m_lists.contains(id)) return m_lists.value(id).toMap();
     if (table == "list_groups" && m_groups.contains(id)) return m_groups.value(id).toMap();
     if (table == "tags" && m_tags.contains(id)) return m_tags.value(id).toMap();
     if (table == "tag_groups" && m_tagGroups.contains(id)) return m_tagGroups.value(id).toMap();
@@ -608,6 +645,7 @@ QVariantMap Store::cached(const QString &table, qint64 id) const {
     if (table == "locations" && m_locations.contains(id)) return m_locations.value(id).toMap();
     if (table == "attachments" && m_attachments.contains(id)) return m_attachments.value(id).toMap();
     if (table == "sections" && m_sections.contains(id)) return m_sections.value(id).toMap();
+    if (table == "proposals" && m_proposals.contains(id)) return m_proposals.value(id).toMap();
     return {};
 }
 

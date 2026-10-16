@@ -19,6 +19,7 @@
 #include <algorithm>
 
 #include "dateparse.h"
+#include "agent.h"
 #include "alarms.h"
 #include "diagnostics.h"
 #include "automation.h"
@@ -3507,6 +3508,92 @@ void Backend::myDayPromptAnswered(bool planned) {
     markMyDayPlanned();
     if (planned && !sourceIsMyDay())
         selectSource("myday");
+}
+
+// ---------------------------------------------------------- proposal engine
+
+bool Backend::agentEnabled() const { return m_store->setting("agent.enabled", false).toBool(); }
+
+void Backend::setAgent(AgentService *agent) {
+    m_agent = agent;
+    if (!agent)
+        return;
+    connect(agent, &AgentService::proposalsChanged, this, [this] {
+        emit proposalsChanged();
+        emit dataChanged();
+    });
+    // A proposal written from the review actions changes the store, which
+    // already raises dataChanged; this keeps the count in step too.
+    connect(m_store, &Store::changed, this, [this] { emit proposalsChanged(); });
+}
+
+QVariantList Backend::proposals() const {
+    QVariantList out;
+    for (const Proposal &p : m_store->proposals())
+        out.append(QVariantMap{{"id", p.id}, {"kind", p.kind}, {"payload", p.payload}});
+    return out;
+}
+
+void Backend::dismissProposal(qint64 id) {
+    if (!m_store->proposals().isEmpty() && id) {
+        bool found = false;
+        for (const Proposal &p : m_store->proposals())
+            if (p.id == id) found = true;
+        if (!found)
+            return;
+    }
+    m_store->begin("Dismiss Suggestion", false);
+    m_store->removeProposal(id);
+    m_store->commit();
+    setStatus("Suggestion dismissed");
+}
+
+void Backend::dismissAllProposals() {
+    const QVector<Proposal> pending = m_store->proposals();
+    if (pending.isEmpty())
+        return;
+    m_store->begin("Dismiss Suggestions", false);
+    for (const Proposal &p : pending)
+        m_store->removeProposal(p.id);
+    m_store->commit();
+    setStatus(QStringLiteral("Dismissed %1 suggestion(s)").arg(pending.size()));
+}
+
+bool Backend::applyProposal(qint64 id) {
+    Proposal found;
+    bool has = false;
+    for (const Proposal &p : m_store->proposals()) {
+        if (p.id == id) {
+            found = p;
+            has = true;
+            break;
+        }
+    }
+    if (!has) {
+        setStatus("That suggestion is no longer there.");
+        return false;
+    }
+    // A proposal's kind routes to the ordinary backend method for that change;
+    // a kind this build does not know is refused rather than guessed at.
+    if (found.kind != QLatin1String("set-due-date")) {
+        setStatus(QStringLiteral("Cannot apply an unknown suggestion kind: %1").arg(found.kind));
+        Diagnostics::note(QStringLiteral("Agent: refused unknown proposal kind \"%1\"").arg(found.kind));
+        return false;
+    }
+    const qint64 taskId = found.payload.value("taskId").toLongLong();
+    const QString due = found.payload.value("due").toString();
+    if (!taskId || !m_store->tasks().contains(taskId) || m_store->task(taskId).deleted) {
+        setStatus("That task is no longer there.");
+        return false;
+    }
+    if (!QDate::fromString(due, Qt::ISODate).isValid()) {
+        setStatus("That suggestion's date cannot be read.");
+        return false;
+    }
+    setDue(taskId, due, -2);
+    dismissProposal(id);
+    setStatus(QString("Applied suggestion to \u201c%1\u201d").arg(m_store->task(taskId).title));
+    return true;
 }
 
 void Backend::addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes) {
