@@ -682,7 +682,8 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         {"ui.defaultView", "E2EMyDay::defaultViewComboChangesTheLaunchView"},
         // The once-a-day prompt's switch has a table row for persistence; its
         // effect is driven by E2EMyDay::promptIsAskedOnceADay.
-        {"myday.prompt", "E2EMyDay::promptIsAskedOnceADay"},        // The end-of-day reminder's switch has a table row for persistence; its
+        {"myday.prompt", "E2EMyDay::promptIsAskedOnceADay"},
+        // The end-of-day reminder's switch has a table row for persistence; its
         // once-a-day effect is driven by E2EMyDay::reminderFiresOnceAtWorkEnd.
         {"myday.shutdownPrompt", "E2EMyDay::reminderFiresOnceAtWorkEnd"},
         // The proposal engine's opt-in group: E2EAgent drives the switch, the

@@ -637,7 +637,8 @@ void Store::applyToCache(const QString &table, const QVariantMap &row, qint64 id
 }
 
 QVariantMap Store::cached(const QString &table, qint64 id) const {
-    if (table == "tasks" && m_tasks.contains(id)) return m_tasks.value(id).toMap();    if (table == "lists" && m_lists.contains(id)) return m_lists.value(id).toMap();
+    if (table == "tasks" && m_tasks.contains(id)) return m_tasks.value(id).toMap();
+    if (table == "lists" && m_lists.contains(id)) return m_lists.value(id).toMap();
     if (table == "list_groups" && m_groups.contains(id)) return m_groups.value(id).toMap();
     if (table == "tags" && m_tags.contains(id)) return m_tags.value(id).toMap();
     if (table == "tag_groups" && m_tagGroups.contains(id)) return m_tagGroups.value(id).toMap();

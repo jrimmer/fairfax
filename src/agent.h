@@ -75,7 +75,7 @@ public:
     // The first balanced JSON object in `text`, ignoring prose around it.
     static QByteArray firstJsonObject(const QByteArray &text);
 
-    // What the review sheet lists, newest first.
+    // What the review sheet lists, oldest first (the sheet appends).
     QVector<Proposal> pending() const;
 
 signals:
