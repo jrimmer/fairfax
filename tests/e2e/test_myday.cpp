@@ -4,7 +4,7 @@
 // in a narrow window. My Day is on by default; a test that wants it off turns
 // the setting off before the app starts.
 
-#include <QFile>
+#include "alarms.h"
 
 #include "automation.h"
 #include "misckit.h"
@@ -171,6 +171,54 @@ Seed seedBlockKeys(Store &store) {
     w.third = task("Block three", 0);   // No duration: B gives it 30 minutes.
     store.commit();
     blockWorld() = w;
+    return s;
+}
+
+// The shutdown review's world: two open tasks still today (one 90 minutes,
+// one without a duration), one completed today for 45 minutes, and one
+// completed yesterday that must not count anywhere.
+struct ShutdownWorld {
+    qint64 openLong = 0, openUndated = 0, doneToday = 0, doneYesterday = 0;
+};
+ShutdownWorld &shutdownWorld() {
+    static ShutdownWorld w;
+    return w;
+}
+
+Seed seedShutdown(Store &store) {
+    const Seed s = seedWorld(store);
+    // Launch on Today so the test can tell the review's opening apart from the
+    // fresh-database My Day default.
+    store.setSetting("ui.defaultView", "today");
+    ShutdownWorld w;
+    const QDate today = QDate::currentDate();
+    store.begin("Seed shutdown", false);
+    auto task = [&](const QString &title, const std::function<void(Task &)> &fn) {
+        Task t;
+        t.id = store.nextId("tasks");
+        t.listId = s.home;
+        t.title = title;
+        t.order = t.id;
+        fn(t);
+        store.putTask(t);
+        return t.id;
+    };
+    w.openLong = task("Still on", [&](Task &t) { t.dueDate = today; t.duration = 90; });
+    w.openUndated = task("Undated today", [&](Task &t) { t.dueDate = today; });
+    w.doneToday = task("Finished today", [&](Task &t) {
+        t.dueDate = today;
+        t.duration = 45;
+        t.completed = true;
+        t.completedAt = QDateTime(today, QTime(12, 0));
+    });
+    w.doneYesterday = task("Finished yesterday", [&](Task &t) {
+        t.dueDate = today.addDays(-1);
+        t.duration = 120;
+        t.completed = true;
+        t.completedAt = QDateTime(today.addDays(-1), QTime(17, 0));
+    });
+    store.commit();
+    shutdownWorld() = w;
     return s;
 }
 
@@ -410,6 +458,8 @@ private slots:
     // The sections show the right tasks, each with its reason chip in Overdue
     // and Suggestions.
     void sectionsShowTheirTasksAndReasons() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedMyDay);
         QVERIFY(app.ok);
         QVERIFY(app.openSource("myday"));
@@ -487,6 +537,8 @@ private slots:
     // Overdue is capped at seven with an "n more" row that expands it, and
     // Suggestions has its "Show more".
     void overdueCapExpands() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedManyOverdue);
         QVERIFY(app.ok);
         QVERIFY(app.openSource("myday"));
@@ -505,6 +557,8 @@ private slots:
     }
 
     void suggestionsShowMore() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         // A world whose suggestions run past fifteen: twenty starred tasks.
         App app([](Store &store) {
             Seed s = seedWorld(store);
@@ -617,6 +671,8 @@ private slots:
 
     // A typed search filters every section in My Day, as it does in a list.
     void searchFiltersTheSections() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedMyDay);
         QVERIFY(app.ok);
         QVERIFY(app.openSource("myday"));
@@ -859,6 +915,157 @@ private slots:
             QVERIFY(findObject("myDayPrompt") != nullptr);
             QTest::qWait(300);
             QVERIFY(!findObject("myDayPrompt")->property("visible").toBool());
+        }
+    }
+
+    // ------------------------------------------------------ shutdown review
+
+    void shutdownModeOpensAfterWorkEndAndListsOnlyUnfinished() {
+        const QDate today = QDate::currentDate();
+        // Half past five: the work day is over.
+        ClockPin pin(QDateTime(today, QTime(17, 30)));
+        App app(seedShutdown, QString(), false, false);
+        QVERIFY(app.ok);
+        // After the work day's end the shortcut opens the review, not the plan.
+        QVERIFY(app.backend().sourceKey() != QString("myday"));
+        app.press(Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("myday"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+        QCOMPARE(paneTitle(), QString("My Day"));
+        const ShutdownWorld &w = shutdownWorld();
+        // The review lists only the unfinished today tasks; the completed ones
+        // and the overdue of other days are not in it.
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(w.openLong) != nullptr, 5000);
+        QVERIFY(app.row(w.openUndated) != nullptr);
+        QVERIFY(app.row(w.doneToday) == nullptr);
+        QVERIFY(app.row(w.doneYesterday) == nullptr);
+        QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), (QStringList{"STILL TODAY"}), 5000);
+        // The summary line replaces the capacity line.
+        QQuickItem *summary = findItem("myDaySummary");
+        QVERIFY(summary);
+        QVERIFY(summary->property("visible").toBool());
+        QCOMPARE(findItem("myDayCapacity"), nullptr);
+        QStringList parts;
+        findIn(summary, [&](QQuickItem *i) {
+            if (i->width() > 0 && i->metaObject()->indexOfProperty("text") >= 0)
+                parts << i->property("text").toString();
+            return false;
+        });
+        QCOMPARE(parts.join(' '), QString("Completed today: 2 · planned 1h 30m, done 45m"));
+        // Finish (Return) leaves the review for the plan.
+        app.press(Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
+        QVERIFY(!sectionTitles().contains("STILL TODAY"));
+        QVERIFY(sectionTitles().contains("ALREADY TODAY"));
+        QVERIFY(findItem("myDaySummary") == nullptr);
+        QQuickItem *capacity = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((capacity = findItem("myDayCapacity")) != nullptr, 5000);
+        QVERIFY(capacity->property("visible").toBool());
+    }
+
+    // "Review today" opens the review at any hour; before workEnd the shortcut
+    // still opens the plan.
+    void reviewTodayButtonOpensTheReviewBeforeWorkEnd() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedPlanKeys);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
+        QVERIFY(tk::clickNamed("myDayReview"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+        QVERIFY(sectionTitles().contains("STILL TODAY"));
+        QVERIFY(findItem("myDayReview") == nullptr);
+        // Leaving My Day and coming back before workEnd is the plan again.
+        QVERIFY(app.openSource("all"));
+        QVERIFY(app.openSource("myday"));
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
+    }
+
+    // In the review Y moves to tomorrow, D defers through the sheet, and R
+    // sends the task back to tomorrow as "remove from My Day" does; Ctrl+Z
+    // undoes each.
+    void reviewKeysMoveDeferAndRemoveWithUndo() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedPlanKeys);
+        QVERIFY(app.ok);
+        const qint64 id = planWorld().alreadyToday;
+        QVERIFY(app.openSource("myday"));
+        QVERIFY(tk::clickNamed("myDayReview"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+        revealTaskInList(app, id);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        QVERIFY(tk::selectRow(app, id));
+
+        // Y: tomorrow, the existing due-tomorrow key.
+        app.press(Qt::Key_Y);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+
+        // D: the defer sheet's chips pick a date; the task leaves the day.
+        QVERIFY(tk::selectRow(app, id));
+        app.press(Qt::Key_D);
+        QObject *popup = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((popup = findObject("commandPopup")) != nullptr, 5000);
+        QVERIFY(popup->property("visible").toBool());
+        QCOMPARE(popup->property("kind").toString(), QString("defer"));
+        // Click the chip once it has settled; the popup's chips are a Flow
+        // that only places them after the popup opens.
+        QVERIFY(tk::clickNamed("commandChip:2 Days"));
+        // The popup must be gone before the next click: its chips stay where
+        // the list's rows are, and a click meant for a row would hit one.
+        QTRY_VERIFY_WITH_TIMEOUT(!popup->property("visible").toBool(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+
+        // R: back to its list by pushing today to tomorrow, with the status
+        // line the plan's R gives.
+        QVERIFY(tk::selectRow(app, id));
+        app.press(Qt::Key_R);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().statusMessage(), QString("Moved to tomorrow"), 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+    }
+
+    // The end-of-day reminder fires once after workEnd when the setting is on,
+    // and never when it is off: through the alarm service's test hook.
+    void reminderFiresOnceAtWorkEnd() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(17, 30)));
+        {
+            App app(seedMyDay);
+            QVERIFY(app.ok);
+            app.store().setSetting("myday.shutdownPrompt", true);
+            int fired = 0;
+            QStringList titles;
+            AlarmService service(&app.store());
+            QObject::connect(&service, &AlarmService::notified, [&](const QString &title, const QString &, qint64) {
+                ++fired;
+                titles << title;
+            });
+            service.checkMyDayReview();
+            QCOMPARE(fired, 1);
+            QCOMPARE(titles, QStringList{"Review your day"});
+            QCOMPARE(MyDay::lastShutdownPrompted(app.store()), today);
+            // The second tick the same day stays quiet: once a day.
+            service.checkMyDayReview();
+            QCOMPARE(fired, 1);
+        }
+        {
+            // The setting off: no reminder, no bookkeeping.
+            App app(seedMyDay);
+            QVERIFY(app.ok);
+            int fired = 0;
+            AlarmService service(&app.store());
+            QObject::connect(&service, &AlarmService::notified, [&](const QString &, const QString &, qint64) { ++fired; });
+            service.checkMyDayReview();
+            QCOMPARE(fired, 0);
+            QVERIFY(!MyDay::lastShutdownPrompted(app.store()).isValid());
         }
     }
 

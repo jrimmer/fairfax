@@ -683,6 +683,9 @@ inline const QMap<QString, QString> &dedicatedKeys() {
         // The once-a-day prompt's switch has a table row for persistence; its
         // effect is driven by E2EMyDay::promptIsAskedOnceADay.
         {"myday.prompt", "E2EMyDay::promptIsAskedOnceADay"},
+        // The end-of-day reminder's switch has a table row for persistence; its
+        // once-a-day effect is driven by E2EMyDay::reminderFiresOnceAtWorkEnd.
+        {"myday.shutdownPrompt", "E2EMyDay::reminderFiresOnceAtWorkEnd"},
         // The Shortcuts pane stores each remappable command under this prefix.
         {"shortcuts.", "E2EShortcuts::rebindAppCommandPersists"},
     };
@@ -707,6 +710,7 @@ inline const QMap<QString, QString> &internalKeys() {
         {"window.", "remembered view state: whether the Lists and Tags panels are shown (E2EMiscWindow::panelTogglesHideShowAndPersist)"},
         {"tasks.lastList", "bookkeeping behind the \"Last used\" default list"},
         {"myday.lastPlanned", "bookkeeping: the day My Day last offered to plan"},
+        {"myday.lastShutdownPrompted", "bookkeeping: the day the end-of-day reminder last fired"},
         {"myday.hidden", "bookkeeping: task uids hidden for one day, cleared when the date changes"},
         {"tasks.quickEntryList", "retired setting, migrated into tasks.defaultList on launch"},
         {"lists.doneWarned", "one-off warning flag"},

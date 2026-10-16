@@ -364,6 +364,12 @@ inline void addTaskCases(QVector<SettingCase> &v) {
             // E2EMyDay::promptIsAskedOnceADay.
             v << c;
         }
+        {
+            K c{"myday.shutdownPrompt", "Tasks", "setting:myday.shutdownPrompt", K::Check, false};
+            // The switch persists; the once-a-day reminder itself is proven by
+            // E2EMyDay::reminderFiresOnceAtWorkEnd.
+            v << c;
+        }
 }
 
 }  // namespace e2e

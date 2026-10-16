@@ -512,6 +512,106 @@ private slots:
         QCOMPARE(MyDay::lastPlanned(f.m_store), Today);
     }
 
+    // ---------------------------------------------------------- summary
+
+    void summaryCountsCompletedAndPlannedMinutes() {
+        Fixture f;
+        // Two open tasks today: one 90 minutes, one 30; a third with no duration.
+        f.add("Open long", [](Task &t) {
+            t.dueDate = Today;
+            t.duration = 90;
+        });
+        f.add("Open short", [](Task &t) {
+            t.dueDate = Today;
+            t.duration = 30;
+        });
+        f.add("Open undated", [](Task &t) { t.dueDate = Today; });
+        // Completed today: one 45 minutes, one 60, and one with no duration; a
+        // fourth was completed yesterday and does not count.
+        f.add("Done long", [](Task &t) {
+            t.completed = true;
+            t.completedAt = at(2026, 7, 15, 9, 0);
+            t.duration = 45;
+        });
+        f.add("Done short", [](Task &t) {
+            t.completed = true;
+            t.completedAt = at(2026, 7, 15, 11, 0);
+            t.duration = 60;
+        });
+        f.add("Done undated", [](Task &t) {
+            t.completed = true;
+            t.completedAt = at(2026, 7, 15, 11, 30);
+        });
+        f.add("Done yesterday", [](Task &t) {
+            t.completed = true;
+            t.completedAt = at(2026, 7, 14, 17, 0);
+            t.duration = 120;
+        });
+        const MyDay::Summary s = MyDay::summary(f.m_store, Now);
+        QCOMPARE(s.completedCount, 3);
+        QCOMPARE(s.plannedMinutes, 120);
+        QCOMPARE(s.doneMinutes, 105);
+    }
+
+    void summaryExcludesProjectsFromTheMinutes() {
+        Fixture f;
+        // A completed project's own duration is not time spent, as in capacity.
+        f.add("Done project", [](Task &t) {
+            t.type = TaskType::Project;
+            t.completed = true;
+            t.completedAt = at(2026, 7, 15, 12, 0);
+            t.duration = 300;
+        });
+        const MyDay::Summary s = MyDay::summary(f.m_store, Now);
+        QCOMPARE(s.completedCount, 1);
+        QCOMPARE(s.doneMinutes, 0);
+    }
+
+    void summaryIsEmptyWhenDisabled() {
+        Fixture f;
+        f.add("Done", [](Task &t) {
+            t.completed = true;
+            t.completedAt = at(2026, 7, 15, 10, 0);
+            t.duration = 30;
+        });
+        f.m_store.setSetting("myday.enabled", false);
+        const MyDay::Summary s = MyDay::summary(f.m_store, Now);
+        QCOMPARE(s.completedCount, 0);
+        QCOMPARE(s.plannedMinutes, 0);
+        QCOMPARE(s.doneMinutes, 0);
+    }
+
+    void workEndedAtTheWorkDaysEnd() {
+        Fixture f;
+        QVERIFY(!MyDay::workEnded(f.m_store, at(2026, 7, 15, 16, 59)));
+        QVERIFY(MyDay::workEnded(f.m_store, at(2026, 7, 15, 17, 0)));
+        QVERIFY(MyDay::workEnded(f.m_store, at(2026, 7, 15, 20, 0)));
+        // The setting moves the end.
+        f.m_store.setSetting("myday.workEnd", 18 * 60);
+        QVERIFY(!MyDay::workEnded(f.m_store, at(2026, 7, 15, 17, 30)));
+        QVERIFY(MyDay::workEnded(f.m_store, at(2026, 7, 15, 18, 0)));
+    }
+
+    void shutdownPromptFiresOnceAfterWorkEnd() {
+        Fixture f;
+        f.m_store.setSetting("myday.shutdownPrompt", true);
+        QVERIFY(!MyDay::shutdownPromptDue(f.m_store, at(2026, 7, 15, 16, 0)));
+        QVERIFY(MyDay::shutdownPromptDue(f.m_store, at(2026, 7, 15, 17, 0)));
+        MyDay::markShutdownPrompted(f.m_store, Today);
+        QVERIFY(!MyDay::shutdownPromptDue(f.m_store, at(2026, 7, 15, 17, 30)));
+        // The next day is due again.
+        QVERIFY(MyDay::shutdownPromptDue(f.m_store, at(2026, 7, 16, 17, 0)));
+    }
+
+    void shutdownPromptRespectsItsSettingAndFeature() {
+        Fixture f;
+        QVERIFY(!MyDay::shutdownPromptDue(f.m_store, at(2026, 7, 15, 17, 0)));
+        f.m_store.setSetting("myday.shutdownPrompt", true);
+        f.m_store.setSetting("myday.enabled", false);
+        QVERIFY(!MyDay::shutdownPromptDue(f.m_store, at(2026, 7, 15, 17, 0)));
+        QVERIFY(!MyDay::workEnded(f.m_store, at(2026, 7, 15, 17, 0)));
+    }
+
     // ----------------------------------------------------------- disabled
 
     void disabledShowsNothing() {
