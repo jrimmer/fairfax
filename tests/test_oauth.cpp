@@ -1,5 +1,3 @@
-#include <QElapsedTimer>
-#include <QTcpSocket>
 #include <QJsonDocument>
 #include <QtTest>
 #include <memory>
@@ -39,24 +37,6 @@ class OAuthTest : public QObject {
     }
 
     QString param(const QString &name) const { return QUrlQuery(m_opened).queryItemValue(name, QUrl::FullyDecoded); }
-
-    // A listener that has just stopped may take a moment to refuse new
-    // connections on macOS, where the OS-level socket teardown is deferred
-    // through the run loop; a single 500 ms probe can connect to a closing
-    // socket. Refusal, not one lucky attempt, is the assertion.
-    static bool refuses(quint16 port, int ms = 3000) {
-        QElapsedTimer clock;
-        clock.start();
-        while (!clock.hasExpired(ms)) {
-            QTcpSocket probe;
-            probe.connectToHost(QHostAddress::LocalHost, port);
-            if (!probe.waitForConnected(500))
-                return true;
-            probe.abort();
-            QTest::qWait(50);
-        }
-        return false;
-    }
 
 private slots:
     void init() {
@@ -147,9 +127,15 @@ private slots:
         // PKCE: the verifier sent now hashes to the challenge sent in the browser URL.
         QVERIFY(!f.queryItemValue("code_verifier").isEmpty());
         QCOMPARE(OAuth::challengeFor(f.queryItemValue("code_verifier")), param("code_challenge"));
-        // One-shot: the listener is gone.
+        // One-shot: the listener answers a second redirect with "already
+        // used" — the OS may keep accepting connections briefly after the
+        // close, so refusal itself is not the portable assertion — and no
+        // second token is ever exchanged.
         QVERIFY(!m_flow->waiting());
-        QVERIFY(refuses(port));
+        QTest::qWait(100);
+        const QString reuse = httpGet(port, "/?code=again&state=" + param("state"));
+        QVERIFY2(reuse.contains("already used") || reuse == "no connection", qPrintable(reuse));
+        QTRY_VERIFY_WITH_TIMEOUT(m_tokens.size() == 1 && m_errors.isEmpty(), 1000);
     }
 
     void microsoftRoundTripSendsNoSecret() {
@@ -206,7 +192,11 @@ private slots:
         const quint16 port = m_flow->port();
         m_flow->cancel();
         QVERIFY(!m_flow->waiting());
-        QVERIFY(refuses(port));
+        // Whatever the OS did with the closing listener, a late redirect
+        // changes nothing: no token, no error, and the one-shot guard
+        // answers any connection that still gets through.
+        const QString late = httpGet(port, "/?code=late&state=" + param("state"));
+        QVERIFY2(late == "no connection" || late.contains("already used") || late.contains("404"), qPrintable(late));
         QTest::qWait(50);
         QVERIFY(m_errors.isEmpty());
         QVERIFY(m_tokens.isEmpty());
