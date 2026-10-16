@@ -32,6 +32,8 @@ SOURCES += test_smart_presets.cpp test_smart_keywords.cpp test_smart_text.cpp te
 HEADERS += misckit.h
 SOURCES += test_misc_sort.cpp test_misc_keys.cpp test_misc_tags.cpp test_misc_io.cpp test_misc_window.cpp
 SOURCES += test_myday.cpp
+# The proposal engine: the opt-in Settings rows, the privacy guard and the review sheet.
+SOURCES += test_agent.cpp
 
 # Gap tests: editor, Quick Look, notes, attachments, alerts and Settings leftovers.
 HEADERS += gapskit2.h

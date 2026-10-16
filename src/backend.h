@@ -600,6 +600,9 @@ public:
     Q_INVOKABLE bool applyProposal(qint64 id);
     Q_INVOKABLE void dismissProposal(qint64 id);
     Q_INVOKABLE void dismissAllProposals();
+    // What the Diagnostics pane shows for the agent: the last request and
+    // response pair and the error, if any.
+    Q_INVOKABLE QString agentDiagnostics() const;
 
     // Alerts beyond the presets.
     Q_INVOKABLE void addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes);

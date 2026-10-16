@@ -1577,6 +1577,20 @@ Window {
                     ].join("\n")
                     onVisibleChanged: if (visible) report = backend.diagnosticsReport(syncStatus)
                     Hint { Layout.topMargin: 0; text: "What to include in a bug report. Nothing here leaves your machine unless you copy it." }
+                    // The proposal engine's last request/response pair and error.
+                    Frame {
+                        Layout.fillWidth: true
+                        Text {
+                            objectName: "diagAgent"
+                            width: parent.width
+                            text: { backend.settingsRevision; return backend.agentDiagnostics() }
+                            color: theme.foreground
+                            font.family: theme.monoFont
+                            font.pixelSize: backend.fontSize - 2
+                            wrapMode: Text.WrapAnywhere
+                            textFormat: Text.PlainText
+                        }
+                    }
                     Frame {
                         Layout.fillWidth: true
                         Text {

@@ -202,6 +202,23 @@ and nothing else changes. The launch view is Settings → General → *Default v
 (the default), Last viewed, Today, All, Starred, Scheduled, Inbox, or any list or Smart List
 by name.
 
+## Suggesting changes
+
+Fairfax can ask a model to suggest changes you review and accept by hand. It is off by
+default: nothing is sent anywhere unless you turn on *Offer suggested changes* in
+Settings → Sync and choose a model server. The default points at a model running on your
+own machine (Ollama's OpenAI-compatible port, `http://127.0.0.1:11434/v1`), and the server
+and model are both editable; a request goes to a `POST /v1/chat/completions` on that server
+and nowhere else.
+
+The model answers with proposals, which land in the suggestions sheet behind the checklist
+button in the task pane's toolbar (it appears only while the feature is on). Each row shows
+what the proposal would change; `y` applies the highlighted one, `n` or Delete dismisses
+it, `a` applies all of them, and Esc closes. Applying goes through the same methods the
+rest of the app uses, so it can be undone with Ctrl+Z like any other change. Proposals are
+kept in the database, so a review survives a restart, and Settings → Diagnostics shows the
+last request and response pair and any error.
+
 ## Accessibility
 
 Fairfax works with Orca on GNOME and with any other screen reader Qt reports to. Every

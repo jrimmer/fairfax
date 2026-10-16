@@ -3534,6 +3534,21 @@ QVariantList Backend::proposals() const {
     return out;
 }
 
+QString Backend::agentDiagnostics() const {
+    if (!m_agent)
+        return QStringLiteral("Agent: off");
+    QStringList out;
+    out << QStringLiteral("Agent: %1, server %2, model %3")
+               .arg(m_agent->enabled() ? "on" : "off", m_agent->baseUrl(),
+                    m_agent->model().isEmpty() ? QStringLiteral("(none)") : m_agent->model());
+    out << QStringLiteral("Pending suggestions: %1").arg(m_store->proposals().size());
+    out << QStringLiteral("Last request: %1").arg(m_agent->lastRequest().isEmpty() ? QStringLiteral("(none)") : m_agent->lastRequest());
+    out << QStringLiteral("Last response: %1").arg(m_agent->lastResponse().isEmpty() ? QStringLiteral("(none)") : m_agent->lastResponse());
+    if (!m_agent->lastError().isEmpty())
+        out << QStringLiteral("Last error: %1").arg(m_agent->lastError());
+    return out.join('\n');
+}
+
 void Backend::dismissProposal(qint64 id) {
     if (!m_store->proposals().isEmpty() && id) {
         bool found = false;
@@ -3546,6 +3561,7 @@ void Backend::dismissProposal(qint64 id) {
     m_store->removeProposal(id);
     m_store->commit();
     setStatus("Suggestion dismissed");
+    emit announce("Suggestion dismissed");
 }
 
 void Backend::dismissAllProposals() {
@@ -3557,6 +3573,7 @@ void Backend::dismissAllProposals() {
         m_store->removeProposal(p.id);
     m_store->commit();
     setStatus(QStringLiteral("Dismissed %1 suggestion(s)").arg(pending.size()));
+    emit announce(QStringLiteral("Dismissed %1 suggestions").arg(pending.size()));
 }
 
 bool Backend::applyProposal(qint64 id) {
@@ -3591,8 +3608,11 @@ bool Backend::applyProposal(qint64 id) {
         return false;
     }
     setDue(taskId, due, -2);
-    dismissProposal(id);
+    m_store->begin("Apply Suggestion", false);
+    m_store->removeProposal(id);
+    m_store->commit();
     setStatus(QString("Applied suggestion to \u201c%1\u201d").arg(m_store->task(taskId).title));
+    emit announce(QString("Applied: %1").arg(m_store->task(taskId).title));
     return true;
 }
 

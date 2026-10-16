@@ -1132,6 +1132,43 @@ private slots:
             if (e.message.startsWith("Mail: "))
                 QCOMPARE(e.politeness, QAccessible::AnnouncementPoliteness::Assertive);
     }
+
+    // A proposal applied or dismissed from the review sheet is announced, with
+    // the task's title on an apply.
+    void proposalReviewIsAnnounced() {
+        auto seed = [](Store &store) {
+            Seed ids = seedWorld(store);
+            store.setSetting("agent.enabled", true);
+            return ids;
+        };
+        App app(seed);
+        QVERIFY(app.ok);
+        AnnouncementLog log;
+        // "Fix the shelf" has no due date yet.
+        Proposal p;
+        p.kind = "set-due-date";
+        p.payload = {{"taskId", app.ids.shelf}, {"due", "2026-08-01"}};
+        app.store().begin("add proposal");
+        p.id = app.store().nextId("proposals");
+        app.store().putProposal(p);
+        app.store().commit();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 1, 5000);
+
+        QVERIFY(app.backend().applyProposal(p.id));
+        QVERIFY(waitUntil([&] { return log.saw("Applied: Fix the shelf"); }));
+        QCOMPARE(log.entries.last().politeness, QAccessible::AnnouncementPoliteness::Polite);
+
+        // Dismissing a second one says so.
+        Proposal q;
+        q.kind = "set-due-date";
+        q.payload = {{"taskId", app.ids.plants}, {"due", "2026-08-02"}};
+        app.store().begin("add proposal");
+        q.id = app.store().nextId("proposals");
+        app.store().putProposal(q);
+        app.store().commit();
+        app.backend().dismissProposal(q.id);
+        QVERIFY(waitUntil([&] { return log.saw("Suggestion dismissed"); }));
+    }
 };
 
 REGISTER_TEST(E2EAccessibility)
