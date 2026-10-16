@@ -76,6 +76,95 @@ Seed seedAgentOff(Store &store) {
     return s;
 }
 
+// An Inbox holding three undated tasks, for the triage scenario. The ids are
+// looked up from the store by title, so no shared global is needed.
+qint64 inboxTaskId(Store &store, const QString &title) {
+    for (const Task &t : store.tasks())
+        if (!t.deleted && t.title == title)
+            return t.id;
+    return 0;
+}
+
+qint64 inboxListId(Store &store) {
+    for (const TaskList &l : store.lists())
+        if (!l.deleted && l.kind == ListKind::Inbox)
+            return l.id;
+    return 0;
+}
+
+Seed seedAgentInbox(Store &store, bool enabled = true) {
+    Seed s = seedWorld(store);
+    store.setSetting("agent.enabled", enabled);
+    store.begin("Seed inbox", false);
+    TaskList inbox;
+    inbox.id = store.nextId("lists");
+    inbox.name = "Inbox";
+    inbox.kind = ListKind::Inbox;
+    inbox.color = 5;
+    store.putList(inbox);
+    for (const QString &title : {QStringLiteral("Call the plumber"), QStringLiteral("Book a table"), QStringLiteral("Read the report")}) {
+        Task t;
+        t.id = store.nextId("tasks");
+        t.listId = inbox.id;
+        t.title = title;
+        t.notes = title == QLatin1String("Call the plumber") ? QStringLiteral("the tap drips") : QString();
+        t.order = t.id;
+        store.putTask(t);
+    }
+    store.commit();
+    return s;
+}
+
+// A canned triage answer, one row per task, built from real ids.
+QByteArray triageAnswer(const QList<QPair<qint64, QByteArray>> &rows) {
+    QJsonArray triage;
+    for (const auto &row : rows)
+        triage.append(QJsonDocument::fromJson(row.second).object());
+    QJsonObject content{{QStringLiteral("triage"), triage}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("assistant")},
+                        {QStringLiteral("content"), QString::fromUtf8(QJsonDocument(content).toJson(QJsonDocument::Compact))}};
+    QJsonObject choice{{QStringLiteral("message"), message}};
+    QJsonObject root{{QStringLiteral("choices"), QJsonArray{choice}}};
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+QByteArray triageRow(qint64 taskId, const QString &list, const QString &tag, const QString &due, int priority) {
+    QJsonObject row{{QStringLiteral("taskId"), taskId},
+                    {QStringLiteral("list"), list},
+                    {QStringLiteral("tags"), QJsonArray{tag}},
+                    {QStringLiteral("due"), due},
+                    {QStringLiteral("priority"), priority}};
+    return QJsonDocument(row).toJson(QJsonDocument::Compact);
+}
+
+// A canned priority answer for the given tasks.
+QByteArray priorityAnswer(const QList<QPair<qint64, int>> &choices) {
+    QJsonArray rows;
+    for (const auto &c : choices)
+        rows.append(QJsonObject{{QStringLiteral("taskId"), c.first}, {QStringLiteral("priority"), c.second}});
+    QJsonObject content{{QStringLiteral("priorities"), rows}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("assistant")},
+                        {QStringLiteral("content"), QString::fromUtf8(QJsonDocument(content).toJson(QJsonDocument::Compact))}};
+    QJsonObject choice{{QStringLiteral("message"), message}};
+    QJsonObject root{{QStringLiteral("choices"), QJsonArray{choice}}};
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+// Opens the review sheet from the toolbar and waits for it. If a collection
+// call already opened it (reviewRequested), the modal would swallow a click on
+// the toolbar, so an already-open sheet is returned as is.
+QObject *openProposalSheet() {
+    QObject *sheet = findObject("proposalSheet");
+    if (sheet && sheet->property("visible").toBool())
+        return sheet;
+    QQuickItem *button = nullptr;
+    if (!QTest::qWaitFor([&] { return (button = findItem("suggestionsButton")) != nullptr; }, 5000))
+        return nullptr;
+    click(button);
+    QTest::qWaitFor([&] { return (sheet = findObject("proposalSheet")) != nullptr && sheet->property("visible").toBool(); }, 5000);
+    return sheet;
+}
+
 }  // namespace
 
 class E2EAgent : public QObject {
@@ -355,6 +444,219 @@ private slots:
         QVERIFY(!sheet || !sheet->property("visible").toBool());
         QVERIFY(app.backend().search().isEmpty());
         QVERIFY(app.backend().compiledQuery().isEmpty());
+    }
+
+    // Triage an Inbox of three: the toolbar button sends one request with all
+    // three, the sheet lists three, Y applies one (moved, tagged, dated) and A
+    // applies the rest.
+    void inboxTriageSendsThreeAndAppliesThem() {
+        Session s;
+        s.seed = [](Store &st) {
+            Seed ids = seedAgentInbox(st);
+            return ids;
+        };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        QVERIFY(app.backend().agentEnabled());
+        const qint64 inbox = inboxListId(app.store());
+        const qint64 plumber = inboxTaskId(app.store(), "Call the plumber");
+        const qint64 table = inboxTaskId(app.store(), "Book a table");
+        const qint64 report = inboxTaskId(app.store(), "Read the report");
+        QVERIFY(inbox && plumber && table && report);
+
+        // Open the Inbox and confirm the toolbar button appears.
+        app.backend().selectSource("list:" + QString::number(inbox));
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceIsInbox(), true, 5000);
+        QQuickItem *button = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((button = findItem("triageInboxButton")) != nullptr, 5000);
+        QVERIFY(button->isVisible());
+
+        // The canned answer proposes a list, a tag, an English due date and a
+        // priority for each of the three.
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = triageAnswer({
+            {plumber, triageRow(plumber, "Work", "garden", "friday", 3)},
+            {table, triageRow(table, "Home", "garden", "tomorrow", 1)},
+            {report, triageRow(report, "Work", "garden", "next week", 2)},
+        });
+        agent.setTransport(std::ref(transport));
+        click(button);
+        QCOMPARE(transport.requests.size(), 1);
+        // The request carries all three tasks and the real choices.
+        const QByteArray request = transport.requests.first();
+        QVERIFY2(request.contains("Call the plumber"), request.constData());
+        QVERIFY2(request.contains("Book a table"), request.constData());
+        QVERIFY2(request.contains("Read the report"), request.constData());
+
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 3, 5000);
+        QObject *sheet = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((sheet = findObject("proposalSheet")) != nullptr && sheet->property("visible").toBool(), 5000);
+        QQuickItem *list = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((list = findItem("proposalList")) != nullptr, 5000);
+        QCOMPARE(list->property("count").toInt(), 3);
+
+        // Y applies the highlighted (first) proposal: the plumber's task moves
+        // to Work, is tagged, and gets a parsed due date and priority.
+        const qint64 work = listNamed(app, "Work");
+        QVERIFY(work);
+        app.press(Qt::Key_Y);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 2, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(plumber).listId, work, 5000);
+        QCOMPARE(app.task(plumber).priority, 3);
+        QVERIFY(!app.task(plumber).tagIds.isEmpty());
+        QVERIFY(app.task(plumber).dueDate.isValid());
+
+        // A applies the rest; the sheet closes itself once the queue empties.
+        app.press(Qt::Key_A);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 0, 5000);
+        QCOMPARE(app.task(table).listId, listNamed(app, "Home"));
+        QCOMPARE(app.task(report).listId, work);
+        QVERIFY(app.task(report).dueDate.isValid());
+        QTRY_VERIFY_WITH_TIMEOUT(!sheet->property("visible").toBool(), 5000);
+    }
+
+    // Dismissing a triage proposal leaves every task untouched.
+    void inboxTriageDismissChangesNothing() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentInbox(st); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        const qint64 inbox = inboxListId(app.store());
+        const qint64 plumber = inboxTaskId(app.store(), "Call the plumber");
+        app.backend().selectSource("list:" + QString::number(inbox));
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = triageAnswer({{plumber, triageRow(plumber, "Work", "garden", "friday", 3)}});
+        agent.setTransport(std::ref(transport));
+        app.backend().triageInbox();
+        QCOMPARE(transport.requests.size(), 1);
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 1, 5000);
+
+        QObject *sheet = openProposalSheet();
+        QVERIFY(sheet);
+        QTRY_VERIFY_WITH_TIMEOUT(sheet->property("visible").toBool(), 5000);
+        // The sheet has the keyboard; N dismisses the highlighted proposal.
+        app.press(Qt::Key_N);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 0, 5000);
+        // The task did not move, gain a tag, a date or a priority.
+        QCOMPARE(app.task(plumber).listId, inbox);
+        QVERIFY(app.task(plumber).tagIds.isEmpty());
+        QVERIFY(!app.task(plumber).dueDate.isValid());
+        QCOMPARE(app.task(plumber).priority, 0);
+    }
+
+    // Triage can also be started from the Inbox focus list's own context menu.
+    void inboxTriageFromTheContextMenu() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentInbox(st); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        const qint64 inbox = inboxListId(app.store());
+        app.backend().selectSource("list:" + QString::number(inbox));
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceIsInbox(), 5000);
+        // Right-click the Inbox sidebar row: the menu carries Triage Inbox.
+        QQuickItem *row = app.sidebarRow("list:" + QString::number(inbox));
+        QVERIFY(row);
+        click(row, Qt::RightButton);
+        QTRY_VERIFY_WITH_TIMEOUT(findText("Triage Inbox", "QQuickMenuItem") != nullptr, 5000);
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = QByteArray("{\"triage\":[]}");
+        agent.setTransport(std::ref(transport));
+        clickMenuEntry("Triage Inbox");
+        QCOMPARE(transport.requests.size(), 1);
+    }
+
+    // Suggest Priorities on a multi-task selection: the context menu entry,
+    // the canned answer, and A applying each setPriority.
+    void suggestPrioritiesOnASelection() {
+        Session s;
+        s.seed = [](Store &st) {
+            Seed ids = seedAgentOff(st);
+            st.setSetting("agent.enabled", true);
+            return ids;
+        };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        // Open Home so all three tasks are on screen; select two with Ctrl.
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        QVERIFY(selectRow(app, app.ids.buyMilk));
+        clickWith(app.row(app.ids.plants), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 2, 5000);
+
+        // The context menu shows Suggest Priorities only on a multi-selection.
+        QVERIFY(contextMenuOn(app, app.ids.buyMilk));
+        QQuickItem *entry = steadyMenuItem("Suggest Priorities");
+        QVERIFY2(entry, qPrintable(QString("Suggest Priorities missing: %1").arg(tk::menuEntries())));
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = priorityAnswer({{app.ids.buyMilk, 3}, {app.ids.plants, 1}});
+        agent.setTransport(std::ref(transport));
+        clickMenu("Suggest Priorities");
+        QCOMPARE(transport.requests.size(), 1);
+        QVERIFY2(transport.requests.first().contains("Buy milk"), transport.requests.first().constData());
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 2, 5000);
+
+        QObject *sheet = openProposalSheet();
+        QVERIFY(sheet);
+        QTRY_VERIFY_WITH_TIMEOUT(sheet->property("visible").toBool(), 5000);
+        app.press(Qt::Key_A);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 0, 5000);
+        QCOMPARE(app.task(app.ids.buyMilk).priority, 3);
+        QCOMPARE(app.task(app.ids.plants).priority, 1);
+    }
+
+    // With the feature off neither triage entry nor Suggest Priorities appears,
+    // and neither call sends anything.
+    void collectionCallsAbsentWhileOff() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentInbox(st, false); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        QVERIFY(!app.backend().agentEnabled());
+        const qint64 inbox = inboxListId(app.store());
+        app.backend().selectSource("list:" + QString::number(inbox));
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().sourceIsInbox(), 5000);
+        QTest::qWait(100);
+
+        // No toolbar triage button, and no suggestions button either.
+        QVERIFY(findItem("triageInboxButton") == nullptr);
+        QVERIFY(findItem("suggestionsButton") == nullptr);
+
+        // The Inbox context menu has no Triage Inbox.
+        QQuickItem *row = app.sidebarRow("list:" + QString::number(inbox));
+        QVERIFY(row);
+        click(row, Qt::RightButton);
+        QTest::qWait(100);
+        QVERIFY(findItem("triageInboxMenu") == nullptr || !findItem("triageInboxMenu")->isVisible());
+        QVERIFY(findText("Triage Inbox") == nullptr);
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(noMenuOpen(), 5000);
+
+        // A multi-selection's context menu has no Suggest Priorities.
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        QVERIFY(selectRow(app, app.ids.buyMilk));
+        clickWith(app.row(app.ids.plants), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 2, 5000);
+        QVERIFY(contextMenuOn(app, app.ids.buyMilk));
+        QTest::qWait(100);
+        QVERIFY(findItem("suggestPriorities") == nullptr || !findItem("suggestPriorities")->isVisible());
+        QVERIFY(findText("Suggest Priorities") == nullptr);
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(noMenuOpen(), 5000);
+
+        // Both calls refuse even when invoked directly.
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        agent.setTransport(std::ref(transport));
+        app.backend().triageInbox();
+        app.backend().suggestPriorities();
+        QCOMPARE(transport.requests.size(), 0);
+        QCOMPARE(app.backend().proposalCount(), 0);
     }
 };
 
