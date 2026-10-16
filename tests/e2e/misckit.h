@@ -596,7 +596,7 @@ inline QList<KeyRow> &keyRows() {
              return homeWith(a, a.ids.plants);
          },
          Qt::Key_P, ctrl, "", [](App &) { return counters().pickers == 1; }, KeyRow::None, {}});
-    add({"Ctrl+Shift+E", "any", {}, Qt::Key_E, ctrlShift, "", [](App &) { return findText("Export Tasks") != nullptr; }, KeyRow::Escape,
+    add({"Ctrl+Shift+D", "any", {}, Qt::Key_D, ctrlShift, "", [](App &) { return findText("Export Tasks") != nullptr; }, KeyRow::Escape,
          [](App &) { return findText("Export Tasks") == nullptr; }});
     add({"F11", "any", {}, Qt::Key_F11, none, "", [](App &a) { return a.window->visibility() == QWindow::FullScreen; }, KeyRow::Again,
          [](App &a) { return a.window->visibility() != QWindow::FullScreen; }});

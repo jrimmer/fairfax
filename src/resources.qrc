@@ -22,6 +22,7 @@
         <file>qml/ListMenu.qml</file>
         <file>qml/Main.qml</file>
         <file>qml/ProposalSheet.qml</file>
+        <file>qml/AskSheet.qml</file>
         <file>qml/MiniCalendar.qml</file>
         <file>qml/NotesArea.qml</file>
         <file>qml/QuickEntry.qml</file>

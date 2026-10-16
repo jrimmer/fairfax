@@ -197,14 +197,14 @@ private slots:
             QDesktopServices::unsetUrlHandler(scheme);
     }
 
-    // "Export > Spreadsheet (.csv)": the dialog (Ctrl+Shift+E) lists the lists,
+    // "Export > Spreadsheet (.csv)": the dialog (Ctrl+Shift+D) lists the lists,
     // a scope and a format; Export… asks for a file, and what is written is
     // the ticked lists' tasks of that scope.
     void exportDialogWritesTheChosenListsAsCsv() {
         QTemporaryDir out;
         App app(seedRich);
         QVERIFY(app.ok);
-        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        app.press(Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
         QQuickItem *go = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((go = findText("Export…", "QQuickAbstractButton")) != nullptr, 5000);
@@ -253,7 +253,7 @@ private slots:
         QCOMPARE(rent.value(12), QString("No"));
 
         // The "Done" scope picks the completed ones.
-        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        app.press(Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
         QVERIFY(pickCombo("exportScope", "Done"));
         QQuickItem *go2 = nullptr;
@@ -274,7 +274,7 @@ private slots:
         QVERIFY(app.ok);
         int asks = 0;
         QObject::connect(&app.services().filePicker, &FilePicker::failed, &app.backend(), [&] { ++asks; });
-        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        app.press(Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
         QVERIFY(clickDialogButton("Cancel"));
         QTRY_VERIFY_WITH_TIMEOUT(!findText("Export Tasks"), 5000);
@@ -294,7 +294,7 @@ private slots:
         {
             App app(seedRich);
             QVERIFY(app.ok);
-            app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+            app.press(Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
             QTRY_VERIFY_WITH_TIMEOUT(findText("Export Tasks") != nullptr, 5000);
             QVERIFY(pickCombo("exportFormat", "Calendar file (.ics)"));
             QQuickItem *go = findText("Export…", "QQuickAbstractButton");

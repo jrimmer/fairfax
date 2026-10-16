@@ -509,7 +509,7 @@ private slots:
         // A ThemedDialog is a Dialog named by its title: Export Tasks.
         app.window->requestActivate();
         QTRY_VERIFY_WITH_TIMEOUT(app.window->isActive(), 5000);
-        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        app.press(Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QObject *exportDialog = nullptr;
         QVERIFY(waitUntil([&] { return (exportDialog = findObject("exportDialog")) && exportDialog->property("opened").toBool(); }));
         checkDialog("exportDialog", "Export Tasks");

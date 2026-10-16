@@ -3522,6 +3522,10 @@ void Backend::setAgent(AgentService *agent) {
         emit proposalsChanged();
         emit dataChanged();
     });
+    connect(agent, &AgentService::compileChanged, this, [this] { emit compileChanged(); });
+    // A compile that finished leaves the query ready to run; putting it in the
+    // search field is what makes it editable and saveable.
+    connect(agent, &AgentService::queryCompiled, this, [this] { applyCompiledQuery(); });
     // A proposal written from the review actions changes the store, which
     // already raises dataChanged; this keeps the count in step too.
     connect(m_store, &Store::changed, this, [this] { emit proposalsChanged(); });
@@ -3542,6 +3546,10 @@ QString Backend::agentDiagnostics() const {
                .arg(m_agent->enabled() ? "on" : "off", m_agent->baseUrl(),
                     m_agent->model().isEmpty() ? QStringLiteral("(none)") : m_agent->model());
     out << QStringLiteral("Pending suggestions: %1").arg(m_store->proposals().size());
+    if (!m_agent->compiledQuery().isEmpty())
+        out << QStringLiteral("Last compiled query: %1").arg(m_agent->compiledQuery());
+    if (!m_agent->compileError().isEmpty())
+        out << QStringLiteral("Last compile error: %1").arg(m_agent->compileError());
     out << QStringLiteral("Last request: %1").arg(m_agent->lastRequest().isEmpty() ? QStringLiteral("(none)") : m_agent->lastRequest());
     out << QStringLiteral("Last response: %1").arg(m_agent->lastResponse().isEmpty() ? QStringLiteral("(none)") : m_agent->lastResponse());
     if (!m_agent->lastError().isEmpty())
@@ -3591,6 +3599,19 @@ bool Backend::applyProposal(qint64 id) {
     }
     // A proposal's kind routes to the ordinary backend method for that change;
     // a kind this build does not know is refused rather than guessed at.
+    if (found.kind == QLatin1String("query")) {
+        // A recorded ask re-runs its compiled query in the search field; the
+        // history row stays, as a log of the asks.
+        const QString query = found.payload.value("query").toString();
+        if (query.trimmed().isEmpty()) {
+            setStatus("That recorded query is empty.");
+            return false;
+        }
+        setSearch(query);
+        setStatus(QStringLiteral("Ran the recorded query: %1").arg(query));
+        emit announce(QStringLiteral("Ran the recorded query"));
+        return true;
+    }
     if (found.kind != QLatin1String("set-due-date")) {
         setStatus(QStringLiteral("Cannot apply an unknown suggestion kind: %1").arg(found.kind));
         Diagnostics::note(QStringLiteral("Agent: refused unknown proposal kind \"%1\"").arg(found.kind));
@@ -3614,6 +3635,27 @@ bool Backend::applyProposal(qint64 id) {
     emit announce(QString("Applied: %1").arg(m_store->task(taskId).title));
     return true;
 }
+
+void Backend::askQuery(const QString &prompt) {
+    if (!m_agent || !agentEnabled())
+        return;  // The off-switch: no compile, no transport, no network.
+    m_agent->compileQuery(prompt);
+}
+
+void Backend::applyCompiledQuery() {
+    if (!m_agent)
+        return;
+    const QString query = m_agent->compiledQuery();
+    if (query.isEmpty())
+        return;
+    setSearch(query);
+    emit compileChanged();
+}
+
+QString Backend::compiledQuery() const { return m_agent ? m_agent->compiledQuery() : QString(); }
+QString Backend::compiledHint() const { return m_agent ? m_agent->compiledHint() : QString(); }
+QString Backend::compileError() const { return m_agent ? m_agent->compileError() : QString(); }
+bool Backend::compiling() const { return m_agent && m_agent->compiling(); }
 
 void Backend::addAbsoluteAlarm(qint64 taskId, const QString &isoDate, int minutes) {
     const QDate day = QDate::fromString(isoDate, Qt::ISODate);

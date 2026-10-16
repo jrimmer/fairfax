@@ -31,6 +31,8 @@ Popup {
             const title = task && task.title ? task.title : "task " + payload.taskId
             return "Set due date of “" + title + "” to " + (payload.due || "?")
         }
+        if (p.kind === "query")
+            return "Ask: “" + (payload.prompt || "?") + "” → " + (payload.query || "?")
         return p.kind + " " + JSON.stringify(payload)
     }
 

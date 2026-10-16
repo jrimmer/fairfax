@@ -5,6 +5,7 @@
 // string.
 
 #include "agent.h"
+#include "smartkit.h"
 #include "taskkit.h"
 #include "settingskit.h"
 #include "../testregistry.h"
@@ -25,6 +26,28 @@ QByteArray cannedAnswer(qint64 taskId, const QString &due) {
     QJsonObject choice{{"message", message}};
     QJsonObject root{{"choices", QJsonArray{choice}}};
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+// The canned answer to a compile: a chat completion whose content is a single
+// {"query": "..."} object, as the compile system prompt demands.
+QByteArray compiledAnswer(const QString &query) {
+    QJsonObject content{{"query", query}};
+    QJsonObject message{{"role", "assistant"}, {"content", QString::fromUtf8(QJsonDocument(content).toJson(QJsonDocument::Compact))}};
+    QJsonObject choice{{"message", message}};
+    QJsonObject root{{"choices", QJsonArray{choice}}};
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+// A world with one task whose notes mention Sam, and one that does not, so a
+// compiled query has something to filter.
+Seed seedAgentWithNotes(Store &store) {
+    Seed s = seedWorld(store);
+    store.begin("Seed notes", false);
+    Task milk = store.task(s.buyMilk);
+    milk.notes = "Waiting on Sam for the invoice number";
+    store.putTask(milk);
+    store.commit();
+    return s;
 }
 
 // A fake transport that records every request and holds the answer until
@@ -214,6 +237,124 @@ private slots:
         // And the proposal still applies to the task.
         s.app->press(Qt::Key_Y);
         QTRY_COMPARE_WITH_TIMEOUT(s.app->task(taskId).dueDate, QDate(2026, 8, 1), 5000);
+    }
+
+    // The flagship: ask "tasks with notes mentioning Sam", the model answers
+    // with a query, the search field holds it, the results filter, and Save as
+    // Smart List creates the list named after the query.
+    void askCompilesQueryFiltersAndSaves() {
+        Session s;
+        s.seed = [](Store &st) {
+            Seed ids = seedAgentWithNotes(st);
+            st.setSetting("agent.enabled", true);
+            return ids;
+        };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = compiledAnswer("sam");
+        agent.setTransport(std::ref(transport));
+
+        // The presets menu carries the entry while the feature is on.
+        QQuickItem *presets = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((presets = findItem("searchPresets")) != nullptr, 5000);
+        click(presets);
+        QVERIFY2(clickMenuEntry("Ask in plain English…"),
+                 qPrintable(QString("the ask entry is missing from the presets menu: %1").arg(tk::menuEntries())));
+
+        // The sheet: one field and a Go.
+        QObject *sheet = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((sheet = findObject("askSheet")) != nullptr && sheet->property("visible").toBool(), 5000);
+        QQuickItem *field = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((field = findItem("askField")) != nullptr, 5000);
+        click(field);
+        QTRY_VERIFY_WITH_TIMEOUT(field->property("activeFocus").toBool(), 5000);
+        app.type("tasks with notes mentioning Sam");
+        QQuickItem *go = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((go = findItem("askGo")) != nullptr && go->property("enabled").toBool(), 5000);
+        click(go);
+        QCOMPARE(transport.requests.size(), 1);
+        // The request names the question and the schema, and never the raw JSON.
+        const QByteArray request = transport.requests.first();
+        QVERIFY2(request.contains("tasks with notes mentioning Sam"), request.constData());
+
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().compiledQuery(), QString("sam"), 5000);
+        // The compiled query lands in the search field as if typed.
+        QQuickItem *search = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((search = findItem("searchField")) != nullptr, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(search->property("text").toString(), QString("sam"), 5000);
+        QCOMPARE(app.backend().search(), QString("sam"));
+        // The results filter: only the task whose notes mention Sam.
+        SMART_SHOWS(app, QStringList{"Buy milk"});
+        // The ask and its result are recorded as history.
+        QCOMPARE(app.backend().proposalCount(), 1);
+
+        // Save as Smart List… hands the compiled query to the builder's own flow.
+        QQuickItem *save = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((save = findItem("askSave")) != nullptr, 5000);
+        clickSteady(save);
+        QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(builderQuery(), QString("sam"), 5000);
+        const qint64 id = saveFromBuilder(app, "Waiting on Sam");
+        QVERIFY(id);
+        QCOMPARE(app.store().list(id).smartQuery, QString("sam"));
+        QCOMPARE(app.store().list(id).kind, int(ListKind::Smart));
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitle(), QString("Waiting on Sam"), 5000);
+        SMART_SHOWS(app, QStringList{"Buy milk"});
+    }
+
+    // The shortcut opens the sheet while the feature is on (Ctrl+Shift+E in the
+    // App context); it is the keyboard twin of the preset-menu entry.
+    void shortcutOpensTheAskSheetWhileOn() {
+        Session s;
+        s.seed = [](Store &st) {
+            Seed ids = seedAgentWithNotes(st);
+            st.setSetting("agent.enabled", true);
+            return ids;
+        };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        QVERIFY(app.backend().agentEnabled());
+        app.window->requestActivate();
+        QTRY_VERIFY_WITH_TIMEOUT(app.window->isActive(), 5000);
+        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        QObject *sheet = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((sheet = findObject("askSheet")) != nullptr && sheet->property("visible").toBool(), 5000);
+        QVERIFY(findItem("askField") != nullptr);
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!sheet->property("visible").toBool(), 5000);
+    }
+
+    // With agent.enabled off the menu entry is not visible and the shortcut
+    // does nothing at all.
+    void askEntryAndShortcutDoNothingWhileOff() {
+        Session s;
+        s.seed = seedAgentOff;
+        QVERIFY(s.start());
+        App &app = *s.app;
+        QVERIFY(!app.backend().agentEnabled());
+        QTest::qWait(100);
+
+        // The presets menu has no visible ask entry.
+        QQuickItem *presets = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((presets = findItem("searchPresets")) != nullptr, 5000);
+        click(presets);
+        QTest::qWait(100);
+        QVERIFY2(findItem("searchAskEnglish") == nullptr || !findItem("searchAskEnglish")->isVisible(),
+                 "the ask entry is visible while the agent is off");
+        QVERIFY(findText("Ask in plain English…") == nullptr);
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(noMenuOpen(), 5000);
+
+        // The shortcut opens no sheet and changes nothing.
+        app.press(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        QTest::qWait(150);
+        QObject *sheet = findObject("askSheet");
+        QVERIFY(!sheet || !sheet->property("visible").toBool());
+        QVERIFY(app.backend().search().isEmpty());
+        QVERIFY(app.backend().compiledQuery().isEmpty());
     }
 };
 

@@ -327,6 +327,9 @@ ApplicationWindow {
         }
     }
     AppShortcut { sequences: backend.shortcutMap["view.searchOptions"] || []; enabled: !backend.recordingShortcut; onActivated: pane.openSearchBuilder() }
+    // The plain-English ask, only while the agent is on; with it off the key
+    // does nothing at all.
+    AppShortcut { sequences: backend.shortcutMap["view.askEnglish"] || []; enabled: !backend.recordingShortcut && backend.agentEnabled; onActivated: pane.openAskSheet() }
     AppShortcut { sequences: backend.shortcutMap["app.settings"] || []; enabled: !backend.recordingShortcut; onActivated: { settings.show(); settings.raise() } }
     AppShortcut { sequences: backend.shortcutMap["app.export"] || []; enabled: !backend.recordingShortcut; onActivated: exportDialog.show() }
 }

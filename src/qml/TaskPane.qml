@@ -44,6 +44,15 @@ Item {
         if (backend.sourceIsSmart) editSmartQuery()
         else searchBuilder.openAt(search)
     }
+    // The plain-English ask: only while the agent is on, so the entry and the
+    // shortcut are inert otherwise.
+    function openAskSheet() {
+        if (!backend.agentEnabled) return
+        askSheet.openSheet()
+    }
+    function saveCompiledAsSmartList() {
+        searchBuilder.openAt(search)
+    }
     function editSmartQuery() { searchBuilder.openForList(Number(backend.sourceKey.split(":")[1])) }
     function focusSearch() { search.opened = true; search.field.forceActiveFocus() }
     function toggleProjectView() {
@@ -123,6 +132,12 @@ Item {
                         }
                     }
                     MenuSeparator {}
+                    MenuItem {
+                        objectName: "searchAskEnglish"
+                        visible: backend.agentEnabled
+                        text: "Ask in plain English…\t" + backend.shortcutText("view.askEnglish")
+                        onTriggered: root.openAskSheet()
+                    }
                     MenuItem { text: "Search Options…\tCtrl+Shift+Alt+F"; onTriggered: root.openSearchBuilder() }
                     MenuItem { text: backend.searchAllLists ? "Search This List Only" : "Search All Lists"; onTriggered: backend.toggleSearchScope() }
                 }
@@ -525,6 +540,7 @@ Item {
     }
 
     SearchBuilder { id: searchBuilder; objectName: "searchBuilder"; onClosed: Qt.callLater(root.focusList) }
+    AskSheet { id: askSheet; objectName: "askSheet"; onSaveRequested: root.saveCompiledAsSmartList() }
 
     Confetti { id: confetti; objectName: "confetti"; anchors.fill: parent; enabled: (backend.settingsRevision, backend.settingFlag("general.celebrate", true)) }
     Connections {

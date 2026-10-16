@@ -134,7 +134,7 @@ offers your lists and `frfx done <Tab>` your open tasks.
   Alerts count from the start date when a task has no due date. Notifications offer Snooze for
   5 minutes, 15 minutes, 1 hour, this evening or tomorrow morning (the Default Due Time when
   set), and close themselves when the task is completed, deleted or re-dated.
-- **Export.** Ctrl+Shift+E opens the export panel (choose lists, All / Not Done / Done, CSV or
+- **Export.** Ctrl+Shift+D opens the export panel (choose lists, All / Not Done / Done, CSV or
   .ics); the task right-click menu has Add to Calendar (opens the task as an event in your
   calendar app), Save as Event (.ics)… and Export Selection….
 - **Calendar day bar.** Add an iCalendar address in Settings → Calendar and today's events

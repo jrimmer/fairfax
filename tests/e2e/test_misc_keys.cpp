@@ -146,6 +146,7 @@ const QHash<QString, QString> &exemptions() {
         {"Ctrl+Shift+O", "test_lists_nav.cpp:quickOpen"},
         {"Ctrl+F", "test_scenarios.cpp:searchFiltersAndEscapeClears"},
         {"Ctrl+Shift+Alt+F", "test_settings_lists.cpp:soundsLikeSearchIsRemembered"},
+        {"Ctrl+Shift+E", "test_agent.cpp:shortcutOpensTheAskSheetWhileOn"},
         {"Ctrl+Alt+F", "unit 3: search scope belongs to the search and smart list tests"},
         {"f", "unit 3: the task find bar belongs to the search and smart list tests"},
         {"j", "test_lists_nav.cpp:listJumpBar"},

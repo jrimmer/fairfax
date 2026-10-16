@@ -80,6 +80,17 @@ QByteArray oneProposal(qint64 taskId) {
            + QByteArray::number(taskId) + ", \"due\": \"2026-07-20\"}}]}";
 }
 
+// A chat completion whose assistant message content is one compiled query, as
+// a model would answer a compileQuery request.
+QByteArray queryAnswer(const QString &query) {
+    QJsonObject content{{QStringLiteral("query"), query}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("assistant")},
+                        {QStringLiteral("content"), QString::fromUtf8(QJsonDocument(content).toJson(QJsonDocument::Compact))}};
+    QJsonObject choice{{QStringLiteral("message"), message}};
+    QJsonObject root{{QStringLiteral("choices"), QJsonArray{choice}}};
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
 }  // namespace
 
 class AgentTest : public QObject {
@@ -215,6 +226,117 @@ private slots:
         QCOMPARE(f.store.proposals().size(), 0);
     }
 
+    // The compile request body carries the query schema, the real grammar and
+    // the user's question; the compile prompt names the grammar's keywords.
+    void compileRequestBodyIsBuiltAsSpecified() {
+        Fixture f;
+        AgentService agent(&f.store);
+        const QJsonObject root = parse(agent.buildQueryRequest("what's waiting on Sam?"));
+        const QJsonArray messages = root.value("messages").toArray();
+        QCOMPARE(messages.size(), 2);
+        const QString system = messages.at(0).toObject().value("content").toString();
+        QCOMPARE(messages.at(0).toObject().value("role").toString(), QString("system"));
+        QVERIFY2(system.contains("query"), qPrintable(system));
+        QVERIFY2(system.contains("type:") && system.contains("tags:") && system.contains("lists:"), qPrintable(system));
+        QVERIFY2(system.contains("AND") && system.contains("OR"), qPrintable(system));
+        // The grammar must not promise a NOT keyword the parser lacks.
+        QVERIFY2(!system.contains("NOT / !"), qPrintable(system));
+        QCOMPARE(messages.at(1).toObject().value("content").toString(), QString("what's waiting on Sam?"));
+        // The static helpers expose the same text for the Diagnostics pane.
+        QVERIFY(AgentService::querySystemPrompt().contains(AgentService::queryGrammar()));
+        QVERIFY(AgentService::queryGrammar().contains("type:"));
+    }
+
+    // A canned query parse-back: the answer's "query" lands in compiledQuery,
+    // no parse error, and the ask and result are recorded as history.
+    void compileQueryReadsTheModelsQueryBack() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        FakeTransport transport;
+        transport.response = queryAnswer("type: hiprio tags: sam");
+        agent.setTransport(std::ref(transport));
+        QSignalSpy compiled(&agent, &AgentService::queryCompiled);
+        QSignalSpy changed(&agent, &AgentService::compileChanged);
+        agent.compileQuery("what's waiting on Sam?");
+        QVERIFY(agent.compiling());
+        QCOMPARE(transport.requests.size(), 1);
+        transport.deliver();
+        QVERIFY(!agent.compiling());
+        QCOMPARE(compiled.count(), 1);
+        QVERIFY(changed.count() >= 1);
+        QCOMPARE(agent.compiledQuery(), QString("type: hiprio tags: sam"));
+        QVERIFY(agent.compiledHint().isEmpty());
+        QVERIFY(agent.compileError().isEmpty());
+        // The history row records the ask and its result.
+        QCOMPARE(f.store.proposals().size(), 1);
+        QCOMPARE(f.store.proposals().first().kind, QString("query"));
+        QCOMPARE(f.store.proposals().first().payload.value("prompt").toString(), QString("what's waiting on Sam?"));
+        QCOMPARE(f.store.proposals().first().payload.value("query").toString(), QString("type: hiprio tags: sam"));
+    }
+
+    // A query the parser adjusts lands in the error-free hint state with the
+    // one-line "adjusted" message and does not crash.
+    void compileQueryKeepsTheParseHint() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        FakeTransport transport;
+        transport.response = queryAnswer("type: nonsense");
+        agent.setTransport(std::ref(transport));
+        agent.compileQuery("something odd");
+        transport.deliver();
+        // Query::parse never fails; it says what it ignored.
+        QCOMPARE(agent.compiledQuery(), QString("type: nonsense"));
+        QVERIFY(!agent.compiledHint().isEmpty());
+        QVERIFY2(agent.compiledHint().contains("adjusted"), qPrintable(agent.compiledHint()));
+        QVERIFY2(agent.compiledHint().contains("nonsense"), qPrintable(agent.compiledHint()));
+        QVERIFY(agent.compileError().isEmpty());
+        // The row is still recorded; the hint is only a note.
+        QCOMPARE(f.store.proposals().size(), 1);
+    }
+
+    // An answer with no query string is an error, not a crash, and records
+    // nothing.
+    void compileQueryWithoutAQueryIsAnError() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        FakeTransport transport;
+        transport.response = queryAnswer(QString());
+        agent.setTransport(std::ref(transport));
+        agent.compileQuery("anything");
+        transport.deliver();
+        QVERIFY(agent.compiledQuery().isEmpty());
+        QVERIFY(!agent.compileError().isEmpty());
+        QVERIFY(f.store.proposals().isEmpty());
+
+        // And a transport error is reported, still without a crash.
+        FakeTransport failing;
+        failing.status = 0;
+        failing.error = "connection refused";
+        agent.setTransport(std::ref(failing));
+        agent.compileQuery("again");
+        failing.deliver();
+        QVERIFY(agent.compiledQuery().isEmpty());
+        QCOMPARE(agent.compileError(), QString("connection refused"));
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
+    // With the feature off the compile sends nothing at all; the off-switch is
+    // inert.
+    void disabledCompileSendsNothing() {
+        Fixture f;
+        AgentService agent(&f.store);
+        FakeTransport transport;
+        agent.setTransport(std::ref(transport));
+        agent.compileQuery("what's waiting on Sam?");
+        QCOMPARE(transport.requests.size(), 0);
+        QVERIFY(!agent.compiling());
+        QVERIFY(agent.compiledQuery().isEmpty());
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
     // The store round-trips a proposal, payload and all, across a reopen of
     // the same database.
     void proposalsRoundTripThroughTheStore() {
@@ -289,6 +411,34 @@ private slots:
         backend.dismissProposal(p.id);
         QVERIFY(f.store.proposals().isEmpty());
         QVERIFY(!f.store.task(f.taskId).dueDate.isValid());
+    }
+
+    // A recorded ask re-runs its compiled query and is kept as history.
+    void applyingAQueryHistoryRowRunsItAndKeepsIt() {
+        Fixture f;
+        Backend backend(&f.store);
+        Proposal p;
+        p.kind = "query";
+        p.payload = {{"prompt", "what's waiting on Sam?"}, {"query", "type: hiprio tags: sam"}};
+        f.store.begin("add proposal");
+        p.id = f.store.nextId("proposals");
+        f.store.putProposal(p);
+        f.store.commit();
+
+        QVERIFY(backend.applyProposal(p.id));
+        QCOMPARE(backend.search(), QString("type: hiprio tags: sam"));
+        // History stays put rather than being consumed like a change proposal.
+        QCOMPARE(f.store.proposals().size(), 1);
+
+        // An empty recorded query is refused and changes nothing.
+        Proposal empty;
+        empty.kind = "query";
+        empty.payload = {{"prompt", "blank"}, {"query", "  "}};
+        f.store.begin("add proposal");
+        empty.id = f.store.nextId("proposals");
+        f.store.putProposal(empty);
+        f.store.commit();
+        QVERIFY(!backend.applyProposal(empty.id));
     }
 
     // An unknown kind is refused, not applied, and stays put for a later build.

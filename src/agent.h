@@ -31,6 +31,12 @@ class AgentService : public QObject {
     Q_PROPERTY(QString lastRequest READ lastRequest NOTIFY stateChanged)
     Q_PROPERTY(QString lastResponse READ lastResponse NOTIFY stateChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY stateChanged)
+    // The plain-English search compile: the query the model produced, the
+    // parse hint when it needed adjusting, and whether a compile is in flight.
+    Q_PROPERTY(QString compiledQuery READ compiledQuery NOTIFY compileChanged)
+    Q_PROPERTY(QString compiledHint READ compiledHint NOTIFY compileChanged)
+    Q_PROPERTY(QString compileError READ compileError NOTIFY compileChanged)
+    Q_PROPERTY(bool compiling READ compiling NOTIFY compileChanged)
 
 public:
     // Performs one request and calls `done` when it finishes. `status` is the
@@ -55,16 +61,30 @@ public:
     // Sends one message to the model. Does nothing at all while disabled:
     // no transport call, no network.
     Q_INVOKABLE void request(const QString &message);
+    // Compiles a plain-English question into a Fairfax query. The answer's
+    // "query" string is read back through Query::parse and any parse error is
+    // kept as a one-line hint; the ask and its result are recorded as a
+    // "query" proposal. Also does nothing while disabled.
+    Q_INVOKABLE void compileQuery(const QString &prompt);
     // Abandons the request in flight; a late answer is ignored.
     Q_INVOKABLE void cancel();
     bool busy() const { return m_busy; }
     QString lastRequest() const { return m_lastRequest; }
     QString lastResponse() const { return m_lastResponse; }
     QString lastError() const { return m_lastError; }
+    QString compiledQuery() const { return m_compiledQuery; }
+    QString compiledHint() const { return m_compiledHint; }
+    QString compileError() const { return m_compileError; }
+    bool compiling() const { return m_compiling; }
 
     // The request body, for tests and for the Diagnostics pane.
     QByteArray buildRequest(const QString &message) const;
     static QString systemPrompt();
+    // The query-compile request body and system prompt, for tests.
+    QByteArray buildQueryRequest(const QString &prompt) const;
+    static QString querySystemPrompt();
+    // The query grammar the compile prompt names, as one static string.
+    static QString queryGrammar();
     // The chat-completions URL for a configured base URL.
     static QString chatUrl(const QString &baseUrl);
 
@@ -82,11 +102,21 @@ signals:
     void busyChanged();
     void stateChanged();
     void proposalsChanged();
+    void compileChanged();
+    void queryCompiled();  // A compile finished; compiledQuery/hint are set.
 
 private:
+    // What the request in flight is for: proposals or a query compile.
+    enum class Mode { Proposals, Query };
+
+    void send(const QByteArray &body, const QString &message, Mode mode);
     void finish(int status, const QByteArray &body, const QString &error);
+    void finishQuery(const QByteArray &body);
     void setBusy(bool on);
+    void setCompiling(bool on);
     int storeProposals(const QList<Proposal> &proposals);
+    // The assistant message's content, or the whole body when there is none.
+    static QByteArray assistantContent(const QByteArray &body);
     QJsonObject proposalRoot(const QByteArray &body) const;
     std::function<void()> sendOverNetwork(const QUrl &url, const QByteArray &body, int timeoutMs, Response done);
 
@@ -94,11 +124,16 @@ private:
     Transport m_transport;
     bool m_transportSet = false;
     bool m_busy = false;
+    bool m_compiling = false;
+    Mode m_mode = Mode::Proposals;
     quint64 m_generation = 0;
     std::function<void()> m_abort;
     QString m_lastRequest;
     QString m_lastResponse;
     QString m_lastError;
+    QString m_compiledQuery;
+    QString m_compiledHint;
+    QString m_compileError;
     QNetworkAccessManager *m_network = nullptr;
     QNetworkReply *m_reply = nullptr;
 };

@@ -127,7 +127,7 @@ private slots:
     void exportDialogFits() {
         App app;
         QVERIFY(app.ok);
-        app.press(Qt::Key_E, Qt::ShiftModifier | Qt::ControlModifier);
+        app.press(Qt::Key_D, Qt::ShiftModifier | Qt::ControlModifier);
         QObject *dialog = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((dialog = findObject("exportDialog")) != nullptr && dialog->property("opened").toBool(), 5000);
         QTest::qWait(200);

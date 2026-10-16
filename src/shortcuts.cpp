@@ -145,6 +145,10 @@ QList<Command> buildCommands() {
     add("view.search", "View", "Search", {"Ctrl+F"});
     add("view.quickOpen", "View", "Quick Open", {"Ctrl+Shift+O"});
     add("view.searchOptions", "View", "Search Options…", {"Ctrl+Shift+Alt+F"});
+    // The plain-English ask. It takes Ctrl+Shift+E in the App context; the
+    // export panel moves to the free Ctrl+Shift+D so the two never collide.
+    // Both are remappable in the View group like the rest.
+    add("view.askEnglish", "View", "Ask in plain English…", {"Ctrl+Shift+E"});
     add("view.searchScope", "View", "Search scope", {"Ctrl+Alt+F"});
     add("view.showScheduled", "View", "Show scheduled", {"Ctrl+K"});
     add("view.showPaused", "View", "Show paused", {"Ctrl+U"});
@@ -162,7 +166,7 @@ QList<Command> buildCommands() {
     add("app.sync", "View", "Sync now", {"Ctrl+S"});
     add("app.settings", "View", "Settings", {"Ctrl+,"});
     add("app.quickEntry", "View", "Quick Entry", {"Ctrl+Shift+2"});
-    add("app.export", "View", "Export tasks", {"Ctrl+Shift+E"});
+    add("app.export", "View", "Export tasks", {"Ctrl+Shift+D"});
     add("app.quit", "View", "Quit", {"Ctrl+Q"});
 
     // ---- Quick Entry

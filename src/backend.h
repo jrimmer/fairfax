@@ -48,6 +48,11 @@ class Backend : public QObject {
     // proposals wait for review.
     Q_PROPERTY(bool agentEnabled READ agentEnabled NOTIFY settingsChanged)
     Q_PROPERTY(int proposalCount READ proposalCount NOTIFY proposalsChanged)
+    // The plain-English search compile, as the ask sheet reads it.
+    Q_PROPERTY(QString compiledQuery READ compiledQuery NOTIFY compileChanged)
+    Q_PROPERTY(QString compiledHint READ compiledHint NOTIFY compileChanged)
+    Q_PROPERTY(QString compileError READ compileError NOTIFY compileChanged)
+    Q_PROPERTY(bool compiling READ compiling NOTIFY compileChanged)
     Q_PROPERTY(QVariantList defaultViewChoices READ defaultViewChoices NOTIFY dataChanged)
     Q_PROPERTY(int sortField READ sortField NOTIFY viewChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY viewChanged)
@@ -600,6 +605,15 @@ public:
     Q_INVOKABLE bool applyProposal(qint64 id);
     Q_INVOKABLE void dismissProposal(qint64 id);
     Q_INVOKABLE void dismissAllProposals();
+    // The plain-English search: ask the model to compile a question into a
+    // query, and apply the finished query to the search field. With the
+    // feature off the ask does nothing at all.
+    Q_INVOKABLE void askQuery(const QString &prompt);
+    Q_INVOKABLE void applyCompiledQuery();
+    QString compiledQuery() const;
+    QString compiledHint() const;
+    QString compileError() const;
+    bool compiling() const;
     // What the Diagnostics pane shows for the agent: the last request and
     // response pair and the error, if any.
     Q_INVOKABLE QString agentDiagnostics() const;
@@ -641,6 +655,7 @@ signals:
     void recordingChanged();
     void myDayChanged();  // The My Day plan or capacity moved.
     void proposalsChanged();  // The agent's suggestion queue changed.
+    void compileChanged();    // The plain-English compile state changed.
     void quickEntryTextRequested(const QString &text);
     void editEnding();  // The editor is about to close: it saves what is still in its fields.
     void editFieldRequested();  // The editor is open; takePendingField() says where to go.
