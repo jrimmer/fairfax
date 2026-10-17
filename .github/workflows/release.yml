@@ -1,0 +1,258 @@
+name: Release
+
+# This workflow runs only on the public GitHub repository. Linux runners are
+# free there, so the two build jobs can run on every release.
+#
+# Never add a schedule or a branch trigger: a release starts from a pushed
+# vX.Y.Z tag or from a manual run that names an existing tag.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, for example v0.5.1
+        required: true
+        type: string
+
+# One release at a time per tag. A re-run waits for the first run instead of
+# cancelling it, so a half-finished upload cannot be left behind.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  # The tag names the version. Refuse to build a tag that disagrees with
+  # fairfax.pro, so the packages and the release notes cannot claim two
+  # different versions.
+  check-version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 1
+
+      - name: Compare the tag with fairfax.pro
+        id: check
+        run: |
+          tag="$TAG"
+          version=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*//p' fairfax.pro | head -n1)
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          if [ -z "$version" ]; then
+            echo "::error::fairfax.pro has no VERSION line"
+            exit 1
+          fi
+          if [ "${tag#v}" != "$version" ]; then
+            echo "::error::tag '$tag' does not match fairfax.pro VERSION '$version': the tag without its leading v must equal VERSION"
+            exit 1
+          fi
+          echo "Releasing Fairfax $version from tag $tag"
+
+  # One runner per architecture. Each builds all five packages one after
+  # another (the AppImage and tarball pull Qt 6.8.3 through aqtinstall and
+  # compile), so the budget is generous and the runner starts with free disk.
+  build:
+    needs: check-version
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.check-version.outputs.tag }}
+          fetch-depth: 1
+
+      # The hosted runners have about 14 GB free. Docker is preinstalled, and
+      # bin/package-linux reaches the network with --network host, which is
+      # fine here.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          docker system prune -af
+
+      # all builds the five packages and then checks each one in a fresh
+      # container of its target system.
+      - name: Build and check every package
+        run: bin/package-linux all
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fairfax-linux-${{ matrix.runs-on == 'ubuntu-24.04-arm' && 'aarch64' || 'x86_64' }}
+          path: dist/*
+          if-no-files-found: error
+
+  # Combine both architectures into one release. The version file, its
+  # checksum and install.sh are written here too, and every expected asset is
+  # checked before gh ever talks to the API.
+  release:
+    needs:
+      - check-version
+      - build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.check-version.outputs.tag }}
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: fairfax-linux-x86_64
+          path: release
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: fairfax-linux-aarch64
+          path: release
+
+      - name: Assemble the release assets
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          set -eu
+          mkdir -p release
+
+          # install.sh is the one-liner the README points at; it travels with
+          # the release so the workflow and the installer cannot drift.
+          cp install.sh release/install.sh
+
+          # The bare version, plus the .sha256 install.sh checks it against.
+          printf '%s\n' "$VERSION" >release/fairfax-version.txt
+          ( cd release && sha256sum fairfax-version.txt >fairfax-version.txt.sha256 )
+
+          # Every asset must be there. The names are exactly the release
+          # contract; a missing or drifted name fails here, before uploading.
+          expected="
+          fairfax-x86_64.pkg.tar.zst
+          fairfax-aarch64.pkg.tar.zst
+          fairfax-amd64.deb
+          fairfax-arm64.deb
+          fairfax-x86_64.rpm
+          fairfax-aarch64.rpm
+          fairfax-x86_64.AppImage
+          fairfax-aarch64.AppImage
+          fairfax-linux-x86_64.tar.gz
+          fairfax-linux-aarch64.tar.gz
+          fairfax-version.txt
+          install.sh
+          "
+          missing=""
+          for name in $expected; do
+            if [ ! -f "release/$name" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::release assets are missing:$missing"
+            exit 1
+          fi
+          for name in $expected; do
+            case "$name" in
+              fairfax-version.txt | install.sh) ;;
+              *)
+                if [ ! -f "release/$name.sha256" ]; then
+                  missing="$missing $name.sha256"
+                fi
+                ;;
+            esac
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::release checksums are missing:$missing"
+            exit 1
+          fi
+
+          # One checksum file over every asset (except itself), handy for a
+          # mirror that does not want to fetch each .sha256. Build it outside
+          # the directory so it never sees its own partial output.
+          ( cd release && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' \
+              | sort | xargs sha256sum ) >"$RUNNER_TEMP/SHA256SUMS"
+          mv "$RUNNER_TEMP/SHA256SUMS" release/SHA256SUMS
+
+          echo "Release assets:"
+          ls -1 release
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          set -eu
+          notes=release-notes.md
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              /^##[[:space:]]/ {
+                if (printing) exit
+                # The section whose heading names this version, with the
+                # version as a whole word rather than the prefix of a longer
+                # one (so 0.5.1 does not match a 0.5.10 heading).
+                if ($0 ~ ("^##[[:space:]]+" ver "([^0-9.]|$)")) printing = 1
+              }
+              printing { print }
+            ' CHANGELOG.md >"$notes"
+          else
+            : >"$notes"
+          fi
+          if [ ! -s "$notes" ]; then
+            cat >"$notes" <<EOF
+          A keyboard-first task manager for Omarchy, modelled on the reference app.
+
+          Install on Linux with one line:
+
+              curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+
+          Prefer a package? Download the one for your system:
+
+          | Asset | System |
+          | --- | --- |
+          | fairfax-x86_64.pkg.tar.zst | Arch Linux (x86_64) |
+          | fairfax-aarch64.pkg.tar.zst | Arch Linux (aarch64) |
+          | fairfax-amd64.deb | Debian/Ubuntu (amd64) |
+          | fairfax-arm64.deb | Debian/Ubuntu (arm64) |
+          | fairfax-x86_64.rpm | Fedora (x86_64) |
+          | fairfax-aarch64.rpm | Fedora (aarch64) |
+          | fairfax-x86_64.AppImage | any Linux from about 2022 (x86_64) |
+          | fairfax-aarch64.AppImage | any Linux from about 2022 (aarch64) |
+          | fairfax-linux-x86_64.tar.gz | portable tarball (x86_64) |
+          | fairfax-linux-aarch64.tar.gz | portable tarball (aarch64) |
+
+          Every asset has a \`.sha256\` beside it, and \`SHA256SUMS\` covers the lot.
+          EOF
+          fi
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          set -eu
+          tag="$TAG"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # A re-run: replace the assets and refresh the notes.
+            gh release upload "$tag" release/* --clobber
+            gh release edit "$tag" --title "Fairfax $VERSION" --notes-file release-notes.md
+          else
+            gh release create "$tag" \
+              --verify-tag \
+              --title "Fairfax $VERSION" \
+              --notes-file release-notes.md \
+              release/*
+          fi
