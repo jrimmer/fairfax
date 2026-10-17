@@ -128,6 +128,13 @@ TARGETS=$EXPANDED
 if [ "$CHECK_ONLY" = 1 ]; then
     DO_BUILD=0
 fi
+# A dry run is a preview of the whole pipeline: it prints every target's
+# build and check commands, so one run shows what `all` would do. A real
+# named target only builds unless --check was given, and `all` always does
+# both.
+if [ "$DRY_RUN" = 1 ]; then
+    DO_CHECK=1
+fi
 
 # Version: the VERSION = line of fairfax.pro.
 VERSION=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*//p' "$ROOT/fairfax.pro" | head -n1)
@@ -546,6 +553,9 @@ name="fairfax-linux-$ARCH_NAME"
 rm -rf "/work/$name"
 mkdir -p "/work/$name/bin" "/work/$name/lib/fairfax" "/work/$name/lib/scripts" "/work/$name/share"
 install -Dm755 /work/AppDir/usr/bin/fairfax "/work/$name/lib/fairfax/fairfax"
+# linuxdeploy's rpath pointed at usr/lib relative to usr/bin; the real binary
+# now lives under lib/fairfax, so point it at the lib/ directory above it.
+patchelf --set-rpath '$ORIGIN/..' "/work/$name/lib/fairfax/fairfax"
 cp -a /work/AppDir/usr/lib/. "/work/$name/lib/"
 # linuxdeploy-plugin-qt puts the platform and image-format plugins under
 # usr/plugins and the QML modules under usr/qml (older builds used
