@@ -403,15 +403,18 @@ apt-get install -y --no-install-recommends \
 # Qt 6.8.3 from aqtinstall, the Qt the app's accessibility guards target.
 # aqt names the arch linux_gcc_64 on x86_64 and linux_gcc_arm64 on aarch64.
 # The base install is qtbase; the app's QML and other needs are the modules
-# qtdeclarative (QtQuick, QtQml, Layouts, Shapes) and qtquickcontrols2
-# (Controls and its Basic/Material styles), qtsvg (the About box shows
-# qrc:/icon.svg) and qtimageformats (QuickLook's pictures). Wayland client
-# support is qtwaylandcompositor. Module names differ between Qt and aqt
-# releases, so they are installed one at a time, and the required QML modules
-# are checked afterwards.
+# qtdeclarative (QtQuick, QtQml, Layouts, Shapes) and qtsvg (the About box
+# shows qrc:/icon.svg) and qtimageformats (QuickLook's pictures). Controls is
+# part of qtdeclarative in Qt 6, so there is no separate qtquickcontrols2
+# archive. Wayland client support is the qtwayland addon: the old
+# qtwaylandcompositor archive was merged into it before Qt 6.8. Module names
+# differ between Qt and aqt releases, so they are installed one at a time;
+# the QML modules and the Wayland platform plugin are both verified
+# afterwards, so a wrong name cannot silently leave the bundle without a
+# Wayland client plugin.
 pip3 install --no-cache-dir aqtinstall >/dev/null
 aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
-for module in qtdeclarative qtquickcontrols2 qtsvg qtimageformats qtwaylandcompositor; do
+for module in qtdeclarative qtsvg qtimageformats qtwayland; do
     if ! aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" "$module" -O /opt/Qt 2>/dev/null; then
         echo "aqtinstall: module $module is not available, skipping" >&2
     fi
@@ -430,6 +433,14 @@ for needed in QtQuick QtQuick/Controls QtQuick/Layouts QtQuick/Shapes; do
         exit 1
     fi
 done
+# Wayland client support has to be present too. Qt 6.8's qtbase does not
+# ship the Wayland client platform plugin; the qtwayland addon supplies
+# libqwayland*.so. Fail here rather than ship an AppImage or tarball that
+# quietly has no Wayland plugin.
+if ! find /opt/Qt -path '*/plugins/platforms/libqwayland*.so' -type f | grep -q .; then
+    echo "aqtinstall: the Qt 6.8.3 install has no Wayland platform plugin (qtwayland)" >&2
+    exit 1
+fi
 
 # bin/build honours QMAKE; linuxdeploy-plugin-qt reads it from PATH.
 export QMAKE="$qmake"
@@ -454,9 +465,10 @@ mkdir -p AppDir/usr/scripts
 cp -a AppDir/usr/lib/fairfax/fairfax-omarchy-setup AppDir/usr/scripts/
 
 # linuxdeploy and its Qt and AppImage plugins. The download uses the pinned
-# dated release first (reproducible) and falls back to the moving continuous
-# tag only if that asset is gone, printing which URL it used. The pinned
-# URLs are:
+# dated release; if that asset is gone the build fails rather than silently
+# falling back to the moving continuous tag, which would un-pin the build.
+# Set FAIRFAX_LINUXDEPLOY_TAG=continuous to opt into the moving tag on
+# purpose. The pinned URLs are:
 #
 #   https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-<arch>.AppImage
 #   https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-plugin-qt-<arch>.AppImage
@@ -467,15 +479,13 @@ rm -f /usr/local/bin/linuxdeploy /usr/local/bin/linuxdeploy-plugin-qt \
     /usr/local/bin/linuxdeploy-plugin-appimage
 fetch_tool() {
     tool="$1"
-    for tag in "$LINUXDEPLOY_TAG" continuous; do
-        url="$base/$tool/releases/download/$tag/$tool-$ARCH_NAME.AppImage"
-        if wget -q -O "/usr/local/bin/$tool" "$url"; then
-            echo "linuxdeploy: $tool from $url"
-            return 0
-        fi
-    done
-    echo "linuxdeploy: cannot download $tool for $ARCH_NAME" >&2
-    return 1
+    url="$base/$tool/releases/download/$LINUXDEPLOY_TAG/$tool-$ARCH_NAME.AppImage"
+    if ! wget -q -O "/usr/local/bin/$tool" "$url"; then
+        echo "linuxdeploy: cannot download $tool for $ARCH_NAME from $url" >&2
+        echo "linuxdeploy: the pinned tag $LINUXDEPLOY_TAG may not exist for this tool; set FAIRFAX_LINUXDEPLOY_TAG=continuous to use the moving tag" >&2
+        return 1
+    fi
+    echo "linuxdeploy: $tool from $url"
 }
 fetch_tool linuxdeploy
 fetch_tool linuxdeploy-plugin-qt
@@ -623,11 +633,20 @@ Unpack this directory anywhere and run:
 
     fairfax-linux-<arch>/bin/fairfax
 
-Add bin/ to your PATH to run `fairfax` and `frfx` by name, or copy
-share/applications/fairfax.desktop and share/icons/hicolor/scalable/apps/
-fairfax.svg into ~/.local/share to get a launcher entry. The launcher sets
-LD_LIBRARY_PATH, QT_PLUGIN_PATH and QML_IMPORT_PATH relative to itself, so
-the bundled Qt in lib/ is used and no system Qt is needed.
+Add bin/ to your PATH to run `fairfax` and `frfx` by name. The bundled
+share/applications/fairfax.desktop assumes `fairfax` is on PATH (its
+Exec=fairfax), so a menu entry only works once bin/ is on your PATH; copy
+share/icons/hicolor/scalable/apps/fairfax.svg and the desktop entry into
+~/.local/share to install it. To have the menu entry work without touching
+PATH, point it at this directory's absolute launcher first, for example:
+
+    sed "s|^Exec=fairfax|Exec=/absolute/path/to/fairfax-linux-<arch>/bin/fairfax|" \
+        fairfax-linux-<arch>/share/applications/fairfax.desktop \
+        > ~/.local/share/applications/fairfax.desktop
+
+The launcher sets LD_LIBRARY_PATH, QT_PLUGIN_PATH and QML_IMPORT_PATH
+relative to itself, so the bundled Qt in lib/ is used and no system Qt is
+needed.
 
 A Wayland or X11 desktop with the usual GL and font libraries is all the
 host has to provide.
