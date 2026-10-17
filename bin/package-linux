@@ -403,21 +403,28 @@ apt-get install -y --no-install-recommends \
 
 # Qt 6.8.3 from aqtinstall, the Qt the app's accessibility guards target.
 # aqt names the arch linux_gcc_64 on x86_64 and linux_gcc_arm64 on aarch64.
-# qtbase is the base archive; the app's imports and needs are the modules
-# qtdeclarative (QtQuick, QtQml, Layouts, Shapes, Templates, Window),
-# qtquickcontrols2 (Controls, Basic, Material), qtsvg (the About box shows
-# qrc:/icon.svg), qtimageformats (QuickLook's pictures) and
-# qtwaylandcompositor (the Wayland client platform plugin).
+# The base install is qtbase; the app's QML and other needs are the modules
+# qtdeclarative (QtQuick, QtQml, Layouts, Shapes) and qtquickcontrols2
+# (Controls and its Basic/Material styles), qtsvg (the About box shows
+# qrc:/icon.svg) and qtimageformats (QuickLook's pictures). Wayland client
+# support is qtwaylandcompositor. Module names differ between Qt and aqt
+# releases, so they are installed one at a time, and the required QML modules
+# are checked afterwards.
 pip3 install --no-cache-dir aqtinstall >/dev/null
-aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt \
-    -m qtdeclarative qtquickcontrols2 qtsvg qtimageformats qtwaylandcompositor
+aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
+for module in qtdeclarative qtquickcontrols2 qtsvg qtimageformats qtwaylandcompositor; do
+    if ! aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -m "$module" -O /opt/Qt 2>/dev/null; then
+        echo "aqtinstall: module $module is not available, skipping" >&2
+    fi
+done
 
 qmake=$(find /opt/Qt -path '*/bin/qmake' -type f | head -n1)
 test -n "$qmake"
 QTBIN=$(dirname "$qmake")
 QTPREFIX=$(dirname "$QTBIN")
 # The modules the app imports have to be there, or the build or the selftest
-# fails obscurely; say so here.
+# fails obscurely; say so here. QtQuick.Controls carries the Basic and
+# Material styles the app sets in main().
 for needed in QtQuick QtQuick/Controls QtQuick/Layouts QtQuick/Shapes; do
     if [ ! -d "$QTPREFIX/qml/$needed" ]; then
         echo "aqtinstall: the Qt 6.8.3 install has no $needed QML module" >&2
@@ -507,7 +514,9 @@ appimage_build_script() {
     cat <<'SCRIPT'
 
 # Deploy the Qt tree and let the appimage output plugin make the AppImage.
+# OUTPUT names the file, so it does not depend on linuxdeploy's own naming.
 cd /work
+export OUTPUT="fairfax-$ARCH_NAME.AppImage"
 linuxdeploy --appdir /work/AppDir --plugin qt \
     --desktop-file /work/AppDir/usr/share/applications/fairfax.desktop \
     --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg \
