@@ -1816,7 +1816,9 @@ Window {
             id: mailPasswordField
             objectName: "mailPassword"
             Accessible.name: parent.label
-            Accessible.labelledBy: passwordLabel
+            // Accessible.labelledBy arrived in Qt 6.10, and older Qt refuses to
+            // load a file that names it, so it is set from script when present.
+            Component.onCompleted: if ("labelledBy" in mailPasswordField.Accessible) mailPasswordField.Accessible.labelledBy = passwordLabel
             Layout.fillWidth: true
             echoMode: TextInput.Password
             selectByMouse: true
