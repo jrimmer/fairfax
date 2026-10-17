@@ -528,6 +528,14 @@ linuxdeploy --appdir /work/AppDir --plugin qt \
     --desktop-file /work/AppDir/usr/share/applications/fairfax.desktop \
     --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg \
     --output appimage
+# linuxdeploy copies the desktop file and icon to the AppDir root for the
+# AppImage's own metadata; keep the installed copies too, because install.sh
+# extracts squashfs-root/usr/share/applications/fairfax.desktop and
+# squashfs-root/usr/share/icons/hicolor/scalable/apps/fairfax.svg.
+install -Dm644 /work/pkgbuild/fairfax.desktop \
+    /work/AppDir/usr/share/applications/fairfax.desktop
+install -Dm644 /work/pkgbuild/fairfax.svg \
+    /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 appimage=$(find /work -maxdepth 1 -type f -name '*.AppImage' | head -n1)
 test -n "$appimage"
 cp "$appimage" "/dist/fairfax-$ARCH_NAME.AppImage"
@@ -549,6 +557,12 @@ cd /work
 linuxdeploy --appdir /work/AppDir --plugin qt \
     --desktop-file /work/AppDir/usr/share/applications/fairfax.desktop \
     --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+# Keep the installed desktop entry and icon, in case linuxdeploy moved them
+# to the AppDir root for its own metadata.
+install -Dm644 /work/pkgbuild/fairfax.desktop \
+    /work/AppDir/usr/share/applications/fairfax.desktop
+install -Dm644 /work/pkgbuild/fairfax.svg \
+    /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 name="fairfax-linux-$ARCH_NAME"
 rm -rf "/work/$name"
 mkdir -p "/work/$name/bin" "/work/$name/lib/fairfax" "/work/$name/lib/scripts" "/work/$name/share"
