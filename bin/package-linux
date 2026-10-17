@@ -206,6 +206,14 @@ LINUXDEPLOY_TAG=${FAIRFAX_LINUXDEPLOY_TAG:-1-alpha-20240126}
 
 # --- container helpers -------------------------------------------------------
 
+# shell_quote TEXT: print TEXT as one shell word. The build and check scripts
+# are single-quoted, so an embedded single quote has to become '\'' or the
+# printed command cannot be pasted back.
+shell_quote() {
+    quoted=$(printf '%s' "$1" | sed "s/'/'\\\\''/g")
+    printf "'%s'" "$quoted"
+}
+
 # run_build IMAGE SCRIPT
 run_build() {
     image=$1
@@ -214,7 +222,7 @@ run_build() {
         printf '\n# build %s\n' "$image"
         printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s --env AQT_ARCH=%s --env LINUXDEPLOY_TAG=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
             "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" "$AQT_ARCH" "$LINUXDEPLOY_TAG" \
-            "$ROOT" "$DIST" "$image" "'$script'"
+            "$ROOT" "$DIST" "$image" "$(shell_quote "$script")"
     else
         "$RUNTIME" run --rm --network host \
             --env JOBS="$JOBS" --env VERSION="$VERSION" \
@@ -233,7 +241,7 @@ run_check() {
         printf '\n# check %s\n' "$image"
         printf '%s run --rm --network host --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s -v %s:/dist:ro %s sh -eu -c %s\n' \
             "$RUNTIME" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" \
-            "$DIST" "$image" "'$script'"
+            "$DIST" "$image" "$(shell_quote "$script")"
     else
         "$RUNTIME" run --rm --network host \
             --env ARCH_NAME="$ARCH_NAME" --env DEB_ARCH="$DEB_ARCH" --env RPM_ARCH="$RPM_ARCH" \
@@ -660,7 +668,7 @@ cd /tmp
 # linuxdeploy keeps the full version in the library file name; read it, then
 # run the AppImage the normal extract-and-run way (no FUSE in the container).
 ./fairfax.AppImage --appimage-extract >/dev/null 2>&1
-qt=\$(ls squashfs-root/usr/lib/libQt6Core.so.6.* 2>/dev/null | head -n1 | sed 's/.*libQt6Core\.so\.//')
+qt=\$(find squashfs-root/usr/lib -maxdepth 1 -name 'libQt6Core.so.6.*' | head -n1 | sed 's/.*libQt6Core\.so\.//')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
     ./fairfax.AppImage --appimage-extract-and-run --demo --selftest >/tmp/selftest.log 2>&1 || {
@@ -687,7 +695,7 @@ cd "/tmp/untar/\$name"
 test -x bin/fairfax
 test -f share/applications/fairfax.desktop
 test -f share/icons/hicolor/scalable/apps/fairfax.svg
-qt=\$(ls lib/libQt6Core.so.6.* 2>/dev/null | head -n1 | sed 's/.*libQt6Core\.so\.//')
+qt=\$(find lib -maxdepth 1 -name 'libQt6Core.so.6.*' | head -n1 | sed 's/.*libQt6Core\.so\.//')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
     ./bin/fairfax --demo --selftest >/tmp/selftest.log 2>&1 || {
