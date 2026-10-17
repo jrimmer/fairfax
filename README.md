@@ -502,6 +502,17 @@ build/fairfax --demo --screenshot shot.png    # render offscreen to a PNG
 QT_QPA_PLATFORM=offscreen build/fairfax --demo --selftest    # drive the UI with scripted keys; fails on any QML error
 ```
 
+### Building packages
+
+`bin/package-linux all` builds the Arch, `.deb` and `.rpm` packages in fresh
+containers and writes them to `dist/`, each with a `.sha256` beside it:
+`fairfax-x86_64.pkg.tar.zst`, `fairfax-amd64.deb` and `fairfax-x86_64.rpm`
+(`aarch64`/`arm64` on ARM). Name one target to build just that one, add
+`--check` to install the built packages in containers of the target distros
+and run `--demo --selftest` against them, and `--dry-run` to print the
+container commands without running them. It needs `podman` or `docker`, and
+uses `FAIRFAX_JOBS` (default 2) for the compiles.
+
 `bin/e2e` boots the real window on a temporary database and drives it the way a user does
 (mouse clicks, double-clicks, typing, shortcuts), then checks the store or the screen. Each
 scenario in `tests/e2e/` quotes the the reference app manual page it comes from, and a layout check fails when

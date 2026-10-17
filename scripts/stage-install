@@ -1,0 +1,51 @@
+#!/bin/sh
+# The one file list for every Fairfax package: lay the installed tree out under
+# DESTDIR (with PREFIX, default /usr). pkgbuild/PKGBUILD's package() calls this,
+# as do the .deb and .rpm builds, so the list is written here once.
+#
+#   scripts/stage-install DESTDIR [PREFIX=/usr]
+#
+# The already-built binary comes from $FAIRFAX_BIN (default build/fairfax,
+# relative to the repository root).
+set -eu
+
+if [ "$#" -lt 1 ]; then
+    echo "usage: scripts/stage-install DESTDIR [PREFIX=/usr]" >&2
+    exit 2
+fi
+
+DESTDIR=$1
+PREFIX=${2:-/usr}
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+BIN=${FAIRFAX_BIN:-$ROOT/build/fairfax}
+
+if [ ! -f "$BIN" ]; then
+    echo "stage-install: no binary at $BIN (build it first, or set FAIRFAX_BIN)" >&2
+    exit 1
+fi
+
+# The program and its terminal shorthand, `frfx`.
+install -Dm755 "$BIN" "$DESTDIR$PREFIX/bin/fairfax"
+ln -sf fairfax "$DESTDIR$PREFIX/bin/frfx"
+
+# The Omarchy setup helper.
+install -Dm755 "$ROOT/scripts/fairfax-omarchy-setup" \
+    "$DESTDIR$PREFIX/lib/fairfax/fairfax-omarchy-setup"
+
+# Shell completions for fairfax and frfx.
+install -Dm644 "$ROOT/completions/fairfax.bash" \
+    "$DESTDIR$PREFIX/share/bash-completion/completions/fairfax"
+ln -sf fairfax "$DESTDIR$PREFIX/share/bash-completion/completions/frfx"
+install -Dm644 "$ROOT/completions/_fairfax" \
+    "$DESTDIR$PREFIX/share/zsh/site-functions/_fairfax"
+install -Dm644 "$ROOT/completions/fairfax.fish" \
+    "$DESTDIR$PREFIX/share/fish/vendor_completions.d/fairfax.fish"
+install -Dm644 "$ROOT/completions/frfx.fish" \
+    "$DESTDIR$PREFIX/share/fish/vendor_completions.d/frfx.fish"
+
+# Licence, icon and desktop entry.
+install -Dm644 "$ROOT/LICENSE" "$DESTDIR$PREFIX/share/licenses/fairfax/LICENSE"
+install -Dm644 "$ROOT/pkgbuild/fairfax.svg" \
+    "$DESTDIR$PREFIX/share/icons/hicolor/scalable/apps/fairfax.svg"
+install -Dm644 "$ROOT/pkgbuild/fairfax.desktop" \
+    "$DESTDIR$PREFIX/share/applications/fairfax.desktop"

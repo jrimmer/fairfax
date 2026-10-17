@@ -1,0 +1,409 @@
+#!/bin/sh
+# Builds Fairfax's native Linux packages in containers, and checks them:
+#
+#   bin/package-linux [--arch-host] TARGET...          build the packages
+#   bin/package-linux --check TARGET...                install and self-test them
+#   bin/package-linux --dry-run all                    print the container commands
+#
+# TARGET is arch, deb, rpm or all. `all` builds every package and then checks
+# each in a fresh container of its distro; a plain target only builds, and
+# --check only checks (assumes dist/ already holds the file). Slice 2 adds the
+# AppImage and the tarball; the switch below is where they will go.
+#
+# The output names in dist/ are the contract the release workflow and
+# install.sh rely on:
+#
+#   fairfax-<arch>.pkg.tar.zst   arch: x86_64, aarch64
+#   fairfax-<arch>.deb           arch: amd64, arm64
+#   fairfax-<arch>.rpm           arch: x86_64, aarch64
+#
+# Each package gets a sibling .sha256 (sha256sum format, file name only).
+#
+# The containers use podman when present, else docker, always with
+# --network host: spoond's kernel has no nftables, so bridge networking fails
+# there. The repo is mounted read-only and copied into the container's scratch
+# dir, so nothing in the checkout changes.
+set -eu
+
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+DIST=$ROOT/dist
+JOBS=${FAIRFAX_JOBS:-2}
+
+DRY_RUN=0
+CHECK_ONLY=0
+ARCH_HOST=0
+TARGETS=""
+
+usage() {
+    cat <<'USAGE'
+usage: bin/package-linux [--arch-host] [--dry-run] [--check] TARGET...
+
+  TARGET   arch, deb, rpm or all
+  --arch-host   use the host architecture, ignoring FAIRFAX_ARCH
+  --check       install the built packages in fresh containers and self-test
+  --dry-run     print the container commands without running them
+
+Environment:
+  FAIRFAX_JOBS    compile jobs (default 2)
+  FAIRFAX_ARCH    target architecture (default: the host's)
+  FAIRFAX_RUNTIME container runtime (default: podman, else docker)
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --arch-host) ARCH_HOST=1 ;;
+        --dry-run) DRY_RUN=1 ;;
+        --check) CHECK_ONLY=1 ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            while [ "$#" -gt 0 ]; do
+                TARGETS="$TARGETS $1"
+                shift
+            done
+            break
+            ;;
+        -*)
+            echo "package-linux: unknown option $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *) TARGETS="$TARGETS $1" ;;
+    esac
+    shift
+done
+
+if [ -z "$TARGETS" ]; then
+    usage >&2
+    exit 2
+fi
+
+# all means the whole pipeline; a named target only builds unless --check.
+DO_BUILD=1
+DO_CHECK=$CHECK_ONLY
+EXPANDED=""
+for target in $TARGETS; do
+    case $target in
+        all)
+            DO_CHECK=1
+            for t in arch deb rpm; do
+                case " $EXPANDED " in
+                    *" $t "*) ;;
+                    *) EXPANDED="$EXPANDED $t" ;;
+                esac
+            done
+            ;;
+        arch | deb | rpm)
+            case " $EXPANDED " in
+                *" $target "*) ;;
+                *) EXPANDED="$EXPANDED $target" ;;
+            esac
+            ;;
+        *)
+            echo "package-linux: unknown target $target (want arch, deb, rpm or all)" >&2
+            exit 2
+            ;;
+    esac
+done
+TARGETS=$EXPANDED
+if [ "$CHECK_ONLY" = 1 ]; then
+    DO_BUILD=0
+fi
+
+# Version: the VERSION = line of fairfax.pro.
+VERSION=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*//p' "$ROOT/fairfax.pro" | head -n1)
+if [ -z "$VERSION" ]; then
+    echo "package-linux: no VERSION in fairfax.pro" >&2
+    exit 1
+fi
+
+# Architecture. The host's, unless FAIRFAX_ARCH says otherwise; --arch-host
+# forces the host's even when FAIRFAX_ARCH is set.
+HOST_MACHINE=$(uname -m)
+if [ "$ARCH_HOST" = 1 ] || [ -z "${FAIRFAX_ARCH:-}" ]; then
+    MACHINE=$HOST_MACHINE
+else
+    MACHINE=$FAIRFAX_ARCH
+fi
+case $MACHINE in
+    x86_64 | amd64)
+        ARCH_NAME=x86_64
+        DEB_ARCH=amd64
+        RPM_ARCH=x86_64
+        ;;
+    aarch64 | arm64)
+        ARCH_NAME=aarch64
+        DEB_ARCH=arm64
+        RPM_ARCH=aarch64
+        ;;
+    *)
+        echo "package-linux: unsupported architecture $MACHINE" >&2
+        exit 1
+        ;;
+esac
+
+# Container runtime: podman, else docker.
+if [ -n "${FAIRFAX_RUNTIME:-}" ]; then
+    RUNTIME=$FAIRFAX_RUNTIME
+elif command -v podman >/dev/null 2>&1; then
+    RUNTIME=podman
+elif command -v docker >/dev/null 2>&1; then
+    RUNTIME=docker
+else
+    RUNTIME=podman
+    if [ "$DRY_RUN" != 1 ]; then
+        echo "package-linux: neither podman nor docker is installed" >&2
+        exit 1
+    fi
+fi
+
+ARCH_IMAGE=archlinux:latest
+DEB_IMAGE=debian:trixie
+RPM_IMAGE=fedora:42
+
+# The QML and runtime packages the ELF dependency generators cannot see are
+# listed in the .deb and .rpm build scripts below, in each distro's names.
+
+# --- container helpers -------------------------------------------------------
+
+# run_build IMAGE SCRIPT
+run_build() {
+    image=$1
+    script=$2
+    if [ "$DRY_RUN" = 1 ]; then
+        printf '\n# build %s\n' "$image"
+        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
+            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" \
+            "$ROOT" "$DIST" "$image" "'$script'"
+    else
+        "$RUNTIME" run --rm --network host \
+            --env JOBS="$JOBS" --env VERSION="$VERSION" \
+            --env ARCH_NAME="$ARCH_NAME" --env DEB_ARCH="$DEB_ARCH" --env RPM_ARCH="$RPM_ARCH" \
+            -v "$ROOT:/src:ro" -v "$DIST:/dist" \
+            "$image" sh -eu -c "$script"
+    fi
+}
+
+# run_check IMAGE SCRIPT
+run_check() {
+    image=$1
+    script=$2
+    if [ "$DRY_RUN" = 1 ]; then
+        printf '\n# check %s\n' "$image"
+        printf '%s run --rm --network host --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s -v %s:/dist:ro %s sh -eu -c %s\n' \
+            "$RUNTIME" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" \
+            "$DIST" "$image" "'$script'"
+    else
+        "$RUNTIME" run --rm --network host \
+            --env ARCH_NAME="$ARCH_NAME" --env DEB_ARCH="$DEB_ARCH" --env RPM_ARCH="$RPM_ARCH" \
+            -v "$DIST:/dist:ro" \
+            "$image" sh -eu -c "$script"
+    fi
+}
+
+# --- build scripts -----------------------------------------------------------
+
+arch_build_script() {
+    cat <<'SCRIPT'
+set -eu
+pacman -Syu --noconfirm --needed base-devel qt6-base qt6-declarative git >/dev/null
+id -u builder >/dev/null 2>&1 || useradd -m builder
+rm -rf /work && mkdir -p /work
+tar -C /src --exclude=./build --exclude=./dist --exclude=./.git -cf - . | tar -C /work -xf -
+chown -R builder:builder /work
+cd /work
+runuser -u builder -- env FAIRFAX_JOBS="$JOBS" ./bin/build
+# makepkg refuses root; the build user also runs package(), which calls
+# scripts/stage-install. The debug package is left behind in pkgbuild/.
+cd /work/pkgbuild
+runuser -u builder -- makepkg -f --noconfirm
+pkg=$(find /work/pkgbuild -maxdepth 1 -name "fairfax-[0-9]*.pkg.tar.zst" | head -n1)
+test -n "$pkg"
+cp "$pkg" "/dist/fairfax-$ARCH_NAME.pkg.tar.zst"
+cd /dist
+sha256sum "fairfax-$ARCH_NAME.pkg.tar.zst" > "fairfax-$ARCH_NAME.pkg.tar.zst.sha256"
+SCRIPT
+}
+
+deb_build_script() {
+    cat <<'SCRIPT'
+set -eu
+export DEBIAN_FRONTEND=noninteractive
+apt-get update >/dev/null
+apt-get install -y --no-install-recommends \
+    build-essential qt6-base-dev qt6-declarative-dev qt6-wayland-dev dpkg-dev >/dev/null
+# Debian keeps qmake6 in the Qt bin directory; put it on PATH for bin/build.
+if ! command -v qmake6 >/dev/null 2>&1; then
+    qmake=$(find /usr/lib /usr/lib64 -name qmake6 -type f 2>/dev/null | head -n1)
+    ln -sf "$qmake" /usr/local/bin/qmake6
+fi
+rm -rf /work && mkdir -p /work
+tar -C /src --exclude=./build --exclude=./dist --exclude=./.git -cf - . | tar -C /work -xf -
+cd /work
+FAIRFAX_JOBS="$JOBS" ./bin/build
+# The one file list; stage-install takes the binary from build/fairfax.
+rm -rf /stage
+scripts/stage-install /stage /usr
+# dpkg-shlibdeps needs a source control stanza to attach the binaries to.
+mkdir -p /stage/debian
+cat > /stage/debian/control <<EOF
+Source: fairfax
+Section: utils
+Priority: optional
+Maintainer: Jason Rimmer <jason@rimmer.net>
+Standards-Version: 4.6.2
+
+Package: fairfax
+Architecture: any
+Description: A keyboard-first task manager for Omarchy, modelled on the reference app
+EOF
+cd /stage
+shlibs=$(dpkg-shlibdeps -O usr/bin/fairfax 2>/dev/null | sed "s/^shlibs:Depends=//")
+rm -rf /stage/debian
+size=$(du -sk /stage/usr | cut -f1)
+# The QML modules, the Qt platform plugins and the runtime tools the ELF
+# dependency generator cannot see, in Debian's names. qt6-qpa-plugins carries
+# the offscreen and Wayland platform plugins (the selftest runs offscreen);
+# qt6-wayland is the client library. Controls pulls Templates, Window and the
+# QtQml modules in transitively; naming the four modules the app imports
+# keeps that intent explicit.
+extra="qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qt6-qpa-plugins, qt6-wayland, libqt6sql6-sqlite, git, python3, xdg-desktop-portal"
+if [ -n "$shlibs" ]; then
+    depends="$shlibs, $extra"
+else
+    depends="$extra"
+fi
+mkdir -p /stage/DEBIAN
+cat > /stage/DEBIAN/control <<EOF
+Package: fairfax
+Version: $VERSION
+Architecture: $DEB_ARCH
+Maintainer: Jason Rimmer <jason@rimmer.net>
+Installed-Size: $size
+Depends: $depends
+Section: utils
+Priority: optional
+Homepage: https://github.com/jrimmer/fairfax
+Description: A keyboard-first task manager for Omarchy, modelled on the reference app
+EOF
+dpkg-deb --root-owner-group --build /stage "/dist/fairfax-$DEB_ARCH.deb"
+cd /dist
+sha256sum "fairfax-$DEB_ARCH.deb" > "fairfax-$DEB_ARCH.deb.sha256"
+SCRIPT
+}
+
+rpm_build_script() {
+    cat <<'SCRIPT'
+set -eu
+dnf install -y \
+    gcc-c++ make rpm-build redhat-rpm-config \
+    qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel git >/dev/null
+# Fedora keeps qmake6 in the Qt bin directory; put it on PATH for bin/build.
+if ! command -v qmake6 >/dev/null 2>&1; then
+    qmake=$(find /usr/lib /usr/lib64 -name qmake6 -type f 2>/dev/null | head -n1)
+    ln -sf "$qmake" /usr/local/bin/qmake6
+fi
+rm -rf /work && mkdir -p /work
+tar -C /src --exclude=./build --exclude=./dist --exclude=./.git -cf - . | tar -C /work -xf -
+cd /work
+FAIRFAX_JOBS="$JOBS" ./bin/build
+rpmbuild -bb \
+    --define "_topdir /work/rpmbuild" \
+    --define "fairfax_src /work" \
+    --define "fairfax_version $VERSION" \
+    pkgbuild/fairfax.spec
+rpmfile=$(find /work/rpmbuild/RPMS -name "fairfax-$VERSION-*.rpm" | head -n1)
+test -n "$rpmfile"
+cp "$rpmfile" "/dist/fairfax-$RPM_ARCH.rpm"
+cd /dist
+sha256sum "fairfax-$RPM_ARCH.rpm" > "fairfax-$RPM_ARCH.rpm.sha256"
+SCRIPT
+}
+
+# --- check scripts -----------------------------------------------------------
+# Each installs the built package with the distro's own package manager so its
+# dependencies resolve, then runs the selftest offscreen and demands zero QML
+# warnings. frfx and the desktop entry must be there too.
+
+selftest_script() {
+    cat <<'SCRIPT'
+test -x /usr/bin/frfx
+test -f /usr/share/applications/fairfax.desktop
+QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \
+    fairfax --demo --selftest >/tmp/selftest.log 2>&1 || {
+    cat /tmp/selftest.log >&2
+    echo "selftest failed" >&2
+    exit 1
+}
+grep -q "0 QML warning(s)" /tmp/selftest.log
+SCRIPT
+}
+
+arch_check_script() {
+    cat <<SCRIPT
+set -eu
+pacman -Syu --noconfirm >/dev/null
+pacman -U --noconfirm "/dist/fairfax-$ARCH_NAME.pkg.tar.zst" >/dev/null
+$(selftest_script)
+SCRIPT
+}
+
+deb_check_script() {
+    cat <<SCRIPT
+set -eu
+export DEBIAN_FRONTEND=noninteractive
+apt-get update >/dev/null
+apt-get install -y --no-install-recommends "/dist/fairfax-$DEB_ARCH.deb" >/dev/null
+$(selftest_script)
+SCRIPT
+}
+
+rpm_check_script() {
+    cat <<SCRIPT
+set -eu
+dnf install -y "/dist/fairfax-$RPM_ARCH.rpm" >/dev/null
+$(selftest_script)
+SCRIPT
+}
+
+# --- targets -----------------------------------------------------------------
+
+build_target() {
+    case $1 in
+        arch) run_build "$ARCH_IMAGE" "$(arch_build_script)" ;;
+        deb) run_build "$DEB_IMAGE" "$(deb_build_script)" ;;
+        rpm) run_build "$RPM_IMAGE" "$(rpm_build_script)" ;;
+    esac
+}
+
+check_target() {
+    case $1 in
+        arch) run_check "$ARCH_IMAGE" "$(arch_check_script)" ;;
+        deb) run_check "$DEB_IMAGE" "$(deb_check_script)" ;;
+        rpm) run_check "$RPM_IMAGE" "$(rpm_check_script)" ;;
+    esac
+}
+
+mkdir -p "$DIST"
+
+if [ "$DO_BUILD" = 1 ]; then
+    for target in $TARGETS; do
+        build_target "$target"
+    done
+fi
+
+if [ "$DO_CHECK" = 1 ]; then
+    for target in $TARGETS; do
+        check_target "$target"
+    done
+fi
+
+if [ "$DRY_RUN" != 1 ]; then
+    echo
+    echo "Packages in $DIST:"
+    ls -1 "$DIST"
+fi

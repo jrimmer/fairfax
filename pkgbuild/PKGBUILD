@@ -1,8 +1,10 @@
+# Maintainer: Jason Rimmer <jason@rimmer.net>
 pkgname=fairfax
-pkgver=0.5.1
+pkgver=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*//p' "$startdir/../fairfax.pro" | head -n1)
 pkgrel=1
 pkgdesc='A keyboard-first task manager for Omarchy, modelled on the reference app'
 arch=('x86_64' 'aarch64')
+url='https://github.com/jrimmer/fairfax'
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal' 'git' 'python')
 optdepends=('libsecret: keep the Todoist token in the keyring'
@@ -18,17 +20,5 @@ build() {
 
 package() {
   cd "$startdir/.."
-  install -Dm755 build/fairfax "$pkgdir/usr/bin/fairfax"
-  # `frfx` is the terminal shorthand: frfx <task> adds one, frfx lists Today.
-  ln -s fairfax "$pkgdir/usr/bin/frfx"
-  install -Dm755 scripts/fairfax-omarchy-setup "$pkgdir/usr/lib/fairfax/fairfax-omarchy-setup"
-  # Shell completions for fairfax and frfx.
-  install -Dm644 completions/fairfax.bash "$pkgdir/usr/share/bash-completion/completions/fairfax"
-  ln -s fairfax "$pkgdir/usr/share/bash-completion/completions/frfx"
-  install -Dm644 completions/_fairfax "$pkgdir/usr/share/zsh/site-functions/_fairfax"
-  install -Dm644 completions/fairfax.fish "$pkgdir/usr/share/fish/vendor_completions.d/fairfax.fish"
-  install -Dm644 completions/frfx.fish "$pkgdir/usr/share/fish/vendor_completions.d/frfx.fish"
-  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-  install -Dm644 "$startdir/fairfax.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/fairfax.svg"
-  install -Dm644 "$startdir/fairfax.desktop" "$pkgdir/usr/share/applications/fairfax.desktop"
+  FAIRFAX_BIN=build/fairfax scripts/stage-install "$pkgdir" /usr
 }
