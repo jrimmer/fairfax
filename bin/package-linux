@@ -163,9 +163,9 @@ else
     fi
 fi
 
-ARCH_IMAGE=archlinux:latest
-DEB_IMAGE=debian:trixie
-RPM_IMAGE=fedora:42
+ARCH_IMAGE=docker.io/library/archlinux:latest
+DEB_IMAGE=docker.io/library/debian:trixie
+RPM_IMAGE=docker.io/library/fedora:42
 
 # The QML and runtime packages the ELF dependency generators cannot see are
 # listed in the .deb and .rpm build scripts below, in each distro's names.
