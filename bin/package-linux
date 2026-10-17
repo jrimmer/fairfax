@@ -103,6 +103,8 @@ for target in $TARGETS; do
                 *) EXPANDED="$EXPANDED $target" ;;
             esac
             ;;
+        # Slice 2 adds the AppImage and the tarball: their targets, images,
+        # build scripts and check scripts slot in beside the three above.
         *)
             echo "package-linux: unknown target $target (want arch, deb, rpm or all)" >&2
             exit 2
@@ -220,7 +222,7 @@ runuser -u builder -- env FAIRFAX_JOBS="$JOBS" ./bin/build
 # makepkg refuses root; the build user also runs package(), which calls
 # scripts/stage-install. The debug package is left behind in pkgbuild/.
 cd /work/pkgbuild
-runuser -u builder -- makepkg -f --noconfirm
+runuser -u builder -- env FAIRFAX_JOBS="$JOBS" makepkg -f --nodeps --noconfirm
 pkg=$(find /work/pkgbuild -maxdepth 1 -name "fairfax-[0-9]*.pkg.tar.zst" | head -n1)
 test -n "$pkg"
 cp "$pkg" "/dist/fairfax-$ARCH_NAME.pkg.tar.zst"
@@ -235,7 +237,7 @@ set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update >/dev/null
 apt-get install -y --no-install-recommends \
-    build-essential qt6-base-dev qt6-declarative-dev qt6-wayland-dev dpkg-dev >/dev/null
+    build-essential qt6-base-dev qt6-declarative-dev dpkg-dev >/dev/null
 # Debian keeps qmake6 in the Qt bin directory; put it on PATH for bin/build.
 if ! command -v qmake6 >/dev/null 2>&1; then
     qmake=$(find /usr/lib /usr/lib64 -name qmake6 -type f 2>/dev/null | head -n1)
@@ -262,16 +264,16 @@ Architecture: any
 Description: A keyboard-first task manager for Omarchy, modelled on the reference app
 EOF
 cd /stage
-shlibs=$(dpkg-shlibdeps -O usr/bin/fairfax 2>/dev/null | sed "s/^shlibs:Depends=//")
+shlibs=$(dpkg-shlibdeps -O --ignore-missing-info usr/bin/fairfax 2>/dev/null | sed "s/^shlibs:Depends=//")
 rm -rf /stage/debian
 size=$(du -sk /stage/usr | cut -f1)
-# The QML modules, the Qt platform plugins and the runtime tools the ELF
-# dependency generator cannot see, in Debian's names. qt6-qpa-plugins carries
-# the offscreen and Wayland platform plugins (the selftest runs offscreen);
-# qt6-wayland is the client library. Controls pulls Templates, Window and the
-# QtQml modules in transitively; naming the four modules the app imports
-# keeps that intent explicit.
-extra="qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qt6-qpa-plugins, qt6-wayland, libqt6sql6-sqlite, git, python3, xdg-desktop-portal"
+# The QML modules and runtime packages the ELF dependency generator cannot
+# see, in Debian's names: the QtQuick, Controls, Layouts and Shapes QML
+# modules, the Qt Wayland plugin (and qt6-qpa-plugins, which carries the
+# offscreen QPA plugin the selftest uses), the SQLite SQL driver, and the
+# tools the app runs. Controls pulls Templates, Window, the QML styles and
+# the QtQml modules in transitively.
+extra="qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qt6-wayland, qt6-qpa-plugins, libqt6sql6-sqlite, git, python3, xdg-desktop-portal"
 if [ -n "$shlibs" ]; then
     depends="$shlibs, $extra"
 else
@@ -301,7 +303,8 @@ rpm_build_script() {
 set -eu
 dnf install -y \
     gcc-c++ make rpm-build redhat-rpm-config \
-    qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel git >/dev/null
+    qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtquickcontrols2-devel \
+    qt6-qtwayland-devel git >/dev/null
 # Fedora keeps qmake6 in the Qt bin directory; put it on PATH for bin/build.
 if ! command -v qmake6 >/dev/null 2>&1; then
     qmake=$(find /usr/lib /usr/lib64 -name qmake6 -type f 2>/dev/null | head -n1)
@@ -339,7 +342,7 @@ QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \
     echo "selftest failed" >&2
     exit 1
 }
-grep -q "0 QML warning(s)" /tmp/selftest.log
+grep -q " 0 QML warning(s)" /tmp/selftest.log
 SCRIPT
 }
 
