@@ -448,6 +448,12 @@ if ! find /opt/Qt -path '*/plugins/platforms/libqwayland*.so' -type f | grep -q 
     exit 1
 fi
 
+# linuxdeploy-plugin-qt deploys every SQL driver the Qt install has, and the
+# ODBC, PostgreSQL and MySQL ones link client libraries this image does not
+# carry, which aborts the deploy. The app stores its data in SQLite only, so
+# keep just that driver.
+find "$QTPREFIX/plugins/sqldrivers" -type f -name '*.so' ! -name libqsqlite.so -delete
+
 # bin/build honours QMAKE; linuxdeploy-plugin-qt reads it from PATH.
 export QMAKE="$qmake"
 export PATH="$QTBIN:$PATH"
