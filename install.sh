@@ -72,9 +72,7 @@ download() {
 machine=$(uname -m)
 
 # Fetches fairfax-version.txt first, so we can say what we're about to do.
-fetch "$RELEASE_URL/fairfax-version.txt" "$tmp/fairfax-version.txt" ||
-    { echo "install.sh: could not download fairfax-version.txt from $RELEASE_URL" >&2; exit 1; }
-version=$(cat "$tmp/fairfax-version.txt")
+version=$(cat "$(download fairfax-version.txt)")
 
 case "$machine" in
     x86_64|aarch64) ;;
@@ -160,6 +158,16 @@ install_appimage() {
     appimage=$(download "fairfax-$version-$machine.AppImage")
     chmod +x "$appimage"
 
+    # Take the .desktop entry and icon out of the AppImage. Extract it first,
+    # so a broken archive aborts before anything lands in $HOME.
+    ( cd "$tmp" && "$appimage" --appimage-extract >/dev/null 2>&1 )
+    squash="$tmp/squashfs-root"
+    desktop="$squash/usr/share/applications/fairfax.desktop"
+    if [ ! -f "$desktop" ]; then
+        echo "install.sh: the AppImage has no desktop entry; aborting." >&2
+        exit 1
+    fi
+
     bindir="$HOME/.local/bin"
     appdir="$HOME/.local/share/applications"
     icondir="$HOME/.local/share/icons/hicolor/scalable/apps"
@@ -168,14 +176,6 @@ install_appimage() {
     install -m755 "$appimage" "$bindir/fairfax"
     ln -sf fairfax "$bindir/frfx"
 
-    # The .desktop entry and icon live inside the AppImage; take them from it.
-    ( cd "$tmp" && "$appimage" --appimage-extract >/dev/null 2>&1 )
-    squash="$tmp/squashfs-root"
-    desktop="$squash/usr/share/applications/fairfax.desktop"
-    if [ ! -f "$desktop" ]; then
-        echo "install.sh: the AppImage has no desktop entry; aborting." >&2
-        exit 1
-    fi
     # Point the launcher at the AppImage we just installed.
     sed "s|^Exec=.*|Exec=$bindir/fairfax %u|" "$desktop" >"$appdir/fairfax.desktop"
     icon=$(find "$squash/usr/share/icons" -name fairfax.svg -print -quit 2>/dev/null || true)
