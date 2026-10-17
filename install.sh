@@ -119,7 +119,8 @@ uninstall_arch() {
         fi
     fi
     echo "Running sudo pacman -R fairfax; you may be asked for your password."
-    sudo pacman -R fairfax
+    # --noconfirm: under curl | bash, standard input is the script itself.
+    sudo pacman -R --noconfirm fairfax
     echo "Fairfax is uninstalled."
 }
 

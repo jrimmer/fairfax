@@ -398,7 +398,7 @@ wire_hyprland
 run --uninstall
 assert_eq "$STATUS" 0 "Arch uninstall exits 0"
 log_has "fairfax setup omarchy --remove" || fail "remove hook on Arch uninstall"
-log_has "sudo pacman -R fairfax" || fail "pacman -R called"
+log_has "sudo pacman -R --noconfirm fairfax" || fail "pacman -R called"
 ok "Arch uninstall"
 
 echo "== uninstall (AppImage) =="
@@ -441,7 +441,7 @@ wire_hyprland
 run --uninstall
 assert_eq "$STATUS" 0 "up-to-date Arch uninstall exits 0"
 assert_not_contains "$OUT" "already installed" "Arch uninstall does not report up to date"
-log_has "sudo pacman -R fairfax" || fail "pacman -R called for a current Arch install"
+log_has "sudo pacman -R --noconfirm fairfax" || fail "pacman -R called for a current Arch install"
 ok "Arch uninstall when up to date"
 
 # --- setup failure ---------------------------------------------------------
