@@ -5,7 +5,10 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build"
 cd "$ROOT/build"
 
-qmake6 "$ROOT/fairfax.pro"
+# QMAKE overrides qmake6, for a Qt that is not the system one (the AppImage
+# build uses aqtinstall's Qt 6.8.3).
+QMAKE=${QMAKE:-qmake6}
+"$QMAKE" "$ROOT/fairfax.pro"
 make -j"${FAIRFAX_JOBS:-$(nproc)}"
 
 echo "Built $ROOT/build/fairfax"
