@@ -817,6 +817,37 @@ private slots:
         QCOMPARE(childrenOf(app, project).first().title, QString("Book a van"));
     }
 
+    // The context menu offers Suggest Steps on any task, and it works on the
+    // task that was right-clicked even when several are selected.
+    void projectBreakdownFromTheContextMenu() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentProject(st); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        const qint64 project = taskIdTitled(app.store(), "Move house");
+        QVERIFY(project);
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        // Select the project plus another task, so the batch temptation is there.
+        QVERIFY(selectRow(app, project));
+        clickWith(app.row(app.ids.buyMilk), Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().selectionCount(), 2, 5000);
+
+        QVERIFY(contextMenuOn(app, project));
+        QQuickItem *entry = steadyMenuItem("Suggest Steps…");
+        QVERIFY2(entry, qPrintable(QString("Suggest Steps missing: %1").arg(tk::menuEntries())));
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = stepsAnswer({{"Sort the boxes", 30}});
+        agent.setTransport(std::ref(transport));
+        clickMenu("Suggest Steps…");
+        QCOMPARE(transport.requests.size(), 1);
+        // It asked about the right-clicked project, not the whole selection.
+        QVERIFY2(transport.requests.first().contains("Move house"), transport.requests.first().constData());
+        QVERIFY2(!transport.requests.first().contains("Buy milk"), transport.requests.first().constData());
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 1, 5000);
+    }
+
     // With the feature off neither entry exists and a direct call sends nothing.
     void projectBreakdownHiddenWhileOff() {
         Session s;
