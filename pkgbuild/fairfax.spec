@@ -51,6 +51,7 @@ FAIRFAX_BIN=%{fairfax_src}/build/fairfax \
 %files
 /usr/bin/fairfax
 /usr/bin/frfx
+%dir /usr/lib/fairfax
 /usr/lib/fairfax/fairfax-omarchy-setup
 /usr/share/bash-completion/completions/fairfax
 /usr/share/bash-completion/completions/frfx

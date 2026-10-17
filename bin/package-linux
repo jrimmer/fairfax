@@ -241,6 +241,7 @@ apt-get install -y --no-install-recommends \
 # Debian keeps qmake6 in the Qt bin directory; put it on PATH for bin/build.
 if ! command -v qmake6 >/dev/null 2>&1; then
     qmake=$(find /usr/lib /usr/lib64 -name qmake6 -type f 2>/dev/null | head -n1)
+    test -n "$qmake"
     ln -sf "$qmake" /usr/local/bin/qmake6
 fi
 rm -rf /work && mkdir -p /work
@@ -314,6 +315,8 @@ rm -rf /work && mkdir -p /work
 tar -C /src --exclude=./build --exclude=./dist --exclude=./.git -cf - . | tar -C /work -xf -
 cd /work
 FAIRFAX_JOBS="$JOBS" ./bin/build
+mkdir -p /work/rpmbuild/BUILD /work/rpmbuild/BUILDROOT /work/rpmbuild/RPMS \
+    /work/rpmbuild/SOURCES /work/rpmbuild/SPECS /work/rpmbuild/SRPMS
 rpmbuild -bb \
     --define "_topdir /work/rpmbuild" \
     --define "fairfax_src /work" \
