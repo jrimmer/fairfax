@@ -449,8 +449,7 @@ Rectangle {
             Accessible.role: header.isGroup ? Accessible.TreeItem : Accessible.Heading
             Accessible.name: header.isGroup ? (header.row.title || "") + ", " + (header.row.collapsed ? "collapsed" : "expanded")
                                             : (header.row.title || "")
-            Accessible.expandable: header.isGroup
-            Accessible.expanded: header.isGroup && !header.row.collapsed
+            AccessibleExpand { target: header; expandable: header.isGroup; expanded: header.isGroup && !header.row.collapsed }
             Accessible.onPressAction: if (header.isGroup) backend.toggleGroupCollapsed(header.row.groupId)
 
             // Lists dropped on a header go to the end of its group; groups
@@ -580,8 +579,7 @@ Rectangle {
             Accessible.role: Accessible.TreeItem
             Accessible.name: [row.title || "", axKind, axCounts].filter(s => s !== "").join(", ")
             Accessible.selected: !!row.selected
-            Accessible.expandable: row.expandable === true
-            Accessible.expanded: row.expanded === true
+            AccessibleExpand { target: item; expandable: row.expandable === true; expanded: row.expanded === true }
             Accessible.onPressAction: if (row.sourceKey) backend.selectSource(row.sourceKey)
             // Consecutive lists' colour pills join into one rounded column.
             readonly property bool runStart: {

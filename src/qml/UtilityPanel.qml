@@ -156,8 +156,7 @@ Rectangle {
                 Accessible.name: isHeader ? (model.title || "") + ", " + (root.collapsed[model.groupId] ? "collapsed" : "expanded")
                                           : [model.title || "", (model.count || 0) > 0 ? model.count + ((model.count || 0) === 1 ? " task" : " tasks") : ""].filter(s => s !== "").join(", ")
                 Accessible.selected: !isHeader && !!model.filtered
-                Accessible.expandable: isGroup
-                Accessible.expanded: isGroup && !root.collapsed[model.groupId]
+                AccessibleExpand { target: row; expandable: row.isGroup; expanded: row.isGroup && !root.collapsed[model.groupId] }
                 Accessible.onPressAction: isHeader ? root.toggleCollapsed(model.groupId) : backend.toggleTagFilter(model.tagId)
 
                 // Header.

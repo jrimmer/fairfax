@@ -14,6 +14,7 @@
         <file>qml/ExportDialog.qml</file>
         <file>qml/ThemedDialog.qml</file>
         <file>qml/FocusButton.qml</file>
+        <file>qml/AccessibleExpand.qml</file>
         <file>qml/IconButton.qml</file>
         <file>qml/Icon.qml</file>
         <file>qml/Icons.js</file>
