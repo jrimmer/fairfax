@@ -104,15 +104,7 @@ for target in $TARGETS; do
                 esac
             done
             ;;
-        arch | deb | rpm)
-            case " $EXPANDED " in
-                *" $target "*) ;;
-                *) EXPANDED="$EXPANDED $target" ;;
-            esac
-            ;;
-        # Slice 2 adds the AppImage and the tarball: their targets, images,
-        # build scripts and check scripts slot in beside the three above.
-        appimage | tar)
+        arch | deb | rpm | appimage | tar)
             case " $EXPANDED " in
                 *" $target "*) ;;
                 *) EXPANDED="$EXPANDED $target" ;;
