@@ -20,7 +20,23 @@ set -euo pipefail
 RELEASE_URL="${FAIRFAX_RELEASE_URL:-https://github.com/jrimmer/fairfax/releases/latest/download}"
 
 usage() {
-    sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    cat <<'USAGE'
+Fairfax one-line installer. Read this before piping it to bash:
+
+  curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+
+Flags (pass them through bash -s --):
+
+  --no-setup    don't wire Fairfax into Omarchy after a fresh install
+  --appimage    use the AppImage even on Arch
+  --uninstall   remove Fairfax
+  --help        show this help
+
+On Arch it installs the pacman package, asking for sudo only for pacman -U.
+Everywhere else it installs the AppImage under ~/.local, no root needed.
+Files come from $FAIRFAX_RELEASE_URL (the GitHub "latest/download" URL by
+default) and each one is checked against its .sha256 before use.
+USAGE
 }
 
 no_setup=false

@@ -410,6 +410,18 @@ assert_contains "$OUT" "Fairfax one-line installer" "help prints the usage block
 assert_contains "$OUT" "--no-setup" "help lists --no-setup"
 ok "--help"
 
+# The README pipes the script into bash; --help must work in that form too,
+# where BASH_SOURCE is empty.
+echo "== --help piped through bash =="
+new_home
+set +e
+OUT=$(cat "$INSTALL" | bash -s -- --help 2>&1)
+STATUS=$?
+set -e
+assert_eq "$STATUS" 0 "piped --help exits 0"
+assert_contains "$OUT" "Fairfax one-line installer" "piped help prints the usage block"
+ok "--help piped through bash"
+
 # --- summary ---------------------------------------------------------------
 
 echo
