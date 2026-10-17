@@ -150,6 +150,69 @@ QByteArray priorityAnswer(const QList<QPair<qint64, int>> &choices) {
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
 
+// A canned breakdown answer: each pair a step title and a duration, a
+// negative duration meaning the step carries none.
+QByteArray stepsAnswer(const QList<QPair<QString, int>> &steps) {
+    QJsonArray rows;
+    for (const auto &step : steps) {
+        QJsonObject row{{QStringLiteral("title"), step.first}};
+        if (step.second >= 0)
+            row.insert(QStringLiteral("duration"), step.second);
+        rows.append(row);
+    }
+    QJsonObject content{{QStringLiteral("steps"), rows}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("assistant")},
+                        {QStringLiteral("content"), QString::fromUtf8(QJsonDocument(content).toJson(QJsonDocument::Compact))}};
+    QJsonObject choice{{QStringLiteral("message"), message}};
+    QJsonObject root{{QStringLiteral("choices"), QJsonArray{choice}}};
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+// A project with one existing child and two open sub-tasks, under Home, so a
+// breakdown has something not to repeat and somewhere to add.
+Seed seedAgentProject(Store &store, bool enabled = true) {
+    Seed s = seedWorld(store);
+    store.setSetting("agent.enabled", enabled);
+    store.begin("Seed project", false);
+    Task project;
+    project.id = store.nextId("tasks");
+    project.listId = s.home;
+    project.type = TaskType::Project;
+    project.title = "Move house";
+    project.notes = "before winter";
+    project.order = 1;
+    store.putTask(project);
+    Task existing;
+    existing.id = store.nextId("tasks");
+    existing.listId = s.home;
+    existing.parentId = project.id;
+    existing.title = "Book a van";
+    existing.order = 1;
+    store.putTask(existing);
+    store.commit();
+    return s;
+}
+
+// Looks a task up by title, for a seed whose project id is not in the Seed.
+qint64 taskIdTitled(Store &store, const QString &title) {
+    for (const Task &t : store.tasks())
+        if (!t.deleted && t.title == title)
+            return t.id;
+    return 0;
+}
+
+// The children of a task in manual order, for checking what an apply added.
+QVector<Task> childrenOf(App &app, qint64 parentId) {
+    QVector<Task> out;
+    for (const Task &t : app.store().tasks())
+        if (!t.deleted && t.parentId == parentId)
+            out.append(t);
+    std::sort(out.begin(), out.end(), [](const Task &a, const Task &b) {
+        return a.order != b.order ? a.order < b.order : a.id < b.id;
+    });
+    return out;
+}
+
 // Opens the review sheet from the toolbar and waits for it. If a collection
 // call already opened it (reviewRequested), the modal would swallow a click on
 // the toolbar, so an already-open sheet is returned as is.
@@ -655,6 +718,136 @@ private slots:
         agent.setTransport(std::ref(transport));
         app.backend().triageInbox();
         app.backend().suggestPriorities();
+        QCOMPARE(transport.requests.size(), 0);
+        QCOMPARE(app.backend().proposalCount(), 0);
+    }
+
+    // Breaking a project down: the editor and context menu entries exist, the
+    // canned three-step answer lists three, Y adds one child, A adds the rest
+    // in order, and each carries its proposed duration.
+    void projectBreakdownReviewsAndAppliesSteps() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentProject(st); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        const qint64 project = taskIdTitled(app.store(), "Move house");
+        QVERIFY(project);
+
+        // Open the project so its tasks are on screen, then the editor's
+        // Suggest Steps entry sends one request describing the task.
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        QVERIFY(openEditor(app, project));
+        QQuickItem *stepsButton = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((stepsButton = findItem("editorSuggestSteps")) != nullptr, 5000);
+        QVERIFY(stepsButton->isVisible());
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = stepsAnswer({{"Sort the boxes", 30}, {"Change the address", -1}, {"Return the keys", 15}});
+        agent.setTransport(std::ref(transport));
+        click(stepsButton);
+        QCOMPARE(transport.requests.size(), 1);
+        // The request names the title, notes, the existing child and the schema.
+        const QByteArray request = transport.requests.first();
+        QVERIFY2(request.contains("Move house"), request.constData());
+        QVERIFY2(request.contains("before winter"), request.constData());
+        QVERIFY2(request.contains("Book a van"), request.constData());
+        QVERIFY2(request.contains("steps"), request.constData());
+
+        // Closing the editor leaves the sheet the keyboard.
+        QVERIFY(closeEditor(app));
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 3, 5000);
+        QObject *sheet = openProposalSheet();
+        QVERIFY(sheet);
+        QTRY_VERIFY_WITH_TIMEOUT(sheet->property("visible").toBool(), 5000);
+        QQuickItem *list = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((list = findItem("proposalList")) != nullptr, 5000);
+        QCOMPARE(list->property("count").toInt(), 3);
+
+        // Y adds the first step as a real child of the project.
+        app.press(Qt::Key_Y);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 2, 5000);
+        QVector<Task> children = childrenOf(app, project);
+        QTRY_COMPARE_WITH_TIMEOUT(children.size(), 2, 5000);
+        QCOMPARE(children.at(0).title, QString("Book a van"));
+        QCOMPARE(children.at(1).title, QString("Sort the boxes"));
+        QCOMPARE(children.at(1).duration, 30);
+
+        // A adds the rest, in the order they were proposed; the no-duration
+        // step is allowed and simply has none.
+        app.press(Qt::Key_A);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 0, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(childrenOf(app, project).size(), 4, 5000);
+        children = childrenOf(app, project);
+        QCOMPARE(children.at(2).title, QString("Change the address"));
+        QCOMPARE(children.at(2).duration, 0);
+        QCOMPARE(children.at(3).title, QString("Return the keys"));
+        QCOMPARE(children.at(3).duration, 15);
+        QTRY_VERIFY_WITH_TIMEOUT(!sheet->property("visible").toBool(), 5000);
+    }
+
+    // N skips a step and leaves the project exactly as it was.
+    void projectBreakdownDismissChangesNothing() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentProject(st); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        const qint64 project = taskIdTitled(app.store(), "Move house");
+        QVERIFY(project);
+        QCOMPARE(childrenOf(app, project).size(), 1);
+
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        transport.answer = stepsAnswer({{"Sort the boxes", 30}, {"Change the address", -1}});
+        agent.setTransport(std::ref(transport));
+        app.backend().suggestSteps(project);
+        QCOMPARE(transport.requests.size(), 1);
+        transport.deliver();
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 2, 5000);
+
+        QObject *sheet = openProposalSheet();
+        QVERIFY(sheet);
+        QTRY_VERIFY_WITH_TIMEOUT(sheet->property("visible").toBool(), 5000);
+        app.press(Qt::Key_N);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 1, 5000);
+        app.press(Qt::Key_N);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().proposalCount(), 0, 5000);
+        // The project has only the child it started with.
+        QCOMPARE(childrenOf(app, project).size(), 1);
+        QCOMPARE(childrenOf(app, project).first().title, QString("Book a van"));
+    }
+
+    // With the feature off neither entry exists and a direct call sends nothing.
+    void projectBreakdownHiddenWhileOff() {
+        Session s;
+        s.seed = [](Store &st) { return seedAgentProject(st, false); };
+        QVERIFY(s.start());
+        App &app = *s.app;
+        QVERIFY(!app.backend().agentEnabled());
+        const qint64 project = taskIdTitled(app.store(), "Move house");
+        QVERIFY(project);
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        QTest::qWait(100);
+
+        // No Suggest Steps entry in the editor.
+        QVERIFY(openEditor(app, project));
+        QTest::qWait(100);
+        QVERIFY(findItem("editorSuggestSteps") == nullptr);
+        QVERIFY(closeEditor(app));
+
+        // No Suggest Steps in the task context menu.
+        QVERIFY(contextMenuOn(app, project));
+        QTest::qWait(100);
+        QVERIFY(findItem("suggestSteps") == nullptr || !findItem("suggestSteps")->isVisible());
+        QVERIFY(findText("Suggest Steps…") == nullptr);
+        app.press(Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(noMenuOpen(), 5000);
+
+        // A direct call refuses.
+        AgentService &agent = app.services().agent;
+        Transport transport;
+        agent.setTransport(std::ref(transport));
+        app.backend().suggestSteps(project);
         QCOMPARE(transport.requests.size(), 0);
         QCOMPARE(app.backend().proposalCount(), 0);
     }

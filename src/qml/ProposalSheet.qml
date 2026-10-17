@@ -21,8 +21,9 @@ Popup {
     focus: true
     background: Rectangle { color: theme.raised; radius: 12; border.color: theme.divider }
 
-    // A proposal's kind and payload, in one line a person can read.
-    function summary(p) {
+    // A proposal's kind and payload, in one line a person can read. `number`
+    // prefixes a breakdown's steps so they read as a numbered list.
+    function summary(p, number) {
         if (!p)
             return ""
         const payload = p.payload || {}
@@ -53,7 +54,8 @@ Popup {
             const title = task && task.title ? task.title : "task " + payload.taskId
             const step = payload.title || "?"
             const duration = payload.duration > 0 ? " — " + backend.durationText(payload.duration) : ""
-            return "Add to “" + title + "”: " + step + duration
+            const prefix = number ? number + ". " : ""
+            return prefix + "Add to “" + title + "”: " + step + duration
         }
         return p.kind + " " + JSON.stringify(payload)
     }
@@ -173,7 +175,7 @@ Popup {
                     color: index === list.currentIndex ? theme.selection : "transparent"
 
                     Accessible.role: Accessible.ListItem
-                    Accessible.name: root.summary(modelData)
+                    Accessible.name: root.summary(modelData, index + 1)
                     Accessible.selected: index === list.currentIndex
                     Accessible.onPressAction: root.applyCurrent()
 
@@ -189,19 +191,19 @@ Popup {
                             wrapMode: Text.Wrap
                             color: theme.foreground
                             font.pixelSize: backend.fontSize
-                            text: root.summary(modelData)
+                            text: root.summary(modelData, index + 1)
                         }
                         Button {
                             objectName: "proposalApply:" + modelData.id
                             text: "Apply"
-                            Accessible.name: "Apply: " + root.summary(modelData)
+                            Accessible.name: "Apply: " + root.summary(modelData, index + 1)
                             flat: true
                             onClicked: { list.currentIndex = index; root.applyCurrent() }
                         }
                         Button {
                             objectName: "proposalDismiss:" + modelData.id
                             text: "Dismiss"
-                            Accessible.name: "Dismiss: " + root.summary(modelData)
+                            Accessible.name: "Dismiss: " + root.summary(modelData, index + 1)
                             flat: true
                             onClicked: { list.currentIndex = index; root.dismissCurrent() }
                         }

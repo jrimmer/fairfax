@@ -221,6 +221,16 @@ rest of the app uses, so it can be undone with Ctrl+Z like any other change. Pro
 kept in the database, so a review survives a restart, and Settings → Diagnostics shows the
 last request and response pair and any error.
 
+Beyond the plain-English search and the Inbox's *Triage Inbox*, two entries break a task
+down and suggest priorities. **Suggest Steps…** is in the task editor's toolbar and in the
+task context menu on any task, most usefully a project: the model is given the task's title,
+its notes, its existing checklist items or sub-tasks (so it does not repeat them) and the
+durations you tend to set, and proposes an ordered list of steps, each with an optional
+duration shown through the usual duration chip. Nothing is added until you review the
+sheet: `y` adds one, `n` skips it, `a` adds all remaining in order, and a step becomes a
+checklist item or a sub-task to match the task's existing children. **Suggest Priorities**
+appears in the context menu when more than one task is selected.
+
 ## Accessibility
 
 Fairfax works with Orca on GNOME and with any other screen reader Qt reports to. Every
