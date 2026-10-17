@@ -729,6 +729,11 @@ cd /tmp
 # linuxdeploy keeps the full version in the library file name; read it, then
 # run the AppImage the normal extract-and-run way (no FUSE in the container).
 ./"fairfax-$ARCH_NAME.AppImage" --appimage-extract >/dev/null 2>&1
+# install.sh depends on these two paths being in the extracted AppImage, and
+# the AppImage has to carry the Wayland client plugin the bundle promises.
+test -f squashfs-root/usr/share/applications/fairfax.desktop
+test -f squashfs-root/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+find squashfs-root -name 'libqwayland*.so' | grep -q .
 qt=\$(find squashfs-root/usr/lib -maxdepth 1 -name 'libQt6Core.so.6.*' | head -n1 | sed 's/.*libQt6Core\.so\.//')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
@@ -756,6 +761,9 @@ cd "/tmp/untar/\$name"
 test -x bin/fairfax
 test -f share/applications/fairfax.desktop
 test -f share/icons/hicolor/scalable/apps/fairfax.svg
+# The portable tree has to carry the Wayland client plugin, same as the
+# AppImage, or the bundle is not the Wayland-capable build it claims.
+find lib -name 'libqwayland*.so' | grep -q .
 qt=\$(find lib -maxdepth 1 -name 'libQt6Core.so.6.*' | head -n1 | sed 's/.*libQt6Core\.so\.//')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
