@@ -117,6 +117,14 @@ Menu {
         text: "Suggest Priorities"
         onTriggered: backend.suggestPriorities()
     }
+    // Break the right-clicked task (or project) into steps. It acts on that one
+    // task only, never the selection, and changes nothing until applied.
+    MenuItem {
+        objectName: "suggestSteps"
+        visible: backend.agentEnabled
+        text: "Suggest Steps…"
+        onTriggered: backend.suggestSteps(root.row.taskId)
+    }
     MenuItem { text: root.row.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.row.starred ? 0 : 1) }
     MenuSeparator {}
     Menu {

@@ -3578,6 +3578,57 @@ void Backend::suggestPriorities() {
     m_reviewRequested = true;
 }
 
+// The task a breakdown request describes: its id, title and notes. The
+// existing children travel separately, as titles, so the model does not repeat
+// them; both a checklist's items and a project's sub-tasks count.
+QVariantMap Backend::stepsRequestTask(qint64 taskId) const {
+    const qint64 id = taskId ? taskId : m_cursor;
+    const Task t = m_store->task(id);
+    if (!t.id || t.deleted)
+        return {};
+    return {{QStringLiteral("taskId"), t.id}, {QStringLiteral("title"), t.title}, {QStringLiteral("notes"), t.notes}};
+}
+
+// The durations the user sets, most used first, then smallest; a suggestion
+// that follows the user's habits is more useful than one that guesses.
+QVariantList Backend::typicalDurations() const {
+    QHash<int, int> counts;
+    for (const auto &t : m_store->tasks()) {
+        if (t.deleted || t.duration <= 0)
+            continue;
+        ++counts[t.duration];
+    }
+    QList<int> values = counts.keys();
+    std::sort(values.begin(), values.end(), [&](int a, int b) {
+        if (counts.value(a) != counts.value(b))
+            return counts.value(a) > counts.value(b);
+        return a < b;
+    });
+    QVariantList out;
+    for (int i = 0; i < values.size() && i < 6; ++i)
+        out.append(values.at(i));
+    return out;
+}
+
+QString Backend::durationText(int minutes) const { return Schedule::durationBadge(minutes); }
+
+void Backend::suggestSteps(qint64 taskId) {
+    if (!m_agent || !agentEnabled())
+        return;  // The off-switch: no request, no transport, no network.
+    const QVariantMap task = stepsRequestTask(taskId);
+    if (task.isEmpty()) {
+        setStatus("Select a task first.");
+        return;
+    }
+    const qint64 id = task.value("taskId").toLongLong();
+    QStringList existing;
+    ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
+    for (const auto &c : views.children(id))
+        existing << c.title;
+    m_agent->suggestSteps(task, existing, typicalDurations());
+    m_reviewRequested = true;
+}
+
 void Backend::setAgent(AgentService *agent) {
     m_agent = agent;
     if (!agent)
@@ -3688,6 +3739,8 @@ bool Backend::applyProposal(qint64 id) {
         return applyTriageProposal(found);
     if (found.kind == QLatin1String("priority"))
         return applyPriorityProposal(found);
+    if (found.kind == QLatin1String("step"))
+        return applyStepProposal(found);
     if (found.kind != QLatin1String("set-due-date")) {
         setStatus(QStringLiteral("Cannot apply an unknown suggestion kind: %1").arg(found.kind));
         Diagnostics::note(QStringLiteral("Agent: refused unknown proposal kind \"%1\"").arg(found.kind));
@@ -3787,6 +3840,40 @@ bool Backend::applyPriorityProposal(const Proposal &proposal) {
     m_store->commit();
     setStatus(QString("Applied priority to \u201c%1\u201d").arg(m_store->task(taskId).title));
     emit announce(QString("Applied: %1").arg(m_store->task(taskId).title));
+    return true;
+}
+
+// A step becomes a real child of the task being broken down. The parent's own
+// type decides the child type: a checklist gets checklist items, everything
+// else gets sub-tasks, matching how the editor adds children by hand. The
+// child is added through the ordinary addSubtask path and the duration, when
+// the model gave one, is set the same way a duration chip does. The proposal
+// is removed only after the child exists, so a refusal changes nothing.
+bool Backend::applyStepProposal(const Proposal &proposal) {
+    const qint64 taskId = proposal.payload.value("taskId").toLongLong();
+    if (!taskId || !m_store->tasks().contains(taskId) || m_store->task(taskId).deleted) {
+        setStatus("That task is no longer there.");
+        return false;
+    }
+    const QString title = proposal.payload.value("title").toString().trimmed();
+    if (title.isEmpty()) {
+        setStatus("That step has no title.");
+        return false;
+    }
+    const qint64 child = addSubtask(taskId, title);
+    if (!child) {
+        setStatus("That step could not be added.");
+        return false;
+    }
+    const int duration = proposal.payload.value("duration").toInt();
+    if (duration > 0)
+        setDuration(child, duration);
+    m_store->begin("Apply Suggestion", false);
+    m_store->removeProposal(proposal.id);
+    m_store->commit();
+    setStatus(QString("Added \u201c%1\u201d to \u201c%2\u201d").arg(title, m_store->task(taskId).title));
+    emit announce(QString("Added: %1").arg(title));
+    emit dataChanged();
     return true;
 }
 

@@ -47,6 +47,14 @@ const char *PrioritySchema = R"({
   ]
 })";
 
+// The schema a project breakdown answers with: one "steps" array, each step a
+// title and, when the user has a habit for it, a duration in minutes.
+const char *StepsSchema = R"({
+  "steps": [
+    {"title": "Draft the outline", "duration": 30}
+  ]
+})";
+
 // The Fairfax query grammar, shipped to the model so it compiles into the real
 // language rather than inventing one. The keyword set mirrors src/query.cpp;
 // the value lists name the presets the type: filter understands.
@@ -165,6 +173,17 @@ QString AgentService::prioritySystemPrompt() {
         .arg(QString::fromUtf8(PrioritySchema));
 }
 
+QString AgentService::stepsSystemPrompt() {
+    return QStringLiteral(
+        "You break a task or project down into the concrete steps it takes. Answer with one JSON "
+        "object and nothing else, matching this schema:\n%1\n"
+        "Each step has a \"title\" and, when a sensible estimate is possible, a \"duration\" in minutes. "
+        "The request lists the task's title and notes, its existing checklist items or sub-tasks so "
+        "you do not repeat them, and the durations this user tends to use, so a duration can follow "
+        "their habits. Keep the steps in the order they should be done and do not explain the JSON.")
+        .arg(QString::fromUtf8(StepsSchema));
+}
+
 QString AgentService::querySystemPrompt() {
     return QStringLiteral(
         "You translate a plain-English question about a task list into a Fairfax search query. "
@@ -245,6 +264,30 @@ QByteArray AgentService::buildPriorityRequest(const QVariantList &tasks) const {
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
 
+QByteArray AgentService::buildStepsRequest(const QVariantMap &task, const QStringList &existingChildren, const QVariantList &durations) const {
+    QJsonObject taskObject{{QStringLiteral("taskId"), task.value("taskId").toLongLong()},
+                           {QStringLiteral("title"), task.value("title").toString()},
+                           {QStringLiteral("notes"), task.value("notes").toString()}};
+    QJsonArray children;
+    for (const QString &title : existingChildren)
+        children.append(title);
+    QJsonArray durationArray;
+    for (const QVariant &value : durations)
+        durationArray.append(value.toInt());
+    QJsonObject user;
+    user.insert("task", taskObject);
+    user.insert("existingChildren", children);
+    user.insert("durations", durationArray);
+    const QString prompt = QString::fromUtf8(QJsonDocument(user).toJson(QJsonDocument::Compact));
+    QJsonObject system{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), stepsSystemPrompt()}};
+    QJsonObject message{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), prompt}};
+    QJsonObject root;
+    root.insert("model", model());
+    root.insert("messages", QJsonArray{system, message});
+    root.insert("stream", false);
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
 QByteArray AgentService::firstJsonObject(const QByteArray &text) {
     int start = text.indexOf('{');
     while (start >= 0) {
@@ -312,6 +355,18 @@ void AgentService::suggestPriorities(const QVariantList &tasks) {
     if (!enabled() || tasks.isEmpty())
         return;
     send(buildPriorityRequest(tasks), QStringLiteral("Suggest priorities for %1 task(s)").arg(tasks.size()), Mode::Priorities);
+}
+
+void AgentService::suggestSteps(const QVariantMap &task, const QStringList &existingChildren, const QVariantList &durations) {
+    // The same guard: no breakdown, no transport, no network while off.
+    if (!enabled())
+        return;
+    const qint64 taskId = task.value("taskId").toLongLong();
+    if (!taskId)
+        return;
+    m_stepsTaskId = taskId;
+    send(buildStepsRequest(task, existingChildren, durations),
+         QStringLiteral("Break down \u201c%1\u201d").arg(task.value("title").toString()), Mode::Steps);
 }
 
 void AgentService::send(const QByteArray &body, const QString &message, Mode mode) {
@@ -385,6 +440,12 @@ void AgentService::finish(int status, const QByteArray &body, const QString &err
         const int count = ingestPriorities(body);
         if (count < 0)
             m_lastError = m_lastError.isEmpty() ? QStringLiteral("The model's answer held no priorities.") : m_lastError;
+        else
+            m_lastError.clear();
+    } else if (m_mode == Mode::Steps) {
+        const int count = ingestSteps(body, m_stepsTaskId);
+        if (count < 0)
+            m_lastError = m_lastError.isEmpty() ? QStringLiteral("The model's answer held no steps.") : m_lastError;
         else
             m_lastError.clear();
     } else {
@@ -569,6 +630,34 @@ int AgentService::ingestPriorities(const QByteArray &body) {
         p.kind = QStringLiteral("priority");
         p.payload = {{QStringLiteral("taskId"), taskId},
                      {QStringLiteral("priority"), qBound(0, item.value("priority").toVariant().toInt(), 3)}};
+        proposals.append(p);
+    }
+    return storeProposals(proposals);
+}
+
+int AgentService::ingestSteps(const QByteArray &body, qint64 taskId) {
+    const QJsonObject root = answerRoot(body);
+    if (root.isEmpty() || !root.contains("steps")) {
+        m_lastError = QStringLiteral("The model's answer held no steps.");
+        Diagnostics::note(QStringLiteral("Agent: ") + m_lastError);
+        return -1;
+    }
+    QList<Proposal> proposals;
+    for (const QJsonValue &value : root.value("steps").toArray()) {
+        const QJsonObject item = value.toObject();
+        const QString title = item.value("title").toString().trimmed();
+        if (title.isEmpty())
+            continue;
+        Proposal p;
+        p.kind = QStringLiteral("step");
+        p.payload = {{QStringLiteral("taskId"), taskId}, {QStringLiteral("title"), title}};
+        // A duration is optional: a step with none is perfectly valid and
+        // simply becomes a child with no duration.
+        if (item.value("duration").isDouble() || item.value("duration").isString()) {
+            const int minutes = item.value("duration").toVariant().toInt();
+            if (minutes > 0)
+                p.payload.insert(QStringLiteral("duration"), minutes);
+        }
         proposals.append(p);
     }
     return storeProposals(proposals);

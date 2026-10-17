@@ -78,6 +78,13 @@ public:
     // priority included so the model learns the user's habits. One proposal of
     // kind "priority" per task. Nothing is sent while disabled.
     Q_INVOKABLE void suggestPriorities(const QVariantList &tasks);
+    // Break down a project (or any task): proposes steps with durations.
+    // `task` is a {taskId, title, notes} map, `existingChildren` the titles of
+    // its current checklist items or sub-tasks (so they are not repeated) and
+    // `durations` the user's typical duration values in minutes. One proposal
+    // of kind "step" per step; each becomes a child of `taskId` when applied.
+    // Nothing is sent while disabled.
+    Q_INVOKABLE void suggestSteps(const QVariantMap &task, const QStringList &existingChildren, const QVariantList &durations);
     // Abandons the request in flight; a late answer is ignored.
     Q_INVOKABLE void cancel();
     bool busy() const { return m_busy; }
@@ -98,8 +105,10 @@ public:
     // The triage and priority request bodies and system prompts, for tests.
     QByteArray buildTriageRequest(const QVariantList &tasks, const QStringList &listNames, const QStringList &tagNames) const;
     QByteArray buildPriorityRequest(const QVariantList &tasks) const;
+    QByteArray buildStepsRequest(const QVariantMap &task, const QStringList &existingChildren, const QVariantList &durations) const;
     static QString triageSystemPrompt();
     static QString prioritySystemPrompt();
+    static QString stepsSystemPrompt();
     // The query grammar the compile prompt names, as one static string.
     static QString queryGrammar();
     // The chat-completions URL for a configured base URL.
@@ -116,6 +125,10 @@ public:
     // Parses a priority answer into "priority" proposals. Returns the count, or
     // -1 for an unreadable answer.
     int ingestPriorities(const QByteArray &body);
+    // Parses a steps answer into "step" proposals for `taskId`. A step keeps
+    // its title and, when given, its duration; a step with no duration is
+    // allowed. Returns the count, or -1 for an unreadable answer.
+    int ingestSteps(const QByteArray &body, qint64 taskId);
     // The first balanced JSON object in `text`, ignoring prose around it.
     static QByteArray firstJsonObject(const QByteArray &text);
 
@@ -131,7 +144,7 @@ signals:
 
 private:
     // What the request in flight is for: proposals or a query compile.
-    enum class Mode { Proposals, Query, Triage, Priorities };
+    enum class Mode { Proposals, Query, Triage, Priorities, Steps };
 
     void send(const QByteArray &body, const QString &message, Mode mode);
     void finish(int status, const QByteArray &body, const QString &error);
@@ -164,6 +177,8 @@ private:
     // The choices a triage answer is validated against, kept from the request.
     QStringList m_triageLists;
     QStringList m_triageTags;
+    // The task a steps answer breaks down, kept from the request.
+    qint64 m_stepsTaskId = 0;
     QNetworkAccessManager *m_network = nullptr;
     QNetworkReply *m_reply = nullptr;
 };

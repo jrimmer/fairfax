@@ -620,6 +620,17 @@ public:
     Q_INVOKABLE void triageInbox();
     Q_INVOKABLE QVariantList selectedPriorityTasks() const;
     Q_INVOKABLE void suggestPriorities();
+    // Break down a project (or any task): the engine proposes steps with
+    // durations that become checklist items or sub-tasks only when applied.
+    // `taskId` defaults to the selected task. Also does nothing while off.
+    Q_INVOKABLE void suggestSteps(qint64 taskId = 0);
+    // The model's view of one task for the breakdown request: title, notes and
+    // the titles of its existing children, so a step is not repeated.
+    Q_INVOKABLE QVariantMap stepsRequestTask(qint64 taskId) const;
+    // The durations this user tends to set, most common first, as minutes.
+    Q_INVOKABLE QVariantList typicalDurations() const;
+    // "30 m", "1 h" as the duration chips on task rows show a duration.
+    Q_INVOKABLE QString durationText(int minutes) const;
     Q_INVOKABLE void applyCompiledQuery();
     QString compiledQuery() const;
     QString compiledHint() const;
@@ -695,6 +706,7 @@ private:
     // methods, removing the proposal when the change lands.
     bool applyTriageProposal(const Proposal &proposal);
     bool applyPriorityProposal(const Proposal &proposal);
+    bool applyStepProposal(const Proposal &proposal);
     void deleteTree(qint64 id);
     qint64 duplicateTree(const Task &task, qint64 parentId, qint64 listId);
     void collectTree(const Task &task, QVector<Task> &into) const;

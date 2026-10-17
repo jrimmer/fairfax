@@ -48,6 +48,13 @@ Popup {
             const title = task && task.title ? task.title : "task " + payload.taskId
             return "Set priority of “" + title + "” to " + priorityName(payload.priority)
         }
+        if (p.kind === "step") {
+            const task = backend.taskInfo(Number(payload.taskId || 0))
+            const title = task && task.title ? task.title : "task " + payload.taskId
+            const step = payload.title || "?"
+            const duration = payload.duration > 0 ? " — " + backend.durationText(payload.duration) : ""
+            return "Add to “" + title + "”: " + step + duration
+        }
         return p.kind + " " + JSON.stringify(payload)
     }
 

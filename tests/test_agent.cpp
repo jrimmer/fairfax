@@ -15,8 +15,10 @@
 #include "backend.h"
 #include "diagnostics.h"
 #include "model.h"
+#include "schedule.h"
 #include "store.h"
 #include "testregistry.h"
+#include "views.h"
 
 namespace {
 
@@ -134,6 +136,19 @@ QByteArray priorityAnswer(const QList<QPair<qint64, int>> &choices) {
     for (const auto &c : choices)
         rows.append(QJsonObject{{QStringLiteral("taskId"), c.first}, {QStringLiteral("priority"), c.second}});
     return wrappedAnswer(QJsonObject{{QStringLiteral("priorities"), rows}});
+}
+
+// A steps answer for a project breakdown, each pair a title and a duration;
+// a negative duration means the step carries none at all.
+QByteArray stepsAnswer(const QList<QPair<QString, int>> &steps) {
+    QJsonArray rows;
+    for (const auto &step : steps) {
+        QJsonObject row{{QStringLiteral("title"), step.first}};
+        if (step.second >= 0)
+            row.insert(QStringLiteral("duration"), step.second);
+        rows.append(row);
+    }
+    return wrappedAnswer(QJsonObject{{QStringLiteral("steps"), rows}});
 }
 
 }  // namespace
@@ -765,6 +780,182 @@ private slots:
         f.store.putProposal(p);
         f.store.commit();
         QVERIFY(!backend.applyProposal(p.id));
+        QCOMPARE(f.store.proposals().size(), 1);
+    }
+
+    // The breakdown request names the task's title and notes, its existing
+    // children and the durations the user tends to use, with the schema.
+    void stepsRequestCarriesTheTaskChildrenAndDurations() {
+        Fixture f;
+        AgentService agent(&f.store);
+        QVariantMap task{{QStringLiteral("taskId"), f.taskId}, {QStringLiteral("title"), "Buy milk"},
+                         {QStringLiteral("notes"), "semi-skimmed"}};
+        const QJsonObject root = parse(agent.buildStepsRequest(task, {"Fetch the keys", "Drive to the shop"}, {30, 60}));
+        const QJsonArray messages = root.value("messages").toArray();
+        QCOMPARE(messages.size(), 2);
+        const QString system = messages.at(0).toObject().value("content").toString();
+        QVERIFY2(system.contains("steps"), qPrintable(system));
+        QVERIFY2(system.contains("duration"), qPrintable(system));
+        const QJsonObject user = parse(messages.at(1).toObject().value("content").toString().toUtf8());
+        QCOMPARE(user.value("task").toObject().value("title").toString(), QString("Buy milk"));
+        QCOMPARE(user.value("task").toObject().value("notes").toString(), QString("semi-skimmed"));
+        QCOMPARE(user.value("existingChildren").toArray().size(), 2);
+        QCOMPARE(user.value("existingChildren").toArray().first().toString(), QString("Fetch the keys"));
+        QCOMPARE(user.value("durations").toArray().size(), 2);
+        QCOMPARE(user.value("durations").toArray().first().toInt(), 30);
+        QVERIFY(AgentService::stepsSystemPrompt().contains("existing"));
+    }
+
+    // A steps answer becomes one "step" proposal per row, each bound to the
+    // task being broken down; a step with no duration is allowed.
+    void stepsAnswerParsesIntoProposals() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        AgentService agent(&f.store);
+        QCOMPARE(agent.ingestSteps(stepsAnswer({{"Draft the outline", 30}, {"Send it", -1}}), f.taskId), 2);
+        const QVector<Proposal> stored = f.store.proposals();
+        QCOMPARE(stored.size(), 2);
+        QCOMPARE(stored.first().kind, QString("step"));
+        QCOMPARE(stored.first().payload.value("taskId").toLongLong(), f.taskId);
+        QCOMPARE(stored.first().payload.value("title").toString(), QString("Draft the outline"));
+        QCOMPARE(stored.first().payload.value("duration").toInt(), 30);
+        // The step with no duration keeps its title and carries no duration.
+        QCOMPARE(stored.at(1).payload.value("title").toString(), QString("Send it"));
+        QVERIFY(!stored.at(1).payload.contains("duration"));
+
+        // A transport error creates nothing and reports it.
+        QCOMPARE(agent.ingestSteps("{}", f.taskId), -1);
+        QVERIFY(!agent.lastError().isEmpty());
+        QCOMPARE(f.store.proposals().size(), 2);
+    }
+
+    // The request builder and the engine's suggestSteps agree: the canned
+    // answer routes through the real store and lands as proposals.
+    void suggestStepsBuildsFromTheStoreAndStoresProposals() {
+        Fixture f;
+        f.store.setSetting("agent.enabled", true);
+        // A project whose one existing sub-task must not be repeated.
+        f.store.begin("project", false);
+        Task project;
+        project.id = f.store.nextId("tasks");
+        project.listId = f.listId;
+        project.type = TaskType::Project;
+        project.title = "Move house";
+        project.notes = "before winter";
+        project.order = 99;
+        f.store.putTask(project);
+        Task child;
+        child.id = f.store.nextId("tasks");
+        child.listId = f.listId;
+        child.parentId = project.id;
+        child.title = "Book a van";
+        child.order = 1;
+        f.store.putTask(child);
+        // One duration in the habit set.
+        Task timed = f.store.task(f.taskId);
+        timed.duration = 45;
+        f.store.putTask(timed);
+        f.store.commit();
+
+        AgentService agent(&f.store);
+        Backend backend(&f.store);
+        backend.setAgent(&agent);
+        FakeTransport transport;
+        transport.response = stepsAnswer({{"Sort the boxes", 30}, {"Change the address", 15}});
+        agent.setTransport(std::ref(transport));
+        backend.suggestSteps(project.id);
+        QCOMPARE(transport.requests.size(), 1);
+        const QJsonObject root = parse(transport.requests.first());
+        const QJsonObject user = parse(root.value("messages").toArray().at(1).toObject().value("content").toString().toUtf8());
+        QCOMPARE(user.value("task").toObject().value("title").toString(), QString("Move house"));
+        QCOMPARE(user.value("task").toObject().value("notes").toString(), QString("before winter"));
+        QCOMPARE(user.value("existingChildren").toArray().first().toString(), QString("Book a van"));
+        QCOMPARE(user.value("durations").toArray().first().toInt(), 45);
+        transport.deliver();
+        QCOMPARE(f.store.proposals().size(), 2);
+        QCOMPARE(f.store.proposals().first().kind, QString("step"));
+        QCOMPARE(f.store.proposals().first().payload.value("duration").toInt(), 30);
+    }
+
+    // Applying a step adds a real child through addSubtask, with its duration,
+    // and removes the proposal. The children keep the proposal order.
+    void stepProposalAppliesRealChildrenInOrder() {
+        Fixture f;
+        Backend backend(&f.store);
+        f.store.begin("project", false);
+        Task project;
+        project.id = f.store.nextId("tasks");
+        project.listId = f.listId;
+        project.type = TaskType::Project;
+        project.title = "Move house";
+        project.order = 99;
+        f.store.putTask(project);
+        f.store.commit();
+
+        auto add = [&](const QString &title, int duration) {
+            Proposal p;
+            p.kind = "step";
+            p.payload = {{"taskId", project.id}, {"title", title}};
+            if (duration > 0)
+                p.payload.insert("duration", duration);
+            f.store.begin("add proposal", false);
+            p.id = f.store.nextId("proposals");
+            f.store.putProposal(p);
+            f.store.commit();
+            return p.id;
+        };
+        const qint64 first = add("Book a van", 30);
+        const qint64 second = add("Sort the boxes", 0);
+        QVERIFY(backend.applyProposal(first));
+        QVERIFY(backend.applyProposal(second));
+
+        // Two real children, in the order they were applied, the first timed.
+        ViewBuilder views(f.store, QDateTime::currentDateTime(), ScheduleSettings{});
+        const QVector<Task> children = views.children(project.id);
+        QCOMPARE(children.size(), 2);
+        QCOMPARE(children.at(0).title, QString("Book a van"));
+        QCOMPARE(children.at(0).duration, 30);
+        QCOMPARE(children.at(1).title, QString("Sort the boxes"));
+        QCOMPARE(children.at(1).duration, 0);
+        QVERIFY(children.at(0).order < children.at(1).order);
+        QVERIFY(f.store.proposals().isEmpty());
+    }
+
+    // A step under a checklist becomes a checklist item, and for a missing task
+    // the apply is refused without touching anything.
+    void stepProposalMatchesTheParentTypeAndRefusesMissingTasks() {
+        Fixture f;
+        Backend backend(&f.store);
+        // Turn the existing task into a checklist; its children are checklist items.
+        Task checklist = f.store.task(f.taskId);
+        checklist.type = TaskType::Checklist;
+        f.store.begin("checklist", false);
+        f.store.putTask(checklist);
+        f.store.commit();
+
+        Proposal p;
+        p.kind = "step";
+        p.payload = {{"taskId", f.taskId}, {"title", "Item one"}, {"duration", 10}};
+        f.store.begin("add proposal", false);
+        p.id = f.store.nextId("proposals");
+        f.store.putProposal(p);
+        f.store.commit();
+        QVERIFY(backend.applyProposal(p.id));
+        ViewBuilder views(f.store, QDateTime::currentDateTime(), ScheduleSettings{});
+        const QVector<Task> items = views.children(f.taskId);
+        QCOMPARE(items.size(), 1);
+        QCOMPARE(items.first().title, QString("Item one"));
+        QCOMPARE(items.first().duration, 10);
+
+        // A step for a task that is gone is refused; the row stays.
+        Proposal gone;
+        gone.kind = "step";
+        gone.payload = {{"taskId", 9999}, {"title", "Nowhere"}};
+        f.store.begin("add proposal", false);
+        gone.id = f.store.nextId("proposals");
+        f.store.putProposal(gone);
+        f.store.commit();
+        QVERIFY(!backend.applyProposal(gone.id));
         QCOMPARE(f.store.proposals().size(), 1);
     }
 };

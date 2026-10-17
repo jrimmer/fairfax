@@ -127,6 +127,16 @@ Item {
                 }
             }
             IconButton { objectName: "editorKeyboard"; icon: "keyboard"; size: 14; tip: "Shortcuts (?)"; onClicked: shortcutsMenu.popup() }
+            // Break this task into steps: the agent proposes, the review sheet
+            // disposes, and nothing here changes until applied.
+            IconButton {
+                objectName: "editorSuggestSteps"
+                icon: "checklist"
+                size: 14
+                visible: backend.agentEnabled
+                tip: "Suggest Steps…"
+                onClicked: backend.suggestSteps(root.e.id)
+            }
             IconButton { objectName: "editorDelete"; icon: "trash"; size: 14; color: theme.overdue; tip: "Delete"; onClicked: backend.deleteSelection() }
             TextEdit { id: clip; visible: false }
             Menu {
