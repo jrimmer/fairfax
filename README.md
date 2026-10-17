@@ -548,7 +548,8 @@ and `--dry-run` to print the container commands without running them. The
 Ubuntu 22.04 against Qt 6.8.3 and bundle their own Qt, so their checks only
 need the host's X/GL runtime. It needs `podman` or `docker`, and uses
 `FAIRFAX_JOBS` (default 2) for the compiles; `FAIRFAX_LINUXDEPLOY_TAG`
-overrides the pinned linuxdeploy release.
+overrides the pinned linuxdeploy release. See [docs/releasing.md](docs/releasing.md)
+for how a release is cut with `.github/workflows/release.yml`.
 
 `bin/e2e` boots the real window on a temporary database and drives it the way a user does
 (mouse clicks, double-clicks, typing, shortcuts), then checks the store or the screen. Each
