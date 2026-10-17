@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 INSTALL="$ROOT/install.sh"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
