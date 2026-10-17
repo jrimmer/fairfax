@@ -116,6 +116,12 @@ for m in x86_64 aarch64; do
 done
 sign_release "$RELEASE2"
 
+# An x86_64-only release, as the release workflow builds until an ARM build
+# is added by hand.
+RELEASE_X86="$WORK/release-x86"
+mkdir -p "$RELEASE_X86"
+cp "$RELEASE"/fairfax-version.txt* "$RELEASE"/fairfax-x86_64.* "$RELEASE_X86/"
+
 # --- stubs -----------------------------------------------------------------
 
 STUBS="$WORK/stubs"
@@ -457,6 +463,28 @@ assert_contains "$OUT" "already bound" "prints the setup failure message"
 assert_contains "$OUT" "fairfax setup omarchy" "prints the retry command"
 assert_contains "$OUT" "install is done" "says the install counts as done"
 ok "setup failure leaves the install done"
+
+# --- ARM without an ARM build ---------------------------------------------
+
+echo "== aarch64 Arch, release without an aarch64 build =="
+new_home
+export STUB_MACHINE=aarch64 FAIRFAX_RELEASE_URL="file://$RELEASE_X86"
+run --no-setup
+assert_eq "$STATUS" 1 "exits 1 without an aarch64 package"
+assert_contains "$OUT" "no aarch64 build yet" "says the release has no ARM build"
+assert_contains "$OUT" "#from-source" "points at the source build"
+log_lacks "pacman -U" || fail "pacman -U not run without a package"
+ok "aarch64 Arch without an ARM build"
+
+echo "== aarch64 elsewhere, release without an aarch64 build =="
+new_home
+use_no_pacman
+export STUB_MACHINE=aarch64 FAIRFAX_RELEASE_URL="file://$RELEASE_X86"
+run --no-setup
+assert_eq "$STATUS" 1 "exits 1 without an aarch64 AppImage"
+assert_contains "$OUT" "no aarch64 build yet" "says the release has no ARM build"
+assert_no_file "$HOME/.local/bin/fairfax" "nothing installed without an ARM build"
+ok "aarch64 elsewhere without an ARM build"
 
 # --- help ------------------------------------------------------------------
 

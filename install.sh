@@ -71,6 +71,13 @@ fi
 download() {
     local name="$1" dest="$tmp/$1"
     if ! fetch "$RELEASE_URL/$name" "$dest"; then
+        # Releases are built on x86_64; an ARM build is added by hand, so a
+        # release may not have one yet.
+        if [ "$machine" != x86_64 ]; then
+            echo "install.sh: this release has no $machine build yet." >&2
+            echo "Build Fairfax from source instead: https://github.com/jrimmer/fairfax#from-source" >&2
+            exit 1
+        fi
         echo "install.sh: could not download $name from $RELEASE_URL" >&2
         exit 1
     fi
