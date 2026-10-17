@@ -24,7 +24,7 @@ for you after a fresh install (skip it with `--no-setup`). Pass flags through
 ### Other Linux
 
 The [latest release](https://github.com/jrimmer/fairfax/releases/latest) also
-has plain packages for x86_64 and aarch64, each one line to install:
+has plain x86_64 packages, each one line to install:
 
 - `fairfax-x86_64.pkg.tar.zst` — Arch: `sudo pacman -U <file>`.
 - `fairfax-amd64.deb` — Debian 13, Ubuntu 25.04 and later: `sudo apt install ./<file>`.
@@ -32,7 +32,8 @@ has plain packages for x86_64 and aarch64, each one line to install:
 - `fairfax-x86_64.AppImage` — any Linux from about 2022 on: `chmod +x <file> && ./<file>`.
 - `fairfax-linux-x86_64.tar.gz` — the same, unpacked: run `fairfax-linux-x86_64/bin/fairfax`.
 
-The aarch64 files are named the same way (`aarch64`, or `arm64` for the .deb).
+On ARM (aarch64), build from source (below) unless the release lists ARM
+files, named the same way (`aarch64`, or `arm64` for the .deb).
 
 Each asset has a `.sha256` beside it. `FAIRFAX_RELEASE_URL` overrides the
 download base, which is handy for a mirror.
@@ -541,7 +542,8 @@ QT_QPA_PLATFORM=offscreen build/fairfax --demo --selftest    # drive the UI with
 writes them to `dist/`, each with a `.sha256` beside it:
 `fairfax-x86_64.pkg.tar.zst`, `fairfax-amd64.deb`, `fairfax-x86_64.rpm`,
 `fairfax-x86_64.AppImage` and `fairfax-linux-x86_64.tar.gz` (`aarch64`/`arm64`
-on ARM). Name one target to build just that one, add `--check` to install it
+on ARM, where the Arch package is built on the machine itself with `makepkg`,
+since Arch has no ARM container image). Name one target to build just that one, add `--check` to install it
 in containers of the target distros and run `--demo --selftest` against it,
 and `--dry-run` to print the container commands without running them. The
 `.deb` and `.rpm` use the distro's Qt 6; the AppImage and tarball are built on

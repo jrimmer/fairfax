@@ -1,7 +1,9 @@
 name: Release
 
 # This workflow runs only on the public GitHub repository. Linux runners are
-# free there, so the two build jobs can run on every release.
+# free there, so the build can run on every release. It builds x86_64 only;
+# ARM packages are built natively on an ARM machine and added to the release
+# by hand (docs/releasing.md).
 #
 # Never add a schedule or a branch trigger: a release starts from a pushed
 # vX.Y.Z tag or from a manual run that names an existing tag.
@@ -62,17 +64,13 @@ jobs:
           fi
           echo "Releasing Fairfax $version from tag $tag"
 
-  # One runner per architecture. Each builds all five packages one after
-  # another (the AppImage and tarball pull Qt 6.8.3 through aqtinstall and
-  # compile), so the budget is generous and the runner starts with free disk.
+  # Builds all five packages one after another (the AppImage and tarball
+  # pull Qt 6.8.3 through aqtinstall and compile), so the budget is generous
+  # and the runner starts with free disk.
   build:
     needs: check-version
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -94,11 +92,11 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: fairfax-linux-${{ matrix.runs-on == 'ubuntu-24.04-arm' && 'aarch64' || 'x86_64' }}
+          name: fairfax-linux-x86_64
           path: dist/*
           if-no-files-found: error
 
-  # Combine both architectures into one release. The version file, its
+  # Turn the build into a release. The version file, its
   # checksum and install.sh are written here too, and every expected asset is
   # checked before gh ever talks to the API.
   release:
@@ -120,11 +118,6 @@ jobs:
           name: fairfax-linux-x86_64
           path: release
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: fairfax-linux-aarch64
-          path: release
-
       - name: Assemble the release assets
         env:
           VERSION: ${{ needs.check-version.outputs.version }}
@@ -144,15 +137,10 @@ jobs:
           # contract; a missing or drifted name fails here, before uploading.
           expected="
           fairfax-x86_64.pkg.tar.zst
-          fairfax-aarch64.pkg.tar.zst
           fairfax-amd64.deb
-          fairfax-arm64.deb
           fairfax-x86_64.rpm
-          fairfax-aarch64.rpm
           fairfax-x86_64.AppImage
-          fairfax-aarch64.AppImage
           fairfax-linux-x86_64.tar.gz
-          fairfax-linux-aarch64.tar.gz
           fairfax-version.txt
           install.sh
           "
@@ -224,17 +212,13 @@ jobs:
           | Asset | System |
           | --- | --- |
           | fairfax-x86_64.pkg.tar.zst | Arch Linux (x86_64) |
-          | fairfax-aarch64.pkg.tar.zst | Arch Linux (aarch64) |
           | fairfax-amd64.deb | Debian/Ubuntu (amd64) |
-          | fairfax-arm64.deb | Debian/Ubuntu (arm64) |
           | fairfax-x86_64.rpm | Fedora (x86_64) |
-          | fairfax-aarch64.rpm | Fedora (aarch64) |
           | fairfax-x86_64.AppImage | any Linux from about 2022 (x86_64) |
-          | fairfax-aarch64.AppImage | any Linux from about 2022 (aarch64) |
           | fairfax-linux-x86_64.tar.gz | portable tarball (x86_64) |
-          | fairfax-linux-aarch64.tar.gz | portable tarball (aarch64) |
 
           Every asset has a \`.sha256\` beside it, and \`SHA256SUMS\` covers the lot.
+          On ARM, build from source: https://github.com/jrimmer/fairfax#from-source
           EOF
           fi
 
