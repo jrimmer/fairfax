@@ -87,9 +87,6 @@ download() {
 
 machine=$(uname -m)
 
-# Fetches fairfax-version.txt first, so we can say what we're about to do.
-version=$(cat "$(download fairfax-version.txt)")
-
 case "$machine" in
     x86_64|aarch64) ;;
     *) echo "install.sh: unsupported architecture '$machine' (Fairfax ships x86_64 and aarch64)." >&2; exit 1 ;;
@@ -112,26 +109,6 @@ omarchy_wired=false
 # The installed version, or empty for a fresh install.
 installed_dir="$HOME/.local/share/fairfax"
 installed_version_file="$installed_dir/installed-version"
-have=""
-if $arch_pacman; then
-    if pacman_q=$(pacman -Q fairfax 2>/dev/null); then
-        have=$(printf '%s\n' "$pacman_q" | awk '{print $2}')
-        have=${have%-*}
-    fi
-elif [ -f "$installed_version_file" ]; then
-    have=$(cat "$installed_version_file")
-fi
-
-if [ "$have" = "$version" ]; then
-    echo "Fairfax $version is already installed."
-    exit 0
-fi
-
-if [ -z "$have" ]; then
-    echo "Installing Fairfax $version…"
-else
-    echo "Updating Fairfax $have → $version…"
-fi
 
 # --- uninstall ------------------------------------------------------------
 
@@ -152,15 +129,53 @@ uninstall_appimage() {
           "$HOME/.local/share/applications/fairfax.desktop" \
           "$HOME/.local/share/icons/hicolor/scalable/apps/fairfax.svg" \
           "$installed_version_file"
+    rmdir "$installed_dir" 2>/dev/null || true
     echo "Fairfax is uninstalled."
 }
 
+# Pick the removal that matches how Fairfax actually got here: an AppImage
+# install writes installed-version, a pacman install does not. Fall back to
+# whether pacman knows the package, then to the platform default.
 if $uninstall; then
-    if $arch_pacman; then uninstall_arch; else uninstall_appimage; fi
+    if [ -f "$installed_version_file" ]; then
+        uninstall_appimage
+    elif $arch_pacman || { command -v pacman >/dev/null 2>&1 && pacman -Q fairfax >/dev/null 2>&1; }; then
+        uninstall_arch
+    else
+        uninstall_appimage
+    fi
     exit 0
 fi
 
 # --- install --------------------------------------------------------------
+
+# Fetch fairfax-version.txt first, so we can say what we're about to do. Keep
+# the path in a variable: `exit 1` inside a command substitution only leaves
+# the subshell, and we want the failure to stop the whole script.
+version_file=$(download fairfax-version.txt)
+version=$(cat "$version_file")
+
+have=""
+if $arch_pacman; then
+    if pacman_q=$(pacman -Q fairfax 2>/dev/null); then
+        have=$(printf '%s\n' "$pacman_q" | awk '{print $2}')
+        have=${have%-*}
+    fi
+elif [ -f "$installed_version_file" ]; then
+    have=$(cat "$installed_version_file")
+fi
+
+if [ "$have" = "$version" ]; then
+    echo "Fairfax $version is already installed."
+    echo "Uninstall it with: curl -fsSL …/install.sh | bash -s -- --uninstall"
+    exit 0
+fi
+
+if [ -z "$have" ]; then
+    echo "Installing Fairfax $version…"
+else
+    echo "Updating Fairfax $have → $version…"
+fi
 
 install_arch() {
     local file="fairfax-$version-1-$machine.pkg.tar.zst"
@@ -192,8 +207,14 @@ install_appimage() {
     install -m755 "$appimage" "$bindir/fairfax"
     ln -sf fairfax "$bindir/frfx"
 
-    # Point the launcher at the AppImage we just installed.
-    sed "s|^Exec=.*|Exec=$bindir/fairfax %u|" "$desktop" >"$appdir/fairfax.desktop"
+    # Point the launcher at the AppImage we just installed. Only the main
+    # [Desktop Entry] Exec changes; the [Desktop Action ...] entries keep
+    # their own commands (Quick Entry, Today, Find, New Window).
+    awk -v exec="Exec=$bindir/fairfax %u" '
+        /^\[/ { section = $0 }
+        section == "[Desktop Entry]" && /^Exec=/ { print exec; next }
+        { print }
+    ' "$desktop" >"$appdir/fairfax.desktop"
     icon=$(find "$squash/usr/share/icons" -name fairfax.svg -print -quit 2>/dev/null || true)
     if [ -n "$icon" ]; then
         install -m644 "$icon" "$icondir/fairfax.svg"

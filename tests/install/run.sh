@@ -73,6 +73,15 @@ Name=Fairfax
 Exec=fairfax %u
 Icon=fairfax
 Terminal=false
+Actions=new-task;new-window;
+
+[Desktop Action new-task]
+Name=New Task
+Exec=fairfax --quick
+
+[Desktop Action new-window]
+Name=New Window
+Exec=fairfax --new-window
 DESKTOP
     printf '<svg/>' >squashfs-root/usr/share/icons/hicolor/scalable/apps/fairfax.svg
     exit 0
@@ -171,7 +180,7 @@ TEST_PATH_ARCH="$STUBS:$PATH"
 REALBIN="$WORK/realbin"
 mkdir -p "$REALBIN"
 for tool in bash env curl sha256sum mktemp sed grep find awk install \
-            mkdir ln chmod cat rm dirname pwd sleep cmp touch; do
+            mkdir ln chmod cat rm dirname pwd sleep cmp touch cp mv readlink rmdir; do
     real=$(command -v "$tool" 2>/dev/null) || continue
     ln -s "$real" "$REALBIN/$tool"
 done
@@ -286,6 +295,19 @@ log_lacks "pacman -U" || fail "no install after a checksum mismatch"
 mv "$WORK/pkg.bak" "$RELEASE/fairfax-$VERSION-1-x86_64.pkg.tar.zst"
 ok "checksum mismatch aborts"
 
+# The AppImage path is verified too: corrupt only that asset.
+echo "== checksum mismatch (AppImage) =="
+new_home
+use_no_pacman
+cp "$RELEASE/fairfax-$VERSION-x86_64.AppImage" "$WORK/appimage.bak"
+printf 'tampered' >>"$RELEASE/fairfax-$VERSION-x86_64.AppImage"
+run
+assert_eq "$STATUS" 1 "AppImage checksum mismatch exits non-zero"
+assert_contains "$OUT" "checksum mismatch" "names the AppImage mismatch"
+assert_no_file "$HOME/.local/bin/fairfax" "no AppImage installed after a mismatch"
+mv "$WORK/appimage.bak" "$RELEASE/fairfax-$VERSION-x86_64.AppImage"
+ok "AppImage checksum mismatch aborts"
+
 # --- unsupported arch ------------------------------------------------------
 
 echo "== unsupported architecture =="
@@ -309,11 +331,15 @@ run
 assert_eq "$STATUS" 0 "AppImage install exits 0"
 assert_file "$BINDIR/fairfax" "appimage installed to ~/.local/bin"
 assert_file "$BINDIR/frfx" "frfx symlink made"
+assert_eq "$(readlink "$BINDIR/frfx")" "fairfax" "frfx points at fairfax"
 assert_file "$APP_DIR/fairfax.desktop" "desktop entry installed"
 assert_file "$ICON_DIR/fairfax.svg" "icon installed"
 assert_file "$HOME/.local/share/fairfax/installed-version" "installed-version written"
 assert_eq "$(cat "$HOME/.local/share/fairfax/installed-version")" "$VERSION" "installed-version content"
 assert_contains "$(cat "$APP_DIR/fairfax.desktop")" "Exec=$BINDIR/fairfax %u" "desktop Exec points at the AppImage"
+assert_not_contains "$(cat "$APP_DIR/fairfax.desktop")" "[Desktop Action new-task]
+Name=New Task
+Exec=$BINDIR/fairfax %u" "desktop action keeps its own command"
 log_lacks "sudo" || fail "no root used for the AppImage install"
 assert_contains "$OUT" "not on your PATH" "warns when ~/.local/bin is off PATH"
 ok "AppImage install"
@@ -328,6 +354,17 @@ assert_file "$HOME/.local/bin/fairfax" "--appimage installs the AppImage"
 log_lacks "pacman -U" || fail "--appimage must not call pacman"
 log_lacks "sudo" || fail "--appimage must not use root"
 ok "--appimage on Arch"
+
+# An AppImage install recorded on Arch uninstalls as an AppImage, without root.
+echo "== --appimage on Arch then plain --uninstall =="
+new_home
+run --appimage
+assert_eq "$STATUS" 0 "--appimage install on Arch exits 0"
+run --uninstall
+assert_eq "$STATUS" 0 "plain uninstall after --appimage exits 0"
+assert_no_file "$HOME/.local/bin/fairfax" "AppImage removed on Arch uninstall"
+log_lacks "sudo" || fail "no root when uninstalling the AppImage on Arch"
+ok "--appimage install on Arch uninstalls without root"
 
 # --- AppImage update and up-to-date ---------------------------------------
 
@@ -383,8 +420,31 @@ assert_no_file "$HOME/.local/bin/frfx" "frfx removed"
 assert_no_file "$HOME/.local/share/applications/fairfax.desktop" "desktop entry removed"
 assert_no_file "$HOME/.local/share/icons/hicolor/scalable/apps/fairfax.svg" "icon removed"
 assert_no_file "$HOME/.local/share/fairfax/installed-version" "installed-version removed"
+assert_no_file "$HOME/.local/share/fairfax" "installed-version directory removed"
 log_lacks "sudo" || fail "no root used to uninstall the AppImage"
 ok "AppImage uninstall"
+
+# The version matches the release: --uninstall still has work to do.
+echo "== uninstall when the installed version is current =="
+new_home
+use_no_pacman
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/fairfax"
+touch "$HOME/.local/bin/fairfax"
+printf '%s\n' "$VERSION" >"$HOME/.local/share/fairfax/installed-version"
+run --uninstall
+assert_eq "$STATUS" 0 "up-to-date AppImage uninstall exits 0"
+assert_not_contains "$OUT" "already installed" "uninstall does not report up to date"
+assert_no_file "$HOME/.local/bin/fairfax" "current AppImage still removed"
+ok "AppImage uninstall when up to date"
+
+new_home
+export PACMAN_INSTALLED=yes PACMAN_VERSION="$VERSION"
+wire_hyprland
+run --uninstall
+assert_eq "$STATUS" 0 "up-to-date Arch uninstall exits 0"
+assert_not_contains "$OUT" "already installed" "Arch uninstall does not report up to date"
+log_has "sudo pacman -R fairfax" || fail "pacman -R called for a current Arch install"
+ok "Arch uninstall when up to date"
 
 # --- setup failure ---------------------------------------------------------
 
