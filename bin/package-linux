@@ -505,6 +505,21 @@ for p in imageformats/libqsvg.so sqldrivers/libqsqlite.so; do
 done
 if [ -n "$qtplugins" ]; then export EXTRA_QT_PLUGINS="$qtplugins"; fi
 export QML_SOURCES_PATHS="/work/src/qml"
+# main.cpp sets QQuickStyle Material at runtime, which the QML import scan
+# cannot see; name it for linuxdeploy-plugin-qt.
+export QT_QUICK_CONTROLS_STYLE=Material
+
+# ensure_controls_style: if linuxdeploy kept the Controls module but not the
+# Material style, copy that style from the Qt install into the deployed tree,
+# so the window does not silently fall back to Basic.
+ensure_controls_style() {
+    controls=$(find /work/AppDir -type d -name Controls -path '*QtQuick*' | head -n1)
+    if [ -n "$controls" ] && [ ! -d "$controls/Material" ] \
+        && [ -d "$QTPREFIX/qml/QtQuick/Controls/Material" ]; then
+        cp -a "$QTPREFIX/qml/QtQuick/Controls/Material" "$controls/"
+        echo "deployed the Material controls style into $controls"
+    fi
+}
 SCRIPT
 }
 
@@ -528,6 +543,7 @@ install -Dm644 /work/pkgbuild/fairfax.desktop \
     /work/AppDir/usr/share/applications/fairfax.desktop
 install -Dm644 /work/pkgbuild/fairfax.svg \
     /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+ensure_controls_style
 appimage=$(find /work -maxdepth 1 -type f -name '*.AppImage' | head -n1)
 test -n "$appimage"
 cp "$appimage" "/dist/fairfax-$ARCH_NAME.AppImage"
@@ -555,13 +571,14 @@ install -Dm644 /work/pkgbuild/fairfax.desktop \
     /work/AppDir/usr/share/applications/fairfax.desktop
 install -Dm644 /work/pkgbuild/fairfax.svg \
     /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+ensure_controls_style
 name="fairfax-linux-$ARCH_NAME"
 rm -rf "/work/$name"
 mkdir -p "/work/$name/bin" "/work/$name/lib/fairfax" "/work/$name/lib/scripts" "/work/$name/share"
 install -Dm755 /work/AppDir/usr/bin/fairfax "/work/$name/lib/fairfax/fairfax"
 # linuxdeploy's rpath pointed at usr/lib relative to usr/bin; the real binary
 # now lives under lib/fairfax, so point it at the lib/ directory above it.
-patchelf --set-rpath '$ORIGIN/..' "/work/$name/lib/fairfax/fairfax"
+patchelf --set-rpath "\$ORIGIN/.." "/work/$name/lib/fairfax/fairfax"
 cp -a /work/AppDir/usr/lib/. "/work/$name/lib/"
 # linuxdeploy-plugin-qt puts the platform and image-format plugins under
 # usr/plugins and the QML modules under usr/qml (older builds used
