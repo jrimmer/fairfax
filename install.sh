@@ -167,7 +167,6 @@ fi
 
 if [ "$have" = "$version" ]; then
     echo "Fairfax $version is already installed."
-    echo "Uninstall it with: curl -fsSL …/install.sh | bash -s -- --uninstall"
     exit 0
 fi
 

@@ -468,6 +468,9 @@ run --help
 assert_eq "$STATUS" 0 "--help exits 0"
 assert_contains "$OUT" "Fairfax one-line installer" "help prints the usage block"
 assert_contains "$OUT" "--no-setup" "help lists --no-setup"
+# --help must match the readable header comment, so the two can't drift.
+header=$(sed -n '2,/^[^#]/p' "$INSTALL" | sed '/^[^#]/d' | sed 's/^# \{0,1\}//' | sed '/^$/d')
+assert_eq "$(printf '%s\n' "$OUT" | sed '/^$/d')" "$header" "help matches the header comment"
 ok "--help"
 
 # The README pipes the script into bash; --help must work in that form too,
