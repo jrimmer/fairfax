@@ -432,6 +432,12 @@ rm -rf AppDir
 scripts/stage-install AppDir /usr
 test -f AppDir/usr/share/applications/fairfax.desktop
 test -f AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+# The app finds the Omarchy setup script in /usr/lib/fairfax (the packaged
+# path) or beside the binary's parent, ../scripts. Only the former exists in
+# the AppDir, so give it the relative location too, which is where an
+# AppImage's applicationDirPath resolves once extracted.
+mkdir -p AppDir/usr/scripts
+cp -a AppDir/usr/lib/fairfax/fairfax-omarchy-setup AppDir/usr/scripts/
 
 # linuxdeploy and its Qt and AppImage plugins. The download uses the pinned
 # dated release first (reproducible) and falls back to the moving continuous
