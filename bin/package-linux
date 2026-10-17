@@ -722,9 +722,13 @@ SCRIPT
 }
 
 # The AppImage and tarball bundle their own Qt, so the check only installs the
-# host's minimal X/GL runtime. The list is exactly those five libraries:
+# host's minimal X/GL runtime:
 #
 #   libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+#
+# plus libcom-err2 and libgpg-error0, which linuxdeploy leaves out on purpose
+# (they are on the AppImage excludelist, present on any desktop install) but
+# which a bare container lacks.
 #
 # offscreen makes the selftest independent of a display. The bundled Qt
 # version is read off the deployed libQt6Core file name, so the check prints
@@ -735,20 +739,22 @@ set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update >/dev/null
 apt-get install -y --no-install-recommends \\
-    libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 >/dev/null
+    libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \\
+    libcom-err2 libgpg-error0 >/dev/null
 # Copy out of the read-only mount so we own the file and its mode.
 cp "/dist/fairfax-$ARCH_NAME.AppImage" "/tmp/fairfax-$ARCH_NAME.AppImage"
 chmod +x "/tmp/fairfax-$ARCH_NAME.AppImage"
 cd /tmp
-# linuxdeploy keeps the full version in the library file name; read it, then
-# run the AppImage the normal extract-and-run way (no FUSE in the container).
+# Run the AppImage the normal extract-and-run way (no FUSE in the container).
 ./"fairfax-$ARCH_NAME.AppImage" --appimage-extract >/dev/null 2>&1
 # install.sh depends on these two paths being in the extracted AppImage, and
 # the AppImage has to carry the Wayland client plugin the bundle promises.
 test -f squashfs-root/usr/share/applications/fairfax.desktop
 test -f squashfs-root/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 find squashfs-root -name 'libqwayland*.so' | grep -q .
-qt=\$(find squashfs-root/usr/lib -maxdepth 1 -name 'libQt6Core.so.6.*' | head -n1 | sed 's/.*libQt6Core\.so\.//')
+# linuxdeploy copies libQt6Core under its soname only, so read the version
+# string the library carries.
+qt=\$(grep -aoE 'QtCore library version Qt [0-9.]+' squashfs-root/usr/lib/libQt6Core.so.6 | head -n1 | sed 's/.* Qt //')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
     ./"fairfax-$ARCH_NAME.AppImage" --appimage-extract-and-run --demo --selftest >/tmp/selftest.log 2>&1 || {
@@ -766,7 +772,8 @@ set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update >/dev/null
 apt-get install -y --no-install-recommends \\
-    libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 >/dev/null
+    libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \\
+    libcom-err2 libgpg-error0 >/dev/null
 name="fairfax-linux-$ARCH_NAME"
 mkdir -p /tmp/untar
 rm -rf "/tmp/untar/\$name"
@@ -778,7 +785,7 @@ test -f share/icons/hicolor/scalable/apps/fairfax.svg
 # The portable tree has to carry the Wayland client plugin, same as the
 # AppImage, or the bundle is not the Wayland-capable build it claims.
 find lib -name 'libqwayland*.so' | grep -q .
-qt=\$(find lib -maxdepth 1 -name 'libQt6Core.so.6.*' | head -n1 | sed 's/.*libQt6Core\.so\.//')
+qt=\$(grep -aoE 'QtCore library version Qt [0-9.]+' lib/libQt6Core.so.6 | head -n1 | sed 's/.* Qt //')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
     ./bin/fairfax --demo --selftest >/tmp/selftest.log 2>&1 || {
