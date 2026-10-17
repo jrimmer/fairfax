@@ -412,7 +412,7 @@ apt-get install -y --no-install-recommends \
 pip3 install --no-cache-dir aqtinstall >/dev/null
 aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
 for module in qtdeclarative qtquickcontrols2 qtsvg qtimageformats qtwaylandcompositor; do
-    if ! aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -m "$module" -O /opt/Qt 2>/dev/null; then
+    if ! aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" "$module" -O /opt/Qt 2>/dev/null; then
         echo "aqtinstall: module $module is not available, skipping" >&2
     fi
 done
