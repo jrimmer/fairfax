@@ -11,6 +11,33 @@ database, synced between machines through a git repository you choose.
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+```
+
+One line: it downloads the latest release, verifies every file against its
+published `.sha256`, and installs it. On Arch it uses the pacman package and
+asks for `sudo` only for `pacman -U`; everywhere else it installs the AppImage
+under `~/.local`, no root needed. On Omarchy it runs `fairfax setup omarchy`
+for you after a fresh install (skip it with `--no-setup`). Pass flags through
+`bash -s`, as in `… | bash -s -- --no-setup`.
+
+### Other Linux
+
+The [latest release](https://github.com/jrimmer/fairfax/releases/latest) also
+has plain packages, each one line to install:
+
+- `fairfax-<version>-1-x86_64.pkg.tar.zst` / `…-aarch64.pkg.tar.zst` — Arch: `sudo pacman -U <file>`.
+- `fairfax_<version>_amd64.deb` — Debian/Ubuntu: `sudo apt install ./<file>`.
+- `fairfax-<version>-1.x86_64.rpm` — Fedora/openSUSE: `sudo rpm -i <file>`.
+- `fairfax-<version>-x86_64.AppImage` / `…-aarch64.AppImage` — any Linux: `chmod +x <file> && ./<file>`.
+- `fairfax-<version>-linux-x86_64.tar.gz` — a relocatable tarball: unpack and run `./fairfax`.
+
+Each asset has a `.sha256` beside it. `FAIRFAX_RELEASE_URL` overrides the
+download base, which is handy for a mirror.
+
+### From source
+
+```sh
 bin/install        # builds, then makepkg -fsi; Fairfax appears in the launcher (Super+Space)
 ```
 
@@ -31,6 +58,10 @@ After installing, wire Fairfax into Omarchy with one command (undo with `--remov
 ```sh
 fairfax setup omarchy
 ```
+
+The install one-liner above already runs this for you on a fresh install
+(`--no-setup` skips it), so you only need it by hand after an update, or to
+pick a different Quick Entry key.
 
 It adds, each in a clearly marked place:
 
