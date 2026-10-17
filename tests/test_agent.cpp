@@ -640,6 +640,7 @@ private slots:
         tasks.append(QVariantMap{{"taskId", f.taskId}, {"title", "Buy milk"}, {"notes", ""}});
         agent.triageInbox(tasks, {"Home"}, {"garden"});
         agent.suggestPriorities(tasks);
+        agent.suggestSteps(QVariantMap{{"taskId", f.taskId}, {"title", "Buy milk"}, {"notes", ""}}, {}, {30});
         QCOMPARE(transport.requests.size(), 0);
         QVERIFY(f.store.proposals().isEmpty());
     }
