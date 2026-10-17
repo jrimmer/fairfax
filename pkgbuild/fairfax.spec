@@ -20,11 +20,11 @@ URL:            https://github.com/jrimmer/fairfax
 # rpmbuild adds the ELF Requires (libQt6Core.so.6()(64bit) and friends)
 # automatically. These are the QML modules, the Qt platform and Wayland
 # plugins, and the runtime tools it cannot see: QtQuick, Layouts and Shapes
-# live in qt6-qtdeclarative, Controls in qt6-qtquickcontrols2, the Wayland and
-# offscreen platform plugins in qt6-qtwayland and qt6-qtbase (whose GUI and
-# SQLite-driver pieces the ELF Requires pull in), and the SQL driver does not
-# need naming separately. git, python3 and the portal are explicit.
+# live in qt6-qtdeclarative, Controls in qt6-qtquickcontrols2, the Wayland
+# platform plugin in qt6-qtwayland, the offscreen plugin in qt6-qtbase-gui,
+# and the SQLite SQL driver inside qt6-qtbase.
 Requires:       qt6-qtbase
+Requires:       qt6-qtbase-gui
 Requires:       qt6-qtdeclarative
 Requires:       qt6-qtquickcontrols2
 Requires:       qt6-qtwayland
