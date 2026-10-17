@@ -395,34 +395,28 @@ apt-get install -y --no-install-recommends \
 
 # Qt 6.8.3 from aqtinstall, the Qt the app's accessibility guards target.
 # aqt names the arch linux_gcc_64 on x86_64 and linux_gcc_arm64 on aarch64.
-# The default desktop install carries qtbase, qtdeclarative (QtQuick, QtQml,
-# Layouts, Shapes, Templates, Window), the Controls styles and the SVG and
-# image-format plugins. Wayland client support is a separate module, added
-# on top; aqt has called it qtwaylandcompositor, with qtwayland as an older
-# alias, so try both and verify the platform plugin afterwards.
+# qtbase is the base archive; the app's imports and needs are the modules
+# qtdeclarative (QtQuick, QtQml, Layouts, Shapes, Templates, Window),
+# qtquickcontrols2 (Controls, Basic, Material), qtsvg (the About box shows
+# qrc:/icon.svg), qtimageformats (QuickLook's pictures) and
+# qtwaylandcompositor (the Wayland client platform plugin).
 pip3 install --no-cache-dir aqtinstall >/dev/null
-aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
-if ! find /opt/Qt -path '*/plugins/platforms/libqwayland*.so' | grep -q .; then
-    for module in qtwaylandcompositor qtwayland; do
-        if aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" "$module" -O /opt/Qt 2>/dev/null; then
-            break
-        fi
-    done
-fi
-
-# The modules the app imports have to be there, or the build or the selftest
-# fails obscurely; say so here.
-for needed in QtQuick QtQuick/Controls QtQuick/Layouts QtQuick/Shapes; do
-    test -d "/opt/Qt/6.8.3/gcc_64/qml/$needed" || \
-        test -d "/opt/Qt/6.8.3/gcc_arm64/qml/$needed" || {
-        echo "aqtinstall: the Qt 6.8.3 install has no $needed QML module" >&2
-        exit 1
-    }
-done
+aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt \
+    -m qtdeclarative qtquickcontrols2 qtsvg qtimageformats qtwaylandcompositor
 
 qmake=$(find /opt/Qt -path '*/bin/qmake' -type f | head -n1)
 test -n "$qmake"
 QTBIN=$(dirname "$qmake")
+QTPREFIX=$(dirname "$QTBIN")
+# The modules the app imports have to be there, or the build or the selftest
+# fails obscurely; say so here.
+for needed in QtQuick QtQuick/Controls QtQuick/Layouts QtQuick/Shapes; do
+    if [ ! -d "$QTPREFIX/qml/$needed" ]; then
+        echo "aqtinstall: the Qt 6.8.3 install has no $needed QML module" >&2
+        exit 1
+    fi
+done
+
 # bin/build honours QMAKE; linuxdeploy-plugin-qt reads it from PATH.
 export QMAKE="$qmake"
 export PATH="$QTBIN:$PATH"
