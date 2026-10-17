@@ -5,10 +5,14 @@
 #   bin/package-linux --check TARGET...                install and self-test them
 #   bin/package-linux --dry-run all                    print the container commands
 #
-# TARGET is arch, deb, rpm or all. `all` builds every package and then checks
-# each in a fresh container of its distro; a plain target only builds, and
-# --check only checks (assumes dist/ already holds the file). Slice 2 adds the
-# AppImage and the tarball; the switch below is where they will go.
+# TARGET is arch, deb, rpm, appimage, tar or all. `all` builds every package
+# and then checks each in a fresh container of its distro; a plain target only
+# builds, and --check only checks (assumes dist/ already holds the file).
+#
+# The .deb and .rpm are built against the distro's Qt 6, the AppImage and the
+# tarball against Qt 6.8.3 from aqtinstall on Ubuntu 22.04 (for a glibc
+# reachable from about 2022 on); the two bundle their own Qt and are checked
+# on Ubuntu 24.04 and Debian trixie with only the host's X/GL runtime.
 #
 # The output names in dist/ are the contract the release workflow and
 # install.sh rely on:
@@ -16,6 +20,8 @@
 #   fairfax-<arch>.pkg.tar.zst   arch: x86_64, aarch64
 #   fairfax-<arch>.deb           arch: amd64, arm64
 #   fairfax-<arch>.rpm           arch: x86_64, aarch64
+#   fairfax-<arch>.AppImage      arch: x86_64, aarch64
+#   fairfax-linux-<arch>.tar.gz  arch: x86_64, aarch64
 #
 # Each package gets a sibling .sha256 (sha256sum format, file name only).
 #
@@ -38,15 +44,16 @@ usage() {
     cat <<'USAGE'
 usage: bin/package-linux [--arch-host] [--dry-run] [--check] TARGET...
 
-  TARGET   arch, deb, rpm or all
+  TARGET   arch, deb, rpm, appimage, tar or all
   --arch-host   use the host architecture, ignoring FAIRFAX_ARCH
   --check       install the built packages in fresh containers and self-test
   --dry-run     print the container commands without running them
 
 Environment:
-  FAIRFAX_JOBS    compile jobs (default 2)
-  FAIRFAX_ARCH    target architecture (default: the host's)
-  FAIRFAX_RUNTIME container runtime (default: podman, else docker)
+  FAIRFAX_JOBS             compile jobs (default 2)
+  FAIRFAX_ARCH             target architecture (default: the host's)
+  FAIRFAX_RUNTIME          container runtime (default: podman, else docker)
+  FAIRFAX_LINUXDEPLOY_TAG  linuxdeploy release tag (default: a pinned dated build)
 USAGE
 }
 
@@ -90,7 +97,7 @@ for target in $TARGETS; do
     case $target in
         all)
             DO_CHECK=1
-            for t in arch deb rpm; do
+            for t in arch deb rpm appimage tar; do
                 case " $EXPANDED " in
                     *" $t "*) ;;
                     *) EXPANDED="$EXPANDED $t" ;;
@@ -105,8 +112,14 @@ for target in $TARGETS; do
             ;;
         # Slice 2 adds the AppImage and the tarball: their targets, images,
         # build scripts and check scripts slot in beside the three above.
+        appimage | tar)
+            case " $EXPANDED " in
+                *" $target "*) ;;
+                *) EXPANDED="$EXPANDED $target" ;;
+            esac
+            ;;
         *)
-            echo "package-linux: unknown target $target (want arch, deb, rpm or all)" >&2
+            echo "package-linux: unknown target $target (want arch, deb, rpm, appimage, tar or all)" >&2
             exit 2
             ;;
     esac
@@ -136,11 +149,15 @@ case $MACHINE in
         ARCH_NAME=x86_64
         DEB_ARCH=amd64
         RPM_ARCH=x86_64
+        # aqtinstall's name for this Qt target; linuxdeploy's asset name is
+        # ARCH_NAME itself.
+        AQT_ARCH=linux_gcc_64
         ;;
     aarch64 | arm64)
         ARCH_NAME=aarch64
         DEB_ARCH=arm64
         RPM_ARCH=aarch64
+        AQT_ARCH=linux_gcc_arm64
         ;;
     *)
         echo "package-linux: unsupported architecture $MACHINE" >&2
@@ -166,9 +183,26 @@ fi
 ARCH_IMAGE=docker.io/library/archlinux:latest
 DEB_IMAGE=docker.io/library/debian:trixie
 RPM_IMAGE=docker.io/library/fedora:42
+# The AppImage and tarball share one build: Qt 6.8.3 from aqtinstall on
+# Ubuntu 22.04, for a glibc old enough to run on anything from 2022 on. They
+# are then checked on the two current non-Arch desktops.
+APPIMAGE_BUILD_IMAGE=docker.io/library/ubuntu:22.04
+APPIMAGE_UBUNTU_IMAGE=docker.io/library/ubuntu:24.04
+APPIMAGE_DEBIAN_IMAGE=docker.io/library/debian:trixie
+
+# linuxdeploy plus its Qt and AppImage plugins, pinned to one dated
+# continuous-tag release so a build is reproducible. Override the tag with
+# FAIRFAX_LINUXDEPLOY_TAG. The URLs are:
+#
+#   https://github.com/linuxdeploy/linuxdeploy/releases/download/<tag>/linuxdeploy-<arch>.AppImage
+#   https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/<tag>/linuxdeploy-plugin-qt-<arch>.AppImage
+#   https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/<tag>/linuxdeploy-plugin-appimage-<arch>.AppImage
+LINUXDEPLOY_TAG=${FAIRFAX_LINUXDEPLOY_TAG:-1-alpha-20240126}
 
 # The QML and runtime packages the ELF dependency generators cannot see are
 # listed in the .deb and .rpm build scripts below, in each distro's names.
+# The AppImage and tarball bundle their own Qt, so they only need the host's
+# X/GL runtime to run their checks.
 
 # --- container helpers -------------------------------------------------------
 
@@ -178,13 +212,14 @@ run_build() {
     script=$2
     if [ "$DRY_RUN" = 1 ]; then
         printf '\n# build %s\n' "$image"
-        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
-            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" \
+        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s --env AQT_ARCH=%s --env LINUXDEPLOY_TAG=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
+            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" "$AQT_ARCH" "$LINUXDEPLOY_TAG" \
             "$ROOT" "$DIST" "$image" "'$script'"
     else
         "$RUNTIME" run --rm --network host \
             --env JOBS="$JOBS" --env VERSION="$VERSION" \
             --env ARCH_NAME="$ARCH_NAME" --env DEB_ARCH="$DEB_ARCH" --env RPM_ARCH="$RPM_ARCH" \
+            --env AQT_ARCH="$AQT_ARCH" --env LINUXDEPLOY_TAG="$LINUXDEPLOY_TAG" \
             -v "$ROOT:/src:ro" -v "$DIST:/dist" \
             "$image" sh -eu -c "$script"
     fi
@@ -330,6 +365,217 @@ sha256sum "fairfax-$RPM_ARCH.rpm" > "fairfax-$RPM_ARCH.rpm.sha256"
 SCRIPT
 }
 
+# The AppImage and tarball share one deployed tree: Qt 6.8.3 from aqtinstall
+# on Ubuntu 22.04 (for a glibc reachable from about 2022 on), the app built
+# against that Qt, and linuxdeploy pulling in the Qt libraries, plugins and
+# QML modules. The shared part stops right before linuxdeploy runs, because
+# the AppImage target adds --output appimage and the tarball target assembles
+# a portable tree instead. The linuxdeploy release is pinned by
+# LINUXDEPLOY_TAG, passed to the container.
+appimage_common_script() {
+    cat <<'SCRIPT'
+set -eu
+export DEBIAN_FRONTEND=noninteractive
+# linuxdeploy itself is an AppImage; a container has no FUSE mount, so run
+# AppImages by extracting them.
+export APPIMAGE_EXTRACT_AND_RUN=1
+apt-get update >/dev/null
+apt-get install -y --no-install-recommends \
+    build-essential python3 python3-pip python3-venv \
+    libgl1-mesa-dev libegl1-mesa-dev libxkbcommon-dev libfontconfig1-dev \
+    libdbus-1-dev libwayland-dev libwayland-bin libxkbcommon-x11-dev \
+    libx11-xcb-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
+    libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev \
+    libxcb-render-util0-dev libxcb-shape0-dev libxcb-sync-dev \
+    libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-xkb-dev \
+    libxcomposite-dev libxdamage-dev libxrandr-dev libxtst-dev \
+    libglib2.0-dev libsm-dev libice-dev libxrender-dev \
+    libpulse-dev libasound2-dev libudev-dev libsqlite3-dev libssl-dev \
+    patchelf file wget ca-certificates xz-utils >/dev/null
+
+# Qt 6.8.3 from aqtinstall, the Qt the app's accessibility guards target.
+# aqt names the arch linux_gcc_64 on x86_64 and linux_gcc_arm64 on aarch64.
+# The default desktop install carries qtbase, qtdeclarative (QtQuick, QtQml,
+# Layouts, Shapes, Templates, Window), the Controls styles and the SVG and
+# image-format plugins. Wayland client support is a separate module, added
+# on top; aqt has called it qtwaylandcompositor, with qtwayland as an older
+# alias, so try both and verify the platform plugin afterwards.
+pip3 install --no-cache-dir aqtinstall >/dev/null
+aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
+if ! find /opt/Qt -path '*/plugins/platforms/libqwayland*.so' | grep -q .; then
+    for module in qtwaylandcompositor qtwayland; do
+        if aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" "$module" -O /opt/Qt 2>/dev/null; then
+            break
+        fi
+    done
+fi
+
+# The modules the app imports have to be there, or the build or the selftest
+# fails obscurely; say so here.
+for needed in QtQuick QtQuick/Controls QtQuick/Layouts QtQuick/Shapes; do
+    test -d "/opt/Qt/6.8.3/gcc_64/qml/$needed" || \
+        test -d "/opt/Qt/6.8.3/gcc_arm64/qml/$needed" || {
+        echo "aqtinstall: the Qt 6.8.3 install has no $needed QML module" >&2
+        exit 1
+    }
+done
+
+qmake=$(find /opt/Qt -path '*/bin/qmake' -type f | head -n1)
+test -n "$qmake"
+QTBIN=$(dirname "$qmake")
+# bin/build honours QMAKE; linuxdeploy-plugin-qt reads it from PATH.
+export QMAKE="$qmake"
+export PATH="$QTBIN:$PATH"
+echo "Qt: $("$qmake" -query QT_VERSION)"
+
+rm -rf /work && mkdir -p /work
+tar -C /src --exclude=./build --exclude=./dist --exclude=./.git -cf - . | tar -C /work -xf -
+cd /work
+FAIRFAX_JOBS="$JOBS" ./bin/build
+# The one file list: binary, omarchy helper, completions, icon and desktop
+# entry all land under AppDir/usr.
+rm -rf AppDir
+scripts/stage-install AppDir /usr
+test -f AppDir/usr/share/applications/fairfax.desktop
+test -f AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+
+# linuxdeploy and its Qt and AppImage plugins. The download uses the pinned
+# dated release first (reproducible) and falls back to the moving continuous
+# tag only if that asset is gone, printing which URL it used. The pinned
+# URLs are:
+#
+#   https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-<arch>.AppImage
+#   https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-plugin-qt-<arch>.AppImage
+#   https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-plugin-appimage-<arch>.AppImage
+base="https://github.com/linuxdeploy"
+mkdir -p /usr/local/bin
+rm -f /usr/local/bin/linuxdeploy /usr/local/bin/linuxdeploy-plugin-qt \
+    /usr/local/bin/linuxdeploy-plugin-appimage
+fetch_tool() {
+    tool="$1"
+    for tag in "$LINUXDEPLOY_TAG" continuous; do
+        url="$base/$tool/releases/download/$tag/$tool-$ARCH_NAME.AppImage"
+        if wget -q -O "/usr/local/bin/$tool" "$url"; then
+            echo "linuxdeploy: $tool from $url"
+            return 0
+        fi
+    done
+    echo "linuxdeploy: cannot download $tool for $ARCH_NAME" >&2
+    return 1
+}
+fetch_tool linuxdeploy
+fetch_tool linuxdeploy-plugin-qt
+fetch_tool linuxdeploy-plugin-appimage
+chmod +x /usr/local/bin/linuxdeploy /usr/local/bin/linuxdeploy-plugin-qt \
+    /usr/local/bin/linuxdeploy-plugin-appimage
+
+# What linuxdeploy-plugin-qt should deploy on top of its own guesses. Only
+# the plugins the Qt in use actually has are forced; a name that is not there
+# would abort the deploy. The list is the Wayland and offscreen platform
+# plugins (the selftest runs offscreen), the SVG image format the About box
+# needs, and the SQLite driver the app stores its data with. Qt 6.8 names the
+# generic Wayland client plugin libqwayland.so (older releases had
+# libqwayland-generic.so), so accept either.
+platforms=""
+for p in libqwayland-generic.so libqwayland.so libqoffscreen.so; do
+    if find /opt/Qt -path "*/plugins/platforms/$p" | grep -q .; then
+        platforms="${platforms:+$platforms;}$p"
+    fi
+done
+if [ -n "$platforms" ]; then export EXTRA_PLATFORM_PLUGINS="$platforms"; fi
+qtplugins=""
+for p in imageformats/libqsvg.so sqldrivers/libqsqlite.so; do
+    if find /opt/Qt -path "*/plugins/$p" | grep -q .; then
+        qtplugins="${qtplugins:+$qtplugins;}$p"
+    fi
+done
+if [ -n "$qtplugins" ]; then export EXTRA_QT_PLUGINS="$qtplugins"; fi
+export QML_SOURCES_PATHS="/work/src/qml"
+SCRIPT
+}
+
+appimage_build_script() {
+    appimage_common_script
+    cat <<'SCRIPT'
+
+# Deploy the Qt tree and let the appimage output plugin make the AppImage.
+cd /work
+linuxdeploy --appdir /work/AppDir --plugin qt \
+    --desktop-file /work/AppDir/usr/share/applications/fairfax.desktop \
+    --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg \
+    --output appimage
+appimage=$(find /work -maxdepth 1 -type f -name '*.AppImage' | head -n1)
+test -n "$appimage"
+cp "$appimage" "/dist/fairfax-$ARCH_NAME.AppImage"
+chmod +x "/dist/fairfax-$ARCH_NAME.AppImage"
+cd /dist
+sha256sum "fairfax-$ARCH_NAME.AppImage" > "fairfax-$ARCH_NAME.AppImage.sha256"
+SCRIPT
+}
+
+tar_build_script() {
+    appimage_common_script
+    cat <<'SCRIPT'
+
+# Deploy the Qt tree (no AppImage wrapper), then lay out the portable tree:
+# bin/fairfax is a launcher that points the dynamic loader and Qt at the
+# lib/ beside it; the real binary, libraries, plugins and QML modules live
+# under lib/; share/ has the icon, desktop entry and completions.
+cd /work
+linuxdeploy --appdir /work/AppDir --plugin qt \
+    --desktop-file /work/AppDir/usr/share/applications/fairfax.desktop \
+    --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
+name="fairfax-linux-$ARCH_NAME"
+rm -rf "/work/$name"
+mkdir -p "/work/$name/bin" "/work/$name/lib/fairfax" "/work/$name/lib/scripts" "/work/$name/share"
+install -Dm755 /work/AppDir/usr/bin/fairfax "/work/$name/lib/fairfax/fairfax"
+cp -a /work/AppDir/usr/lib/. "/work/$name/lib/"
+# stage-install's omarchy helper is under usr/lib/fairfax; the app finds it
+# beside the binary's parent through ../scripts, so keep a copy there too.
+if [ -f "/work/$name/lib/fairfax/fairfax-omarchy-setup" ]; then
+    cp -a "/work/$name/lib/fairfax/fairfax-omarchy-setup" "/work/$name/lib/scripts/"
+fi
+cp -a /work/AppDir/usr/plugins "/work/$name/lib/plugins"
+cp -a /work/AppDir/usr/qml "/work/$name/lib/qml"
+cp -a /work/AppDir/usr/share/. "/work/$name/share/"
+
+cat > "/work/$name/bin/fairfax" <<'LAUNCHER'
+#!/bin/sh
+# Fairfax portable launcher: point the loader and Qt at the lib/ tree beside
+# this script, so the tarball runs wherever it is unpacked.
+here=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+export LD_LIBRARY_PATH="$here/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$here/lib/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+export QML_IMPORT_PATH="$here/lib/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+export QML2_IMPORT_PATH="$here/lib/qml${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+exec "$here/lib/fairfax/fairfax" "$@"
+LAUNCHER
+chmod +x "/work/$name/bin/fairfax"
+ln -sf fairfax "/work/$name/bin/frfx"
+
+cat > "/work/$name/INSTALL.txt" <<'INSTALL'
+Fairfax for Linux (portable tarball)
+
+Unpack this directory anywhere and run:
+
+    fairfax-linux-<arch>/bin/fairfax
+
+Add bin/ to your PATH to run `fairfax` and `frfx` by name, or copy
+share/applications/fairfax.desktop and share/icons/hicolor/scalable/apps/
+fairfax.svg into ~/.local/share to get a launcher entry. The launcher sets
+LD_LIBRARY_PATH, QT_PLUGIN_PATH and QML_IMPORT_PATH relative to itself, so
+the bundled Qt in lib/ is used and no system Qt is needed.
+
+A Wayland or X11 desktop with the usual GL and font libraries is all the
+host has to provide.
+INSTALL
+
+tar -C /work -czf "/dist/$name.tar.gz" "$name"
+cd /dist
+sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
+SCRIPT
+}
+
 # --- check scripts -----------------------------------------------------------
 # Each installs the built package with the distro's own package manager so its
 # dependencies resolve, then runs the selftest offscreen and demands zero QML
@@ -379,6 +625,67 @@ $(selftest_script)
 SCRIPT
 }
 
+# The AppImage and tarball bundle their own Qt, so the check only installs the
+# host's minimal X/GL runtime. The list is exactly those five libraries:
+#
+#   libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+#
+# offscreen makes the selftest independent of a display. The bundled Qt
+# version is read off the deployed libQt6Core file name, so the check prints
+# the Qt it ran against without pulling in any extra tool.
+appimage_check_script() {
+    cat <<SCRIPT
+set -eu
+export DEBIAN_FRONTEND=noninteractive
+apt-get update >/dev/null
+apt-get install -y --no-install-recommends \\
+    libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 >/dev/null
+# Copy out of the read-only mount so we own the file and its mode.
+cp "/dist/fairfax-$ARCH_NAME.AppImage" /tmp/fairfax.AppImage
+chmod +x /tmp/fairfax.AppImage
+cd /tmp
+# linuxdeploy keeps the full version in the library file name; read it, then
+# run the AppImage the normal extract-and-run way (no FUSE in the container).
+./fairfax.AppImage --appimage-extract >/dev/null 2>&1
+qt=\$(ls squashfs-root/usr/lib/libQt6Core.so.6.* 2>/dev/null | head -n1 | sed 's/.*libQt6Core\.so\.//')
+echo "Qt: \${qt:-unknown}"
+QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
+    ./fairfax.AppImage --appimage-extract-and-run --demo --selftest >/tmp/selftest.log 2>&1 || {
+    cat /tmp/selftest.log >&2
+    echo "selftest failed" >&2
+    exit 1
+}
+grep -q " 0 QML warning(s)" /tmp/selftest.log
+SCRIPT
+}
+
+tar_check_script() {
+    cat <<SCRIPT
+set -eu
+export DEBIAN_FRONTEND=noninteractive
+apt-get update >/dev/null
+apt-get install -y --no-install-recommends \\
+    libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 >/dev/null
+name="fairfax-linux-$ARCH_NAME"
+mkdir -p /tmp/untar
+rm -rf "/tmp/untar/\$name"
+tar -C /tmp/untar -xzf "/dist/\$name.tar.gz"
+cd "/tmp/untar/\$name"
+test -x bin/fairfax
+test -f share/applications/fairfax.desktop
+test -f share/icons/hicolor/scalable/apps/fairfax.svg
+qt=\$(ls lib/libQt6Core.so.6.* 2>/dev/null | head -n1 | sed 's/.*libQt6Core\.so\.//')
+echo "Qt: \${qt:-unknown}"
+QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
+    ./bin/fairfax --demo --selftest >/tmp/selftest.log 2>&1 || {
+    cat /tmp/selftest.log >&2
+    echo "selftest failed" >&2
+    exit 1
+}
+grep -q " 0 QML warning(s)" /tmp/selftest.log
+SCRIPT
+}
+
 # --- targets -----------------------------------------------------------------
 
 build_target() {
@@ -387,6 +694,8 @@ build_target() {
         arch) run_build "$ARCH_IMAGE" "$(arch_build_script)" ;;
         deb) run_build "$DEB_IMAGE" "$(deb_build_script)" ;;
         rpm) run_build "$RPM_IMAGE" "$(rpm_build_script)" ;;
+        appimage) run_build "$APPIMAGE_BUILD_IMAGE" "$(appimage_build_script)" ;;
+        tar) run_build "$APPIMAGE_BUILD_IMAGE" "$(tar_build_script)" ;;
     esac
 }
 
@@ -396,6 +705,17 @@ check_target() {
         arch) run_check "$ARCH_IMAGE" "$(arch_check_script)" ;;
         deb) run_check "$DEB_IMAGE" "$(deb_check_script)" ;;
         rpm) run_check "$RPM_IMAGE" "$(rpm_check_script)" ;;
+        appimage)
+            # The AppImage and tarball are checked on both current non-Arch
+            # desktops; every check runs, so one image's failure still shows
+            # the other's result.
+            run_check "$APPIMAGE_UBUNTU_IMAGE" "$(appimage_check_script)"
+            run_check "$APPIMAGE_DEBIAN_IMAGE" "$(appimage_check_script)"
+            ;;
+        tar)
+            run_check "$APPIMAGE_UBUNTU_IMAGE" "$(tar_check_script)"
+            run_check "$APPIMAGE_DEBIAN_IMAGE" "$(tar_check_script)"
+            ;;
     esac
 }
 
