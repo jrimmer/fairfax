@@ -265,7 +265,7 @@ Architecture: any
 Description: A keyboard-first task manager for Omarchy, modelled on the reference app
 EOF
 cd /stage
-shlibs=$(dpkg-shlibdeps -O --ignore-missing-info usr/bin/fairfax 2>/dev/null | sed "s/^shlibs:Depends=//")
+shlibs=$(dpkg-shlibdeps -O --ignore-missing-info usr/bin/fairfax 2>/dev/null | sed "s/^shlibs:Depends=//" || true)
 rm -rf /stage/debian
 size=$(du -sk /stage/usr | cut -f1)
 # The QML modules and runtime packages the ELF dependency generator cannot
