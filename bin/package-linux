@@ -51,7 +51,8 @@ usage: bin/package-linux [--arch-host] [--dry-run] [--check] TARGET...
 
 Environment:
   FAIRFAX_JOBS             compile jobs (default 2)
-  FAIRFAX_ARCH             target architecture (default: the host's)
+  FAIRFAX_ARCH             target architecture (default: the host's; only a
+                           dry run may differ from the host)
   FAIRFAX_RUNTIME          container runtime (default: podman, else docker)
   FAIRFAX_LINUXDEPLOY_TAG  one release tag for linuxdeploy and both plugins
                            (default: each pinned to its own dated build)
@@ -149,14 +150,16 @@ case $MACHINE in
         ARCH_NAME=x86_64
         DEB_ARCH=amd64
         RPM_ARCH=x86_64
-        # aqtinstall's name for this Qt target; linuxdeploy's asset name is
-        # ARCH_NAME itself.
+        # aqtinstall's host and arch names for this Qt; linuxdeploy's asset
+        # name is ARCH_NAME itself.
+        AQT_HOST=linux
         AQT_ARCH=linux_gcc_64
         ;;
     aarch64 | arm64)
         ARCH_NAME=aarch64
         DEB_ARCH=arm64
         RPM_ARCH=aarch64
+        AQT_HOST=linux_arm64
         AQT_ARCH=linux_gcc_arm64
         ;;
     *)
@@ -164,6 +167,16 @@ case $MACHINE in
         exit 1
         ;;
 esac
+# The containers run at the host's architecture, so another FAIRFAX_ARCH
+# would only rename host binaries. A dry run may still preview it.
+case $HOST_MACHINE in
+    amd64) HOST_MACHINE=x86_64 ;;
+    arm64) HOST_MACHINE=aarch64 ;;
+esac
+if [ "$ARCH_NAME" != "$HOST_MACHINE" ] && [ "$DRY_RUN" != 1 ]; then
+    echo "package-linux: cannot build $ARCH_NAME packages on an $HOST_MACHINE host; build on an $ARCH_NAME machine" >&2
+    exit 1
+fi
 
 # Container runtime: podman, else docker.
 if [ -n "${FAIRFAX_RUNTIME:-}" ]; then
@@ -223,14 +236,14 @@ run_build() {
     script=$2
     if [ "$DRY_RUN" = 1 ]; then
         printf '\n# build %s\n' "$image"
-        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s --env AQT_ARCH=%s --env LINUXDEPLOY_TAG=%s --env LINUXDEPLOY_QT_TAG=%s --env LINUXDEPLOY_APPIMAGE_TAG=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
-            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" "$AQT_ARCH" "$LINUXDEPLOY_TAG" "$LINUXDEPLOY_QT_TAG" "$LINUXDEPLOY_APPIMAGE_TAG" \
+        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s --env AQT_HOST=%s --env AQT_ARCH=%s --env LINUXDEPLOY_TAG=%s --env LINUXDEPLOY_QT_TAG=%s --env LINUXDEPLOY_APPIMAGE_TAG=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
+            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" "$AQT_HOST" "$AQT_ARCH" "$LINUXDEPLOY_TAG" "$LINUXDEPLOY_QT_TAG" "$LINUXDEPLOY_APPIMAGE_TAG" \
             "$ROOT" "$DIST" "$image" "$(shell_quote "$script")"
     else
         "$RUNTIME" run --rm --network host \
             --env JOBS="$JOBS" --env VERSION="$VERSION" \
             --env ARCH_NAME="$ARCH_NAME" --env DEB_ARCH="$DEB_ARCH" --env RPM_ARCH="$RPM_ARCH" \
-            --env AQT_ARCH="$AQT_ARCH" --env LINUXDEPLOY_TAG="$LINUXDEPLOY_TAG" \
+            --env AQT_HOST="$AQT_HOST" --env AQT_ARCH="$AQT_ARCH" --env LINUXDEPLOY_TAG="$LINUXDEPLOY_TAG" \
             --env LINUXDEPLOY_QT_TAG="$LINUXDEPLOY_QT_TAG" --env LINUXDEPLOY_APPIMAGE_TAG="$LINUXDEPLOY_APPIMAGE_TAG" \
             -v "$ROOT:/src:ro" -v "$DIST:/dist" \
             "$image" sh -eu -c "$script"
@@ -407,7 +420,9 @@ apt-get install -y --no-install-recommends \
     patchelf file wget ca-certificates xz-utils >/dev/null
 
 # Qt 6.8.3 from aqtinstall, the Qt the app's accessibility guards target.
-# aqt names the arch linux_gcc_64 on x86_64 and linux_gcc_arm64 on aarch64.
+# aqt names the host linux and the arch linux_gcc_64 on x86_64, and
+# linux_arm64 and linux_gcc_arm64 on aarch64 (Qt's ARM builds sit under their
+# own host directory).
 # The base install is qtbase; the app's QML and other needs are the modules
 # qtdeclarative (QtQuick, QtQml, Layouts, Shapes) and qtsvg (the About box
 # shows qrc:/icon.svg) and qtimageformats (QuickLook's pictures). Controls is
@@ -419,9 +434,9 @@ apt-get install -y --no-install-recommends \
 # afterwards, so a wrong name cannot silently leave the bundle without a
 # Wayland client plugin.
 pip3 install --no-cache-dir aqtinstall >/dev/null
-aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
+aqt install-qt "$AQT_HOST" desktop 6.8.3 "$AQT_ARCH" -O /opt/Qt
 for module in qtdeclarative qtsvg qtimageformats qtwayland; do
-    if ! aqt install-qt linux desktop 6.8.3 "$AQT_ARCH" "$module" -O /opt/Qt 2>/dev/null; then
+    if ! aqt install-qt "$AQT_HOST" desktop 6.8.3 "$AQT_ARCH" "$module" -O /opt/Qt 2>/dev/null; then
         echo "aqtinstall: module $module is not available, skipping" >&2
     fi
 done
