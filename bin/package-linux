@@ -354,6 +354,7 @@ arch_check_script() {
 set -eu
 pacman -Syu --noconfirm >/dev/null
 pacman -U --noconfirm "/dist/fairfax-$ARCH_NAME.pkg.tar.zst" >/dev/null
+pacman -Q qt6-declarative
 $(selftest_script)
 SCRIPT
 }
@@ -364,6 +365,7 @@ set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update >/dev/null
 apt-get install -y --no-install-recommends "/dist/fairfax-$DEB_ARCH.deb" >/dev/null
+dpkg-query -W qml6-module-qtquick
 $(selftest_script)
 SCRIPT
 }
@@ -372,6 +374,7 @@ rpm_check_script() {
     cat <<SCRIPT
 set -eu
 dnf install -y "/dist/fairfax-$RPM_ARCH.rpm" >/dev/null
+rpm -q qt6-qtdeclarative
 $(selftest_script)
 SCRIPT
 }
@@ -379,6 +382,7 @@ SCRIPT
 # --- targets -----------------------------------------------------------------
 
 build_target() {
+    [ "$DRY_RUN" = 1 ] || printf '\n== build %s\n' "$1"
     case $1 in
         arch) run_build "$ARCH_IMAGE" "$(arch_build_script)" ;;
         deb) run_build "$DEB_IMAGE" "$(deb_build_script)" ;;
@@ -387,6 +391,7 @@ build_target() {
 }
 
 check_target() {
+    [ "$DRY_RUN" = 1 ] || printf '\n== check %s\n' "$1"
     case $1 in
         arch) run_check "$ARCH_IMAGE" "$(arch_check_script)" ;;
         deb) run_check "$DEB_IMAGE" "$(deb_check_script)" ;;
@@ -402,9 +407,11 @@ if [ "$DO_BUILD" = 1 ]; then
     done
 fi
 
+# Every check runs even when an earlier one fails, so one run shows them all.
+FAILED=""
 if [ "$DO_CHECK" = 1 ]; then
     for target in $TARGETS; do
-        check_target "$target"
+        check_target "$target" || FAILED="$FAILED $target"
     done
 fi
 
@@ -412,4 +419,8 @@ if [ "$DRY_RUN" != 1 ]; then
     echo
     echo "Packages in $DIST:"
     ls -1 "$DIST"
+fi
+if [ -n "$FAILED" ]; then
+    echo "package-linux: checks failed:$FAILED" >&2
+    exit 1
 fi

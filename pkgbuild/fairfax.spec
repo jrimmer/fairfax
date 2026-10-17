@@ -2,7 +2,7 @@
 #
 # Built by `bin/package-linux rpm` on Fedora: rpmbuild runs it with
 #   --define "fairfax_src /work" --define "fairfax_version <version>"
-# after bin/build has already produced %{fairfax_src}/build/fairfax.
+# after bin/build has already produced build/fairfax in that tree.
 # %install is scripts/stage-install, the one file list, so the packaged tree
 # is identical to the Arch and Debian packages.
 
@@ -63,5 +63,5 @@ FAIRFAX_BIN=%{fairfax_src}/build/fairfax \
 /usr/share/applications/fairfax.desktop
 
 %changelog
-* Thu Oct 17 2026 Jason Rimmer <jason@rimmer.net> - %{fairfax_version}-1
+* Sat Oct 17 2026 Jason Rimmer <jason@rimmer.net> - %{fairfax_version}-1
 - Package Fairfax for Fedora.
