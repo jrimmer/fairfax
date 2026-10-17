@@ -56,6 +56,9 @@ Environment:
   FAIRFAX_RUNTIME          container runtime (default: podman, else docker)
   FAIRFAX_LINUXDEPLOY_TAG  one release tag for linuxdeploy and both plugins
                            (default: each pinned to its own dated build)
+  FAIRFAX_ARCH_NATIVE      1 builds and checks the Arch package on this Arch
+                           host with makepkg instead of in a container (the
+                           default on ARM, where Arch has no container image)
 USAGE
 }
 
@@ -186,11 +189,9 @@ elif command -v podman >/dev/null 2>&1; then
 elif command -v docker >/dev/null 2>&1; then
     RUNTIME=docker
 else
-    RUNTIME=podman
-    if [ "$DRY_RUN" != 1 ]; then
-        echo "package-linux: neither podman nor docker is installed" >&2
-        exit 1
-    fi
+    # Checked once the targets are known: the Arch package built on the host
+    # needs no container.
+    RUNTIME=""
 fi
 
 ARCH_IMAGE=docker.io/library/archlinux:latest
@@ -812,12 +813,82 @@ grep -q " 0 QML warning(s)" /tmp/selftest.log
 SCRIPT
 }
 
+# --- the Arch package on the host --------------------------------------------
+# Arch Linux publishes its container image for x86_64 only, so on ARM the Arch
+# package is built with makepkg on the host, which has to be Arch (an Omarchy
+# ARM machine is). Its check unpacks the package and runs the selftest against
+# the host's Qt, since there is no clean Arch container to install it into.
+
+ARCH_NATIVE=${FAIRFAX_ARCH_NATIVE:-0}
+[ "$ARCH_NAME" = x86_64 ] || ARCH_NATIVE=1
+
+build_arch_native() {
+    if [ "$DRY_RUN" = 1 ]; then
+        printf '\n# build arch on the host\n(cd %s/pkgbuild && makepkg -f --syncdeps --noconfirm)\n' "$ROOT"
+        return 0
+    fi
+    if ! command -v makepkg >/dev/null 2>&1; then
+        echo "package-linux: the $ARCH_NAME Arch package is built on the host, which needs makepkg (Arch Linux)" >&2
+        return 1
+    fi
+    # makepkg refuses root; under sudo, build as the user who ran it.
+    as_user=""
+    if [ "$(id -u)" = 0 ]; then
+        if [ -z "${SUDO_USER:-}" ]; then
+            echo "package-linux: makepkg cannot run as root; run this as a normal user" >&2
+            return 1
+        fi
+        as_user="sudo -u $SUDO_USER"
+    fi
+    rm -f "$ROOT"/pkgbuild/fairfax-*.pkg.tar.zst
+    (cd "$ROOT/pkgbuild" && $as_user env FAIRFAX_JOBS="$JOBS" makepkg -f --syncdeps --noconfirm)
+    pkg=$(find "$ROOT/pkgbuild" -maxdepth 1 -name "fairfax-[0-9]*-$ARCH_NAME.pkg.tar.zst" | head -n1)
+    if [ -z "$pkg" ]; then
+        echo "package-linux: makepkg left no $ARCH_NAME package in pkgbuild/" >&2
+        return 1
+    fi
+    cp "$pkg" "$DIST/fairfax-$ARCH_NAME.pkg.tar.zst"
+    (cd "$DIST" && sha256sum "fairfax-$ARCH_NAME.pkg.tar.zst" > "fairfax-$ARCH_NAME.pkg.tar.zst.sha256")
+}
+
+check_arch_native() {
+    if [ "$DRY_RUN" = 1 ]; then
+        printf '\n# check arch on the host: unpack %s and run its selftest\n' "$DIST/fairfax-$ARCH_NAME.pkg.tar.zst"
+        return 0
+    fi
+    unpacked=$(mktemp -d)
+    rc=0
+    tar -C "$unpacked" -xf "$DIST/fairfax-$ARCH_NAME.pkg.tar.zst" || rc=1
+    [ "$rc" = 1 ] || [ -L "$unpacked/usr/bin/frfx" ] || { echo "no /usr/bin/frfx in the package" >&2; rc=1; }
+    [ "$rc" = 1 ] || [ -f "$unpacked/usr/share/applications/fairfax.desktop" ] || { echo "no desktop entry in the package" >&2; rc=1; }
+    if [ "$rc" = 0 ]; then
+        pacman -Q qt6-declarative || true
+        if QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \
+            "$unpacked/usr/bin/fairfax" --demo --selftest >"$unpacked/selftest.log" 2>&1 \
+            && grep -q " 0 QML warning(s)" "$unpacked/selftest.log"; then
+            grep '^selftest:' "$unpacked/selftest.log" || true
+        else
+            cat "$unpacked/selftest.log" >&2
+            echo "selftest failed" >&2
+            rc=1
+        fi
+    fi
+    rm -rf "$unpacked"
+    return $rc
+}
+
 # --- targets -----------------------------------------------------------------
 
 build_target() {
     [ "$DRY_RUN" = 1 ] || printf '\n== build %s\n' "$1"
     case $1 in
-        arch) run_build "$ARCH_IMAGE" "$(arch_build_script)" ;;
+        arch)
+            if [ "$ARCH_NATIVE" = 1 ]; then
+                build_arch_native
+            else
+                run_build "$ARCH_IMAGE" "$(arch_build_script)"
+            fi
+            ;;
         deb) run_build "$DEB_IMAGE" "$(deb_build_script)" ;;
         rpm) run_build "$RPM_IMAGE" "$(rpm_build_script)" ;;
         appimage) run_build "$APPIMAGE_BUILD_IMAGE" "$(appimage_build_script)" ;;
@@ -828,7 +899,13 @@ build_target() {
 check_target() {
     [ "$DRY_RUN" = 1 ] || printf '\n== check %s\n' "$1"
     case $1 in
-        arch) run_check "$ARCH_IMAGE" "$(arch_check_script)" ;;
+        arch)
+            if [ "$ARCH_NATIVE" = 1 ]; then
+                check_arch_native
+            else
+                run_check "$ARCH_IMAGE" "$(arch_check_script)"
+            fi
+            ;;
         deb) run_check "$DEB_IMAGE" "$(deb_check_script)" ;;
         rpm) run_check "$RPM_IMAGE" "$(rpm_check_script)" ;;
         appimage)
@@ -847,6 +924,16 @@ check_target() {
             ;;
     esac
 }
+
+if [ -z "$RUNTIME" ]; then
+    RUNTIME=podman
+    for target in $TARGETS; do
+        if [ "$DRY_RUN" != 1 ] && { [ "$target" != arch ] || [ "$ARCH_NATIVE" != 1 ]; }; then
+            echo "package-linux: neither podman nor docker is installed" >&2
+            exit 1
+        fi
+    done
+fi
 
 mkdir -p "$DIST"
 
