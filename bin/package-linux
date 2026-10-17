@@ -754,7 +754,7 @@ test -f squashfs-root/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 find squashfs-root -name 'libqwayland*.so' | grep -q .
 # linuxdeploy copies libQt6Core under its soname only, so read the version
 # string the library carries.
-qt=\$(grep -aoE 'QtCore library version Qt [0-9.]+' squashfs-root/usr/lib/libQt6Core.so.6 | head -n1 | sed 's/.* Qt //')
+qt=\$(grep -aoE 'Qt [0-9]+\.[0-9]+\.[0-9]+ \(' squashfs-root/usr/lib/libQt6Core.so.6 | head -n1 | sed 's/^Qt //; s/ ($//')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
     ./"fairfax-$ARCH_NAME.AppImage" --appimage-extract-and-run --demo --selftest >/tmp/selftest.log 2>&1 || {
@@ -785,7 +785,7 @@ test -f share/icons/hicolor/scalable/apps/fairfax.svg
 # The portable tree has to carry the Wayland client plugin, same as the
 # AppImage, or the bundle is not the Wayland-capable build it claims.
 find lib -name 'libqwayland*.so' | grep -q .
-qt=\$(grep -aoE 'QtCore library version Qt [0-9.]+' lib/libQt6Core.so.6 | head -n1 | sed 's/.* Qt //')
+qt=\$(grep -aoE 'Qt [0-9]+\.[0-9]+\.[0-9]+ \(' lib/libQt6Core.so.6 | head -n1 | sed 's/^Qt //; s/ ($//')
 echo "Qt: \${qt:-unknown}"
 QT_QPA_PLATFORM=offscreen FAIRFAX_KEYRING=memory QT_FORCE_STDERR_LOGGING=1 \\
     ./bin/fairfax --demo --selftest >/tmp/selftest.log 2>&1 || {
