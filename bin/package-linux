@@ -769,15 +769,18 @@ check_target() {
         deb) run_check "$DEB_IMAGE" "$(deb_check_script)" ;;
         rpm) run_check "$RPM_IMAGE" "$(rpm_check_script)" ;;
         appimage)
-            # The AppImage and tarball are checked on both current non-Arch
-            # desktops; every check runs, so one image's failure still shows
-            # the other's result.
-            run_check "$APPIMAGE_UBUNTU_IMAGE" "$(appimage_check_script)"
-            run_check "$APPIMAGE_DEBIAN_IMAGE" "$(appimage_check_script)"
+            # Both current non-Arch desktops; every check runs, and either
+            # image failing fails the target.
+            rc=0
+            run_check "$APPIMAGE_UBUNTU_IMAGE" "$(appimage_check_script)" || rc=1
+            run_check "$APPIMAGE_DEBIAN_IMAGE" "$(appimage_check_script)" || rc=1
+            return $rc
             ;;
         tar)
-            run_check "$APPIMAGE_UBUNTU_IMAGE" "$(tar_check_script)"
-            run_check "$APPIMAGE_DEBIAN_IMAGE" "$(tar_check_script)"
+            rc=0
+            run_check "$APPIMAGE_UBUNTU_IMAGE" "$(tar_check_script)" || rc=1
+            run_check "$APPIMAGE_DEBIAN_IMAGE" "$(tar_check_script)" || rc=1
+            return $rc
             ;;
     esac
 }
