@@ -53,7 +53,7 @@ printf '%s\n' "$VERSION" >"$RELEASE/fairfax-version.txt"
 
 # Dummy Arch packages: content differs by arch so the checksum check is real.
 for m in x86_64 aarch64; do
-    printf 'pkg-%s' "$m" >"$RELEASE/fairfax-$VERSION-1-$m.pkg.tar.zst"
+    printf 'pkg-%s' "$m" >"$RELEASE/fairfax-$m.pkg.tar.zst"
 done
 
 # A tiny fake AppImage: a script that, for --appimage-extract, writes the
@@ -91,7 +91,7 @@ APPIMAGE
     chmod +x "$path"
 }
 for m in x86_64 aarch64; do
-    make_appimage "$RELEASE/fairfax-$VERSION-$m.AppImage"
+    make_appimage "$RELEASE/fairfax-$m.AppImage"
 done
 
 # Real .sha256 files for every asset.
@@ -111,8 +111,8 @@ RELEASE2="$WORK/release2"
 mkdir -p "$RELEASE2"
 printf '%s\n' "$VERSION2" >"$RELEASE2/fairfax-version.txt"
 for m in x86_64 aarch64; do
-    printf 'pkg2-%s' "$m" >"$RELEASE2/fairfax-$VERSION2-1-$m.pkg.tar.zst"
-    make_appimage "$RELEASE2/fairfax-$VERSION2-$m.AppImage"
+    printf 'pkg2-%s' "$m" >"$RELEASE2/fairfax-$m.pkg.tar.zst"
+    make_appimage "$RELEASE2/fairfax-$m.AppImage"
 done
 sign_release "$RELEASE2"
 
@@ -223,7 +223,7 @@ run
 assert_eq "$STATUS" 0 "fresh Arch install exits 0"
 assert_contains "$OUT" "Installing Fairfax $VERSION" "says it is installing"
 assert_contains "$OUT" "sudo pacman -U" "warns about sudo before pacman"
-assert_contains "$OUT" "fairfax-$VERSION-1-x86_64.pkg.tar.zst" "arch-named package used"
+assert_contains "$OUT" "fairfax-x86_64.pkg.tar.zst" "arch-named package used"
 log_has "sudo pacman -U --noconfirm" || fail "sudo used for pacman -U"
 log_has "fairfax setup omarchy" || fail "setup run on Omarchy fresh install"
 assert_contains "$OUT" "Super+Shift+T" "start line mentions Quick Entry when setup ran"
@@ -285,27 +285,27 @@ ok "Arch update"
 echo "== checksum mismatch =="
 new_home
 make_omarchy
-cp "$RELEASE/fairfax-$VERSION-1-x86_64.pkg.tar.zst" "$WORK/pkg.bak"
+cp "$RELEASE/fairfax-x86_64.pkg.tar.zst" "$WORK/pkg.bak"
 # Corrupt the package without touching its .sha256.
-printf 'tampered' >>"$RELEASE/fairfax-$VERSION-1-x86_64.pkg.tar.zst"
+printf 'tampered' >>"$RELEASE/fairfax-x86_64.pkg.tar.zst"
 run
 assert_eq "$STATUS" 1 "checksum mismatch exits non-zero"
 assert_contains "$OUT" "checksum mismatch" "names the mismatch"
 log_lacks "pacman -U" || fail "no install after a checksum mismatch"
-mv "$WORK/pkg.bak" "$RELEASE/fairfax-$VERSION-1-x86_64.pkg.tar.zst"
+mv "$WORK/pkg.bak" "$RELEASE/fairfax-x86_64.pkg.tar.zst"
 ok "checksum mismatch aborts"
 
 # The AppImage path is verified too: corrupt only that asset.
 echo "== checksum mismatch (AppImage) =="
 new_home
 use_no_pacman
-cp "$RELEASE/fairfax-$VERSION-x86_64.AppImage" "$WORK/appimage.bak"
-printf 'tampered' >>"$RELEASE/fairfax-$VERSION-x86_64.AppImage"
+cp "$RELEASE/fairfax-x86_64.AppImage" "$WORK/appimage.bak"
+printf 'tampered' >>"$RELEASE/fairfax-x86_64.AppImage"
 run
 assert_eq "$STATUS" 1 "AppImage checksum mismatch exits non-zero"
 assert_contains "$OUT" "checksum mismatch" "names the AppImage mismatch"
 assert_no_file "$HOME/.local/bin/fairfax" "no AppImage installed after a mismatch"
-mv "$WORK/appimage.bak" "$RELEASE/fairfax-$VERSION-x86_64.AppImage"
+mv "$WORK/appimage.bak" "$RELEASE/fairfax-x86_64.AppImage"
 ok "AppImage checksum mismatch aborts"
 
 # --- unsupported arch ------------------------------------------------------
@@ -337,9 +337,7 @@ assert_file "$ICON_DIR/fairfax.svg" "icon installed"
 assert_file "$HOME/.local/share/fairfax/installed-version" "installed-version written"
 assert_eq "$(cat "$HOME/.local/share/fairfax/installed-version")" "$VERSION" "installed-version content"
 assert_contains "$(cat "$APP_DIR/fairfax.desktop")" "Exec=$BINDIR/fairfax %u" "desktop Exec points at the AppImage"
-assert_not_contains "$(cat "$APP_DIR/fairfax.desktop")" "[Desktop Action new-task]
-Name=New Task
-Exec=$BINDIR/fairfax %u" "desktop action keeps its own command"
+assert_contains "$(cat "$APP_DIR/fairfax.desktop")" "Exec=$BINDIR/fairfax --quick" "desktop action points at the AppImage, keeping its arguments"
 log_lacks "sudo" || fail "no root used for the AppImage install"
 assert_contains "$OUT" "not on your PATH" "warns when ~/.local/bin is off PATH"
 ok "AppImage install"

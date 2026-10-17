@@ -177,7 +177,7 @@ else
 fi
 
 install_arch() {
-    local file="fairfax-$version-1-$machine.pkg.tar.zst"
+    local file="fairfax-$machine.pkg.tar.zst"
     pkg=$(download "$file")
     echo "Running sudo pacman -U $file; you may be asked for your password."
     sudo pacman -U --noconfirm "$pkg"
@@ -185,7 +185,7 @@ install_arch() {
 
 install_appimage() {
     local desktop icon squash bindir appdir icondir
-    appimage=$(download "fairfax-$version-$machine.AppImage")
+    appimage=$(download "fairfax-$machine.AppImage")
     chmod +x "$appimage"
 
     # Take the .desktop entry and icon out of the AppImage. Extract it first,
@@ -206,14 +206,10 @@ install_appimage() {
     install -m755 "$appimage" "$bindir/fairfax"
     ln -sf fairfax "$bindir/frfx"
 
-    # Point the launcher at the AppImage we just installed. Only the main
-    # [Desktop Entry] Exec changes; the [Desktop Action ...] entries keep
-    # their own commands (Quick Entry, Today, Find, New Window).
-    awk -v exec="Exec=$bindir/fairfax %u" '
-        /^\[/ { section = $0 }
-        section == "[Desktop Entry]" && /^Exec=/ { print exec; next }
-        { print }
-    ' "$desktop" >"$appdir/fairfax.desktop"
+    # Point the launcher and its actions (New Task, Today, Find, New Window)
+    # at the AppImage we just installed, keeping each one's arguments, since
+    # ~/.local/bin is often not on the desktop's PATH.
+    sed "s|^Exec=fairfax|Exec=$bindir/fairfax|" "$desktop" >"$appdir/fairfax.desktop"
     icon=$(find "$squash/usr/share/icons" -name fairfax.svg -print -quit 2>/dev/null || true)
     if [ -n "$icon" ]; then
         install -m644 "$icon" "$icondir/fairfax.svg"
@@ -225,8 +221,10 @@ install_appimage() {
     esac
 
     printf '%s\n' "$version" >"$installed_version_file"
+    fairfax_cmd="$bindir/fairfax"
 }
 
+fairfax_cmd=fairfax
 if $arch_pacman; then
     install_arch
 else
@@ -238,8 +236,8 @@ setup_ran=false
 if $is_omarchy && [ -z "$have" ] && ! $no_setup; then
     if $omarchy_wired; then
         echo "Fairfax is already wired into Omarchy; leaving it as it is."
-    elif command -v fairfax >/dev/null 2>&1; then
-        if fairfax setup omarchy; then
+    elif command -v "$fairfax_cmd" >/dev/null 2>&1; then
+        if "$fairfax_cmd" setup omarchy; then
             setup_ran=true
         else
             echo "The install is done. Finishing Omarchy setup failed; retry with:" >&2

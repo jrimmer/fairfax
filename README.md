@@ -24,13 +24,15 @@ for you after a fresh install (skip it with `--no-setup`). Pass flags through
 ### Other Linux
 
 The [latest release](https://github.com/jrimmer/fairfax/releases/latest) also
-has plain packages, each one line to install:
+has plain packages for x86_64 and aarch64, each one line to install:
 
-- `fairfax-<version>-1-x86_64.pkg.tar.zst` / `…-aarch64.pkg.tar.zst` — Arch: `sudo pacman -U <file>`.
-- `fairfax_<version>_amd64.deb` — Debian/Ubuntu: `sudo apt install ./<file>`.
-- `fairfax-<version>-1.x86_64.rpm` — Fedora/openSUSE: `sudo rpm -i <file>`.
-- `fairfax-<version>-x86_64.AppImage` / `…-aarch64.AppImage` — any Linux: `chmod +x <file> && ./<file>`.
-- `fairfax-<version>-linux-x86_64.tar.gz` — a relocatable tarball: unpack and run `./fairfax`.
+- `fairfax-x86_64.pkg.tar.zst` — Arch: `sudo pacman -U <file>`.
+- `fairfax-amd64.deb` — Debian 13, Ubuntu 25.04 and later: `sudo apt install ./<file>`.
+- `fairfax-x86_64.rpm` — Fedora 41 and later: `sudo dnf install ./<file>`.
+- `fairfax-x86_64.AppImage` — any Linux from about 2022 on: `chmod +x <file> && ./<file>`.
+- `fairfax-linux-x86_64.tar.gz` — the same, unpacked: run `fairfax-linux-x86_64/bin/fairfax`.
+
+The aarch64 files are named the same way (`aarch64`, or `arm64` for the .deb).
 
 Each asset has a `.sha256` beside it. `FAIRFAX_RELEASE_URL` overrides the
 download base, which is handy for a mirror.
@@ -59,9 +61,9 @@ After installing, wire Fairfax into Omarchy with one command (undo with `--remov
 fairfax setup omarchy
 ```
 
-The install one-liner above already runs this for you on a fresh install
-(`--no-setup` skips it), so you only need it by hand after an update, or to
-pick a different Quick Entry key.
+The install one-liner above already runs this for you on a fresh install, so
+you only need it by hand if you installed another way or passed `--no-setup`,
+or to pick a different Quick Entry key.
 
 It adds, each in a clearly marked place:
 
