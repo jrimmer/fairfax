@@ -53,7 +53,8 @@ Environment:
   FAIRFAX_JOBS             compile jobs (default 2)
   FAIRFAX_ARCH             target architecture (default: the host's)
   FAIRFAX_RUNTIME          container runtime (default: podman, else docker)
-  FAIRFAX_LINUXDEPLOY_TAG  linuxdeploy release tag (default: a pinned dated build)
+  FAIRFAX_LINUXDEPLOY_TAG  one release tag for linuxdeploy and both plugins
+                           (default: each pinned to its own dated build)
 USAGE
 }
 
@@ -189,14 +190,17 @@ APPIMAGE_BUILD_IMAGE=docker.io/library/ubuntu:22.04
 APPIMAGE_UBUNTU_IMAGE=docker.io/library/ubuntu:24.04
 APPIMAGE_DEBIAN_IMAGE=docker.io/library/debian:trixie
 
-# linuxdeploy plus its Qt and AppImage plugins, pinned to one dated
-# continuous-tag release so a build is reproducible. Override the tag with
-# FAIRFAX_LINUXDEPLOY_TAG. The URLs are:
+# linuxdeploy plus its Qt and AppImage plugins, each pinned to a dated
+# release so a build is reproducible. The three projects tag their releases
+# separately, so each has its own tag; FAIRFAX_LINUXDEPLOY_TAG (for example
+# continuous) replaces all three. The URLs are:
 #
 #   https://github.com/linuxdeploy/linuxdeploy/releases/download/<tag>/linuxdeploy-<arch>.AppImage
 #   https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/<tag>/linuxdeploy-plugin-qt-<arch>.AppImage
 #   https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/<tag>/linuxdeploy-plugin-appimage-<arch>.AppImage
-LINUXDEPLOY_TAG=${FAIRFAX_LINUXDEPLOY_TAG:-1-alpha-20240126}
+LINUXDEPLOY_TAG=${FAIRFAX_LINUXDEPLOY_TAG:-1-alpha-20251107-1}
+LINUXDEPLOY_QT_TAG=${FAIRFAX_LINUXDEPLOY_TAG:-1-alpha-20250213-1}
+LINUXDEPLOY_APPIMAGE_TAG=${FAIRFAX_LINUXDEPLOY_TAG:-1-alpha-20250213-1}
 
 # The QML and runtime packages the ELF dependency generators cannot see are
 # listed in the .deb and .rpm build scripts below, in each distro's names.
@@ -219,14 +223,15 @@ run_build() {
     script=$2
     if [ "$DRY_RUN" = 1 ]; then
         printf '\n# build %s\n' "$image"
-        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s --env AQT_ARCH=%s --env LINUXDEPLOY_TAG=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
-            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" "$AQT_ARCH" "$LINUXDEPLOY_TAG" \
+        printf '%s run --rm --network host --env JOBS=%s --env VERSION=%s --env ARCH_NAME=%s --env DEB_ARCH=%s --env RPM_ARCH=%s --env AQT_ARCH=%s --env LINUXDEPLOY_TAG=%s --env LINUXDEPLOY_QT_TAG=%s --env LINUXDEPLOY_APPIMAGE_TAG=%s -v %s:/src:ro -v %s:/dist %s sh -eu -c %s\n' \
+            "$RUNTIME" "$JOBS" "$VERSION" "$ARCH_NAME" "$DEB_ARCH" "$RPM_ARCH" "$AQT_ARCH" "$LINUXDEPLOY_TAG" "$LINUXDEPLOY_QT_TAG" "$LINUXDEPLOY_APPIMAGE_TAG" \
             "$ROOT" "$DIST" "$image" "$(shell_quote "$script")"
     else
         "$RUNTIME" run --rm --network host \
             --env JOBS="$JOBS" --env VERSION="$VERSION" \
             --env ARCH_NAME="$ARCH_NAME" --env DEB_ARCH="$DEB_ARCH" --env RPM_ARCH="$RPM_ARCH" \
             --env AQT_ARCH="$AQT_ARCH" --env LINUXDEPLOY_TAG="$LINUXDEPLOY_TAG" \
+            --env LINUXDEPLOY_QT_TAG="$LINUXDEPLOY_QT_TAG" --env LINUXDEPLOY_APPIMAGE_TAG="$LINUXDEPLOY_APPIMAGE_TAG" \
             -v "$ROOT:/src:ro" -v "$DIST:/dist" \
             "$image" sh -eu -c "$script"
     fi
@@ -378,7 +383,8 @@ SCRIPT
 # QML modules. The shared part stops right before linuxdeploy runs, because
 # the AppImage target adds --output appimage and the tarball target assembles
 # a portable tree instead. The linuxdeploy release is pinned by
-# LINUXDEPLOY_TAG, passed to the container.
+# LINUXDEPLOY_TAG, LINUXDEPLOY_QT_TAG and LINUXDEPLOY_APPIMAGE_TAG, passed to
+# the container.
 appimage_common_script() {
     cat <<'SCRIPT'
 set -eu
@@ -464,32 +470,33 @@ test -f AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 mkdir -p AppDir/usr/scripts
 cp -a AppDir/usr/lib/fairfax/fairfax-omarchy-setup AppDir/usr/scripts/
 
-# linuxdeploy and its Qt and AppImage plugins. The download uses the pinned
+# linuxdeploy and its Qt and AppImage plugins. Each download uses its pinned
 # dated release; if that asset is gone the build fails rather than silently
 # falling back to the moving continuous tag, which would un-pin the build.
 # Set FAIRFAX_LINUXDEPLOY_TAG=continuous to opt into the moving tag on
 # purpose. The pinned URLs are:
 #
 #   https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-<arch>.AppImage
-#   https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-plugin-qt-<arch>.AppImage
-#   https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-plugin-appimage-<arch>.AppImage
+#   https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/$LINUXDEPLOY_QT_TAG/linuxdeploy-plugin-qt-<arch>.AppImage
+#   https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/$LINUXDEPLOY_APPIMAGE_TAG/linuxdeploy-plugin-appimage-<arch>.AppImage
 base="https://github.com/linuxdeploy"
 mkdir -p /usr/local/bin
 rm -f /usr/local/bin/linuxdeploy /usr/local/bin/linuxdeploy-plugin-qt \
     /usr/local/bin/linuxdeploy-plugin-appimage
 fetch_tool() {
     tool="$1"
-    url="$base/$tool/releases/download/$LINUXDEPLOY_TAG/$tool-$ARCH_NAME.AppImage"
+    tag="$2"
+    url="$base/$tool/releases/download/$tag/$tool-$ARCH_NAME.AppImage"
     if ! wget -q -O "/usr/local/bin/$tool" "$url"; then
         echo "linuxdeploy: cannot download $tool for $ARCH_NAME from $url" >&2
-        echo "linuxdeploy: the pinned tag $LINUXDEPLOY_TAG may not exist for this tool; set FAIRFAX_LINUXDEPLOY_TAG=continuous to use the moving tag" >&2
+        echo "linuxdeploy: the pinned tag $tag may not exist for this tool; set FAIRFAX_LINUXDEPLOY_TAG=continuous to use the moving tag" >&2
         return 1
     fi
     echo "linuxdeploy: $tool from $url"
 }
-fetch_tool linuxdeploy
-fetch_tool linuxdeploy-plugin-qt
-fetch_tool linuxdeploy-plugin-appimage
+fetch_tool linuxdeploy "$LINUXDEPLOY_TAG"
+fetch_tool linuxdeploy-plugin-qt "$LINUXDEPLOY_QT_TAG"
+fetch_tool linuxdeploy-plugin-appimage "$LINUXDEPLOY_APPIMAGE_TAG"
 chmod +x /usr/local/bin/linuxdeploy /usr/local/bin/linuxdeploy-plugin-qt \
     /usr/local/bin/linuxdeploy-plugin-appimage
 
@@ -537,14 +544,13 @@ appimage_build_script() {
     appimage_common_script
     cat <<'SCRIPT'
 
-# Deploy the Qt tree and let the appimage output plugin make the AppImage.
-# OUTPUT names the file, so it does not depend on linuxdeploy's own naming.
+# Deploy the Qt tree first, fix it up, and only then pack it, so the fixups
+# land in the AppImage. OUTPUT names the file, so it does not depend on
+# linuxdeploy's own naming.
 cd /work
-export OUTPUT="fairfax-$ARCH_NAME.AppImage"
 linuxdeploy --appdir /work/AppDir --plugin qt \
     --desktop-file /work/AppDir/usr/share/applications/fairfax.desktop \
-    --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg \
-    --output appimage
+    --icon-file /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 # linuxdeploy copies the desktop file and icon to the AppDir root for the
 # AppImage's own metadata; keep the installed copies too, because install.sh
 # extracts squashfs-root/usr/share/applications/fairfax.desktop and
@@ -554,6 +560,8 @@ install -Dm644 /work/pkgbuild/fairfax.desktop \
 install -Dm644 /work/pkgbuild/fairfax.svg \
     /work/AppDir/usr/share/icons/hicolor/scalable/apps/fairfax.svg
 ensure_controls_style
+export OUTPUT="fairfax-$ARCH_NAME.AppImage"
+linuxdeploy --appdir /work/AppDir --output appimage
 appimage=$(find /work -maxdepth 1 -type f -name '*.AppImage' | head -n1)
 test -n "$appimage"
 cp "$appimage" "/dist/fairfax-$ARCH_NAME.AppImage"
