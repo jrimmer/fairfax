@@ -530,13 +530,21 @@ rm -rf "/work/$name"
 mkdir -p "/work/$name/bin" "/work/$name/lib/fairfax" "/work/$name/lib/scripts" "/work/$name/share"
 install -Dm755 /work/AppDir/usr/bin/fairfax "/work/$name/lib/fairfax/fairfax"
 cp -a /work/AppDir/usr/lib/. "/work/$name/lib/"
-# stage-install's omarchy helper is under usr/lib/fairfax; the app finds it
-# beside the binary's parent through ../scripts, so keep a copy there too.
+# linuxdeploy-plugin-qt puts the platform and image-format plugins under
+# usr/plugins and the QML modules under usr/qml (older builds used
+# usr/lib/plugins and usr/lib/qml, which the copy above already moved).
+if [ -d /work/AppDir/usr/plugins ]; then
+    cp -a /work/AppDir/usr/plugins "/work/$name/lib/plugins"
+fi
+if [ -d /work/AppDir/usr/qml ]; then
+    cp -a /work/AppDir/usr/qml "/work/$name/lib/qml"
+fi
+# stage-install's omarchy helper is under usr/lib/fairfax; the app looks for
+# ../scripts/fairfax-omarchy-setup beside the binary's directory, so keep a
+# copy there too.
 if [ -f "/work/$name/lib/fairfax/fairfax-omarchy-setup" ]; then
     cp -a "/work/$name/lib/fairfax/fairfax-omarchy-setup" "/work/$name/lib/scripts/"
 fi
-cp -a /work/AppDir/usr/plugins "/work/$name/lib/plugins"
-cp -a /work/AppDir/usr/qml "/work/$name/lib/qml"
 cp -a /work/AppDir/usr/share/. "/work/$name/share/"
 
 cat > "/work/$name/bin/fairfax" <<'LAUNCHER'
@@ -548,10 +556,15 @@ export LD_LIBRARY_PATH="$here/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export QT_PLUGIN_PATH="$here/lib/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
 export QML_IMPORT_PATH="$here/lib/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
 export QML2_IMPORT_PATH="$here/lib/qml${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+# Keep the invoked name, so the `frfx` terminal shorthand still recognises
+# itself: argv[0] must stay `frfx`, not become `fairfax`.
+self=$(basename -- "$0")
+[ "$self" = frfx ] && exec "$here/lib/fairfax/frfx" "$@"
 exec "$here/lib/fairfax/fairfax" "$@"
 LAUNCHER
 chmod +x "/work/$name/bin/fairfax"
 ln -sf fairfax "/work/$name/bin/frfx"
+ln -sf fairfax "/work/$name/lib/fairfax/frfx"
 
 cat > "/work/$name/INSTALL.txt" <<'INSTALL'
 Fairfax for Linux (portable tarball)

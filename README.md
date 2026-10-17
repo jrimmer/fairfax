@@ -537,14 +537,18 @@ QT_QPA_PLATFORM=offscreen build/fairfax --demo --selftest    # drive the UI with
 
 ### Building packages
 
-`bin/package-linux all` builds the Arch, `.deb` and `.rpm` packages in fresh
-containers and writes them to `dist/`, each with a `.sha256` beside it:
-`fairfax-x86_64.pkg.tar.zst`, `fairfax-amd64.deb` and `fairfax-x86_64.rpm`
-(`aarch64`/`arm64` on ARM). Name one target to build just that one, add
-`--check` to install the built packages in containers of the target distros
-and run `--demo --selftest` against them, and `--dry-run` to print the
-container commands without running them. It needs `podman` or `docker`, and
-uses `FAIRFAX_JOBS` (default 2) for the compiles.
+`bin/package-linux all` builds every release package in fresh containers and
+writes them to `dist/`, each with a `.sha256` beside it:
+`fairfax-x86_64.pkg.tar.zst`, `fairfax-amd64.deb`, `fairfax-x86_64.rpm`,
+`fairfax-x86_64.AppImage` and `fairfax-linux-x86_64.tar.gz` (`aarch64`/`arm64`
+on ARM). Name one target to build just that one, add `--check` to install it
+in containers of the target distros and run `--demo --selftest` against it,
+and `--dry-run` to print the container commands without running them. The
+`.deb` and `.rpm` use the distro's Qt 6; the AppImage and tarball are built on
+Ubuntu 22.04 against Qt 6.8.3 and bundle their own Qt, so their checks only
+need the host's X/GL runtime. It needs `podman` or `docker`, and uses
+`FAIRFAX_JOBS` (default 2) for the compiles; `FAIRFAX_LINUXDEPLOY_TAG`
+overrides the pinned linuxdeploy release.
 
 `bin/e2e` boots the real window on a temporary database and drives it the way a user does
 (mouse clicks, double-clicks, typing, shortcuts), then checks the store or the screen. Each
