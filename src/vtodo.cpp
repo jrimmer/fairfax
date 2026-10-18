@@ -301,7 +301,7 @@ QString escapeText(const QString &s) {
     out.reserve(s.size());
     for (QChar c : s) {
         if (c == '\\') out += "\\\\";
-        else if (c == ';') out += "\;";
+        else if (c == ';') out += "\\;";
         else if (c == ',') out += "\\,";
         else if (c == '\n') out += "\\n";
         else if (c == '\r') continue;

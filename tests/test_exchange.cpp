@@ -111,7 +111,7 @@ private slots:
         const qint64 list = addList(*s, "L");
         Task t;
         t.listId = list;
-        t.title = "Semi\; comma, back\\slash " + QString(60, QChar(0x00e9));
+        t.title = "Semi; comma, back\\slash " + QString(60, QChar(0x00e9));
         t.notes = "a\nb";
         t.priority = Priority::Low;
         t.dueDate = QDate(2026, 7, 15);
@@ -136,7 +136,7 @@ private slots:
         QVERIFY(text.contains("STATUS:NEEDS-ACTION"));
         QVERIFY(text.contains("RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"));
         QVERIFY(text.contains("DESCRIPTION:a\\nb"));
-        QVERIFY(text.contains("Semi\; comma\\, back\\\\slash"));
+        QVERIFY(text.contains("Semi\\; comma\\, back\\\\slash"));
     }
 
     void icsRoundTrip() {

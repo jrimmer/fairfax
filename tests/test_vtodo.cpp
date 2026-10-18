@@ -282,6 +282,49 @@ private slots:
         QVERIFY(p.extra.meta.isEmpty());
     }
 
+    void textEscapingRoundTrips() {
+        // RFC 5545 TEXT escapes a backslash before a semicolon, comma or
+        // newline; a bare ";", "," or newline would otherwise end or split the
+        // value when another client reads it.
+        QCOMPARE(Vtodo::escapeText(QStringLiteral("a;b")), QStringLiteral("a\\;b"));
+        QCOMPARE(Vtodo::escapeText(QStringLiteral("a,b")), QStringLiteral("a\\,b"));
+        QCOMPARE(Vtodo::escapeText(QStringLiteral("a\\b")), QStringLiteral("a\\\\b"));
+        QCOMPARE(Vtodo::escapeText(QStringLiteral("a\nb")), QStringLiteral("a\\nb"));
+
+        const QString title = QStringLiteral("Semi; comma, back\\slash\nsecond line");
+        const QString notes = QStringLiteral("Notes; with, odd\\chars\nand\na newline");
+        QCOMPARE(Vtodo::unescapeText(Vtodo::escapeText(title)), title);
+        QCOMPARE(Vtodo::unescapeText(Vtodo::escapeText(notes)), notes);
+
+        // The same text survives a write and read through a whole VTODO.
+        auto s = freshStore();
+        const qint64 list = addList(*s, "Escapes");
+        Task t;
+        t.listId = list;
+        t.title = title;
+        t.notes = notes;
+        const qint64 tid = addTask(*s, t);
+        const QByteArray ics = Vtodo::toIcs(*s, s->task(tid));
+        QVERIFY(ics.contains("SUMMARY:Semi\\; comma\\, back\\\\slash\\nsecond line"));
+        QVERIFY(ics.contains("DESCRIPTION:Notes\\; with\\, odd\\\\chars\\nand\\na newline"));
+        const Vtodo::Parsed p = Vtodo::fromIcs(ics);
+        QCOMPARE(p.task.title, title);
+        QCOMPARE(p.task.notes, notes);
+    }
+
+    void readsBareSemicolonInSummary() {
+        // Older Fairfax builds wrote a bare semicolon in SUMMARY; already
+        // synced resources still have to read back to the same title.
+        const QByteArray ics =
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+            "BEGIN:VTODO\r\nUID:legacy-1\r\nSUMMARY:Buy milk; then bread\r\n"
+            "DESCRIPTION:One; two, three\r\n"
+            "END:VTODO\r\nEND:VCALENDAR\r\n";
+        const Vtodo::Parsed p = Vtodo::fromIcs(ics);
+        QCOMPARE(p.task.title, QStringLiteral("Buy milk; then bread"));
+        QCOMPARE(p.task.notes, QStringLiteral("One; two, three"));
+    }
+
     void exportIcsSampleIsUnchanged() {
         auto src = freshStore();
         const qint64 work = addList(*src, "Work");
@@ -354,7 +397,7 @@ private slots:
             "BEGIN:VTODO", "UID:XXX", "SUMMARY:Proj", "DTSTAMP:T", "CREATED:T", "LAST-MODIFIED:T",
             "STATUS:NEEDS-ACTION", "X-FAIRFAX-LIST:Work", "X-FAIRFAX-TYPE:project", "END:VTODO",
             "BEGIN:VTODO", "UID:XXX", "SUMMARY:Child",
-            "DESCRIPTION:Notes; with\\, odd\\\\chars\\nand a newline", "DTSTAMP:T", "CREATED:T",
+            "DESCRIPTION:Notes\\; with\\, odd\\\\chars\\nand a newline", "DTSTAMP:T", "CREATED:T",
             "LAST-MODIFIED:T", "DTSTART;VALUE=DATE:20260801", "DUE:20260803T143000", "PRIORITY:5",
             "STATUS:NEEDS-ACTION", "CATEGORIES:Alpha,beta\\, gamma", "X-FAIRFAX-LIST:Work",
             "X-FAIRFAX-TYPE:task", "X-FAIRFAX-STARRED:1", "X-FAIRFAX-DURATION:45",
