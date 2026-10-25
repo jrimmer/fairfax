@@ -200,11 +200,13 @@ QString scrollHolds(QQuickItem *entry) {
     QTest::qWait(300);
     if (contentY() < wheeled - 1)
         return QString("hover: %1 -> %2").arg(wheeled).arg(contentY());
-    // And a position set directly holds as well.
+    // And a position set directly holds as well. The end is read from the
+    // list's estimated height, so the list may settle on its real end a little
+    // short of it; what must not happen is a jump back up.
     const qreal bottom = list->property("contentHeight").toReal() - list->height();
     list->setProperty("contentY", bottom);
     QTest::qWait(1000);
-    if (contentY() < bottom - 1)
+    if (!(contentY() >= bottom - 1 || list->property("atYEnd").toBool()) || contentY() < wheeled)
         return QString("set: %1 -> %2").arg(bottom).arg(contentY());
     return QString();
 }

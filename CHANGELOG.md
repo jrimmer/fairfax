@@ -35,14 +35,12 @@
   title, in place of a button in the title row; Back to plan is the same kind
   of link in the review's summary line. Both work with the keyboard (Tab to
   them, then Return or Space).
-- Long menus (lists, sidebar, sorting, search presets, tags and lists in the
-  editor and Quick Entry) can be scrolled in a short window without jumping
-  back to the top.
+- Long menus (the task menu, lists, sidebar, sorting, search presets, tags and
+  lists in the editor and Quick Entry) can be scrolled in a short window
+  without jumping back to the top.
 - The task menu no longer has a blank band above Star when model suggestions
   are off; hidden entries (here and in the Inbox, search and place menus) take
   no room.
-- The task menu can be scrolled when the window is shorter than it is; it no
-  longer jumps back to the top.
 
 ## 1.0.3 (2026-10-25)
 
