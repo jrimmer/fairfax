@@ -595,10 +595,16 @@ Parsed parseTodo(const RawComponent &component) {
     t.priority = prio >= 1 && prio <= 4 ? Priority::High : prio == 5 ? Priority::Medium : prio >= 6 && prio <= 9 ? Priority::Low : Priority::None;
 
     const QString status = value("STATUS").trimmed().toUpper();
-    t.completed = status == "COMPLETED" || status == "CANCELLED" || value("PERCENT-COMPLETE").trimmed() == "100" ||
+    // CANCELLED is a task closed without being done: abandoned. A to-do that
+    // also says it was COMPLETED stays done.
+    t.abandoned = status == "CANCELLED" && value("PERCENT-COMPLETE").trimmed() != "100" && component.find("COMPLETED") == nullptr;
+    t.completed = t.abandoned || status == "COMPLETED" || status == "CANCELLED" || value("PERCENT-COMPLETE").trimmed() == "100" ||
                   component.find("COMPLETED") != nullptr;
     if (t.completed) {
         t.completedAt = parseIcsStamp(value("COMPLETED"));
+        // A cancelled to-do has no COMPLETED time; it was closed about when it last changed.
+        if (!t.completedAt.isValid() && t.abandoned)
+            t.completedAt = t.modified;
         if (!t.completedAt.isValid())
             t.completedAt = QDateTime::currentDateTime();
     }
@@ -729,7 +735,9 @@ void appendTodo(QByteArray &out, const Store &store, const Task &task, const Wri
     case Priority::Low: line("PRIORITY:9"); break;
     default: break;
     }
-    if (task.completed) {
+    if (task.abandoned) {
+        line("STATUS:CANCELLED");
+    } else if (task.completed) {
         line("STATUS:COMPLETED");
         if (task.completedAt.isValid())
             line("COMPLETED:" + icsUtc(task.completedAt));

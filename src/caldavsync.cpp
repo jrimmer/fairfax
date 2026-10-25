@@ -62,6 +62,8 @@ Vtodo::Extra extraFromMap(const QVariantMap &m) {
 // link snapshot is (through JSON), so a null date compares the same either
 // way.
 QVariantMap projection(QVariantMap map) {
+    // Snapshots from before tasks could be abandoned have no such field.
+    map.insert(QStringLiteral("abandoned"), map.value(QStringLiteral("abandoned")).toBool());
     for (const char *key : {"id", "modified", "created", "sort_order", "collapsed", "series_uid", "deleted", "section_id"})
         map.remove(key);
     for (auto it = map.begin(); it != map.end();) {
@@ -965,6 +967,7 @@ qint64 CalDavSync::applyRemoteResource(const QString &href, const QString &etag,
     merged.duration = remote.duration;
     merged.completed = remote.completed;
     merged.completedAt = remote.completedAt;
+    merged.abandoned = remote.abandoned;
     merged.type = remote.type;
     merged.actionType = remote.actionType;
     merged.actionValue = remote.actionValue;

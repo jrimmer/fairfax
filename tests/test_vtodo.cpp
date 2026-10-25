@@ -195,6 +195,53 @@ private slots:
         QCOMPARE(dp.task.dueTime, -1);
     }
 
+    // An abandoned task is STATUS:CANCELLED (and has no COMPLETED), a done
+    // one stays STATUS:COMPLETED; both come back as they went.
+    void abandonedIsCancelledAndDoneStaysCompleted() {
+        auto s = freshStore();
+        const qint64 list = addList(*s, "Errands");
+        Task a;
+        a.listId = list;
+        a.title = "Won't do";
+        a.completed = true;
+        a.abandoned = true;
+        a.completedAt = QDateTime(QDate(2026, 3, 5), QTime(10, 0));
+        a.modified = QDateTime(QDate(2026, 3, 6), QTime(8, 30));
+        const qint64 aid = addTask(*s, a);
+        Task d = a;
+        d.title = "Did it";
+        d.abandoned = false;
+        const qint64 did = addTask(*s, d);
+
+        const QByteArray cancelled = Vtodo::toIcs(*s, s->task(aid));
+        QVERIFY(cancelled.contains("STATUS:CANCELLED"));
+        QVERIFY(!cancelled.contains("STATUS:COMPLETED"));
+        QVERIFY(!cancelled.contains("\r\nCOMPLETED:"));
+        const Vtodo::Parsed ap = Vtodo::fromIcs(cancelled);
+        QVERIFY(ap.task.completed);
+        QVERIFY(ap.task.abandoned);
+        QVERIFY(ap.task.completedAt.isValid());
+
+        const QByteArray completed = Vtodo::toIcs(*s, s->task(did));
+        QVERIFY(completed.contains("STATUS:COMPLETED"));
+        QVERIFY(completed.contains("\r\nCOMPLETED:"));
+        const Vtodo::Parsed dp = Vtodo::fromIcs(completed);
+        QVERIFY(dp.task.completed);
+        QVERIFY(!dp.task.abandoned);
+
+        // Another client's cancelled to-do arrives abandoned; one that also
+        // carries a COMPLETED time stays done.
+        const QByteArray foreign =
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:x\r\nSUMMARY:Cancelled\r\nSTATUS:CANCELLED\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+        QVERIFY(Vtodo::fromIcs(foreign).task.abandoned);
+        const QByteArray both =
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:y\r\nSUMMARY:Both\r\nSTATUS:CANCELLED\r\n"
+            "COMPLETED:20260305T100000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+        const Vtodo::Parsed bp = Vtodo::fromIcs(both);
+        QVERIFY(bp.task.completed);
+        QVERIFY(!bp.task.abandoned);
+    }
+
     void readsForeignTimezone() {
         const QByteArray ics =
             "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"

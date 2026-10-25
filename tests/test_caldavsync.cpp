@@ -301,6 +301,58 @@ private slots:
         QVERIFY(!find(*a.store, "Second, edited"));
     }
 
+    // An abandoned task reaches the server as STATUS:CANCELLED, and a
+    // cancelled to-do from another client arrives abandoned; a done task
+    // stays COMPLETED on the wire.
+    void abandonedAndCancelledGoBothWays() {
+        Account a = makeAccount();
+        const qint64 list = addList(*a.store, "Tasks");
+        connect(a, *m_server);
+        QVERIFY(a.sync->syncBlocking().ok);
+
+        const qint64 wontDo = addTask(*a.store, "Won't do", list);
+        const qint64 didIt = addTask(*a.store, "Did it", list);
+        QVERIFY(a.sync->syncBlocking().ok);
+        QTest::qWait(1100);
+        Task w = a.store->task(wontDo);
+        w.completed = true;
+        w.abandoned = true;
+        w.completedAt = QDateTime::currentDateTime();
+        edit(*a.store, w, "abandon");
+        Task d = a.store->task(didIt);
+        d.completed = true;
+        d.completedAt = QDateTime::currentDateTime();
+        edit(*a.store, d, "complete");
+        QVERIFY(a.sync->syncBlocking().ok);
+
+        QString cancelled, completed;
+        for (auto it = m_server->tasks()->resources.constBegin(); it != m_server->tasks()->resources.constEnd(); ++it) {
+            const QString body = QString::fromUtf8(it.value());
+            if (body.contains("Won't do"))
+                cancelled = body;
+            else if (body.contains("Did it"))
+                completed = body;
+        }
+        QVERIFY(cancelled.contains("STATUS:CANCELLED"));
+        QVERIFY(completed.contains("STATUS:COMPLETED"));
+
+        // Another client cancels a to-do; here it is abandoned, and a second
+        // sync leaves it that way.
+        m_server->editFromAnotherClient(QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("two.ics"), TaskTwo);
+        QVERIFY(a.sync->syncBlocking().ok);
+        QVERIFY(find(*a.store, "Second"));
+        m_server->editFromAnotherClient(
+            QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("two.ics"),
+            QByteArray(TaskTwo).replace("SUMMARY:Second", "SUMMARY:Second\r\nSTATUS:CANCELLED").replace("20250101", "20250102"));
+        QVERIFY(a.sync->syncBlocking().ok);
+        QVERIFY(a.sync->syncBlocking().ok);
+        const Task second = a.store->task(find(*a.store, "Second"));
+        QVERIFY(second.completed);
+        QVERIFY(second.abandoned);
+        QVERIFY(a.store->task(wontDo).abandoned);
+        QVERIFY(!a.store->task(didIt).abandoned);
+    }
+
     void newestEditWinsRemoteOverLocal() {
         Account a = makeAccount();
         const qint64 list = addList(*a.store, "Tasks");
