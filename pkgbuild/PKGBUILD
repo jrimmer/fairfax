@@ -6,10 +6,10 @@ pkgdesc='A keyboard-first task manager for Omarchy'
 arch=('x86_64' 'aarch64')
 url='https://github.com/jrimmer/fairfax'
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal' 'git' 'python')
+depends=('zlib' 'qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal' 'git' 'python')
 optdepends=('libsecret: keep the Todoist token in the keyring'
             'pipewire: record audio notes')
-makedepends=('gcc' 'make')
+makedepends=('gcc' 'make' 'zlib')
 source=()
 sha256sums=()
 

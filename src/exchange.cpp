@@ -14,6 +14,8 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QDir>
+#include <QTemporaryDir>
 #include <QLocale>
 #include <QMarginsF>
 #include <QPageSize>
@@ -29,6 +31,7 @@
 #include "recurrence.h"
 #include "store.h"
 #include "vtodo.h"
+#include "ziparchive.h"
 
 namespace {
 
@@ -731,12 +734,8 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
     return result;
 }
 
-ImportResult importTaskDatabase(Store &store, const QString &path) {
+static ImportResult importSqliteFile(Store &store, const QString &path) {
     ImportResult result;
-    if (!QFile::exists(path)) {
-        result.error = QStringLiteral("The file does not exist.");
-        return result;
-    }
     const QString name = QStringLiteral("fairfax-taskdb-import-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
     {
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", name);
@@ -748,7 +747,7 @@ ImportResult importTaskDatabase(Store &store, const QString &path) {
             // A non-SQLite file opens fine and fails on first use.
             QSqlQuery probe(db);
             if (!probe.exec("SELECT count(*) FROM sqlite_master"))
-                result.error = QStringLiteral("This is not a task database: %1").arg(probe.lastError().text());
+                result.error = QStringLiteral("This is not a readable task database: %1").arg(probe.lastError().text());
             else
                 result = importTaskDatabaseImpl(store, db);
             probe.finish();
@@ -756,6 +755,100 @@ ImportResult importTaskDatabase(Store &store, const QString &path) {
         }
     }
     QSqlDatabase::removeDatabase(name);
+    return result;
+}
+
+namespace {
+
+const QByteArray kSqliteMagic("SQLite format 3\0", 16);
+const QByteArray kZipMagic("PK\x03\x04", 4);
+
+QString zipUnsupported() {
+    return QStringLiteral("This backup uses a zip feature Fairfax can't read; unzip it and import the .db inside.");
+}
+
+// Pulls the database out of a zipped backup into dir; returns its path, or sets error.
+QString extractBackupDatabase(const QString &zipPath, const QString &dir, QString *error) {
+#ifdef FAIRFAX_NO_ZLIB
+    Q_UNUSED(zipPath)
+    Q_UNUSED(dir)
+    *error = QStringLiteral("This is a zipped backup; unzip it first and import the .db inside.");
+    return {};
+#else
+    const ZipArchive::Listing listing = ZipArchive::list(zipPath);
+    if (listing.status != ZipArchive::Status::Ok) {
+        *error = listing.status == ZipArchive::Status::Unsupported ? zipUnsupported() : listing.error;
+        return {};
+    }
+    QList<ZipArchive::Entry> candidates;
+    for (const ZipArchive::Entry &e : listing.entries)
+        if (!e.isDirectory() && !e.name.startsWith(QLatin1String("__MACOSX/")))
+            candidates.append(e);
+    std::stable_sort(candidates.begin(), candidates.end(), [](const ZipArchive::Entry &a, const ZipArchive::Entry &b) {
+        return a.name.endsWith(QLatin1String(".db"), Qt::CaseInsensitive) && !b.name.endsWith(QLatin1String(".db"), Qt::CaseInsensitive);
+    });
+    bool sawUnsupported = false;
+    for (const ZipArchive::Entry &e : candidates) {
+        const ZipArchive::Content head = ZipArchive::read(zipPath, e, kSqliteMagic.size());
+        if (head.status == ZipArchive::Status::Unsupported) {
+            sawUnsupported = true;
+            continue;
+        }
+        if (head.status != ZipArchive::Status::Ok) {
+            *error = head.error;
+            return {};
+        }
+        if (head.data != kSqliteMagic)
+            continue;
+        const ZipArchive::Content body = ZipArchive::read(zipPath, e);
+        if (body.status != ZipArchive::Status::Ok) {
+            *error = body.error;
+            return {};
+        }
+        const QString out = QDir(dir).filePath(QStringLiteral("backup.db"));
+        QFile f(out);
+        if (!f.open(QIODevice::WriteOnly) || f.write(body.data) != body.data.size()) {
+            *error = QStringLiteral("Could not unpack the backup: %1").arg(f.errorString());
+            return {};
+        }
+        f.close();
+        return out;
+    }
+    *error = sawUnsupported ? zipUnsupported()
+                            : QStringLiteral("This zip archive does not contain a task database.");
+    return {};
+#endif
+}
+
+}  // namespace
+
+ImportResult importTaskDatabase(Store &store, const QString &path) {
+    ImportResult result;
+    QFile f(path);
+    if (!f.exists()) {
+        result.error = QStringLiteral("The file does not exist.");
+        return result;
+    }
+    if (!f.open(QIODevice::ReadOnly)) {
+        result.error = QStringLiteral("Could not open the file: %1").arg(f.errorString());
+        return result;
+    }
+    const QByteArray head = f.read(kSqliteMagic.size());
+    f.close();
+    if (head == kSqliteMagic)
+        return importSqliteFile(store, path);
+    if (head.startsWith(kZipMagic)) {
+        QTemporaryDir dir;
+        if (!dir.isValid()) {
+            result.error = QStringLiteral("Could not make a temporary folder to unpack the backup.");
+            return result;
+        }
+        const QString db = extractBackupDatabase(path, dir.path(), &result.error);
+        if (db.isEmpty())
+            return result;
+        return importSqliteFile(store, db);
+    }
+    result.error = QStringLiteral("This is not a task database or a zipped backup of one.");
     return result;
 }
 

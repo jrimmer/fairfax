@@ -12,6 +12,7 @@ Release:        1%{?dist}
 Summary:        A keyboard-first task manager for Omarchy
 License:        MIT
 URL:            https://github.com/jrimmer/fairfax
+BuildRequires:  zlib-devel
 
 # The binary is already built and the package is only assembled from it, so
 # there is nothing for the debuginfo machinery to split out.

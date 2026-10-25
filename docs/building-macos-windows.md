@@ -181,6 +181,10 @@ Signing in the workflow happens only when these repository secrets exist
   "fit into a free third" are Linux only).
 - The Dock badge and the login item (SMAppService) are not done on macOS.
 - Windows on arm64 has not been tried.
+- Importing a zipped task-database backup needs zlib. macOS has it; on Windows the
+  build leaves it out unless the ZLIB_DIR environment variable names a prefix
+  with include/ and lib/, and the importer then asks for the backup to be unzipped
+  first.
 - No PowerShell completions for `frfx`.
 - Secrets (account passwords and tokens) are kept in the Windows Credential
   Manager, as generic credentials named `fairfax:<account>`; a secret saved by

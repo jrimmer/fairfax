@@ -10,7 +10,7 @@ INCLUDEPATH += ../../src
 # the QML resources: the tests boot the real window and drive it with the mouse
 # and keyboard.
 HEADERS += ../../src/agent.h ../../src/alarms.h ../../src/appsetup.h ../../src/backend.h ../../src/dateparse.h ../../src/exchange.h ../../src/filepicker.h ../../src/gitsync.h ../../src/synctree.h ../../src/foldersync.h ../../src/webdav.h ../../src/synchub.h ../../src/restorelists.h ../../src/model.h ../../src/nlparse.h ../../src/query.h ../../src/recurrence.h ../../src/rowmodel.h ../../src/schedule.h ../../src/store.h ../../src/theme.h ../../src/views.h ../../src/markdown.h ../../src/automation.h ../../src/calendar.h ../../src/myday.h ../../src/sounds.h ../../src/todoist.h ../../src/keyring.h ../../src/mailtask.h ../../src/imapclient.h ../../src/mailfetch.h ../../src/oauth.h ../../src/diagnostics.h ../../src/traymenu.h ../../src/tray.h ../../src/searchrules.h harness.h ../../src/shortcuts.h ../../src/vtodo.h ../../src/caldavclient.h ../../src/caldavsync.h
-SOURCES += ../../src/agent.cpp ../../src/alarms.cpp ../../src/appsetup.cpp ../../src/backend.cpp ../../src/dateparse.cpp ../../src/demo.cpp ../../src/exchange.cpp ../../src/filepicker.cpp ../../src/gitsync.cpp ../../src/synctree.cpp ../../src/foldersync.cpp ../../src/webdav.cpp ../../src/synchub.cpp ../../src/restorelists.cpp ../../src/model.cpp ../../src/nlparse.cpp ../../src/query.cpp ../../src/recurrence.cpp ../../src/rowmodel.cpp ../../src/schedule.cpp ../../src/store.cpp ../../src/theme.cpp ../../src/views.cpp ../../src/markdown.cpp ../../src/automation.cpp ../../src/calendar.cpp ../../src/myday.cpp ../../src/sounds.cpp ../../src/todoist.cpp ../../src/keyring.cpp ../../src/mailtask.cpp ../../src/imapclient.cpp ../../src/mailfetch.cpp ../../src/oauth.cpp ../../src/diagnostics.cpp ../../src/traymenu.cpp ../../src/tray.cpp ../../src/searchrules.cpp ../../src/shortcuts.cpp ../../src/vtodo.cpp ../../src/caldavclient.cpp ../../src/caldavsync.cpp
+SOURCES += ../../src/agent.cpp ../../src/alarms.cpp ../../src/appsetup.cpp ../../src/backend.cpp ../../src/dateparse.cpp ../../src/demo.cpp ../../src/exchange.cpp ../../src/filepicker.cpp ../../src/gitsync.cpp ../../src/synctree.cpp ../../src/foldersync.cpp ../../src/webdav.cpp ../../src/synchub.cpp ../../src/restorelists.cpp ../../src/model.cpp ../../src/nlparse.cpp ../../src/query.cpp ../../src/recurrence.cpp ../../src/rowmodel.cpp ../../src/schedule.cpp ../../src/store.cpp ../../src/theme.cpp ../../src/views.cpp ../../src/markdown.cpp ../../src/automation.cpp ../../src/calendar.cpp ../../src/myday.cpp ../../src/sounds.cpp ../../src/todoist.cpp ../../src/keyring.cpp ../../src/mailtask.cpp ../../src/imapclient.cpp ../../src/mailfetch.cpp ../../src/oauth.cpp ../../src/diagnostics.cpp ../../src/traymenu.cpp ../../src/tray.cpp ../../src/searchrules.cpp ../../src/shortcuts.cpp ../../src/vtodo.cpp ../../src/caldavclient.cpp ../../src/caldavsync.cpp ../../src/ziparchive.cpp
 SOURCES += main.cpp test_scenarios.cpp test_layout.cpp
 SOURCES += test_lists.cpp test_lists_groups.cpp test_lists_nav.cpp
 HEADERS += listkit.h
@@ -56,3 +56,15 @@ HEADERS += ../fakecaldav.h
 
 # The Credential Manager (src/keyring.cpp).
 win32: LIBS += -ladvapi32
+
+# Zipped task-database backups (src/ziparchive.cpp); see fairfax.pro.
+unix: LIBS += -lz
+win32 {
+    ZLIB_PREFIX = $$(ZLIB_DIR)
+    isEmpty(ZLIB_PREFIX) {
+        DEFINES += FAIRFAX_NO_ZLIB
+    } else {
+        INCLUDEPATH += $$ZLIB_PREFIX/include
+        LIBS += -L$$ZLIB_PREFIX/lib -lz
+    }
+}
