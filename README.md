@@ -122,7 +122,8 @@ offers your lists and `frfx done <Tab>` your open tasks.
 - **Sections.** Split a list into headings (right-click a list → New Section, or + → New
   Section): drag tasks onto a heading to move them, double-click a heading to rename it.
 - **Tags.** Group them, filter by them from the right panel, and *pause* one (right-click) to
-  hide every task that carries it until you resume it.
+  hide every task that carries it until you resume it. A place (location) can be paused the
+  same way: right-click it in the Tags panel's places tab and choose Pause.
 - **Smart Lists.** Type a search in the search syntax (`type: hiprio tags: !work`,
   `"exact phrase"`, `OR`, `-word`) and save it as a Smart List. Search Options
   (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) has a Search Presets rule
@@ -227,7 +228,7 @@ The day does not only start with a plan: after the work day's end (or any time t
 still due today under *Not done yet*, and the header reports `Done today: N tasks · Xh Ym of Xh Ym`,
 where the first time sums the durations of the tasks completed today and the second the
 durations of the day's tasks. `y` moves a task to
-tomorrow, `d` picks a date, `r` sends it back to its list, and Return (or *Back to plan*)
+tomorrow, `d` picks a date, `r` takes it off today (its date moves to tomorrow, as in the plan), and Return (or *Back to plan*)
 leaves the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
 posts a "Review your day" notification at the work day's end that opens the review when
 clicked; it fires once a day.
@@ -307,10 +308,13 @@ the table spells them Ctrl and Alt.
 | `c` | Collapse a project or checklist |
 | `p` / `u` | Perform the task's action / open its links |
 | `j` / `f` / `/` | Jump to a list / find a task / find a tag |
-| `Delete` | Delete |
+| `Delete` / `Backspace` (bare), `Ctrl+Backspace` | Delete |
 | `Ctrl+N` / `Ctrl+Alt+N` / `Ctrl+Shift+Alt+N` / `Alt+N` | New task / project / checklist / sub-task |
 | `Ctrl+Shift+N` | New list |
-| `Ctrl+.` | Complete or reopen |
+| `Ctrl+.` / `Ctrl+Alt+.` | Complete or reopen / reopen |
+| `Ctrl+L` / `Ctrl+R` | Move to list… / Tag… |
+| `Ctrl+Shift+Alt+1` / `Ctrl+Shift+Alt+2` / `Ctrl+Shift+Alt+3` | Convert to task / project / checklist |
+| `Ctrl+Alt+0`…`Ctrl+Alt+3` | Priority none…high while editing |
 | `Ctrl+D` | Duplicate |
 | `Ctrl+1`…`Ctrl+5`, `Ctrl+0` | All, Today, Starred, Scheduled, Done; Inbox |
 | `Ctrl+Shift+P` | My Day |
@@ -320,6 +324,10 @@ the table spells them Ctrl and Alt.
 | `Ctrl+Shift+Alt+↑` / `Ctrl+Shift+Alt+↓` | Collapse / expand every list group |
 | `Ctrl+F` / `Ctrl+Shift+O` | Search / Quick Open |
 | `Ctrl+K` / `Ctrl+U` / `Ctrl+O` | Show scheduled / show paused / hide completed |
+| `Ctrl+Shift+K` | Show scheduled and paused |
+| `Ctrl+Shift+E` | Ask in plain English… |
+| `Ctrl+Shift+D` | Export tasks |
+| `Ctrl+Shift+2` | Quick Entry |
 | `Ctrl+Alt+J` | Project view |
 | `Ctrl+Alt+←` / `Ctrl+Alt+→` | Show or hide the Lists / Tags panels (remembered between launches) |
 | `Ctrl+=` / `Ctrl+-` | Text size |
