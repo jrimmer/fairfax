@@ -605,33 +605,36 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("30m of tasks"), 5000);
     }
 
-    // The pane date, the capacity line and the Review today button share one
-    // baseline, at the wide and the narrow window the harness uses.
-    void headerMetadataSharesOneBaseline() {
+    // The date and the Wrap up day button share the title's row and stay
+    // inside the pane; the capacity line sits on its own line below, and also
+    // fits, at the default window and at a narrow one.
+    void headerFitsAtEveryWidth() {
         const QDate today = QDate::currentDate();
         ClockPin pin(QDateTime(today, QTime(9, 0)));
         App app(seedOnePlanned);
         QVERIFY(app.ok);
         QVERIFY(app.openSource("myday"));
-        QQuickItem *cap = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((cap = findItem("myDayCapacity")) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayCapacity") != nullptr, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayReview") != nullptr, 5000);
-        QTest::qWait(300);
-        auto assertAligned = [&] {
+        auto rect = [](QQuickItem *i) { return i->mapRectToScene(QRectF(0, 0, i->width(), i->height())); };
+        auto assertFits = [&](const char *where) {
+            QTest::qWait(300);
+            QQuickItem *title = findItem("paneTitle");
             QQuickItem *date = findItem("paneDate");
-            QQuickItem *cap2 = findItem("myDayCapacity");
             QQuickItem *review = findItem("myDayReview");
-            QVERIFY2(date && cap2 && review, "missing a header metadata item");
-            const qreal b = baselineSceneY(date);
-            QVERIFY2(qAbs(baselineSceneY(cap2) - b) < 1.5,
-                     qPrintable(QString("capacity baseline %1 vs date %2").arg(baselineSceneY(cap2)).arg(b)));
-            QVERIFY2(qAbs(baselineSceneY(review) - b) < 1.5,
-                     qPrintable(QString("button baseline %1 vs date %2").arg(baselineSceneY(review)).arg(b)));
+            QQuickItem *cap = findItem("myDayCapacity");
+            QQuickItem *line = findItem("myDayLine");
+            QVERIFY2(title && date && review && cap && line, where);
+            const QRectF t = rect(title), r = rect(review), c = rect(cap), l = rect(line);
+            QVERIFY2(qAbs(baselineSceneY(review) - baselineSceneY(date)) < 1.5, where);
+            QVERIFY2(r.left() >= rect(date).right() - 0.5, where);
+            QVERIFY2(r.right() <= l.right() + 0.5, qPrintable(QString("%1: button ends at %2, pane at %3").arg(where).arg(r.right()).arg(l.right())));
+            QVERIFY2(c.top() >= t.bottom() - 2, qPrintable(QString("%1: capacity line not below the title").arg(where)));
+            QVERIFY2(c.right() <= l.right() + 0.5, qPrintable(QString("%1: capacity line runs past the pane").arg(where)));
         };
-        assertAligned();
-        app.window->resize(720, 760);
-        QTest::qWait(300);
-        assertAligned();
+        assertFits("default window");
+        app.window->resize(900, 760);
+        assertFits("900 wide");
     }
 
     // The right pane's Day title only shows with calendar sources; without any

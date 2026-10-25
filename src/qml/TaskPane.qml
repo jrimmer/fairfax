@@ -169,7 +169,7 @@ Item {
             Layout.leftMargin: root.contentMargin
             Layout.rightMargin: root.contentMargin
             Layout.topMargin: 4
-            Layout.bottomMargin: 10
+            Layout.bottomMargin: backend.sourceIsMyDay ? 2 : 10
             spacing: 8
 
             // In a project the list name becomes an arrow-shaped badge.
@@ -201,6 +201,68 @@ Item {
                 font.pixelSize: backend.fontSize + 5
                 Layout.alignment: Qt.AlignBaseline
             }
+            // The plan header's "Wrap up day" opens the end-of-day review at
+            // any time (it also opens by itself once the work day is over);
+            // "Back to plan" (or Return) leaves it.
+            Button {
+                objectName: "myDayReview"
+                visible: backend.sourceIsMyDay && !backend.myDayShutdown
+                text: "Wrap up day"
+                flat: true
+                Layout.alignment: Qt.AlignBaseline
+                font.pixelSize: backend.fontSize - 1
+                onClicked: backend.myDayReview()
+            }
+            Button {
+                objectName: "myDayFinish"
+                visible: backend.sourceIsMyDay && backend.myDayShutdown
+                text: "Back to plan"
+                flat: true
+                Layout.alignment: Qt.AlignBaseline
+                font.pixelSize: backend.fontSize - 1
+                onClicked: backend.myDayFinishReview()
+            }
+            Item { Layout.fillWidth: true }
+            Text {
+                visible: backend.selectionSummary !== "" && root.width > 640
+                text: backend.selectionSummary
+                color: theme.muted
+                font.pixelSize: backend.fontSize - 1
+            }
+            IconButton {
+                objectName: "showScheduledButton"
+                visible: backend.hasHidden
+                icon: "clock"
+                checked: backend.showScheduled || backend.showPaused
+                tip: backend.showScheduled ? "Hide Scheduled (Ctrl+K)" : "Show Scheduled (Ctrl+K)"
+                onClicked: backend.showScheduled = !backend.showScheduled
+            }
+            Rectangle { visible: backend.hasHidden; implicitWidth: 1; implicitHeight: 16; color: theme.divider }
+            FocusButton {}
+            IconButton {
+                objectName: "sortReverse"
+                visible: !backend.sourceIsMyDay
+                icon: backend.sortAscending ? "arrowDown" : "arrowUp"
+                size: 15
+                tip: "Reverse Sort"
+                onClicked: backend.toggleSortDirection()
+            }
+            // My Day has its own section order, so it offers no sort control.
+            Loader { active: !backend.sourceIsMyDay; sourceComponent: SortButton {} }
+        }
+
+        // My Day's numbers sit on their own line under the title, so the
+        // title row keeps room for the date and the button at any width.
+        RowLayout {
+            objectName: "myDayLine"
+            visible: backend.sourceIsMyDay
+            Layout.fillWidth: true
+            Layout.leftMargin: root.contentMargin
+            Layout.rightMargin: root.contentMargin
+            Layout.topMargin: -6
+            Layout.bottomMargin: 10
+            spacing: 8
+
             // My Day's capacity line: the day's tasks against the work day left.
             RowLayout {
                 objectName: "myDayCapacity"
@@ -208,7 +270,7 @@ Item {
                 spacing: 6
                 Layout.alignment: Qt.AlignBaseline
                 // A RowLayout has no baseline of its own; report the first
-                // text's so the row aligns with the date and the button.
+                // text's so the row's texts share one baseline.
                 baselineOffset: plannedLabel.y + plannedLabel.baselineOffset
                 readonly property int planned: Number(backend.myDayCapacityMap.plannedMinutes || 0)
                 readonly property int free: Number(backend.myDayCapacityMap.freeMinutes || 0)
@@ -264,54 +326,7 @@ Item {
                     font.pixelSize: backend.fontSize + 1
                 }
             }
-            // The plan header's "Wrap up day" opens the end-of-day review at
-            // any time (it also opens by itself once the work day is over);
-            // "Back to plan" (or Return) leaves it.
-            Button {
-                objectName: "myDayReview"
-                visible: backend.sourceIsMyDay && !backend.myDayShutdown
-                text: "Wrap up day"
-                flat: true
-                Layout.alignment: Qt.AlignBaseline
-                font.pixelSize: backend.fontSize - 1
-                onClicked: backend.myDayReview()
-            }
-            Button {
-                objectName: "myDayFinish"
-                visible: backend.sourceIsMyDay && backend.myDayShutdown
-                text: "Back to plan"
-                flat: true
-                Layout.alignment: Qt.AlignBaseline
-                font.pixelSize: backend.fontSize - 1
-                onClicked: backend.myDayFinishReview()
-            }
             Item { Layout.fillWidth: true }
-            Text {
-                visible: backend.selectionSummary !== "" && root.width > 640
-                text: backend.selectionSummary
-                color: theme.muted
-                font.pixelSize: backend.fontSize - 1
-            }
-            IconButton {
-                objectName: "showScheduledButton"
-                visible: backend.hasHidden
-                icon: "clock"
-                checked: backend.showScheduled || backend.showPaused
-                tip: backend.showScheduled ? "Hide Scheduled (Ctrl+K)" : "Show Scheduled (Ctrl+K)"
-                onClicked: backend.showScheduled = !backend.showScheduled
-            }
-            Rectangle { visible: backend.hasHidden; implicitWidth: 1; implicitHeight: 16; color: theme.divider }
-            FocusButton {}
-            IconButton {
-                objectName: "sortReverse"
-                visible: !backend.sourceIsMyDay
-                icon: backend.sortAscending ? "arrowDown" : "arrowUp"
-                size: 15
-                tip: "Reverse Sort"
-                onClicked: backend.toggleSortDirection()
-            }
-            // My Day has its own section order, so it offers no sort control.
-            Loader { active: !backend.sourceIsMyDay; sourceComponent: SortButton {} }
         }
 
         // A Smart List shows its saved search, editable in place; a typed
