@@ -366,6 +366,65 @@ private slots:
         QVERIFY(!m_store->syncLinks("todoist", "lists").contains(work.id));
     }
 
+    // An abandoned task is closed on Todoist with an "abandoned" label (and
+    // not as a tag here); reopening takes the label off again.
+    void abandonedIsClosedWithALabel() {
+        syncedBase();
+        const qint64 id = byTitle("Alpha").id;
+        edit(id, [](Task &t) { t.completed = true; t.abandoned = true; t.completedAt = QDateTime::currentDateTime(); });
+        runSync();
+        QCOMPARE(m_server.types(), QStringList({"item_update", "item_close"}));
+        const QJsonObject up = m_server.first("item_update").value("args").toObject();
+        QCOMPARE(up.value("labels").toArray(), QJsonArray({"abandoned"}));
+        QVERIFY(m_store->tags().isEmpty());
+
+        m_server.forms.clear();
+        edit(id, [](Task &t) { t.completed = false; t.abandoned = false; t.completedAt = QDateTime(); });
+        runSync();
+        QCOMPARE(m_server.types(), QStringList({"item_uncomplete", "item_update"}));
+        QVERIFY(m_server.first("item_update").value("args").toObject().value("labels").toArray().isEmpty());
+    }
+
+    // A task another Fairfax abandoned arrives abandoned; the label is not a
+    // tag, and a plain closed item is simply done. An item reopened over there
+    // comes back open.
+    void abandonedLabelIsReadBack() {
+        setup();
+        m_server.canned = {
+            {"projects", QJsonArray{project("P0", "Inbox", true)}},
+            {"labels", QJsonArray{QJsonObject{{"id", "L9"}, {"name", "abandoned"}, {"is_deleted", false}}}},
+            {"items", QJsonArray{item("I1", "Dropped", "P0", {{"checked", true}, {"completed_at", "2025-02-01T08:00:00Z"}, {"labels", QJsonArray{"abandoned"}}}),
+                                 item("I2", "Finished", "P0", {{"checked", true}, {"completed_at", "2025-02-01T08:00:00Z"}})}}};
+        runSync();
+        const Task dropped = byTitle("Dropped");
+        QVERIFY(dropped.completed);
+        QVERIFY(dropped.abandoned);
+        QVERIFY(dropped.tagIds.isEmpty());
+        QVERIFY(m_store->tags().isEmpty());
+        QVERIFY(!byTitle("Finished").abandoned);
+        QVERIFY(buildCommands(*m_store).isEmpty());
+
+        m_server.canned = {{"items", QJsonArray{item("I1", "Dropped", "P0", {{"checked", false}, {"labels", QJsonArray{"abandoned"}},
+                                                                            {"updated_at", "2099-01-01T10:00:00Z"}})}}};
+        runSync();
+        QVERIFY(!byTitle("Dropped").completed);
+        QVERIFY(!byTitle("Dropped").abandoned);
+    }
+
+    // Snapshots saved before the field existed must not make every task look
+    // edited.
+    void oldSnapshotsDoNotLookEdited() {
+        syncedBase();
+        QVERIFY(buildCommands(*m_store).isEmpty());
+        const qint64 id = byTitle("Alpha").id;
+        const auto links = m_store->syncLinks("todoist", "tasks");
+        QVERIFY(links.contains(id));
+        Store::SyncLink old = links.value(id);
+        old.snapshot.remove("abandoned");
+        m_store->setSyncLink("todoist", "tasks", old);
+        QVERIFY(buildCommands(*m_store).isEmpty());
+    }
+
     void completedSeriesCopyIsNotPushed() {
         syncedBase();
         Task copy;

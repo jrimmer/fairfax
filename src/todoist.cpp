@@ -52,6 +52,8 @@ QJsonObject projection(const QString &entity, QVariantMap m) {
     }
     for (const char *k : {"modified", "sort_order", "collapsed", "created", "id", "location_ids", "ext", "modified_by", "pending"})
         m.remove(k);
+    // Snapshots from before tasks could be abandoned have no such field.
+    m.insert("abandoned", m.value("abandoned").toBool());
     return QJsonObject::fromVariantMap(m);
 }
 
@@ -173,13 +175,20 @@ QJsonValue durationFor(const Task &t) {
     return QJsonObject{{"amount", t.duration}, {"unit", "minute"}};
 }
 
+// An abandoned task is closed on Todoist and carries this label, which is how
+// another Fairfax tells it from a task that was done. The name is reserved: it
+// is never a tag here.
+const QString AbandonedLabel = QStringLiteral("abandoned");
+
 QStringList labelNames(const Store &s, const Task &t) {
     QStringList names;
     for (qint64 id : t.tagIds) {
         const Tag tag = s.tag(id);
-        if (tag.id && !tag.deleted && !tag.name.isEmpty())
+        if (tag.id && !tag.deleted && !tag.name.isEmpty() && tag.name.compare(AbandonedLabel, Qt::CaseInsensitive) != 0)
             names << tag.name;
     }
+    if (t.abandoned)
+        names << AbandonedLabel;
     return names;
 }
 
@@ -671,6 +680,8 @@ struct Pull {
                 continue;
             const bool deleted = o.value("is_deleted").toBool();
             const QString name = o.value("name").toString();
+            if (name.compare(AbandonedLabel, Qt::CaseInsensitive) == 0)
+                continue;  // The abandoned mark, not a tag.
             qint64 id = tagByRemote.value(rid, 0);
             bool adopt = false;
             if (!id && !deleted) {
@@ -813,9 +824,15 @@ struct Pull {
         t.parentId = par.isEmpty() ? 0 : taskByRemote.value(par, 0);
 
         QList<qint64> tags;
-        for (const auto &n : item.value("labels").toArray())
-            tags << tagFor(n.toString());
+        bool abandonedLabel = false;
+        for (const auto &n : item.value("labels").toArray()) {
+            if (n.toString().compare(AbandonedLabel, Qt::CaseInsensitive) == 0)
+                abandonedLabel = true;
+            else
+                tags << tagFor(n.toString());
+        }
         t.tagIds = tags;
+        t.abandoned = checked && abandonedLabel;
     }
 
     void items(const QJsonArray &incoming) {
