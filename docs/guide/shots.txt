@@ -1,0 +1,38 @@
+# One line per screenshot the guide references:
+#   <file-name>.png | <what it shows> | <how to get it>
+# Every command uses the built-in sample data (--demo). Write the PNGs to docs/guide/img/.
+# The sample data's ids: lists Home=1, Family=2, Errands=3, Work=4, Product Launch=5; Smart Lists Important=6, Calls to make=7;
+# tasks: 7 Daily mobility routine, 8 Call Alex about birthday dinner (has an alert), 9 Weekly review (repeats weekly),
+# 15 Clean kitchen pantry, 16 Email Sam school forms (notes and an email action), 18 Pick up library holds.
+# Commands are meant to run from a checkout (build/fairfax) or an installed fairfax. Add --size to change the window.
+# Several shots are crops of a full-window capture; the crop is named in the last column.
+main-window.png | The whole main window on Today: Lists panel, task list and Tags panel, in the dark scheme | fairfax --demo --screenshot main-window.png --size 1280x800 --scheme dark --source today
+sidebar.png | The Lists panel: My Day, the five focus lists, the Personal and Work groups, two Smart Lists, the mini calendar and sync footer | fairfax --demo --screenshot sidebar.png --size 1280x800 --scheme dark --source today ; then crop to the left 260 px
+list-group.png | The Home list (inside the Personal group) selected, with its tasks in the middle panel | fairfax --demo --screenshot list-group.png --size 1280x800 --scheme dark --source list:1
+quick-entry.png | Quick Entry with a plain-language task typed in and its pills filled in underneath | fairfax --demo --quick --quick-text "Call Sam tomorrow at 3pm #family !! every Monday [30m] /Work/" --screenshot quick-entry.png --size 1280x800 --scheme dark
+task-editor.png | The task editor open on "Email Sam school forms": due date, tags, notes and an email action | fairfax --demo --screenshot task-editor.png --size 1280x800 --scheme dark --source list:2 --edit 16
+focus-lists.png | The five focus lists at the top of the Lists panel (All, Today, Starred, Scheduled, Done) | fairfax --demo --screenshot focus-lists.png --size 1280x800 --scheme dark --source today ; then crop to the top of the left panel
+focus-today.png | Today, with the overdue tasks in red at the top and the rest of the day's tasks below | fairfax --demo --screenshot focus-today.png --size 1280x800 --scheme dark --source today
+focus-scheduled.png | Scheduled, listing the tasks that wait for their start dates | fairfax --demo --screenshot focus-scheduled.png --size 1280x800 --scheme dark --source scheduled
+focus-done.png | Done, listing a few tasks completed just now | fairfax --demo --screenshot focus-done.png --size 1280x800 --scheme dark --source done --shot-eval "backend.toggleComplete(7); backend.toggleComplete(15); backend.toggleComplete(18)"
+project-and-checklist.png | A project with its sub-tasks and a checklist showing its open-item count, in All | fairfax --demo --screenshot project-and-checklist.png --size 1280x800 --scheme dark --source all
+sections.png | The Work list split into the sections This Sprint and Backlog | fairfax --demo --screenshot sections.png --size 1280x800 --scheme dark --source list:4
+tags-panel.png | The Tags panel with its Work, Home and Travel groups | fairfax --demo --screenshot tags-panel.png --size 1400x800 --scheme dark --source all ; then crop to the right panel
+quick-open.png | Quick Open, the box for finding any task or list | fairfax --demo --open --screenshot quick-open.png --size 1280x800 --scheme dark --source today
+search-results.png | A search typed into the search box, with the matching tasks listed | fairfax --demo --screenshot search-results.png --size 1280x800 --scheme dark --source all --shot-eval "backend.search = 'tags: work'"
+search-builder.png | The Search Options rule builder with its rule rows, name chips and the live query | fairfax --demo --screenshot search-builder.png --size 1280x800 --scheme dark --source all --shot-eval "pane.openSearchBuilder()"
+smart-list.png | The Important Smart List with its saved search shown above the tasks | fairfax --demo --screenshot smart-list.png --size 1280x800 --scheme dark --source list:6
+my-day-plan.png | My Day with the Overdue, Today and Could do today sections and the capacity line in the header (needs the new My Day labels) | fairfax --demo --screenshot my-day-plan.png --size 1280x800 --scheme dark --source myday
+my-day-wrap-up.png | The end-of-day review: the Not done yet section, the Done today summary and the Back to plan button (needs the new My Day labels) | fairfax --demo --screenshot my-day-wrap-up.png --size 1280x800 --scheme dark --source myday --shot-eval "backend.toggleComplete(7); backend.toggleComplete(15); backend.myDayReview()"
+repeat-editor.png | The repeat editor open on "Weekly review and plan next sprint": presets, interval, weekdays, After completion and the end rules | fairfax --demo --screenshot repeat-editor.png --size 1280x800 --scheme dark --source list:4 --edit 9 --shot-eval "backend.editField('repeat')"
+editor-alerts.png | The alerts menu open in the task editor, with its presets, Days Before at a Time and At a Date and Time | fairfax --demo --screenshot editor-alerts.png --size 1280x800 --scheme dark --source list:2 --edit 8 --shot-eval "backend.editField('alerts')"
+settings-general.png | Settings, General pane | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 0" --screenshot settings-general.png --scheme dark
+settings-appearance.png | Settings, Appearance pane, in the light scheme to show the contrast | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 1" --screenshot settings-appearance.png --scheme light
+settings-tasks.png | Settings, Tasks pane, including the My Day switches | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 2" --screenshot settings-tasks.png --scheme dark
+settings-today-lists.png | Settings, Today & Lists pane with the Hide lists checkboxes | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 3" --screenshot settings-today-lists.png --scheme dark
+settings-alerts.png | Settings, Alerts pane with Default Reminders | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 4" --screenshot settings-alerts.png --scheme dark
+settings-sync.png | Settings, Sync pane (sync is off in demo mode, so the git section says so) | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 5" --screenshot settings-sync.png --scheme dark
+settings-mail.png | Settings, Mail pane with Gmail chosen | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 6" --screenshot settings-mail.png --scheme dark
+settings-backups.png | Settings, Backups pane (run Back Up Now once beforehand, or the list is empty) | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 7; backend.backupNow()" --screenshot settings-backups.png --scheme dark
+settings-import-export.png | Settings, Import & Export pane | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 8" --screenshot settings-import-export.png --scheme dark
+settings-shortcuts.png | Settings, Shortcuts pane | fairfax --demo --settings --shot-window Settings --shot-eval "settings.pane = 11" --screenshot settings-shortcuts.png --scheme dark
