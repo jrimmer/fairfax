@@ -8,7 +8,7 @@ TARGET = fairfax
 TEMPLATE = app
 # The one place the app version lives: bin/build-macos and bin/build-windows.ps1
 # read it for the app bundle and the installer, and it is compiled in below.
-VERSION = 1.0.2
+VERSION = 1.0.3
 DEFINES += FAIRFAX_VERSION=\\\"$$VERSION\\\"
 
 # SVG is needed by --render-icon on Windows (the .ico) and macOS (the .png
