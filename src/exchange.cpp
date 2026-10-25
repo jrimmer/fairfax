@@ -539,7 +539,7 @@ bool exportCsv(const Store &store, const QString &path, const QList<qint64> &tas
             t.duration > 0 ? QString::number(t.duration) : QString(),
             tagNames.join(", "),
             Recurrences::describe(t.recurrence),
-            t.completed ? "Yes" : "No",
+            t.abandoned ? "Abandoned" : t.completed ? "Yes" : "No",
             t.completed && t.completedAt.isValid() ? t.completedAt.toString("yyyy-MM-dd HH:mm") : QString(),
             t.created.isValid() ? t.created.toString("yyyy-MM-dd HH:mm") : QString(),
         };
@@ -1156,8 +1156,7 @@ ImportResult importTickTick(Store &store, const QString &path) {
             t.completed = true;
             const QDateTime done = tickTickInstant(col(row, "Completed Time"));
             t.completedAt = done.isValid() ? done.toLocalTime() : (created.isValid() ? created.toLocalTime() : QDateTime::currentDateTime());
-            if (status == "-1")
-                t.tagIds.append(tagFor("abandoned"));  // TickTick's "Won't Do".
+            t.abandoned = status == "-1";  // TickTick's "Won't Do".
         }
         for (const auto &name : col(row, "Tags").split(QRegularExpression("[,，]"), Qt::SkipEmptyParts))
             if (const qint64 id = tagFor(name); id && !t.tagIds.contains(id))
@@ -1228,6 +1227,7 @@ ImportResult importTickTick(Store &store, const QString &path) {
             item.parentId = t.id;
             item.title = itemTitle.left(1000);
             item.completed = done || t.completed;
+            item.abandoned = !done && t.abandoned;
             if (item.completed)
                 item.completedAt = t.completedAt.isValid() ? t.completedAt : QDateTime::currentDateTime();
             item.order = ++order;
@@ -1464,8 +1464,8 @@ ImportResult importThingsJson(Store &store, const QByteArray &json) {
             t.completedAt = parseLooseDateTime(doneText, &doneDate, &doneMinutes)
                                 ? QDateTime(doneDate, QTime(0, 0).addSecs(qMax(0, doneMinutes) * 60))
                                 : QDateTime::currentDateTime();
-            if (status.startsWith("cancel"))
-                t.tagIds.append(names.tag("canceled"));
+            // Things' canceled items were closed without being done.
+            t.abandoned = status.startsWith("cancel");
         }
         const QJsonValue tagValue = field(o, {"tags", "tag_names"});
         QStringList tagNames;
@@ -1498,7 +1498,9 @@ ImportResult importThingsJson(Store &store, const QByteArray &json) {
             item.listId = listId;
             item.parentId = t.id;
             item.title = itemTitle.left(1000);
-            item.completed = t.completed || field(c, {"completed"}).toBool() || text(c, {"status"}).toLower() == "completed";
+            const bool itemDone = field(c, {"completed"}).toBool() || text(c, {"status"}).toLower() == "completed";
+            item.completed = t.completed || itemDone;
+            item.abandoned = !itemDone && t.abandoned;
             if (item.completed)
                 item.completedAt = t.completedAt.isValid() ? t.completedAt : QDateTime::currentDateTime();
             item.order = ++itemOrder;
@@ -1673,9 +1675,15 @@ ImportResult importTaskPaperText(Store &store, const QString &text) {
             t.startDate = d;
             t.startTime = minutes;
         }
-        if (p.attrs.contains("done") || p.tags.contains("done", Qt::CaseInsensitive)) {
+        // @done is finished; @dropped (OmniFocus's "won't do") is closed
+        // without being done. An item that is both stays done.
+        const bool done = p.attrs.contains("done") || p.tags.contains("done", Qt::CaseInsensitive);
+        const bool dropped = p.attrs.contains("dropped") || p.tags.contains("dropped", Qt::CaseInsensitive);
+        if (done || dropped) {
             t.completed = true;
-            t.completedAt = parseLooseDateTime(p.attrs.value("done"), &d, &minutes)
+            t.abandoned = dropped && !done;
+            const QString when = p.attrs.value(done ? "done" : "dropped");
+            t.completedAt = parseLooseDateTime(when, &d, &minutes)
                                 ? QDateTime(d, QTime(0, 0).addSecs(qMax(0, minutes) * 60))
                                 : QDateTime::currentDateTime();
         }
@@ -1791,9 +1799,9 @@ QString printHtml(const QString &title, const QVector<PrintSection> &sections, b
             html += "<h2 style=\"font-size: 12pt; margin: 12pt 0 3pt 0; border-bottom: 1px solid #999999;\">" + htmlEscape(section.heading) + "</h2>";
         html += "<table cellspacing=\"0\" cellpadding=\"2\" width=\"100%\">";
         for (const auto &item : section.items) {
-            const QString box = item.done ? QStringLiteral("&#9745;") : QStringLiteral("&#9744;");
+            const QString box = item.abandoned ? QStringLiteral("&#9746;") : item.done ? QStringLiteral("&#9745;") : QStringLiteral("&#9744;");
             QString name = htmlEscape(item.title);
-            if (item.done)
+            if (item.done || item.abandoned)
                 name = "<s style=\"color: #888888;\">" + name + "</s>";
             if (item.starred)
                 name += " &#9733;";
@@ -1834,7 +1842,8 @@ PrintItem printItem(const Store &store, const Task &t, int depth) {
     PrintItem item;
     item.title = t.title;
     item.depth = depth;
-    item.done = t.completed;
+    item.done = t.completed && !t.abandoned;
+    item.abandoned = t.abandoned;
     item.starred = t.starred;
     item.priority = t.priority;
     item.notes = t.notes;
@@ -1854,7 +1863,7 @@ QString tasksAsText(const Store &store, const QList<qint64> &taskIds) {
     QSet<qint64> wanted(taskIds.begin(), taskIds.end());
     std::function<void(const Task &, int)> add = [&](const Task &t, int depth) {
         const QString pad(depth * 4, ' ');
-        out += pad + (t.completed ? "[x] " : "[ ] ") + t.title;
+        out += pad + (t.abandoned ? "[-] " : t.completed ? "[x] " : "[ ] ") + t.title;
         const QString due = dateText(t.dueDate, t.dueTime);
         if (!due.isEmpty())
             out += "  (due " + due + ")";

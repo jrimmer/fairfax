@@ -384,6 +384,9 @@ private slots:
         QCOMPARE(gear.type, int(TaskType::Checklist));
         QVERIFY(named(app, "Amps").parentId == gear.id && named(app, "Cables").parentId == gear.id);
         QVERIFY(named(app, "Old idea").completed);
+        QVERIFY(!named(app, "Old idea").abandoned);
+        // TickTick's "won't do" is closed but not done.
+        QVERIFY(named(app, "Parked idea").completed && named(app, "Parked idea").abandoned);
         // It shows in the sidebar's lists.
         QVERIFY(app.sidebarRow(lk(drums.listId)) != nullptr);
         const int count = liveTitles(app).size();
@@ -408,7 +411,8 @@ private slots:
         QCOMPARE(crates.parentId, project.id);
         QCOMPARE(crates.startDate, QDate(2027, 3, 20));
         QCOMPARE(tk::tagNames(app, crates), (QStringList{"boxes", "urgent"}));
-        QVERIFY(named(app, "Cancel the lease").completed);
+        QVERIFY(named(app, "Cancel the lease").completed && !named(app, "Cancel the lease").abandoned);
+        QVERIFY(named(app, "Book the gala").completed && named(app, "Book the gala").abandoned);
         const Task kit = named(app, "Pack the kit");
         QCOMPARE(kit.type, int(TaskType::Checklist));
         QVERIFY(named(app, "Microphones").completed && !named(app, "Cables").completed);
@@ -450,6 +454,9 @@ private slots:
         QCOMPARE(app.store().groups().value(app.store().list(mix.listId).groupId).name, QString("Studio"));
         QCOMPARE(listName(app, named(app, "Post the parcel")), QString("Errands"));
         QCOMPARE(named(app, "Post the parcel").dueDate, QDate(2027, 3, 9));
+        // OmniFocus's dropped items are closed but not done.
+        QVERIFY(named(app, "Skip the fair").completed && named(app, "Skip the fair").abandoned);
+        QVERIFY(!master.abandoned);
         QVERIFY(app.sidebarRow(lk(mix.listId)) != nullptr);
     }
 

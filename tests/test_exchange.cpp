@@ -538,6 +538,8 @@ private slots:
         QCOMPARE(byTitle(*s, "Wrapped").dueDate, QDate(2026, 8, 1));
         QCOMPARE(byTitle(*s, "Wrapped").notes, "hi");
         QVERIFY(byTitle(*s, "Dropped").completed);
+        QVERIFY(byTitle(*s, "Dropped").abandoned);  // Things' canceled: closed, not done.
+        QVERIFY(!byTitle(*s, "Done thing").abandoned);
 
         // Importing again adds nothing for items that carry an id.
         const ImportResult again = Exchange::importThingsJson(*s, json);
@@ -556,11 +558,13 @@ private slots:
             "\t\t\tNeeds the brief.\n"
             "\t\t\t- Outline @home\n"
             "\t\t- Ship it @defer(2026-07-01) @done(2026-07-02)\n"
+            "\t\t- Old plan @dropped(2026-07-03)\n"
+            "\t\t- Never mind @dropped\n"
             "Personal:\n"
             "\t- Call mom @due(2026-07-10)\n");
         const ImportResult r = Exchange::importTaskPaperText(*s, text);
         QVERIFY2(r.error.isEmpty(), qPrintable(r.error));
-        QCOMPARE(r.tasks, 5);
+        QCOMPARE(r.tasks, 7);
         QCOMPARE(s->list(byTitle(*s, "Inbox thing").listId).name, "Inbox");
         QVERIFY(byTitle(*s, "Inbox thing").starred);
         const Task copy = byTitle(*s, "Write copy");
@@ -574,6 +578,14 @@ private slots:
         QCOMPARE(byTitle(*s, "Outline").tagIds.size(), 1);
         const Task ship = byTitle(*s, "Ship it");
         QVERIFY(ship.completed);
+        QVERIFY(!ship.abandoned);
+        // OmniFocus's dropped items are closed but were not done.
+        const Task plan = byTitle(*s, "Old plan");
+        QVERIFY(plan.completed);
+        QVERIFY(plan.abandoned);
+        QCOMPARE(plan.completedAt.date(), QDate(2026, 7, 3));
+        QVERIFY(plan.tagIds.isEmpty());
+        QVERIFY(byTitle(*s, "Never mind").abandoned);
         QCOMPARE(ship.startDate, QDate(2026, 7, 1));
         QCOMPARE(ship.parentId, 0);
         // The folder became a group holding the Website list; Personal is its own list.

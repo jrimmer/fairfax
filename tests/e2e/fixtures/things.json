@@ -4,7 +4,8 @@
    "items": [
      {"type": "to-do", "uuid": "TD-CRATES", "title": "Order crates", "tags": ["boxes", "urgent"], "when": "2027-03-20"},
      {"type": "to-do", "uuid": "TD-LEASE", "title": "Cancel the lease", "status": "completed",
-      "completion_date": "2027-01-05T09:00:00Z"}
+      "completion_date": "2027-01-05T09:00:00Z"},
+     {"type": "to-do", "uuid": "TD-GALA", "title": "Book the gala", "status": "canceled"}
    ]},
   {"type": "to-do", "uuid": "TD-KIT", "title": "Pack the kit",
    "checklist": [{"title": "Cables"}, {"title": "Microphones", "completed": true}]},

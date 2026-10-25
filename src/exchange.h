@@ -98,6 +98,7 @@ struct PrintItem {
     int depth = 0;
     int priority = 0;
     bool done = false;
+    bool abandoned = false;
     bool starred = false;
 };
 struct PrintSection {

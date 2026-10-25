@@ -91,7 +91,9 @@ private slots:
 
         const Task idea = find(store, "Old idea");
         QVERIFY(idea.completed);
-        QCOMPARE(store.tag(idea.tagIds.value(0)).name, QString("abandoned"));
+        QVERIFY(idea.abandoned);  // TickTick's "won't do" (status -1).
+        QVERIFY(idea.tagIds.isEmpty());
+        QVERIFY(!find(store, "Change filter").abandoned);
     }
 
     void reimportAddsNothingAndUndoesInOneStep() {
