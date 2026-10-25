@@ -77,7 +77,8 @@ copy's `modified`.
    of now and the old value plus one.
 4. Write all the fields the record needs (see the field tables). A missing field gets its
    default, and Fairfax then writes the defaulted record back, so omissions are not preserved.
-5. Keep other fields as you read them. Fairfax drops keys it does not know.
+5. Keep the fields you read and do not understand. Fairfax keeps `ext` (below) and drops every other key it
+   does not know, so put your own data under `ext.<your-name>`.
 
 A record with a missing or non-numeric `modified` counts as time 0: it loses to every existing
 local record, and a new one is stamped with the time it arrived. A `modified` far in the future
@@ -108,6 +109,13 @@ becomes "none", and the next write-back stores the empty value, so the link is l
 Commit referenced records in the same commit as, or before, the records that point at them.
 New alarms and attachments whose task is unknown are not imported at all.
 
+**Data from other writers.** Every record kind may carry an `ext` object: `"ext": {"<writer-name>": {...}}`.
+Fairfax stores it as it is, never reads into it, and writes it back unchanged (keys sorted like the
+rest of the file). It is omitted when empty. Put your own data under one key that names your program
+(`ext.acme-sync`) and leave the other writers' keys alone. Copying a task in Fairfax (duplicate,
+the copy a repeating task leaves behind) does not copy `ext`. Numbers inside `ext` are read as
+doubles, so integers above 2^53 lose precision; store such values as strings.
+
 **Excluded lists.** A user can mark a list "Don't Sync This List" on one machine. That machine
 neither writes nor imports the list's files or anything that belongs to it. Another machine's
 files for it stay in the repository untouched.
@@ -125,6 +133,7 @@ Folder `list-groups/`. A group holds lists in the sidebar.
 | `color` | integer | Palette index lists in the group take on; `-1` for none | no | `-1` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `list-groups/10000000-0000-4000-8000-000000000001.json`
 
@@ -166,6 +175,7 @@ Folder `lists/`. A list holds tasks. A list is normal, the Inbox, or a Smart Lis
 | `mute_alerts` | bool | Alerts of this list's tasks stay silent | no | `false` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `lists/20000000-0000-4000-8000-000000000001.json`
 
@@ -175,6 +185,11 @@ Sample: `lists/20000000-0000-4000-8000-000000000001.json`
     "color": 4,
     "completed_mode": 0,
     "deleted": false,
+    "ext": {
+        "acme-sync": {
+            "id": "P-7"
+        }
+    },
     "group_uid": "10000000-0000-4000-8000-000000000001",
     "include_scheduled": false,
     "kind": 0,
@@ -235,6 +250,7 @@ Folder `sections/`. A section is a heading inside a list that groups tasks.
 | `sort_order` | number | Position among the list's sections, ascending | no | `0` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `sections/30000000-0000-4000-8000-000000000001.json`
 
@@ -261,6 +277,7 @@ Folder `tag-groups/`.
 | `collapsed` | bool | Shown collapsed in the sidebar | no | `false` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `tag-groups/40000000-0000-4000-8000-000000000001.json`
 
@@ -288,6 +305,7 @@ Folder `tags/`.
 | `sort_order` | number | Position among tags, ascending | no | `0` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `tags/50000000-0000-4000-8000-000000000001.json`
 
@@ -333,6 +351,7 @@ Folder `locations/`. A saved place a task can carry.
 | `paused` | bool | A paused location hides the tasks that carry it | no | `false` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `locations/60000000-0000-4000-8000-000000000001.json`
 
@@ -391,6 +410,7 @@ Folder `tasks/`. See "Tasks in depth" below for how the fields work together.
 | `created` | integer or null | Seconds since epoch, UTC; if absent Fairfax uses `modified` | no | `modified` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 A project with a subtask, tags, a location and a deadline at 17:00:
 
@@ -408,6 +428,12 @@ Sample: `tasks/70000000-0000-4000-8000-000000000001.json`
     "due_date": "2026-10-30",
     "due_time": 1020,
     "duration": 90,
+    "ext": {
+        "acme-sync": {
+            "etag": "9f3c",
+            "id": "T-1042"
+        }
+    },
     "list_uid": "20000000-0000-4000-8000-000000000001",
     "location_uids": [
         "60000000-0000-4000-8000-000000000001"
@@ -660,6 +686,7 @@ user adds them; the importer does not).
 | `fired_for` | integer or null | The fire moment it last went off for | no | `null` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `alarms/80000000-0000-4000-8000-000000000001.json`
 
@@ -715,6 +742,7 @@ file; the bytes are a separate file in `attachment-files/`.
 | `created` | integer or null | Seconds since epoch, UTC; if absent Fairfax uses `modified` | no | `modified` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
+| `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
 
 Sample: `attachments/90000000-0000-4000-8000-000000000001.json`
 

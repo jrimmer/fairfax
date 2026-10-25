@@ -81,8 +81,15 @@ QString idList(const QJsonArray &uids, const QHash<QString, qint64> &uid) {
     return ids.join(',');
 }
 
+// "ext" is stored as compact JSON text: a writer's own data, never interpreted.
+QString extText(const QJsonValue &value) {
+    const QJsonObject o = value.toObject();
+    return o.isEmpty() ? QString() : QString::fromUtf8(QJsonDocument(o).toJson(QJsonDocument::Compact));
+}
+
 QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     map.remove("id");
+    const QString ext = map.take("ext").toString();
     QJsonArray tagUids;
     QJsonArray locationUids;
     switch (kind) {
@@ -106,6 +113,9 @@ QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     default: break;
     }
     QJsonObject obj = QJsonObject::fromVariantMap(map);
+    const QJsonObject extObject = QJsonDocument::fromJson(ext.toUtf8()).object();
+    if (!extObject.isEmpty())
+        obj.insert("ext", extObject);
     if (kind == KTask) {
         obj.insert("tag_uids", tagUids);
         obj.insert("location_uids", locationUids);
@@ -117,6 +127,7 @@ QByteArray bytesOf(const QJsonObject &obj) { return QJsonDocument(obj).toJson(QJ
 
 QVariantMap fromJson(Kind kind, const QJsonObject &obj, const Maps &x, qint64 id) {
     QVariantMap map = obj.toVariantMap();
+    map.insert("ext", extText(obj.value("ext")));
     auto swapBack = [&](const char *uidKey, const char *idKey, Kind target) {
         const QString u = map.take(uidKey).toString();
         map.insert(idKey, u.isEmpty() ? 0 : x.uid[target].value(u, 0));

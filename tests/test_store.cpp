@@ -366,6 +366,31 @@ private slots:
         QCOMPARE(s->tagGroups().begin()->name, QString("Context"));
     }
 
+    void extPersistsAndIsNotCopied() {
+        const QString ext = R"({"acme":{"n":[1,2],"x":"y"}})";
+        qint64 id;
+        {
+            auto s = open();
+            id = put(*s, "Has ext");
+            Task t = s->task(id);
+            t.ext = ext;
+            s->begin("ext");
+            s->putTask(t);
+            s->commit();
+        }
+        auto s = open();
+        QCOMPARE(s->task(id).ext, ext);
+        // A copy (saved without a uid) is a new record and keeps none of it.
+        Task copy = s->task(id);
+        copy.id = s->nextId("tasks");
+        copy.uid.clear();
+        s->begin("copy");
+        s->putTask(copy);
+        s->commit();
+        QVERIFY(s->task(copy.id).ext.isEmpty());
+        QCOMPARE(s->task(id).ext, ext);
+    }
+
     void newUidsAreUnique() {
         QVERIFY(Store::newUid() != Store::newUid());
         QVERIFY(!Store::newUid().isEmpty());

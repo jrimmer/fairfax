@@ -188,6 +188,22 @@ class FolderSyncTest : public QObject {
         return n;
     }
 
+    static QJsonObject readJson(const QString &path) {
+        QFile f(path);
+        return f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+    }
+
+    static void writeJson(const QString &path, const QJsonObject &obj) {
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(QJsonDocument(obj).toJson(QJsonDocument::Indented));
+    }
+
+    static QString taskFile(const QString &folder, const Store &s, qint64 id) {
+        return folder + "/tasks/" + s.task(id).uid + ".json";
+    }
+
     static bool syncs(Store &s, SyncTree::Remote &r, const QString &mirror, SyncTree::FirstSync first = SyncTree::FirstSync::Merge) {
         const auto out = SyncTree::sync(s, r, mirror, first);
         if (!out.ok)
@@ -237,6 +253,65 @@ private slots:
         QVERIFY(syncs(*a.store, remote, a.mirror));
         QVERIFY(syncs(*b.store, remote, b.mirror));
         QVERIFY(!find(*b.store, "Parent"));
+    }
+
+    void extIsKeptVerbatimAndWrittenBack() {
+        const QString folder = m_dir.filePath("ext1"); QDir().mkpath(folder);
+        SyncTree::FolderRemote remote(folder);
+        Machine a = machine("a"), b = machine("b");
+        const qint64 list = addList(*a.store, "L");
+        const qint64 id = addTask(*a.store, "Task", list);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        // Another writer adds its data to the file, with a larger `modified`.
+        const QString file = taskFile(folder, *a.store, id);
+        QJsonObject obj = readJson(file);
+        QVERIFY(!obj.contains("ext"));  // omitted when empty
+        obj["ext"] = QJsonObject{{"zeta", QJsonObject{{"b", 2}, {"a", QJsonArray{1, "two"}}}}, {"acme", QJsonObject{{"id", "X-1"}}}};
+        obj["modified"] = obj.value("modified").toInteger() + 10;
+        obj["unknown_key"] = "dropped";
+        writeJson(file, obj);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(a.store->task(id).ext, QString(R"({"acme":{"id":"X-1"},"zeta":{"a":[1,"two"],"b":2}})"));
+        // It comes back unchanged, still under both writer names; other unknown keys are gone.
+        const QJsonObject back = readJson(file);
+        QCOMPARE(back.value("ext"), obj.value("ext"));
+        QVERIFY(!back.contains("unknown_key"));
+        QVERIFY(syncs(*b.store, remote, b.mirror));
+        QCOMPARE(b.store->task(find(*b.store, "Task")).ext, a.store->task(id).ext);
+        QVERIFY(syncs(*b.store, remote, b.mirror));
+        QCOMPARE(readJson(file).value("ext"), obj.value("ext"));
+        // An ext that is not an object is not kept.
+        obj["ext"] = "text";
+        obj["modified"] = obj.value("modified").toInteger() + 10;
+        writeJson(file, obj);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QVERIFY(a.store->task(id).ext.isEmpty());
+        QVERIFY(!readJson(file).contains("ext"));
+    }
+
+    void everyRecordKindKeepsExt() {
+        const QString folder = m_dir.filePath("ext2"); QDir().mkpath(folder);
+        SyncTree::FolderRemote remote(folder);
+        Machine a = machine("a"), b = machine("b");
+        const QJsonObject ext{{"acme", QJsonObject{{"k", 1}}}};
+        const QMap<QString, QString> files{{"list-groups", "G1"}, {"lists", "L1"}, {"sections", "S1"}, {"tag-groups", "TG1"},
+                                           {"tags", "T1"}, {"locations", "LOC1"}, {"tasks", "K1"}, {"alarms", "A1"},
+                                           {"attachments", "AT1"}};
+        const qint64 base = 1792000000;
+        for (auto it = files.cbegin(); it != files.cend(); ++it) {
+            QJsonObject o{{"modified", base}, {"name", "n"}, {"title", "n"}, {"ext", ext}};
+            if (it.key() == "sections")
+                o["list_uid"] = "L1";
+            if (it.key() == "tasks")
+                o["list_uid"] = "L1";
+            if (it.key() == "alarms" || it.key() == "attachments")
+                o["task_uid"] = "K1";
+            writeJson(folder + "/" + it.key() + "/" + it.value() + ".json", o);
+        }
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QVERIFY(syncs(*b.store, remote, b.mirror));
+        for (auto it = files.cbegin(); it != files.cend(); ++it)
+            QCOMPARE(readJson(b.mirror + "/" + it.key() + "/" + it.value() + ".json").value("ext").toObject(), ext);
     }
 
     void junkFilesInTheFolderAreIgnored() {

@@ -96,6 +96,7 @@ struct Task {
     QDateTime created;
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static Task fromMap(const QVariantMap &map);
@@ -110,6 +111,7 @@ struct ListGroup {
     int color = -1;           // Palette index its lists take on ("Color grouped lists"); -1 for none.
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static ListGroup fromMap(const QVariantMap &map);
@@ -156,6 +158,7 @@ struct TaskList {
     bool muteAlerts = false;  // Alerts for this list's tasks stay silent.
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static TaskList fromMap(const QVariantMap &map);
@@ -169,6 +172,7 @@ struct TagGroup {
     bool collapsed = false;
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static TagGroup fromMap(const QVariantMap &map);
@@ -183,6 +187,7 @@ struct Tag {
     double order = 0;
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static Tag fromMap(const QVariantMap &map);
@@ -205,6 +210,7 @@ struct Alarm {
     QDateTime firedFor;       // The fire moment it last went off for, so a moved due date re-arms it.
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static Alarm fromMap(const QVariantMap &map);
@@ -222,6 +228,7 @@ struct Location {
     bool paused = false;
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static Location fromMap(const QVariantMap &map);
@@ -242,6 +249,7 @@ struct Attachment {
     QDateTime created;
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static Attachment fromMap(const QVariantMap &map);
@@ -257,6 +265,7 @@ struct ListSection {
     double order = 0;
     QDateTime modified;
     bool deleted = false;
+    QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
 
     QVariantMap toMap() const;
     static ListSection fromMap(const QVariantMap &map);

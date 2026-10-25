@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 8;
+constexpr int SchemaVersion = 9;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -28,6 +28,14 @@ const char *SyncColumns = R"(
 )";
 
 const QStringList Tables{"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections", "proposals"};
+
+// A record saved without a uid is a new one (a copy of another, say): it gets
+// its own uid and none of the other writers' data the original carried.
+template <typename Record>
+void startRecord(Record &r) {
+    r.uid = Store::newUid();
+    r.ext.clear();
+}
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
 
@@ -229,6 +237,11 @@ bool Store::migrate(QString *error) {
             created INTEGER))"),
     };
 
+    // Version 9 keeps other writers' data (the sync files' "ext") as JSON text.
+    QStringList version9;
+    for (const char *table : {"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections"})
+        version9 << QStringLiteral("ALTER TABLE %1 ADD COLUMN ext TEXT NOT NULL DEFAULT ''").arg(table);
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -246,6 +259,8 @@ bool Store::migrate(QString *error) {
         steps += version7;
     if (version < 8)
         steps += version8;
+    if (version < 9)
+        steps += version9;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();
@@ -343,7 +358,7 @@ void Store::record(const QString &table, qint64 id, const QVariantMap &before, c
 void Store::putTask(const Task &t) {
     Task copy = t;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     if (!copy.created.isValid())
@@ -354,7 +369,7 @@ void Store::putTask(const Task &t) {
 void Store::putList(const TaskList &l) {
     TaskList copy = l;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("lists", copy.id, cached("lists", copy.id), copy.toMap());
@@ -363,7 +378,7 @@ void Store::putList(const TaskList &l) {
 void Store::putGroup(const ListGroup &g) {
     ListGroup copy = g;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("list_groups", copy.id, cached("list_groups", copy.id), copy.toMap());
@@ -372,7 +387,7 @@ void Store::putGroup(const ListGroup &g) {
 void Store::putTag(const Tag &t) {
     Tag copy = t;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("tags", copy.id, cached("tags", copy.id), copy.toMap());
@@ -381,7 +396,7 @@ void Store::putTag(const Tag &t) {
 void Store::putAlarm(const Alarm &a) {
     Alarm copy = a;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("alarms", copy.id, cached("alarms", copy.id), copy.toMap());
@@ -390,7 +405,7 @@ void Store::putAlarm(const Alarm &a) {
 void Store::putLocation(const Location &l) {
     Location copy = l;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("locations", copy.id, cached("locations", copy.id), copy.toMap());
@@ -399,7 +414,7 @@ void Store::putLocation(const Location &l) {
 void Store::putSection(const ListSection &section) {
     ListSection copy = section;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("sections", copy.id, cached("sections", copy.id), copy.toMap());
@@ -419,7 +434,7 @@ QVector<ListSection> Store::sectionsOf(qint64 listId) const {
 void Store::putAttachment(const Attachment &a) {
     Attachment copy = a;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     if (!copy.created.isValid())
@@ -471,7 +486,7 @@ QString Store::attachmentsFolder() const { return QFileInfo(m_path).absolutePath
 void Store::putTagGroup(const TagGroup &g) {
     TagGroup copy = g;
     if (copy.uid.isEmpty())
-        copy.uid = newUid();
+        startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         copy.modified = QDateTime::currentDateTime();
     record("tag_groups", copy.id, cached("tag_groups", copy.id), copy.toMap());
