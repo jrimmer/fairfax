@@ -205,7 +205,7 @@ jobs:
 
           Install on Linux with one line:
 
-              curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+              curl -fsSL https://github.com/jrimmer/fairfax/releases/latest/download/install.sh | bash
 
           Prefer a package? Download the one for your system:
 

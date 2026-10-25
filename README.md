@@ -10,7 +10,7 @@ database, synced between machines through a git repository you choose.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+curl -fsSL https://github.com/jrimmer/fairfax/releases/latest/download/install.sh | bash
 ```
 
 One line: it downloads the latest release, verifies every file against its
@@ -225,7 +225,7 @@ The day does not only start with a plan: after the work day's end (or any time t
 *Review today* in the plan header) My Day opens its shutdown review. It lists the tasks
 still due today, and the header reports `Completed today: N · planned Xh Ym, done Xh Ym`,
 where *done* sums the durations of the tasks completed today. `y` moves a task to
-tomorrow, `d` picks a date, `r` sends it back to its list, and Return (or *Finish*) leaves
+tomorrow, `d` picks a date, `r` sends it back to its list, and Return (or *Close Review*) leaves
 the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
 posts a "Review your day" notification at the work day's end that opens the review when
 clicked; it fires once a day.

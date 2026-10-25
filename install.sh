@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fairfax one-line installer. Read this before piping it to bash:
 #
-#   curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+#   curl -fsSL https://github.com/jrimmer/fairfax/releases/latest/download/install.sh | bash
 #
 # Flags (pass them through bash -s --):
 #
@@ -23,7 +23,7 @@ usage() {
     cat <<'USAGE'
 Fairfax one-line installer. Read this before piping it to bash:
 
-  curl -fsSL https://raw.githubusercontent.com/jrimmer/fairfax/main/install.sh | bash
+  curl -fsSL https://github.com/jrimmer/fairfax/releases/latest/download/install.sh | bash
 
 Flags (pass them through bash -s --):
 

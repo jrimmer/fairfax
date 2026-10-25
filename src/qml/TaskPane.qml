@@ -245,10 +245,13 @@ Item {
                 visible: backend.sourceIsMyDay && backend.myDayShutdown
                 spacing: 6
                 Layout.alignment: Qt.AlignBaseline
+                // As with the capacity row: report the first text's baseline.
+                baselineOffset: completedLabel.y + completedLabel.baselineOffset
                 readonly property int completed: Number(backend.myDaySummaryMap.completedCount || 0)
                 readonly property int planned: Number(backend.myDaySummaryMap.plannedMinutes || 0)
                 readonly property int done: Number(backend.myDaySummaryMap.doneMinutes || 0)
                 Text {
+                    id: completedLabel
                     text: "Completed today: " + parent.completed
                     color: theme.muted
                     font.pixelSize: backend.fontSize + 1
@@ -260,8 +263,9 @@ Item {
                     font.pixelSize: backend.fontSize + 1
                 }
             }
-            // The plan header's "Review today" opens the shutdown review at
-            // any time; its "Finish" (or Return) leaves it.
+            // The plan header's "Review today" opens the end-of-day review at
+            // any time (it also opens by itself once the work day is over);
+            // "Close Review" (or Return) goes back to the plan.
             Button {
                 objectName: "myDayReview"
                 visible: backend.sourceIsMyDay && !backend.myDayShutdown
@@ -274,7 +278,7 @@ Item {
             Button {
                 objectName: "myDayFinish"
                 visible: backend.sourceIsMyDay && backend.myDayShutdown
-                text: "Finish"
+                text: "Close Review"
                 flat: true
                 Layout.alignment: Qt.AlignBaseline
                 font.pixelSize: backend.fontSize - 1
