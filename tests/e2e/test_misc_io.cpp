@@ -453,8 +453,8 @@ private slots:
         QVERIFY(app.sidebarRow(lk(mix.listId)) != nullptr);
     }
 
-    // From a the reference app database (or a .taskdb backup): lists, groups, tags, dates, repeats, alerts.
-    void importTaskDatabase() {
+    // From a task database file: lists, groups, tags, dates, repeats, alerts.
+    void importFromTaskDb() {
         QTemporaryDir dir;
         const QString db = dir.filePath("tasks.db");
         {

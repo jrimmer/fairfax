@@ -21,10 +21,10 @@ const char *TaskTwo =
     "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Fairfax//EN\r\nBEGIN:VTODO\r\nUID:two\r\n"
     "SUMMARY:Second\r\nLAST-MODIFIED:20250101T000000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
 
-// A VTODO carrying the reference app's own metadata, to prove it survives an edit here.
-const char *TwoDoTask =
-    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//EN\r\nBEGIN:VTODO\r\nUID:twodo\r\n"
-    "SUMMARY:From the reference app\r\nDESCRIPTION:Note text\\n<App Meta>{\"x\":1}</App Meta>\r\n"
+// A VTODO carrying another client's own metadata, to prove it survives an edit here.
+const char *VendorTask =
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//EN\r\nBEGIN:VTODO\r\nUID:vendor\r\n"
+    "SUMMARY:From another client\r\nDESCRIPTION:Note text\\n<Example Meta>{\"x\":1}</Example Meta>\r\n"
     "X-EXAMPLE-FOO;X=1:bar\r\nLAST-MODIFIED:20250101T000000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
 
 }  // namespace
@@ -574,15 +574,15 @@ private slots:
         QCOMPARE(m_server->tasks()->resources.size(), serverTasks);
     }
 
-    void twoDoMetadataSurvivesAnEdit() {
+    void vendorMetadataSurvivesAnEdit() {
         Account a = makeAccount();
         addList(*a.store, "Tasks");
         connect(a, *m_server);
         QVERIFY(a.sync->syncBlocking().ok);
-        m_server->editFromAnotherClient(QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("twodo.ics"),
-                                        QByteArray(TwoDoTask));
+        m_server->editFromAnotherClient(QStringLiteral("/calendars/jane/tasks/"), QStringLiteral("vendor.ics"),
+                                        QByteArray(VendorTask));
         QVERIFY(a.sync->syncBlocking().ok);
-        const qint64 id = find(*a.store, "From the reference app");
+        const qint64 id = find(*a.store, "From another client");
         QVERIFY(id);
 
         Task t = a.store->task(id);
@@ -591,11 +591,11 @@ private slots:
         edit(*a.store, t);
         QVERIFY(a.sync->syncBlocking().ok);
 
-        const QByteArray body = m_server->tasks()->resources.value(QStringLiteral("/calendars/jane/tasks/twodo.ics"));
+        const QByteArray body = m_server->tasks()->resources.value(QStringLiteral("/calendars/jane/tasks/vendor.ics"));
         QVERIFY(!body.isEmpty());
         QVERIFY(body.contains("Edited in Fairfax"));
         QVERIFY(body.contains("X-EXAMPLE-FOO;X=1:bar"));
-        QVERIFY(body.contains("<App Meta>{\"x\":1}</App Meta>"));
+        QVERIFY(body.contains("<Example Meta>{\"x\":1}</Example Meta>"));
     }
 
     // -------------------------------------------- unknown etag on a new write

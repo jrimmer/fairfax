@@ -3,7 +3,7 @@
 // Builds what the three panes show. Given the store, the selected source
 // (a focus list, a list or a project) and the view options, it decides which
 // tasks are visible, how they nest, which sections they fall into and how
-// they sort, following the reference app's focus-list and Smart Scheduling rules.
+// they sort, following the focus-list and Smart Scheduling rules.
 
 #include <QDateTime>
 #include <QHash>
@@ -34,7 +34,7 @@ struct ViewOptions {
     int completedWindowMinutes = 24 * 60;  // -1 keeps completed tasks forever, 0 hides them at once.
     QSet<qint64> tagFilter;
     QSet<qint64> locationFilter;
-    QString search;  // the reference app search syntax; see query.h.
+    QString search;  // Search syntax; see query.h.
     bool soundex = false;
     QStringList focusConditions;  // Focus Filter conditions, OR-combined; empty when the filter is off.
     QDate dayFilterFrom;
@@ -117,14 +117,14 @@ public:
     static bool matchesFocusCondition(const Task &task, const QString &condition, const QDateTime &now,
                                       const ScheduleSettings &settings);
     // Archived lists are normally out of sight; Smart Lists and Done pass
-    // `allowArchived` because the reference app keeps feeding them from the archive.
+    // `allowArchived` because they keep feeding them from the archive.
     bool listVisible(qint64 listId, bool allowArchived = false) const;
     // The "lists.hidden" setting: uids of the lists kept out of sight.
     static QSet<QString> hiddenListUids(const Store &store);
     QString sourceTitle(const Source &source) const;
     QVector<TaskList> orderedLists() const;  // Sidebar order: ungrouped first, then by group.
     QVector<Task> children(qint64 parentId) const;  // Sorted by manual order.
-    // A project or checklist's own sort (the reference app's Sort Project), or manual.
+    // A project or checklist's own sort or manual.
     SortSpec projectSort(qint64 parentId) const;
     // Tags as the Tags panel lists them: ungrouped first, then by group, then
     // alphabetically or, with the "tags.manual" setting, in their own order.

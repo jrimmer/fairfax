@@ -30,7 +30,7 @@ _fairfax() {
     case $prev in
         --db|--theme-dir|--screenshot) COMPREPLY=($(compgen -f -- "$cur")); return ;;
         --source) COMPREPLY=($(compgen -W "all today starred scheduled done" -- "$cur")); return ;;
-        import) COMPREPLY=($(compgen -f -X '!*.@(csv|ics|db|taskdb)' -- "$cur") $(compgen -d -- "$cur")); return ;;
+        import) COMPREPLY=($(compgen -f -- "$cur") $(compgen -d -- "$cur")); return ;;
         --maildir) COMPREPLY=($(compgen -d -- "$cur")); return ;;
         --list) local IFS=$'\n'; COMPREPLY=($(compgen -W "$(_fairfax_values lists)" -- "$cur")); return ;;
         ctl) COMPREPLY=($(compgen -W "help url $(_fairfax_values ctl)" -- "$cur")); return ;;

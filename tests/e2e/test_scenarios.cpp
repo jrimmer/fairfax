@@ -1,5 +1,5 @@
 // End-to-end scenarios: each boots the real window on a fresh temporary
-// database and does what the the reference app manual says a user does, with the mouse and
+// database and does what a user does, with the mouse and
 // keyboard, then checks the result in the store or on screen.
 
 #include "harness.h"
@@ -83,8 +83,7 @@ private slots:
         QCOMPARE(app.taskTitled("Send the invoice").dueDate, QDate::currentDate());
     }
 
-    // "The first column of every task row is a checkbox. Click it to mark
-    // complete." (the-window.md) and "Edit > Undo (⌘Z)" (backups.md).
+    // Ticking a row's checkbox completes it, and Undo (Ctrl+Z) restores it.
     void checkboxCompletesAndUndoRestores() {
         App app;
         QVERIFY(app.ok);

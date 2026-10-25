@@ -263,7 +263,7 @@ int shorthand(Store &store, const QStringList &args, QTextStream &out, QTextStre
                "frfx                    Today, numbered\n"
                "frfx ls [all|starred|scheduled|done|<list>]\n"
                "frfx done <n> [<n>…]    complete tasks by number\n"
-               "frfx find <words>       search everything (the reference app search syntax works)\n"
+               "frfx find <words>       search everything (search syntax works)\n"
                "frfx open               open Fairfax\n"
                "fairfax ctl myday       open My Day in the running window\n"
                "frfx add <task>         add a task that starts with one of these words\n";

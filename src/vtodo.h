@@ -5,7 +5,7 @@
 // per resource. toIcs() writes a single VTODO with its own VCALENDAR wrapper;
 // fromIcs() reads it back. Anything Fairfax does not map is kept in Extra and
 // written again, so properties and sub-components belonging to other clients
-// (the reference app's X-EXAMPLE-* and <App Meta> notes block, Apple's X-APPLE-*, unknown
+// (vendor X-* properties and "<Something Meta>" notes blocks, Apple's X-APPLE-*, unknown
 // VALARMs) survive a round trip without being interpreted.
 
 #include <QByteArray>
@@ -37,7 +37,7 @@ struct Extra {
     QStringList properties;              // Unknown VTODO properties, verbatim content lines.
     QList<QStringList> components;       // Unknown sub-components, each its BEGIN..END lines.
     QList<QStringList> alarmProperties;  // Unknown properties of each mapped VALARM, in order.
-    QString meta;                        // The <App Meta> block, without a trailing newline.
+    QString meta;                        // The "<Something Meta>" block, without a trailing newline.
     int sequence = -1;                   // The SEQUENCE last seen, or -1 for none.
 };
 

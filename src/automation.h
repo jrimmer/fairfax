@@ -1,9 +1,9 @@
 #pragma once
 
-// Fairfax's automation layer, mirroring the reference app's 26-command Automation Suite.
+// Fairfax's automation layer.
 // One command table serves three front ends: the `fairfax ctl` command line,
 // an MCP server on stdio (for Claude Co-Work and other agents) and the
-// fairfax:// URL scheme. Commands use the reference app's snake_case names and argument
+// fairfax:// URL scheme. Commands use the snake_case names and argument
 // names, are strict about unknown keys, and every mutating command is exactly
 // one store change, so the app's undo reverses it.
 
@@ -50,7 +50,7 @@ public:
     // response to `out`; returns 0 when the command succeeded and 1 otherwise.
     int runCli(const QStringList &args, QTextStream &out, QTextStream &err);
 
-    // fairfax://x-callback-url/<action>?...; see url-schemes in the reference app's manual.
+    // fairfax://x-callback-url/<action>?...; see url-schemes in the manual.
     // Actions that need the window use the callbacks when set, and always
     // describe what they want in the result ("source", "task_id", "search",
     // "quickEntry") so the caller can act on it.

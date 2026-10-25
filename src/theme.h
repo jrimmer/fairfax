@@ -1,6 +1,6 @@
 #pragma once
 
-// Follows the Omarchy theme live. Fairfax needs more than the accent: the reference app's
+// Follows the Omarchy theme live. Fairfax needs more than the accent: the
 // look leans on semantic colors (overdue red, start-date green, duration
 // purple, per-list colors), so the whole colors.toml palette is read and
 // mapped onto those roles. Light themes are honoured through `mode`.

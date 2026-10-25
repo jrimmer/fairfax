@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// the reference app's export panel: tick the lists to write out, say which tasks (All, Not
+// The export panel: tick the lists to write out, say which tasks (All, Not
 // Done, Done) and pick the format; the save panel follows. Main and Settings
 // each have one, so `owner` keeps them from both answering the file picker.
 ThemedDialog {

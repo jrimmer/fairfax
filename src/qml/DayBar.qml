@@ -542,7 +542,7 @@ Item {
         }
     }
 
-    // Details of the clicked event. Events are read-only here, as in the reference app.
+    // Details of the clicked event. Events are read-only here.
     Popup {
         id: details
         objectName: "dayBarDetails"

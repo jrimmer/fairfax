@@ -1,6 +1,6 @@
 #pragma once
 
-// The typeable Start and Due fields. the reference app's date fields accept a terse grammar
+// The typeable Start and Due fields. They accept a terse grammar
 // ("tom mor", "in 3w 3pm", "18d", "w19", "9p45", "eod") and drop down a short
 // list of suggestions as you type; this produces that list.
 

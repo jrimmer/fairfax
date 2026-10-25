@@ -9,7 +9,7 @@
 Name:           fairfax
 Version:        %{fairfax_version}
 Release:        1%{?dist}
-Summary:        A keyboard-first task manager for Omarchy, modelled on the reference app
+Summary:        A keyboard-first task manager for Omarchy
 License:        MIT
 URL:            https://github.com/jrimmer/fairfax
 
@@ -33,7 +33,7 @@ Requires:       python3
 Requires:       xdg-desktop-portal
 
 %description
-Fairfax is a keyboard-first task manager for Omarchy, modelled closely on the reference app:
+Fairfax is a keyboard-first task manager for Omarchy:
 three panels (lists, tasks, tags), focus lists, start dates, projects and
 checklists, and single-key commands for everything. It keeps tasks in a local
 SQLite database and syncs them through a git repository you choose.

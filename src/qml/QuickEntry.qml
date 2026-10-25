@@ -5,8 +5,8 @@ import QtQuick.Controls.Basic as Plain
 import QtQuick.Layouts
 
 // Quick Entry: a small floating window for capturing a task from anywhere,
-// summoned with `fairfax --quick` from a Hyprland bind. Its layout follows
-// the reference app's own Quick Entry: the title (priority and star at the right), a ribbon
+// summoned with `fairfax --quick` from a Hyprland bind. Its layout:
+// the title (priority and star at the right), a ribbon
 // in the list's colour with the list, the due summary and the attribute
 // buttons, tags beside the Start and Due fields, notes, and a footer.
 //
@@ -306,7 +306,7 @@ Window {
         title_.text = ""
         listId = defaults.listId
         applyParsed()
-        // Like the reference app, the clipboard's text lands in the notes, ready to keep or clear.
+        // The clipboard's text lands in the notes, ready to keep or clear.
         notes.text = ""
         if (backend.settingFlag("quickEntry.clipboard", true)) {
             clip.text = ""
@@ -858,7 +858,7 @@ Window {
             }
         }
 
-        // ---- tags on the left; start and due on the right, as in the reference app: the
+        // ---- tags on the left; start and due on the right: the
         // date and time sit right next to their icon at the far right.
         RowLayout {
             Layout.fillWidth: true

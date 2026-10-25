@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// One palette behind the reference app's quick commands: Defer (d), Schedule (k), Due Time
+// One palette behind the quick commands: Defer (d), Schedule (k), Due Time
 // (e), Duration (x), Tag (l), Untag (Alt+L), Move (m), List Jump (j), Find
 // Task (f), Tag Search (/), Repeat and Quick Open (Ctrl+Shift+O). Each kind
 // supplies preset chips (Alt+1…), a filtered item list, and what accepting

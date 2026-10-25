@@ -1,6 +1,6 @@
 #pragma once
 
-// Repeating tasks, following the reference app's rules: completing an occurrence keeps a
+// Repeating tasks: completing an occurrence keeps a
 // completed copy and moves the task to its next occurrence; "from completion"
 // restarts the cycle from the day it was done; the gap between start and due
 // is preserved; and an end rule makes the last occurrence simply complete.

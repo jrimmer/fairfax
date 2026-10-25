@@ -1,6 +1,6 @@
 // Unit tests for the per-task iCalendar VTODO conversion: the whole-field
 // round trip through toIcs/fromIcs, the verbatim carrying of properties and
-// components Fairfax does not understand (the reference app's metadata, other clients'
+// components Fairfax does not understand (vendor metadata, other clients'
 // X- properties), and a golden sample proving the whole-file .ics export is
 // unchanged by the refactor.
 
@@ -215,7 +215,7 @@ private slots:
             "BEGIN:VTODO\r\n"
             "UID:carry-1\r\n"
             "SUMMARY:Carried\r\n"
-            "DESCRIPTION:Notes here\\n<App Meta>\\n{\"foo\":1}\\n</App Meta>\r\n"
+            "DESCRIPTION:Notes here\\n<Example Meta>\\n{\"foo\":1}\\n</Example Meta>\r\n"
             "DTSTAMP:20260101T000000Z\r\n"
             "X-EXAMPLE-THING;X-P=1:some value\r\n"
             "X-APPLE-SORT-ORDER:123\r\n"
@@ -237,8 +237,8 @@ private slots:
         const Vtodo::Parsed p = Vtodo::fromIcs(input);
         QCOMPARE(p.task.title, QString("Carried"));
         QCOMPARE(p.task.notes, QString("Notes here"));
-        QVERIFY(p.extra.meta.contains("<App Meta>"));
-        QVERIFY(p.extra.meta.contains("</App Meta>"));
+        QVERIFY(p.extra.meta.contains("<Example Meta>"));
+        QVERIFY(p.extra.meta.contains("</Example Meta>"));
         // One alarm is representable, the other's date-only trigger is not, so
         // it is kept whole as an unknown component along with the X- one.
         QCOMPARE(p.alarms.size(), 1);
@@ -269,8 +269,8 @@ private slots:
                                   "TRIGGER;VALUE=DATE:20260101"};
         for (const QString &wanted : carried)
             QVERIFY2(lines.contains(wanted), qPrintable(wanted));
-        QVERIFY2(lines.contains("DESCRIPTION:Notes here\\n<App Meta>\\n{\"foo\":1}\\n</App Meta>"),
-                 "the the reference app metadata block survives");
+        QVERIFY2(lines.contains("DESCRIPTION:Notes here\\n<Example Meta>\\n{\"foo\":1}\\n</Example Meta>"),
+                 "the vendor metadata block survives");
     }
 
     void doesNotInventMetaWhenThereIsNone() {

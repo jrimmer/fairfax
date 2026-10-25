@@ -555,7 +555,7 @@ private slots:
         QCOMPARE(code(url("fairfax://x-callback-url/showlist?name=work")), "not_found");   // Case-sensitive.
         QCOMPARE(url("fairfax://x-callback-url/search?text=invoice%20acme")["search"].toString(), "invoice acme");
         QCOMPARE(code(url("fairfax://x-callback-url/frobnicate")), "invalid_arguments");
-        QCOMPARE(code(url("twodo://x-callback-url/showtoday")), "invalid_arguments");
+        QCOMPARE(code(url("othertasks://x-callback-url/showtoday")), "invalid_arguments");
 
         const auto added = url("fairfax://x-callback-url/add?task=Submit%20expenses&note=Receipts&forlist=work&due=2026-07-15&duetime=17:00"
                                "&tags=finance%2Cadmin&priority=2&starred=1&action=call%3A%2B15551234567&x-success=other%3A%2F%2Fdone");

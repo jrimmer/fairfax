@@ -196,7 +196,7 @@ void Backend::storeSortSpec(const SortSpec &spec) {
     rebuild();
 }
 
-// the reference app's nine named text sizes, Tiny to Giant, with Normal the default.
+// The nine named text sizes, Tiny to Giant, with Normal the default.
 int Backend::textSize() const { return m_store->setting("appearance.textSize", 2).toInt(); }
 
 int Backend::fontSize() const {
@@ -248,7 +248,7 @@ int Backend::sourceColor() const {
 }
 
 QVariantList Backend::sortChoices() const {
-    // The Done list and Smart Lists offer their own subsets, as in the reference app.
+    // The Done list and Smart Lists offer their own subsets.
     QList<QPair<int, QString>> all{
         {SortField::DueDate, "Due Date"}, {SortField::StartDate, "Start Date"}, {SortField::Priority, "Priority"},
         {SortField::List, "To-do List"},  {SortField::Title, "Title"},          {SortField::Tag, "Tag"},
@@ -609,7 +609,7 @@ QString Backend::dayFilterTo() const {
 
 QVariantList Backend::monthDays(int year, int month) const {
     // Busy-day counts for the mini calendar. Each task counts once, on its
-    // due day or, failing that, its start day, as in the reference app; repeating tasks
+    // due day or, failing that, its start day; repeating tasks
     // also mark their next occurrences within the month.
     const QDate first(year, month, 1);
     QHash<QDate, int> counts;
@@ -1328,7 +1328,7 @@ void Backend::linkFile(qint64 taskId, const QString &path) {
     setNotes(taskId, t.notes.isEmpty() ? link : t.notes.trimmed() + "\n" + link);
 }
 
-// Moving tasks by hand puts the list in manual order, as dragging does in the reference app.
+// Moving tasks by hand puts the list in manual order, as dragging does.
 // The switch joins the move's own change, so one Ctrl+Z undoes both. Returns
 // whether the list was switched.
 bool Backend::putManualSort() {
@@ -1342,7 +1342,7 @@ bool Backend::putManualSort() {
 
 void Backend::moveSelection(int delta) {
     // ⌃⌘↑/↓: manual reordering among siblings, which also switches the list
-    // to manual order the way dragging does in the reference app.
+    // to manual order the way dragging does.
     if (m_cursor == 0)
         return;
     const Task t = m_store->task(m_cursor);
@@ -1434,7 +1434,7 @@ void Backend::dropOnDate(const QString &iso) {
 }
 
 void Backend::dropBefore(qint64 taskId) {
-    // Dragging within a list puts it in manual order, as in the reference app.
+    // Dragging within a list puts it in manual order.
     const Task anchor = m_store->task(taskId);
     auto ids = targetIds();
     ids.removeAll(taskId);
@@ -1608,7 +1608,7 @@ void Backend::setTitle(qint64 id, const QString &title) {
     if (title.size() > 1000)
         t.notes = title.mid(1000) + (t.notes.isEmpty() ? "" : "\n" + t.notes);
     // A new task's title is read for dates, tags, repeats and the rest, which
-    // then come out of the title, as the reference app's natural-language input does.
+    // then come out of the title, as natural-language input does.
     if (id == m_newTask && id != m_noDetectTask && m_store->setting("nl.editor", true).toBool())
         applyParsed(t, NaturalLanguage::parse(head, QDateTime::currentDateTime(), listNames(), locationNames()));
     m_store->putTask(t);
@@ -1759,7 +1759,7 @@ void Backend::setAction(qint64 id, int type, const QString &value) {
 }
 
 void Backend::setRepeatPreset(qint64 id, int preset) {
-    // the reference app's ⌥1–⌥6 presets: Daily, Weekly, Every 2 weeks, Monthly, Quarterly,
+    // The ⌥1–⌥6 presets: Daily, Weekly, Every 2 weeks, Monthly, Quarterly,
     // Yearly; 0 turns repeating off.
     editTasks("Change Recurrence", {id}, [&](Task &t) {
         Recurrence r;
@@ -1821,7 +1821,7 @@ void Backend::setRecurrence(qint64 id, const QVariantMap &rule) {
 QString Backend::describeRecurrence(const QVariantMap &rule) const { return Recurrences::describe(recurrenceFromMap(rule)); }
 
 void Backend::toggleAlarm(qint64 id, int minutesBefore) {
-    // the reference app's alarm presets: Message with Sound, relative to the due moment.
+    // The alarm presets: Message with Sound, relative to the due moment.
     // Choosing a preset that's already set removes it.
     Task t = m_store->task(id);
     if (!t.id)
@@ -1877,7 +1877,7 @@ qint64 Backend::newList(const QString &name) {
     TaskList l;
     l.id = m_store->nextId("lists");
     l.name = name.isEmpty() ? QStringLiteral("New List") : name;
-    // A new list joins the group of the list you're in, as the reference app does.
+    // A new list joins the group of the list you're in.
     if (m_source.kind == Source::List)
         l.groupId = m_store->list(m_source.id).groupId;
     l.order = l.id;
@@ -2403,7 +2403,7 @@ void Backend::setTagsManual(bool on) {
 
 void Backend::moveTag(qint64 tagId, qint64 beforeTagId, qint64 groupId) {
     // Dragging a tag in the panel puts it before another (or last in a
-    // group), and switches the panel to manual order as it does in the reference app.
+    // group), and switches the panel to manual order.
     Tag moved = m_store->tag(tagId);
     if (!moved.id || tagId == beforeTagId)
         return;
@@ -2656,7 +2656,7 @@ void Backend::renameTag(qint64 tagId, const QString &name) {
     const QString clean = name.trimmed().remove(QRegularExpression("^#"));
     if (!t.id || clean.isEmpty() || clean == t.name)
         return;
-    // Tags stay unique, as in the reference app: a name another tag already has is refused.
+    // Tags stay unique: a name another tag already has is refused.
     for (const auto &other : m_store->tags()) {
         if (!other.deleted && other.id != tagId && other.name.compare(clean, Qt::CaseInsensitive) == 0) {
             setStatus(QStringLiteral("There is already a tag called %1.").arg(other.name));
@@ -3111,7 +3111,7 @@ void Backend::pasteText(const QString &text) {
 }
 
 void Backend::dropMail(qint64 taskId, const QString &path) {
-    // As in the reference app: the message becomes the task's action, so one click reopens
+    // The message becomes the task's action, so one click reopens
     // it (a mid: link, which Thunderbird and most Linux mail clients open). A
     // task that already has an action gets the subject and link in its notes
     // instead; dropped on empty space, a new task is titled with the subject.
@@ -3298,7 +3298,7 @@ void Backend::toggleRecording(qint64 taskId) {
 }
 
 void Backend::timeBlock(const QString &isoDate, int startMinute, int durationMinutes) {
-    // the reference app's time blocking: dropped on the day bar, the task is due when the
+    // Time blocking: dropped on the day bar, the task is due when the
     // block ends and takes the block's length, so its effective start is
     // where it was dropped.
     const QDate day = isoDate.isEmpty() ? QDate::currentDate() : QDate::fromString(isoDate, Qt::ISODate);
@@ -3937,7 +3937,7 @@ void Backend::addDaysBeforeAlarm(qint64 taskId, int days, int minutes) {
 }
 
 void Backend::setAlarmSound(qint64 alarmId, bool sound) {
-    // the reference app's per-alert style: "Message with Sound" or just "Message".
+    // The per-alert style: "Message with Sound" or just "Message".
     Alarm a = m_store->alarms().value(alarmId);
     if (!a.id || a.sound == sound)
         return;
@@ -3987,7 +3987,7 @@ QStringList Backend::focusConditions() const {
 
 void Backend::toggleFocus() {
     // With nothing ticked yet, turning the filter on starts from Today, as a
-    // single click on the reference app's sun button does.
+    // single click on the sun button does.
     if (!focusOn() && focusConditions().isEmpty())
         m_store->setSetting(focusSettingKey() + ".conditions", "overdue,today");
     m_store->setSetting(focusSettingKey() + ".on", !focusOn());
@@ -4431,7 +4431,7 @@ bool Backend::addToCalendar(qint64 taskId, const QString &path) {
 
 void Backend::importFrom(const QString &path, const QString &format) {
     backupNow("before-import");
-    const ImportResult r = format == "taskapp"        ? Exchange::importTwoDo(*m_store, path)
+    const ImportResult r = format == "taskdb"   ? Exchange::importTaskDatabase(*m_store, path)
                          : format == "ticktick" ? Exchange::importTickTick(*m_store, path)
                          : format == "things"   ? Exchange::importThings(*m_store, path)
                          : format == "omnifocus" ? Exchange::importOmniFocus(*m_store, path)
@@ -4799,7 +4799,7 @@ QVariantMap Backend::splitPaste(const QString &text) const {
     if (lines.isEmpty())
         return {{"title", QString()}, {"notes", QString()}, {"url", QString()}};
     const QString title = lines.takeFirst();
-    // Like the reference app, the title keeps its first line and the rest moves to the notes.
+    // The title keeps its first line and the rest moves to the notes.
     return {{"title", title}, {"notes", lines.join('\n').trimmed()}, {"url", isBareUrl(title) ? title : QString()}};
 }
 

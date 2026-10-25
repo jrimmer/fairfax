@@ -33,7 +33,7 @@ const QHash<QString, QColor> &fallbackColors() {
     return colors;
 }
 
-// The built-in light palette, after the reference app's light look, for forcing Light on a
+// The built-in light palette, for forcing Light on a
 // dark Omarchy theme.
 const QHash<QString, QColor> &lightColors() {
     static const QHash<QString, QColor> colors{
@@ -51,8 +51,8 @@ const QHash<QString, QColor> &lightColors() {
     return colors;
 }
 
-// The list palette walks the theme's hues in the order the reference app's own palette
-// does: blue first, then purple, green, red, orange and the rest.
+// The list palette walks the theme's hues in a fixed order:
+// blue first, then purple, green, red, orange and the rest.
 const QStringList PaletteKeys{"blue", "magenta", "green", "red", "orange", "cyan", "yellow", "brown",
                               "bright_blue", "bright_magenta", "bright_green", "bright_red", "bright_cyan"};
 
@@ -131,7 +131,7 @@ QColor Theme::mix(const QColor &a, const QColor &b, double t) const {
                             a.blueF() + (b.blueF() - a.blueF()) * t, a.alphaF() + (b.alphaF() - a.alphaF()) * t);
 }
 
-// the reference app's sidebar is a shade off the content area; dark themes go darker, light
+// The sidebar is a shade off the content area; dark themes go darker, light
 // themes a touch grayer.
 QColor Theme::sidebar() const {
     if (dark() != m_dark || m_colors.contains("dark_background"))
@@ -155,7 +155,7 @@ QColor Theme::raised() const {
 QColor Theme::faint() const { return mix(background(), muted(), 0.55); }
 QColor Theme::divider() const { return mix(background(), foreground(), dark() ? 0.09 : 0.11); }
 
-// the reference app's notes area is a pale cream; here it is the background warmed toward
+// The notes area is a pale cream; here it is the background warmed toward
 // the theme's yellow.
 QColor Theme::notes() const { return mix(surface(), color("yellow"), dark() ? 0.05 : 0.10); }
 QColor Theme::tagBubble() const { return mix(background(), color("blue"), dark() ? 0.16 : 0.13); }

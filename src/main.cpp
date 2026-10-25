@@ -1,4 +1,4 @@
-// fairfax — a keyboard-first task manager for Omarchy, modelled on the reference app.
+// fairfax — a keyboard-first task manager for Omarchy.
 
 #include <QClipboard>
 #include <QBuffer>
@@ -258,7 +258,7 @@ int runHeadless(int argc, char *argv[]) {
         return 2;
 #else
         // A Waybar custom module: the count the "Badge shows" setting picks
-        // (overdue, due today or both), like the reference app's Dock badge.
+        // (overdue, due today or both), like a dock badge.
         const ScheduleSettings settings = ScheduleSettings::fromStore(store);
         const ViewBuilder views(store, QDateTime::currentDateTime(), settings);
         const auto today = views.countsForFocus(Source::Today);
@@ -297,17 +297,17 @@ int runHeadless(int argc, char *argv[]) {
         return Cli::importMail(store, args.mid(2), in, out, err);
     }
     if (mode == "import") {
-        // fairfax import FILE: a the reference app database or .taskdb backup, or .ics.
+        // fairfax import FILE: a task database, .ics, or another app's export.
         const QString file = args.value(2);
         if (file.isEmpty()) {
-            err << "usage: fairfax import <tasks.db | backup.taskdb | tasks.ics | TickTick-backup.csv | Things.json | OmniFocus.taskpaper> [--db PATH]" << Qt::endl;
+            err << "usage: fairfax import <task database | tasks.ics | TickTick-backup.csv | Things.json | OmniFocus.taskpaper> [--db PATH]" << Qt::endl;
             return 2;
         }
         const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive) ? Exchange::importIcs(store, file, 0)
                                : Exchange::isTickTickBackup(file)          ? Exchange::importTickTick(store, file)
                                : file.endsWith(".json", Qt::CaseInsensitive) && Exchange::isThingsExport(file) ? Exchange::importThings(store, file)
                                : Exchange::isTaskPaper(file)               ? Exchange::importOmniFocus(store, file)
-                                                                           : Exchange::importTwoDo(store, file);
+                                                                           : Exchange::importTaskDatabase(store, file);
         if (!r.error.isEmpty()) {
             err << "fairfax: import failed: " << r.error << Qt::endl;
             return 1;
@@ -614,7 +614,7 @@ int main(int argc, char *argv[]) {
     if (cli.isSet(settingsOption))
         QTimer::singleShot(300, &backend, [&backend] { backend.requestPanel("settings"); });
 
-    // Alarms are delivered by this process, so like the reference app's Alarm Helper it
+    // Alarms are delivered by this process, so it
     // keeps running after the window closes; Q or Ctrl+Q quits for real.
     std::unique_ptr<AlarmService> alarms;
     if (!offscreen && opened) {
@@ -637,7 +637,7 @@ int main(int argc, char *argv[]) {
     }
 
     // File > New Window: another window over the same store, with its own
-    // selection, list and search, as the reference app's multiple windows have. The open
+    // selection, list and search, separate from other windows. The open
     // windows' lists are remembered, so a relaunch brings them back; closing
     // a window forgets it.
     QList<QPointer<Backend>> extraBackends;

@@ -2,7 +2,7 @@
 pkgname=fairfax
 pkgver=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*//p' "$startdir/../fairfax.pro" | head -n1)
 pkgrel=1
-pkgdesc='A keyboard-first task manager for Omarchy, modelled on the reference app'
+pkgdesc='A keyboard-first task manager for Omarchy'
 arch=('x86_64' 'aarch64')
 url='https://github.com/jrimmer/fairfax'
 license=('MIT')

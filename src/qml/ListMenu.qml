@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 
 // The right-click menu on a list: edit, rename, colour, focus-list exclusions,
-// archive, hide and delete, as in the reference app's Lists panel.
+// archive, hide and delete, as in the Lists panel.
 Menu {
     id: root
 

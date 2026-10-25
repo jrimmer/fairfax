@@ -2,7 +2,7 @@
 
 // Outline icons on a 24-unit grid, drawn with QtQuick.Shapes so they take the
 // theme's colors directly. Kept deliberately plain to sit close to the
-// SF Symbols look of the reference app's sidebar and task rows.
+// SF Symbols look of the sidebar and task rows.
 var paths = {
     "all": "M4.5 4.5h6v6h-6z M13.5 4.5h6v6h-6z M4.5 13.5h6v6h-6z M13.5 13.5h6v6h-6z",
     "starred": "M12 3.6l2.55 5.2 5.7.82-4.12 4.03.97 5.67L12 16.64l-5.1 2.68.97-5.67L3.75 9.62l5.7-.82z",
@@ -63,6 +63,6 @@ var paths = {
     "google": "M4.5 10.5a6 6 0 1 0 12 0a6 6 0 1 0 -12 0 M15 15l5 5",
 };
 
-// The action types, in the reference app's ⌥1–⌥6 order, for rows, the editor and Quick Look.
+// The action types, in the ⌥1–⌥6 order, for rows, the editor and Quick Look.
 var actionIcons = ["", "phone", "message", "mail", "visit", "url", "google"];
 var actionNames = ["None", "Call", "Message", "Mail", "Visit", "URL", "Google"];

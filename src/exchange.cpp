@@ -177,9 +177,9 @@ void breakCycles(QList<Task> &tasks) {
     }
 }
 
-// ----------------------------------------------------------------- the reference app DB
+// ------------------------------------------------------------ task database
 
-// One row of a SELECT *, tolerant of columns an older the reference app database lacks.
+// One row of a SELECT *, tolerant of columns an older database lacks.
 struct Row {
     QSqlRecord rec;
     QSqlQuery *q;
@@ -215,12 +215,12 @@ QStringList splitTagNames(const QString &s) {
     return out;
 }
 
-ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
+ImportResult importTaskDatabaseImpl(Store &store, QSqlDatabase &db) {
     ImportResult result;
     const QStringList tables = db.tables();
     for (const char *needed : {"tasks", "calendars"})
         if (!tables.contains(QLatin1String(needed), Qt::CaseInsensitive)) {
-            result.error = QStringLiteral("This does not look like a the reference app database: table \"%1\" is missing.").arg(needed);
+            result.error = QStringLiteral("This does not look like a task database: table \"%1\" is missing.").arg(needed);
             return result;
         }
 
@@ -240,12 +240,12 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
         return true;
     };
 
-    store.begin(QStringLiteral("Import from the reference app"));
+    store.begin(QStringLiteral("Import from a task database"));
     Resolver res(store);
     auto fail = [&]() {
         // No rollback API: commit what was staged and undo it again.
         store.commit();
-        if (store.undoLabel() == QLatin1String("Import from the reference app"))
+        if (store.undoLabel() == QLatin1String("Import from a task database"))
             store.undo();
         result.tasks = result.lists = result.tags = result.alarms = 0;
         return result;
@@ -254,10 +254,10 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
     // List groups.
     QHash<QString, qint64> groupByUid;
     if (!rows("calgroups", "COALESCE(isdeleted,0)=0", "displayorder", [&](const Row &r) {
-            // the reference app's sidebar sections (FOCUS, LISTS, SMART LISTS, …) are rows
-            // here too, with uids like AppCalGroupFocus and grouptype 2–4;
-            // only the user's own groups become list groups.
-            if (r.str("uid").startsWith("AppCalGroup") || (r.num("grouptype") >= 2 && r.num("grouptype") <= 5))
+            // The built-in sidebar sections (focus lists, lists, smart lists, …)
+            // are rows here too, with grouptype 2–5; only the user's own
+            // groups become list groups.
+            if (r.num("grouptype") >= 2 && r.num("grouptype") <= 5)
                 return;
             ListGroup g;
             g.id = store.nextId("list_groups");
@@ -293,10 +293,10 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
                 l.name = inbox ? QStringLiteral("Inbox") : QStringLiteral("Untitled");
             const QString smart = r.str("smartsearch");
             l.kind = inbox ? ListKind::Inbox : (!smart.isEmpty() ? ListKind::Smart : ListKind::Normal);
-            // "*" is the reference app's match-everything search, used with a date range.
+            // "*" is the match-everything search, used with a date range.
             l.smartQuery = smart.trimmed() == "*" ? QString() : smart;
             if (l.kind == ListKind::Smart) {
-                // the reference app's date filter: small numbers are a Dynamic Range (N, unit
+                // The date filter: small numbers are a Dynamic Range (N, unit
                 // 1 days … 4 years, as in its "Next 3 Days" preset: 3, 1);
                 // large ones are a fixed range of timestamps.
                 const double from = r.dbl("smartrangefrom", 0), to = r.dbl("smartrangeto", 0);
@@ -307,7 +307,7 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
                                        .arg(QDateTime::fromSecsSinceEpoch(qint64(from), QTimeZone::UTC).date().toString(Qt::ISODate),
                                             QDateTime::fromSecsSinceEpoch(qint64(to), QTimeZone::UTC).date().toString(Qt::ISODate));
             }
-            // the reference app's list sorts as seen in a real database: 1 due date,
+            // List sorts as seen in a real database: 1 due date,
             // 11 start date, 8 completion; anything else falls back to due date.
             const int sort = int(r.num("tasksortfield", 1));
             l.sortField = sort == 11 ? SortField::StartDate : sort == 8 ? SortField::Completion : SortField::DueDate;
@@ -374,7 +374,7 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
         return fail();
     }
 
-    // Sections within lists (the reference app's tasksections, confirmed in a 4.21 database).
+    // Sections within lists (the tasksections table).
     QHash<QString, qint64> sectionByUid;
     if (!rows("tasksections", "COALESCE(isdeleted,0)=0", "displayorder", [&](const Row &r) {
             const qint64 listId = listByUid.value(r.str("calendaruid"), 0);
@@ -402,10 +402,10 @@ ImportResult importTwoDoImpl(Store &store, QSqlDatabase &db) {
             t.sectionId = sectionByUid.value(r.str("sectionuid"), 0);
             t.title = r.str("title");
             t.notes = r.str("notes");
-            // the reference app's tasktype: 0 task, 1 checklist, 2 project (ours: Project=1, Checklist=2).
+            // tasktype: 0 task, 1 checklist, 2 project (ours: Project=1, Checklist=2).
             const int tt = int(r.num("tasktype"));
             t.type = tt == 1 ? TaskType::Checklist : tt == 2 ? TaskType::Project : TaskType::Task;
-            // the reference app's priority: 0 none, 1 low, 2 medium, 3 high; same as ours.
+            // priority: 0 none, 1 low, 2 medium, 3 high; same as ours.
             t.priority = int(qBound<qint64>(0, r.num("priority"), qint64(3)));
             t.starred = r.flag("starred");
             t.dueDate = dateFromSecs(r.dbl("duedate"));
@@ -731,7 +731,7 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
     return result;
 }
 
-ImportResult importTwoDo(Store &store, const QString &path) {
+ImportResult importTaskDatabase(Store &store, const QString &path) {
     ImportResult result;
     if (!QFile::exists(path)) {
         result.error = QStringLiteral("The file does not exist.");
@@ -748,9 +748,9 @@ ImportResult importTwoDo(Store &store, const QString &path) {
             // A non-SQLite file opens fine and fails on first use.
             QSqlQuery probe(db);
             if (!probe.exec("SELECT count(*) FROM sqlite_master"))
-                result.error = QStringLiteral("This is not a the reference app database: %1").arg(probe.lastError().text());
+                result.error = QStringLiteral("This is not a task database: %1").arg(probe.lastError().text());
             else
-                result = importTwoDoImpl(store, db);
+                result = importTaskDatabaseImpl(store, db);
             probe.finish();
             db.close();
         }

@@ -7,8 +7,7 @@
 #include "store.h"
 #include "testregistry.h"
 
-// Mail to Fairfax's converter. The sentences quoted in the comments are from
-// the the reference app manual page "Mail to the reference app" (reference/manual/email-to-tasks.md).
+// Mail to Fairfax's converter. The comments describe the rule each test covers.
 
 #ifndef MAIL_FIXTURES
 #error "MAIL_FIXTURES must name tests/fixtures/mail"

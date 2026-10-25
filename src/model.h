@@ -1,7 +1,7 @@
 #pragma once
 
-// Plain records for everything Fairfax stores. They mirror the reference app's own model:
-// lists live in groups, tasks live in lists, projects and checklists are tasks
+// Plain records for everything Fairfax stores. Lists live in
+// groups, tasks live in lists, projects and checklists are tasks
 // with children, and tags live in tag groups. Each record converts to and from
 // a QVariantMap so the store and the undo journal can treat them uniformly.
 
@@ -19,7 +19,7 @@ namespace Priority {
 enum { None = 0, Low = 1, Medium = 2, High = 3 };
 }
 
-// the reference app's action types, in the order of its ⌥1–⌥6 presets.
+// The action types, in the order of the ⌥1–⌥6 presets.
 namespace ActionType {
 enum { None = 0, Call = 1, Message = 2, Mail = 3, Visit = 4, Url = 5, Google = 6 };
 }
@@ -30,7 +30,7 @@ enum From { FromDue = 0, FromCompletion = 1 };
 enum End { Never = 0, AfterCount = 1, OnDate = 2 };
 }
 
-// How a list orders its tasks; the names follow the reference app's sort menu.
+// How a list orders its tasks; the names follow the sort menu.
 namespace SortField {
 enum {
     DueDate = 0,
@@ -72,7 +72,7 @@ struct Task {
     QString uid;
     qint64 listId = 0;
     qint64 parentId = 0;
-    qint64 sectionId = 0;  // A heading within the list (the reference app's task sections, TickTick's columns).
+    qint64 sectionId = 0;  // A heading within the list (the task sections, TickTick's columns).
     int type = TaskType::Task;
     QString title;
     QString notes;
@@ -138,19 +138,19 @@ struct TaskList {
     double order = 0;
     int sortField = SortField::DueDate;
     bool sortAscending = true;
-    bool separated = true;    // the reference app's "Separated" switch: section headers on or off.
+    bool separated = true;    // The "Separated" switch: section headers on or off.
     bool showInAll = true;
     bool showInToday = true;
     bool showInDone = true;
     bool archived = false;
     QString smartQuery;
-    // A Smart List's date filter, after the reference app's Search Options: "" (none),
+    // A Smart List's date filter, after the Search Options: "" (none),
     // "next:N:unit" with unit d/w/m/y ("In the next 3 days"),
     // "fixed:yyyy-MM-dd:yyyy-MM-dd", or "nodue".
     QString smartRange;
     // Whether completed tasks show here: the list default, always, or never.
     // Normal lists default to showing them (subject to the completed-window
-    // setting); Smart Lists default to hiding them, as in the reference app.
+    // setting); Smart Lists default to hiding them.
     int completedMode = 0;    // 0 default, 1 include, 2 exclude.
     bool includeScheduled = false;  // Smart Lists: also match scheduled tasks.
     bool muteAlerts = false;  // Alerts for this list's tasks stay silent.
@@ -188,7 +188,7 @@ struct Tag {
     static Tag fromMap(const QVariantMap &map);
 };
 
-// An alert on a task, after the reference app's alarms: relative to the due moment (an
+// An alert on a task, after the alarms: relative to the due moment (an
 // offset in minutes before it), a number of days before the due date at a
 // time of day, or at a fixed date and time.
 struct Alarm {
@@ -210,7 +210,7 @@ struct Alarm {
     static Alarm fromMap(const QVariantMap &map);
 };
 
-// A saved place, after the reference app's Locations: tasks can carry one or more, and a
+// A saved place, after the Locations: tasks can carry one or more, and a
 // location can be paused like a tag, hiding its tasks.
 struct Location {
     qint64 id = 0;
@@ -247,7 +247,7 @@ struct Attachment {
     static Attachment fromMap(const QVariantMap &map);
 };
 
-// A heading inside a list that groups its tasks, after the reference app's task sections
+// A heading inside a list that groups its tasks, after the task sections
 // (and TickTick's sections).
 struct ListSection {
     qint64 id = 0;

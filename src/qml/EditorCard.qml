@@ -5,7 +5,7 @@ import QtQuick.Controls.Basic as Plain
 import "Icons.js" as Icons
 
 // The inline task editor, opened in place of the row (Return or a
-// double-click). Its anatomy follows the reference app: title row; a ribbon in the list's
+// double-click). Its layout: title row; a ribbon in the list's
 // colour with the list picker, the due hint and the attribute buttons; tags
 // beside the Start and Due fields; the notes area; and a meta line above.
 Item {
@@ -503,7 +503,7 @@ Item {
                         tags: root.e.tags || []
                     }
                     // Start and due, each a date and a time, with the row's icon at the
-                    // right as in Quick Entry and the reference app.
+                    // right, as in Quick Entry.
                     GridLayout {
                         Layout.alignment: Qt.AlignTop
                         visible: !root.e.isChecklistItem
@@ -601,7 +601,7 @@ Item {
                                 font.strikeout: modelData.completed
                                 selectByMouse: true
                                 onEditingFinished: if (text !== modelData.title && text.trim() !== "") backend.setTitle(modelData.id, text)
-                                // Return on a sub-task starts the next one, as the reference app's setting does.
+                                // Return on a sub-task starts the next one.
                                 Keys.onReturnPressed: root.renameSubtask(modelData.id, modelData.title, text)
                                 Keys.onEscapePressed: root.finish()
                             }
@@ -696,7 +696,7 @@ Item {
                                 Icon { name: "alarm"; size: 12; color: theme.priorityMedium; opacity: modelData.sound ? 1 : 0.5 }
                                 Text { id: alarmLabel; text: modelData.label + (modelData.sound ? "" : " (message)"); color: theme.priorityMedium; font.pixelSize: backend.fontSize - 2 }
                             }
-                            // Clicking the chip chooses its style, as in the reference app's alert rows.
+                            // Clicking the chip chooses its style, as in the alert rows.
                             MouseArea {
                                 anchors.fill: parent; anchors.rightMargin: 22
                                 onClicked: { alarmStyleMenu.alarmId = modelData.id; alarmStyleMenu.sound = modelData.sound; alarmStyleMenu.popup() }

@@ -1495,12 +1495,12 @@ const QList<Command> &commands() {
         c << Command{"get_task", "Get one task by task_id.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::getTask};
         c << Command{"query_tasks",
                      "Search and filter tasks. Use at most one of list_id, list_group_id, smart_list_id or focus (default: all open tasks). "
-                     "search uses the reference app syntax: words, \"phrases\", OR, -word, type: hiprio, tags: work, lists: Home.",
+                     "search uses the Fairfax search syntax: words, \"phrases\", OR, -word, type: hiprio, tags: work, lists: Home.",
                      {{"list_id", str("Only tasks in this list.")},
                       {"list_group_id", str("Only tasks in the lists of this list group.")},
                       {"smart_list_id", str("Run this saved Smart List.")},
                       {"focus", enumStr("A focus list.", kFocusNames)},
-                      {"search", str("the reference app search expression, at most 256 characters.")},
+                      {"search", str("Search expression, at most 256 characters.")},
                       {"due_on_or_after", str("yyyy-MM-dd; keep tasks due on or after this date.")},
                       {"due_on_or_before", str("yyyy-MM-dd; keep tasks due on or before this date.")},
                       {"start_on_or_after", str("yyyy-MM-dd; keep tasks starting on or after this date.")},
@@ -1759,7 +1759,7 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
     action = action.remove('/').toLower();
     const QUrlQuery q(url);
     // (clipboard) stands in for the clipboard's text in the add parameters
-    // that take it, as in the reference app.
+    // that take it.
     auto param = [&](const QString &key) {
         const QString v = q.queryItemValue(key, QUrl::FullyDecoded);
         static const QStringList clipboardKeys = {"task", "note", "tags", "locations", "subtasks"};
@@ -1775,7 +1775,7 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
         const QString v = param(key).toLower();
         return v == "1" || v == "true" || v == "yes";
     };
-    // x-success gets the new uid appended as `add`, as the reference app's callbacks do.
+    // x-success gets the new uid appended as `add`.
     auto finish = [&](QJsonObject result, const QString &callbackKey = QString(), const QString &callbackValue = QString()) {
         result["ok"] = true;
         result["action"] = action;
@@ -2007,7 +2007,7 @@ QJsonObject Automation::Impl::urlCommand(const QUrl &url) {
         startMinutes = phraseMinutes;
     }
     if (has("repeat")) {
-        // the reference app's presets; the recurrence only exists on the created task, so
+        // The presets; the recurrence only exists on the created task, so
         // it is applied after creation below.
         const int n = param("repeat").toInt();
         if (n < 1 || n > 4) invalid("repeat must be 1 (daily), 2 (weekly), 3 (every two weeks) or 4 (monthly).");
@@ -2145,7 +2145,7 @@ QJsonObject McpServer::handle(const QJsonObject &message) {
         return reply(QJsonObject{{"protocolVersion", "2025-06-18"},
                                  {"serverInfo", QJsonObject{{"name", "fairfax"}, {"version", m_version}}},
                                  {"capabilities", QJsonObject{{"tools", QJsonObject()}}},
-                                 {"instructions", "Fairfax is a classic task manager. Call list_lists first to find list ids, then query_tasks, create_task and the rest."}});
+                                 {"instructions", "Fairfax is a keyboard-first task manager. Call list_lists first to find list ids, then query_tasks, create_task and the rest."}});
     }
     if (method == "ping")
         return reply({});

@@ -6,7 +6,7 @@
 //   frfx                                  what's on Today, numbered
 //   frfx ls [all|starred|scheduled|LIST]  another list
 //   frfx done 12 15                       complete tasks by number
-//   frfx find dentist                     search everything (the reference app syntax works)
+//   frfx find dentist                     search everything (search syntax works)
 //   frfx open                             bring up the app
 //   fairfax import-mail [FILE.eml …]      tasks from emails (see mailtask.h)
 //   fairfax ctl myday                     open My Day in the running window

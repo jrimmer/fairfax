@@ -1,9 +1,9 @@
 #pragma once
 
-// Getting tasks in and out: CSV export (as the reference app's File > Export), iCalendar
-// VTODO export and import (as the reference app's .ics support, with hierarchy carried in
-// RELATED-TO), and import of a the reference app database or .taskdb backup so moving from
-// the Mac keeps lists, groups, tags, dates, repeats and alerts.
+// Getting tasks in and out: CSV export, iCalendar VTODO export and
+// import (with hierarchy carried in RELATED-TO), and import of a task
+// database file so moving over keeps lists, groups, tags, dates, repeats and
+// alerts.
 
 #include <QByteArray>
 #include <QList>
@@ -30,12 +30,12 @@ namespace Exchange {
 // through. Shared by the .eml reader and Mail to Fairfax.
 QString decodeMimeWords(const QString &raw);
 
-// Which tasks an export includes, as in the reference app's "Tasks to export:" popup.
+// Which tasks an export includes, as in the "Tasks to export:" popup.
 enum class Scope { All, NotDone, Done };
 
 // The non-deleted tasks in `listIds` that match `scope`, in id order. Unlike
 // the exporters' own "empty means everything", an empty list set selects
-// nothing: the reference app writes no file when no list is ticked.
+// nothing, since no file is written when no list is ticked.
 QList<qint64> selectTasks(const Store &store, const QSet<qint64> &listIds, Scope scope);
 
 // A one-event VCALENDAR for a task, so it can be handed to a calendar app.
@@ -70,9 +70,9 @@ ImportResult importTickTick(Store &store, const QString &path);
 // True when `path` looks like a TickTick backup CSV.
 bool isTickTickBackup(const QString &path);
 
-// Imports a the reference app database (tasks.db, or a .taskdb backup, which is the same
-// SQLite file) as one undoable change, skipping the reference app's built-in focus lists.
-ImportResult importTwoDo(Store &store, const QString &path);
+// Imports a task database (an SQLite file with tasks and calendars tables,
+// recognised by its contents) as one undoable change, skipping the built-in focus lists.
+ImportResult importTaskDatabase(Store &store, const QString &path);
 
 // Imports a Things 3 JSON export (things:///json style with "attributes", or
 // the flat title/notes/status/deadline/tags form other exporters write) as one

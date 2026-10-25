@@ -67,7 +67,7 @@ Popup {
                     font.strikeout: !!root.t.completed
                 }
                 Icon { visible: !!root.t.starred; name: "starred"; filled: true; size: 16; color: theme.star }
-                // Copy the task out in the forms the reference app's Quick Look offers.
+                // Copy the task out in the forms the Quick Look offers.
                 IconButton {
                     id: copyButton
                     objectName: "quickLookCopy"

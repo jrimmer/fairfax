@@ -301,7 +301,7 @@ private slots:
         QVERIFY(!r.error.isEmpty());
     }
 
-    void twoDoImport() {
+    void taskDatabaseImport() {
         const QString dbFile = file("tasks.db");
         {
             QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "maketaskdb");
@@ -364,7 +364,7 @@ private slots:
         QSqlDatabase::removeDatabase("maketaskdb");
 
         auto s = freshStore();
-        const ImportResult r = Exchange::importTwoDo(*s, dbFile);
+        const ImportResult r = Exchange::importTaskDatabase(*s, dbFile);
         QVERIFY2(r.error.isEmpty(), qPrintable(r.error));
         QCOMPARE(r.tasks, 4);  // k1, k2, k3, k5 (k5's list is skipped, so it lands in the inbox)
         QCOMPARE(r.alarms, 2);
@@ -435,15 +435,15 @@ private slots:
         QVERIFY(s->groups().isEmpty());
     }
 
-    void twoDoErrors() {
+    void taskDatabaseErrors() {
         auto s = freshStore();
-        QVERIFY(!Exchange::importTwoDo(*s, file("missing.db")).error.isEmpty());
+        QVERIFY(!Exchange::importTaskDatabase(*s, file("missing.db")).error.isEmpty());
 
         QFile junk(file("junk.db"));
         QVERIFY(junk.open(QIODevice::WriteOnly));
         junk.write(QByteArray(5000, 'x'));
         junk.close();
-        QVERIFY(!Exchange::importTwoDo(*s, file("junk.db")).error.isEmpty());
+        QVERIFY(!Exchange::importTaskDatabase(*s, file("junk.db")).error.isEmpty());
 
         {
             QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "emptytaskdb");
@@ -453,7 +453,7 @@ private slots:
             db.close();
         }
         QSqlDatabase::removeDatabase("emptytaskdb");
-        const ImportResult r = Exchange::importTwoDo(*s, file("empty.db"));
+        const ImportResult r = Exchange::importTaskDatabase(*s, file("empty.db"));
         QVERIFY(r.error.contains("tasks") || r.error.contains("calendars"));
         QVERIFY(!s->canUndo());
     }

@@ -1,7 +1,7 @@
 #pragma once
 
 // My Day: a daily plan derived from dates, not a task field. A task is in the
-// plan because of its due and start dates, exactly as the reference app's Today works, so it
+// plan because of its due and start dates, so it
 // round-trips through every sync provider without a new column.
 //
 // `now` is passed in everywhere so the rules are testable and a whole view is

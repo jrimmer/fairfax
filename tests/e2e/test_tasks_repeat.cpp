@@ -210,9 +210,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).recurrence.endType, int(Repeat::Never), 5000);
     }
 
-    // "When you complete a repeating task and another occurrence remains, the reference app
-    // keeps a completed copy for your history and moves the active task to the
-    // next occurrence." Daily, due today: tomorrow next; Done shows the copy.
+    // Completing a repeating task leaves a finished copy in history and moves
+    // the active task to its next occurrence. Daily, due today: tomorrow next; Done shows the copy.
     void completingDailyMovesDueAndKeepsACopy() {
         App app(milkWith([](Task &t) { t.recurrence.frequency = Repeat::Daily; }));
         QVERIFY(app.ok);

@@ -1,6 +1,6 @@
 #pragma once
 
-// the reference app's search and Smart List language: free text with implicit AND, OR,
+// The search and Smart List language: free text with implicit AND, OR,
 // -word / !word, word*, *word, "phrases", parentheses, and keyword filters
 // (type:, tags:, taggroups:, locations:, lists:, groups:, modified:,
 // created:, completed:, {datefilter}). One parsed Query is evaluated against

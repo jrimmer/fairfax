@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import "Icons.js" as Icons
 
-// One task in the list, laid out like the reference app's row: checkbox, title, then tags,
+// One task in the list, laid out as checkbox, title, then tags,
 // action, duration, date and priority on the right, with the parent project
 // as a breadcrumb underneath when the task appears outside it.
 Item {
@@ -15,7 +15,7 @@ Item {
     property var r: row || ({})
     onRowChanged: if (row) r = row
     property real margin: 40
-    property bool revealNames: false  // Alt held: show list names, like the reference app.
+    property bool revealNames: false  // Alt held: show list names.
     readonly property real lineHeight: Math.round(backend.fontSize * [2.05, 2.5, 2.8][backend.density])
     readonly property bool showNotes: !!r.notesPreview && (backend.showNotesPreview || backend.density === 2)
 

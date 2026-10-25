@@ -988,7 +988,7 @@ private slots:
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!help->property("visible").toBool(), 5000);
 
-        // The command popup (Defer bar), the shared palette behind the reference app's
+        // The command popup (Defer bar), the shared palette behind the
         // quick commands.
         QVERIFY(mk::homeWith(app, app.ids.buyMilk));
         app.press(Qt::Key_D);

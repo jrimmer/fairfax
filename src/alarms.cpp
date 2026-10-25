@@ -154,8 +154,7 @@ AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_s
     QDBusConnection::sessionBus().connect(Service, Path, Interface, "NotificationClosed", this,
                                           SLOT(onClosed(uint, uint)));
 #endif
-    // Sounding alerts can come back until they're handled, like the reference app's
-    // "Sound alerts repeat until dismissed".
+    // Sounding alerts can come back until they're handled.
     if (!m_store->setting("alerts.nagMinutes").isValid())
         m_store->setSetting("alerts.nagMinutes", m_store->setting("alerts.nag", false).toBool() ? 5 : 0);  // The old on/off switch.
     m_nagTimer.setInterval(30 * 1000);
@@ -289,7 +288,7 @@ void AlarmService::notify(const Alarm &a, const Task &t, const QDateTime &moment
     const bool quiet = a.sound && doNotDisturb();
     if (a.sound && !quiet)
         hints.insert("sound-name", "alarm-clock-elapsed");
-    // the reference app's snooze menu: the two date-based rows show the time they land on,
+    // The snooze menu: the two date-based rows show the time they land on,
     // and "This evening" is left out when 7 PM is less than 30 minutes away.
     const QDateTime now = QDateTime::currentDateTime();
     QStringList actions{"default", "Open", "complete", "Complete", "snooze5", "Snooze 5 Minutes", "snooze", "Snooze 15 Minutes",

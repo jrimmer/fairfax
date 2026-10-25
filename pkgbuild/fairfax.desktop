@@ -2,13 +2,13 @@
 Type=Application
 Name=Fairfax
 GenericName=Task Manager
-Comment=A keyboard-first task manager, modelled on the reference app
+Comment=A keyboard-first task manager
 Exec=fairfax %u
 MimeType=x-scheme-handler/fairfax;
 Icon=fairfax
 Terminal=false
 Categories=Office;ProjectManagement;Utility;
-Keywords=todo;tasks;gtd;taskapp;
+Keywords=todo;tasks;gtd;
 StartupWMClass=fairfax
 Actions=new-task;new-window;today;find;
 

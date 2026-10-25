@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-// Settings, in the reference app's panes: General, Appearance, Tasks, Today & Lists,
+// Settings panes: General, Appearance, Tasks, Today & Lists,
 // Alerts, Sync, Mail, Backups, and Import & Export. Everything applies at once.
 Window {
     id: root
@@ -74,7 +74,7 @@ Window {
             if (purpose === "export-csv") backend.exportTo(path, "csv")
             else if (purpose === "export-ics") backend.exportTo(path, "ics")
             else if (purpose === "import-ics") backend.importFrom(path, "ics")
-            else if (purpose === "import-taskdb") backend.importFrom(path, "taskapp")
+            else if (purpose === "import-taskdb") backend.importFrom(path, "taskdb")
             else if (purpose === "import-ticktick") backend.importFrom(path, "ticktick")
             else if (purpose === "import-things") backend.importFrom(path, "things")
             else if (purpose === "import-omnifocus") backend.importFrom(path, "omnifocus")
@@ -985,7 +985,7 @@ Window {
                     }
                     Hint {
                         Layout.topMargin: 0
-                        text: "Mail sent to a Fairfax address becomes tasks, as in the reference app's Mail to the reference app. Fairfax has no server of its own, so it watches a mailbox you own and picks out only the messages meant for it; the rest of that mailbox is left alone."
+                        text: "Mail sent to a Fairfax address becomes tasks. Fairfax has no server of its own, so it watches a mailbox you own and picks out only the messages meant for it; the rest of that mailbox is left alone."
                     }
                     RowLayout {
                         Layout.topMargin: 8
@@ -1183,7 +1183,7 @@ Window {
                     Hint {
                         Layout.topMargin: 0
                         leftPadding: 44
-                        text: "the reference app's due(), start(), list(), tag(), priority() and action() in the subject always work. This also reads “tomorrow 3pm #home !!” the way Quick Entry does."
+                        text: "The due(), start(), list(), tag(), priority() and action() in the subject always work. This also reads “tomorrow 3pm #home !!” the way Quick Entry does."
                     }
                     RowLayout {
                         Label { text: "Check every"; Layout.preferredWidth: 160 }
@@ -1291,7 +1291,7 @@ Window {
                     Label { text: "Import"; font.bold: true; Layout.topMargin: 12 }
                     RowLayout {
                         Button { objectName: "importTickTick"; text: "From TickTick…"; onClicked: filePicker.open("Choose a TickTick backup (.csv)", "import-ticktick") }
-                        Button { objectName: "importTaskDb"; text: "From the reference app…"; onClicked: filePicker.open("Choose a the reference app database (tasks.db or a .taskdb backup)", "import-taskdb") }
+                        Button { objectName: "importTaskDb"; text: "From a task database…"; onClicked: filePicker.open("Choose a task database file", "import-taskdb") }
                         Button { objectName: "importIcs"; text: "iCalendar (.ics)…"; onClicked: filePicker.open("Choose an iCalendar file", "import-ics") }
                     }
                     RowLayout {
@@ -1300,7 +1300,7 @@ Window {
                     }
                     Hint { text: "From Things 3 (a JSON export) and OmniFocus (File > Export > TaskPaper): areas, folders and projects become lists and projects; dates, tags, flags, notes and checklists come across." }
                     Hint { text: "From TickTick: in TickTick's web app, Settings → Account → Generate Backup, then choose the .csv here. Lists, tags, dates, repeats, reminders, checklists and completed history come across; importing the same backup again adds only what's new." }
-                    Hint { text: "From the reference app: on the Mac, use a backup from the reference app > Settings > Backups (a .taskdb file). Lists, groups, tags, dates, repeats and alerts come across; one Ctrl+Z undoes the whole import, and a backup is made first." }
+                    Hint { text: "From a task database file (an SQLite database or a backup of one, recognised by its contents): lists, groups, tags, dates, repeats and alerts come across; one Ctrl+Z undoes the whole import, and a backup is made first." }
                 }
 
                 // Calendar

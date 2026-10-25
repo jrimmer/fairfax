@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Basic as Plain
 import QtQuick.Layouts
 
-// the reference app's Repeat popup. Every control writes the rule straight back through
+// The Repeat popup. Every control writes the rule straight back through
 // backend.setRecurrence, so there is no OK button; the summary line shows
 // what the backend will make of the rule. While the rule is "Never" the six
 // preset chips (Alt+1…6) offer a one-click start.

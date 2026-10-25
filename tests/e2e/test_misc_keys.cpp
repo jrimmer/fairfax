@@ -322,7 +322,7 @@ private slots:
     }
 
     // Home, End, Page Up and Page Down are not bound by the task list (nor
-    // listed by the reference app): they leave the selection and the data alone.
+    // listed in the shortcut help): they leave the selection and the data alone.
     void homeEndAndPageKeysLeaveTheSelection() {
         App app;
         QVERIFY(app.ok);

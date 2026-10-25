@@ -14,7 +14,7 @@ ColumnLayout {
     readonly property int year: shown.getFullYear()
     readonly property int month: shown.getMonth()
     readonly property int firstDay: backend.firstDayOfWeek  // 0 = Sunday; the "Week starts" setting.
-    // the reference app's Busy Days styles: a heat-map tint, dots under the date, or none,
+    // The Busy Days styles: a heat-map tint, dots under the date, or none,
     // which skips the counting entirely.
     readonly property string style: (backend.settingsRevision, String(backend.setting("appearance.calendarStyle").value || "heat"))
     readonly property bool shadeWeekends: (backend.settingsRevision, backend.settingFlag("appearance.calendarWeekends", false))

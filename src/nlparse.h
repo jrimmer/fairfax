@@ -1,6 +1,6 @@
 #pragma once
 
-// Natural-language input for new tasks, after the reference app 2026.3.4: details typed into
+// Natural-language input for new tasks: details typed into
 // a title ("Call Sam tomorrow at 3pm #family !! every Monday [30m]") fill the
 // matching fields and come out of the title. Quick Entry and the editor use
 // the spans to draw the recognised words as capsules while you type.

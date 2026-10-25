@@ -323,7 +323,7 @@ Standards-Version: 4.6.2
 
 Package: fairfax
 Architecture: any
-Description: A keyboard-first task manager for Omarchy, modelled on the reference app
+Description: A keyboard-first task manager for Omarchy
 EOF
 cd /stage
 shlibs=$(dpkg-shlibdeps -O --ignore-missing-info usr/bin/fairfax 2>/dev/null | sed "s/^shlibs:Depends=//" || true)
@@ -352,7 +352,7 @@ Depends: $depends
 Section: utils
 Priority: optional
 Homepage: https://github.com/jrimmer/fairfax
-Description: A keyboard-first task manager for Omarchy, modelled on the reference app
+Description: A keyboard-first task manager for Omarchy
 EOF
 dpkg-deb --root-owner-group --build /stage "/dist/fairfax-$DEB_ARCH.deb"
 cd /dist

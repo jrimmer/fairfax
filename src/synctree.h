@@ -2,7 +2,7 @@
 
 // The per-record file tree that git sync, folder sync and WebDAV sync share.
 // The database never goes into it; instead every record is a small JSON file,
-// laid out like the reference app's own folder-sync tree (Tasks.sync/):
+// laid out as a folder tree:
 //
 //   Store.json                  {"format": "fairfax-sync", "version": 1}
 //   list-groups/<uid>.json

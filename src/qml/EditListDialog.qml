@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// the reference app's Edit List sheet: name, colour, group, which Focus Lists the list
+// The Edit List sheet: name, colour, group, which Focus Lists the list
 // feeds, how completed tasks show, and muted alerts. Smart Lists only have a
 // name and a colour here; their rules are edited in the search builder.
 ThemedDialog {

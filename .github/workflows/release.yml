@@ -201,7 +201,7 @@ jobs:
           fi
           if [ ! -s "$notes" ]; then
             cat >"$notes" <<EOF
-          A keyboard-first task manager for Omarchy, modelled on the reference app.
+          A keyboard-first task manager for Omarchy.
 
           Install on Linux with one line:
 

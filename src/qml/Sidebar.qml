@@ -603,7 +603,7 @@ Rectangle {
             Rectangle {
                 objectName: "sidebarBand"
                 visible: item.isList || item.row.kind === "project"
-                // the reference app's bands are wide pills that stack into one column.
+                // The bands are wide pills that stack into one column.
                 x: 24
                 width: 20
                 y: item.runStart ? 3 : 0
@@ -640,7 +640,7 @@ Rectangle {
                 MouseArea { anchors.fill: parent; anchors.margins: -5; onClicked: backend.toggleListExpanded(item.row.listId) }
             }
 
-            // Focus list glyphs; Today shows the day of the month like the reference app.
+            // Focus list glyphs; Today shows the day of the month.
             Item {
                 visible: item.row.kind === "focus" || item.row.kind === "smart"
                 x: 22
@@ -656,7 +656,7 @@ Rectangle {
                          : item.row.kind === "smart" && typeof item.row.color === "number" && item.row.color >= 0 ? theme.listColor(item.row.color)
                          : theme.muted
                 }
-                // A calendar page showing today's date, as the reference app draws it.
+                // A calendar page showing today's date.
                 Rectangle {
                     anchors.centerIn: parent
                     visible: item.row.icon === "today"

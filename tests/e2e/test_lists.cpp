@@ -205,8 +205,8 @@ private slots:
         QCOMPARE(liveList(app, app.ids.work).groupId, world().personal);
     }
 
-    // "Delete all Tasks: empties the list but keeps the list itself, its color,
-    // and its settings. the reference app asks for confirmation first." (lists-and-list-groups.md)
+    // Deleting all tasks empties the list but keeps the list, its colour and
+    // its settings.
     void deleteAllTasksKeepsList() {
         App app(seedLists);
         QVERIFY(app.ok);

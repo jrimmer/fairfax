@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// the reference app's "Search Options", as a visual builder for the search language. The
+// The "Search Options", as a visual builder for the search language. The
 // Search Presets rule rows, chips and pickers write a query string (shown live,
 // and editable); opening it with an existing search reads back what it
 // recognises and keeps the rest as text. Name chip states: off -> include ->
@@ -25,7 +25,7 @@ Popup {
     property bool loading: false              // Suppresses rebuilds while state is being set.
     property bool editingPreview: false
 
-    // Smart List options (the reference app's Search Options sheet): the date range stored in
+    // Smart List options (the Search Options sheet): the date range stored in
     // TaskList.smartRange, and the per-list completed/scheduled switches.
     property int editingListId: 0             // The Smart List being edited, or 0 when building a plain search.
     property string rangeKind: "none"         // "none" | "fixed" | "next" | "nodue"

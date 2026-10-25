@@ -31,8 +31,7 @@ class E2ETasksLifecycle : public QObject {
     static QString homeKey(App &app) { return "list:" + QString::number(app.ids.home); }
 
 private slots:
-    // "The first column of every task row is a checkbox. Click it to mark
-    // complete" (the-window.md): the row is struck through, Done lists it,
+    // Ticking the checkbox completes a task: the row is struck through, Done lists it,
     // and clicking its checkbox there reopens it.
     void completeAndReopenWithCheckbox() {
         App app;

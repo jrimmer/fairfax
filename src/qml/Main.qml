@@ -3,9 +3,9 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-// The main window: the reference app's three panels (lists, tasks, tags) and every
+// The main window: the three panels (lists, tasks, tags) and every
 // app-wide shortcut. ⌘ maps to Ctrl because Super belongs to Hyprland; the
-// bare-key commands live in TaskPane, where the reference app scopes them to the list.
+// bare-key commands live in TaskPane, where they are scoped to the list.
 ApplicationWindow {
     id: win
 
@@ -106,7 +106,7 @@ ApplicationWindow {
     }
 
     // Selecting Done with 500+ completed tasks and auto-delete off asks once
-    // whether to open the setting, as the reference app does.
+    // whether to open the setting.
     Connections {
         target: backend
         function onDoneWarningRequested() { if (win.active) doneWarning.open() }
@@ -321,7 +321,7 @@ ApplicationWindow {
     AppShortcut { sequences: backend.shortcutMap["view.searchScope"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleSearchScope() }
     AppShortcut { sequences: backend.shortcutMap["app.newWindow"] || []; enabled: !backend.recordingShortcut; onActivated: backend.requestNewWindow() }
     AppShortcut { sequences: backend.shortcutMap["app.savePdf"] || []; enabled: !backend.recordingShortcut; onActivated: filePicker.save("Save this list as a PDF", (backend.sourceTitle || "Tasks") + ".pdf", "print-pdf") }
-    // the reference app's Ctrl+Cmd+F; Ctrl+Alt+F is taken by the search scope.
+    // Full screen; Ctrl+Alt+F is taken by the search scope.
     AppShortcut { sequences: backend.shortcutMap["view.fullScreen"] || []; enabled: !backend.recordingShortcut; onActivated: win.visibility = win.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
     AppShortcut {
         sequences: backend.shortcutMap["app.sync"] || []; enabled: !backend.recordingShortcut

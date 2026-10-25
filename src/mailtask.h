@@ -1,8 +1,7 @@
 #pragma once
 
-// Mail to Fairfax: turns an RFC 822 message into a task the way the reference app's "Mail
-// to the reference app" does (see its manual page on email). the reference app hosts a private address;
-// Fairfax has no server, so the message arrives from an IMAP mailbox you own
+// Mail to Fairfax: turns an RFC 822 message into a task. Fairfax has no
+// server to host an address, so the message arrives from an IMAP mailbox you own
 // or from `fairfax import-mail`, and both come through here.
 //
 // parse() reads the message; import() files it. They are separate so a caller

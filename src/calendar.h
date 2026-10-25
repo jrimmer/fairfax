@@ -1,7 +1,7 @@
 #pragma once
 
-// The Calendar Day Bar's data source. On the Mac the reference app reads EventKit; on Linux
-// the equivalent is iCalendar, either local .ics files or http(s)/webcal URLs
+// The Calendar Day Bar's data source. On Linux
+// the source is iCalendar, either local .ics files or http(s)/webcal URLs
 // (the "secret address" every Google, Fastmail and Nextcloud calendar offers).
 //
 // Ics:: is a pure parser and recurrence expander with no Qt Quick or network

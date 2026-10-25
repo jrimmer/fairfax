@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Basic as Plain
 import Fairfax 1.0
 
-// The notes editor: a Markdown-styled text area with the reference app's left chip column
+// The notes editor: a Markdown-styled text area with the left chip column
 // (note, Markdown preview, insert date, open links). The text is always the
 // Markdown source; the preview is a separate read-only rendering.
 Rectangle {

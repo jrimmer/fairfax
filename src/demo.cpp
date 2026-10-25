@@ -1,5 +1,5 @@
-// Demo data for `fairfax --demo`: a lived-in database shaped like the one in
-// the reference app's own screenshots, with dates relative to today so it always looks current.
+// Demo data for `fairfax --demo`: a lived-in database shaped for
+// screenshots, with dates relative to today so it always looks current.
 
 #include "backend.h"
 
@@ -161,7 +161,7 @@ void Backend::seedDemo() {
     const qint64 read = s.task(office, "Read the platform RFC", NoDate, -1, 60, {"work"});
     s.edit(read, [](Task &t) { t.starred = true; });
 
-    // Sections in the Work list, like the reference app's task sections.
+    // Sections in the Work list, like the task sections.
     auto section = [&](const QString &name, double order) {
         ListSection sec;
         sec.id = m_store->nextId("sections");

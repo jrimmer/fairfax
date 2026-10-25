@@ -1,6 +1,7 @@
 #include "vtodo.h"
 
 #include <QHash>
+#include <QRegularExpression>
 #include <QSet>
 #include <QTimeZone>
 #include <QUuid>
@@ -241,15 +242,19 @@ void appendTimezone(QByteArray &out, const QTimeZone &zone) {
     line("END:VTIMEZONE");
 }
 
-// Splits a description's unescaped text into the notes and the the reference app metadata
-// block, which runs from a "<App Meta>" line to its closing line (or the end).
+// Splits a description's unescaped text into the notes and a metadata block
+// written by another client: it runs from a "<Something Meta>" line to its
+// closing "</Something Meta>" line (or the end).
 void splitMeta(const QString &description, QString &notes, QString &meta) {
+    static const QRegularExpression opener(QStringLiteral("^<([^<>/\\n]+ Meta)>"));
     const QStringList lines = description.split('\n');
     int start = -1;
+    QString closer;
     for (int i = 0; i < lines.size(); ++i) {
-        QString t = lines[i];
-        if (t.startsWith("<App Meta>")) {
+        const QRegularExpressionMatch m = opener.match(lines[i]);
+        if (m.hasMatch()) {
             start = i;
+            closer = QStringLiteral("</") + m.captured(1) + QLatin1Char('>');
             break;
         }
     }
@@ -260,7 +265,7 @@ void splitMeta(const QString &description, QString &notes, QString &meta) {
     }
     int end = lines.size() - 1;
     for (int i = start + 1; i < lines.size(); ++i) {
-        if (lines[i].trimmed() == "</App Meta>") {
+        if (lines[i].trimmed() == closer) {
             end = i;
             break;
         }

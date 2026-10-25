@@ -10,7 +10,7 @@
 // completion) and are read back with the natural-language parser. Fields
 // Todoist has no place for (start date and time, star, task type, action)
 // ride in a "<Fairfax Meta>{json}</Fairfax Meta>" block at the end of the
-// description, as the reference app does. List groups, smart lists, alarms and sections
+// description. List groups, smart lists, alarms and sections
 // stay local.
 //
 // Change tracking uses Store::SyncLink snapshots: a local record differs

@@ -18,8 +18,7 @@ class E2EMiscSort : public QObject {
 private slots:
     void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
 
-    // "Sorting ... Tap the sort button and choose Due Date, Priority, Title ..."
-    // (the-window.md): every option of the menu, ascending and descending,
+    // Every option of the menu, ascending and descending,
     // with and without Separated, gives exactly one order of the five tasks.
     void everySortOrdersTheRows_data() {
         QTest::addColumn<int>("field");
@@ -71,7 +70,7 @@ private slots:
         }
     }
 
-    // The menu offers the sorts the reference app does, ticks the one in force, and the
+    // The menu offers each sort, ticks the one in force, and the
     // Done list offers its own subset.
     void menuListsTheChoicesAndTicksTheCurrentOne() {
         App app(seedMisc);
@@ -184,8 +183,7 @@ private slots:
         QVERIFY(app.backend().sortAscending());
     }
 
-    // "Manual: drag tasks into the order you want" (the-window.md): a task
-    // dropped on another goes in front of it, and the list stays manual.
+    // Manual order by dragging: a task dropped on another goes in front of it, and the list stays manual.
     void manualOrderByDragging() {
         App app(seedMisc);
         QVERIFY(app.ok);

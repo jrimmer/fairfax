@@ -284,7 +284,7 @@ QueryContext ViewBuilder::queryContext(const ViewOptions &o) const {
 
 bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewOptions &o, const Query *query) const {
     // Archived lists stay out of everything but Smart Lists and Done, which
-    // is where the reference app still finds their tasks.
+    // is where their tasks remain reachable.
     const bool reachesArchive = source.kind == Source::Done
         || (source.kind == Source::List && isSmartList(source.id));
     if (t.deleted || !listVisible(t.listId, reachesArchive))
@@ -451,7 +451,7 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
             return {QStringLiteral("sec:%1").arg(sec.id), sec.name, {}, -1, qint64(sec.order * 1000) + 1};
         }
         case SortField::Status: {
-            // the reference app's Status sort: what needs attention first.
+            // The Status sort: what needs attention first.
             if (t.completed) return {"st:done", "Completed", {}, -1, 6};
             if (Schedule::isOverdue(t, m_now, m_settings)) return {"st:overdue", "Overdue", "overdue", -1, 0};
             if (Schedule::isInProgress(t, m_now)) return {"st:progress", "In Progress", "progress", -1, 1};
@@ -539,7 +539,7 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
         const qint64 ra = rankOf.value(a.key), rb = rankOf.value(b.key);
         if (ra == rb) return QString::localeAwareCompare(a.title, b.title) < 0;
         // Descending reverses the dated sections but keeps Overdue first and
-        // the undated section last, as the reference app does.
+        // the undated section last.
         const bool pinned = ra == RankFirst || rb == RankFirst || ra == RankLast || rb == RankLast;
         if (!sort.ascending && dated && !pinned) return ra > rb;
         if (!sort.ascending && !dated) return ra > rb;

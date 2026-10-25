@@ -1,8 +1,7 @@
 # Fairfax
 
-A keyboard-first task manager for [Omarchy](https://omarchy.org), modelled closely on
-[the reference app](https://example.com) for the Mac: three panels (lists, tasks, tags), focus lists that
-pull tasks from everywhere, start dates that hide work until it's time, projects and
+A keyboard-first task manager for [Omarchy](https://omarchy.org): three panels (lists,
+tasks, tags), focus lists that pull tasks from everywhere, start dates that hide work until it's time, projects and
 checklists, and single-key commands for everything you do to a task.
 
 It follows the Omarchy theme live, light or dark, and keeps everything in a local SQLite
@@ -103,7 +102,7 @@ From any terminal, `frfx` (short for `fairfax`) does the same:
 frfx Call Sam tomorrow 3pm #family !!    # add a task
 frfx                                     # Today, numbered
 frfx ls Personal                         # a list (or all, starred, scheduled, done)
-frfx find dentist                        # search everything; the reference app search syntax works
+frfx find dentist                        # search everything; the search syntax works
 frfx done 347                            # complete by number
 frfx help
 ```
@@ -124,7 +123,7 @@ offers your lists and `frfx done <Tab>` your open tasks.
   Section): drag tasks onto a heading to move them, double-click a heading to rename it.
 - **Tags.** Group them, filter by them from the right panel, and *pause* one (right-click) to
   hide every task that carries it until you resume it.
-- **Smart Lists.** Type a search in the reference app's syntax (`type: hiprio tags: !work`,
+- **Smart Lists.** Type a search in the search syntax (`type: hiprio tags: !work`,
   `"exact phrase"`, `OR`, `-word`) and save it as a Smart List. Search Options
   (Ctrl+Shift+Alt+F, or right-click a Smart List → Edit Search…) has a Search Presets rule
   builder, a row per clause (Priority is High, Tag is not set…) with Match All or Any, [−] and
@@ -281,7 +280,7 @@ mark is not visible to a screen reader user.
 
 ## Keyboard
 
-the reference app's ⌘ is Ctrl here, since Super belongs to Hyprland. The bare keys work while the task
+The Mac's ⌘ is Ctrl here, since Super belongs to Hyprland. The bare keys work while the task
 list has focus. Press `?` in the app for the full list. Every shortcut can be changed in
 Settings → Shortcuts, except the navigation, Return, Esc and clipboard keys; the table below
 lists the defaults. The `?` overlay, the Shortcuts pane, the editor's shortcut menu and the
@@ -346,7 +345,8 @@ the table spells them Ctrl and Alt.
   task's time zone), repeats, reminders, priorities, checklists, sub-tasks, sections and
   completed history come across, and importing the same backup again adds only what's new
   (and fills in sections for tasks an earlier import brought in).
-- **From the reference app:** `fairfax import tasks.db` (or a `.taskdb` backup).
+- **From a task database:** `fairfax import tasks.db`, an SQLite file whose tables Fairfax
+  recognises by content; Settings → Import & Export → From a task database….
 - **From Things 3:** a JSON export (`fairfax import things.json`, or Settings → Import &
   Export → From Things…). Areas become lists, projects stay projects, checklist items stay
   checklists; "when" becomes the start date and the deadline the due date.
@@ -359,8 +359,8 @@ Every import is one step that Ctrl+Z undoes, and a backup is taken first.
 
 ## Mail to Fairfax
 
-the reference app's "Mail to the reference app" turns email into tasks through a private hosted address. Fairfax has no
-server, so mail reaches it from a mailbox you own, and the conversion is the same as the reference app's:
+Fairfax has no server to host a mail address, so mail reaches it from a mailbox you own.
+The conversion follows these rules:
 
 - The subject is the title (leading `Re:`, `Fwd:`, `AW:` and friends are trimmed), the plain-text
   body is the notes (up to 10,000 characters), and attachments and HTML formatting are dropped.
@@ -429,7 +429,7 @@ What it picks, and what it does afterwards, is set under *Which mail* and *What 
   high-water mark so old mail is not fetched again. Messages that were already tasks get the same
   treatment. Messages over 25 MB are skipped and reported.
 - *New tasks go to* a list (the Inbox by default), and *Read dates and tags in the subject* adds
-  Quick Entry's parsing to the reference app's filing instructions, which always work.
+  Quick Entry's parsing to the filing instructions, which always work.
 
 From a script, `procmail`, Sieve, `fetchmail` or a ProtonMail Bridge setup:
 
@@ -460,8 +460,8 @@ from your server's security settings, then map each Fairfax list to one of the s
 VTODO calendars under **Lists and calendars**, or let **Create calendars for new lists** make
 one per list. Calendars that exist on the server without a matching list arrive as new lists
 in an account group. Other clients' metadata is preserved: unknown VTODO properties (such as
-the reference app's `X-EXAMPLE-*` and its `<App Meta>` notes block) ride along in each task and go back
-unchanged, so a real the reference app or Reminders client on the same server keeps its own data. Dates,
+vendor `X-*` properties and a `<Something Meta>` notes block) ride along in each task and go back
+unchanged, so another client, such as Reminders, on the same server keeps its own data. Dates,
 repeats, priorities, tags, sub-tasks and alerts all sync; a wrong password is reported in the
 status line, and **Disconnect** forgets the account and its links without deleting a single
 task on either side.
@@ -477,7 +477,7 @@ without touching what you have, saved elsewhere with **Save a Copy…**, or dele
 
 ## Automation
 
-Everything the reference app's Automation Suite offers is available outside the window too:
+Everything Fairfax automates is available outside the window too:
 
 ```sh
 fairfax ctl help                                    # list commands
@@ -499,7 +499,7 @@ start_date, priority, duration, created, modified, completed). `create_task` and
 `list_alarms`, `add_alarm` (relative with `offset_seconds`, absolute with `at`, or
 `days_before` with `time_of_day`) and `remove_alarm`.
 
-The URL scheme follows the reference app's `twodo://` one under `fairfax://x-callback-url/<action>`:
+The URL scheme lives under `fairfax://x-callback-url/<action>`:
 `add` (with `task`, `note`, `forlist`, `forparentname`, `due`, `duetime`, `start`, `repeat`,
 `tags`, `locations`, `subtasks`, `priority`, `starred`, `action`, `picture` and `audio` as
 base64, `ignoredefaults`, `edit`, `usequickentry`, `saveinclipboard`), `paste`, `addnewtask`,
@@ -516,8 +516,7 @@ Do Not Disturb.
 
 The desktop file has a **New Window** action as well (`fairfax --new-window`).
 
-If you use Waybar rather than Omarchy's own bar, a module with today's counts (like the reference app's
-Dock badge) goes in `~/.config/waybar/config.jsonc`:
+If you use Waybar rather than Omarchy's own bar, a module with today's counts (like a dock badge) goes in `~/.config/waybar/config.jsonc`:
 
 ```jsonc
 "custom/fairfax": { "exec": "fairfax --waybar", "return-type": "json", "interval": 60, "on-click": "fairfax" }
@@ -554,12 +553,11 @@ overrides the pinned linuxdeploy release. See [docs/releasing.md](docs/releasing
 for how a release is cut with `.github/workflows/release.yml`.
 
 `bin/e2e` boots the real window on a temporary database and drives it the way a user does
-(mouse clicks, double-clicks, typing, shortcuts), then checks the store or the screen. Each
-scenario in `tests/e2e/` quotes the the reference app manual page it comes from, and a layout check fails when
-any visible item sticks out of its dialog, popup or window. Pass Qt Test arguments through
+(mouse clicks, double-clicks, typing, shortcuts), then checks the store or the screen. A layout
+check fails when any visible item sticks out of its dialog, popup or window. Pass Qt Test arguments through
 (`bin/e2e doubleClickOpensEditorWithTitle`); `FAIRFAX_E2E=1 bin/test` runs it after the unit tests.
 
 `src/` holds the C++ (store, scheduling rules, view building, the `backend` QObject) and
-`src/qml/` the interface. `docs/analysis.md` records how the reference app behaves and the roadmap.
+`src/qml/` the interface.
 
-Fairfax is an independent project and is not affiliated with the reference app or its makers.
+Fairfax is an independent project.

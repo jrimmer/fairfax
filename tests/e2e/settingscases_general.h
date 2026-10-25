@@ -15,7 +15,7 @@ inline void addGeneralAndAppearanceCases(QVector<SettingCase> &v) {
         }
         {
             K c{"quickEntry.clipboard", "General", "setting:quickEntry.clipboard", K::Check, true};
-            // "Like the reference app, the clipboard's text lands in the notes" (QuickEntry.qml reset()).
+            // "The clipboard's text lands in the notes" (QuickEntry.qml reset()).
             c.effect = SK_EFFECT {
                 SK_APP
                 const QString clip = "pasted from the clipboard";

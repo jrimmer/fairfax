@@ -17,7 +17,7 @@ _frfx() {
   if (( CURRENT == 2 )); then
     local -a commands=(
       'ls:show a list (Today when omitted)'
-      'find:search everything (the reference app search syntax)'
+      'find:search everything (search syntax)'
       'done:complete tasks by number'
       'undone:reopen tasks by number'
       'open:open Fairfax'
@@ -61,7 +61,7 @@ _fairfax_main() {
         'add:add a task (natural language)'
         'ctl:run an automation command'
         'mcp:run the MCP server on stdio'
-        'import:import a TickTick backup, the reference app database or iCalendar file'
+        'import:import a TickTick backup, task database or iCalendar file'
         'import-mail:turn emails into tasks (Mail to Fairfax)'
         'setup:wire Fairfax into Omarchy'
       )
@@ -79,7 +79,7 @@ _fairfax_main() {
             '--maildir[import a Maildir]:directory:_files -/' \
             '*:message:_files -g "*.eml"'
           ;;
-        import) _files -g '*.(csv|ics|db|taskdb)' ;;
+        import) _files ;;
         setup)
           if (( CURRENT == 2 )); then
             _values 'target' omarchy

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Every shortcut, on `?`. the reference app's ⌘ is Ctrl here, since Super belongs to
+// Every shortcut, on `?`. ⌘ is Ctrl here, since Super belongs to
 // Hyprland; the bare keys work while the task list has focus. The rows come
 // from the command registry, so a remapped key shows its new binding.
 Popup {

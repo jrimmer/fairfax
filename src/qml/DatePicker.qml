@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// the reference app's date picker: preset chips (Today, Tomorrow, the day after tomorrow by
+// The date picker: preset chips (Today, Tomorrow, the day after tomorrow by
 // weekday name, Week, None) above a month calendar. Everything is reachable
 // from the keyboard: arrows move the cursor, PageUp/PageDown change month,
 // Return picks and Alt+0…4 trigger the chips.
@@ -130,7 +130,7 @@ Popup {
                     Text {
                         id: chipText
                         anchors.centerIn: parent
-                        // The Alt hint for None is 0 in the reference app rather than its position in the row; No Time has no shortcut.
+                        // The Alt hint for None is 0 rather than its position in the row; No Time has no shortcut.
                         text: modelData.label + (modelData.days === -2 ? "" : "  ⌥" + (modelData.days === -1 ? 0 : index + 1))
                         color: theme.foreground
                         font.pixelSize: backend.fontSize - 2

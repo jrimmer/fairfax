@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 
-// The arrow-shaped list badge the reference app puts before a project's name and in the
+// The arrow-shaped list badge shown before a project's name and in the
 // editor's list ribbon.
 Item {
     id: root

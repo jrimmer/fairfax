@@ -1,6 +1,6 @@
 // End-to-end task tests, part 1: creating tasks (Ctrl+N, the + button, Return
 // for the next task, Quick Entry, projects and checklists). Each test boots the
-// real window, does what the the reference app manual says with the mouse and keyboard, then
+// real window, does what a user does with the mouse and keyboard, then
 // checks the saved task and what the list shows.
 
 #include "taskkit.h"

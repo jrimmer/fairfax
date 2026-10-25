@@ -2,7 +2,7 @@
 
 // Sync through a git repository, the primary way to share tasks between
 // machines. The database never goes into git; instead every record is a
-// small JSON file, laid out like the reference app's own folder-sync tree (Tasks.sync/):
+// small JSON file, laid out as a folder tree:
 //
 //   Store.json                  {"format": "fairfax-sync", "version": 1}
 //   list-groups/<uid>.json

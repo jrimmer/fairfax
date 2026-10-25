@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Basic as Plain
 
-// A typeable date field with the reference app's suggestion dropdown: "tom 3pm", "in 2w",
+// A typeable date field with the suggestion dropdown: "tom 3pm", "in 2w",
 // "18d", "fri". Up/Down pick a suggestion, Return or a click applies it, and
 // leaving the field applies the best reading of what was typed.
 Plain.TextField {
@@ -72,7 +72,7 @@ Plain.TextField {
         picked(s.date, s.minutes)
     }
 
-    // Down with no suggestions open shows the calendar, as in the reference app.
+    // Down with no suggestions open shows the calendar.
     Keys.onDownPressed: {
         if (popup.visible) highlighted = Math.min(highlighted + 1, suggestions.length - 1)
         else if (!timeOnly) picker.openAt(root, root.iso)

@@ -1,7 +1,7 @@
 #pragma once
 
 // When a task is visible, due, overdue, scheduled or "in progress", following
-// the reference app's Dates and Durations rules. Everything takes `now` explicitly so the
+// The date and duration rules. Everything takes `now` explicitly so the
 // rules are testable and a whole view is evaluated against one instant.
 
 #include <QDateTime>

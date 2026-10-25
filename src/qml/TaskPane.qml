@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // The centre panel: toolbar, the list title with its sort bar, and the
-// sectioned task list. the reference app's bare-key commands (t, y, d, ], [, 0–3 …) act
+// sectioned task list. The bare-key commands (t, y, d, ], [, 0–3 …) act
 // here, only while the list itself has focus, so typing elsewhere is safe.
 Item {
     id: root
@@ -110,7 +110,7 @@ Item {
             }
             Item { Layout.fillWidth: true }
             SearchBox { id: search; onFinished: root.focusList() }
-            // the reference app's search menu: ready-made searches, and the full options.
+            // The search menu: ready-made searches, and the full options.
             IconButton {
                 id: presetsButton
                 objectName: "searchPresets"
@@ -459,7 +459,7 @@ Item {
                 }
             }
 
-            // Clicking empty space clears the selection, as in the reference app.
+            // Clicking empty space clears the selection.
             MouseArea {
                 z: -1
                 anchors.fill: parent
@@ -491,7 +491,7 @@ Item {
                 onDropped: (drop) => { if (drop.hasUrls) { backend.dropFiles(0, drop.urls); drop.accept() } }
             }
 
-            // Section bars, as in the reference app: one centred dash per section, longer for
+            // Section bars: one centred dash per section, longer for
             // fuller sections, with the one in view drawn darker. Click or drag
             // along the rail to jump. Only shown when the list scrolls, so it
             // isn't mistaken for a row's priority mark.
@@ -577,7 +577,7 @@ Item {
             // The shutdown review finishes on Return, before the editor's
             // Return; the Finish button does the same when it has the focus.
             if (backend.sourceIsMyDay && backend.myDayShutdown) { backend.myDayFinishReview(); return done() }
-            // the reference app's option: Return creates a new task and Ctrl+Return edits.
+            // With the setting on, Return creates a new task and Ctrl+Return edits.
             const returnCreates = backend.settingFlag("tasks.returnCreates", false)
             if (returnCreates !== !!ctrl) backend.newTask(0); else backend.beginEdit()
             return done()

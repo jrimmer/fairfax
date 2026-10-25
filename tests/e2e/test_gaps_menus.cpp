@@ -172,8 +172,7 @@ private slots:
 
     // ------------------------------------------------------- sort direction
 
-    // "Sorting ... the arrow beside the sort button reverses the order"
-    // (the-window.md): the rows turn over, each list remembers its own
+    // The arrow beside the sort button reverses the order: the rows turn over, each list remembers its own
     // direction, and a second click puts the order back.
     void reverseArrowReversesRowsPerListAndKeepsAcrossRestart() {
         Keep k(seedWorld);

@@ -1,8 +1,7 @@
 // Mail to Fairfax, from the user's side: Settings > Mail, and the connector
-// against a fake IMAP server on 127.0.0.1 (tests/fakeimap.h). The the reference app manual
-// page "Mail to the reference app" (email-to-tasks.md) describes a hosted address; Fairfax
-// reaches a mailbox you own instead, so these tests quote the manual for what
-// becomes a task and follow the Mail spec for how mail arrives.
+// against a fake IMAP server on 127.0.0.1 (tests/fakeimap.h). Fairfax
+// reaches a mailbox you own rather than a hosted address, so these tests cover
+// what becomes a task and follow the Mail spec for how mail arrives.
 //
 // Nothing here touches the network beyond the loopback or the real keyring (the
 // keyring is in memory, see main.cpp), and the OAuth HTTP calls go through
@@ -465,7 +464,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(textOf("mailStatus"), QString("Off"), 5000);
     }
 
-    // the reference app manual: "Move to" is the Gmail default; the mail goes under the Fairfax label and out
+    // "Move to" is the Gmail default; the mail goes under the Fairfax label and out
     // of the inbox, and a message that was already a task is moved all the same.
     void movedMailLeavesTheInbox() {
         FakeImap server;
@@ -521,7 +520,7 @@ private slots:
         QVERIFY(app.taskTitled("One").id);
     }
 
-    // "Natural language" is off by default; the reference app's own due(), list() and the rest always work.
+    // "Natural language" is off by default; the due(), list() and the rest always work.
     void naturalLanguageSwitchControlsDatesInTheSubject() {
         FakeImap server;
         server.add("INBOX", plusMail("Pay the rent tomorrow", "n1"));

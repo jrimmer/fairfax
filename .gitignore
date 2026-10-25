@@ -3,7 +3,7 @@
 /pkgbuild/src/
 *.pkg.tar.*
 /dist/
-# Research material from the the reference app teardown; never ship or commit it.
+# Research material; never ship or commit it.
 /reference/
 .claude/
 # Icons made by bin/build-macos and bin/build-windows.ps1 from the SVG.

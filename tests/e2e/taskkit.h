@@ -342,7 +342,7 @@ inline bool openEditor(App &app, qint64 id) {
     return opened;
 }
 
-// Leaves the editor the way the reference app's Ctrl+Return does.
+// Leaves the editor the way the Ctrl+Return does.
 inline bool closeEditor(App &app) {
     app.press(Qt::Key_Return, Qt::ControlModifier);
     return waitFor([&] { return !findItem("editorCard"); });

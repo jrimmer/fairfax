@@ -233,7 +233,7 @@ public:
     Q_INVOKABLE bool isSelected(qint64 id) const { return m_selected.contains(id); }
 
     // Creating and changing tasks. Selection-wide actions apply to every
-    // selected task, as the reference app's bare-key commands do.
+    // selected task, as the bare-key commands do.
     Q_INVOKABLE void newTask(int type = 0, bool subtask = false);
     Q_INVOKABLE void toggleComplete(qint64 id = 0);
     Q_INVOKABLE void setCompleted(bool done);
@@ -506,7 +506,7 @@ public:
     Q_INVOKABLE void deleteGroup(qint64 groupId);
     Q_INVOKABLE QVariantList archivedLists() const;
 
-    // Sections within a list (the reference app's task sections).
+    // Sections within a list (the task sections).
     Q_INVOKABLE qint64 newSection(qint64 listId, const QString &name);
     Q_INVOKABLE void renameSection(qint64 sectionId, const QString &name);
     Q_INVOKABLE void deleteSection(qint64 sectionId);
@@ -646,7 +646,7 @@ public:
     Q_INVOKABLE void setAlarmSound(qint64 alarmId, bool sound);
     Q_INVOKABLE void removeAlarm(qint64 alarmId);
 
-    // Search everywhere rather than in the current list (the reference app's scope toggle).
+    // Search everywhere rather than in the current list (the scope toggle).
     Q_INVOKABLE void toggleSearchScope();
     Q_INVOKABLE void setSearchAllLists(bool all);
 
