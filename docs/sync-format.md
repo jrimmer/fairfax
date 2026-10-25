@@ -783,6 +783,8 @@ git push origin main
 **Complete a task.** Set `completed` and `completed_at`. This is for a task that does not repeat.
 
 ```sh
+f=tasks/$TASK.json
+old=$(jq .modified "$f"); new=$(( NOW > old ? NOW : old + 1 ))
 jq -S --indent 4 --argjson m "$new" '.completed = true | .completed_at = $m | .modified = $m' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 git commit -am "Complete task: Call the plumber"
 git push origin main
@@ -791,6 +793,8 @@ git push origin main
 **Delete a task.** Set `deleted` rather than removing the file, and do the same for its subtasks.
 
 ```sh
+f=tasks/$TASK.json
+old=$(jq .modified "$f"); new=$(( NOW > old ? NOW : old + 1 ))
 jq -S --indent 4 --argjson m "$new" '.deleted = true | .modified = $m' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 git commit -am "Delete task: Call the plumber"
 git push origin main
