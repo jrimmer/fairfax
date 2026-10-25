@@ -1,4 +1,5 @@
 #include <QBuffer>
+#include <QProcess>
 #include <QtTest>
 #include <memory>
 
@@ -313,6 +314,34 @@ private slots:
         const Run missing = importFile(path("nope.ics"));
         QCOMPARE(missing.code, 1);
         QVERIFY(backupFiles().isEmpty());
+    }
+
+    // --version and --help answer without a display, as over SSH.
+    void versionAndHelpNeedNoDisplay() {
+        const QString binary = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../fairfax");
+        if (!QFileInfo(binary).isExecutable())
+            QSKIP("the fairfax binary isn't built beside the tests");
+        auto run = [&](const QString &flag, QString *out) {
+            QProcess p;
+            QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+            for (const char *name : {"WAYLAND_DISPLAY", "DISPLAY", "QT_QPA_PLATFORM"})
+                env.remove(name);
+            p.setProcessEnvironment(env);
+            p.start(binary, {flag});
+            QVERIFY(p.waitForFinished(20000));
+            QCOMPARE(p.exitStatus(), QProcess::NormalExit);
+            QCOMPARE(p.exitCode(), 0);
+            *out = QString::fromUtf8(p.readAllStandardOutput());
+        };
+        QString out;
+        run("--version", &out);
+        QVERIFY2(out.startsWith("fairfax "), qPrintable(out));
+        QVERIFY(out.trimmed().size() > QString("fairfax ").size());
+        run("--version", &out);
+        run("--help", &out);
+        QVERIFY2(out.contains("Usage:") && out.contains("--screenshot"), qPrintable(out));
+        run("-h", &out);
+        QVERIFY(out.contains("--demo"));
     }
 
     void shorthandNameFromArgv0() {

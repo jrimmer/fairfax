@@ -346,18 +346,11 @@ int main(int argc, char *argv[]) {
             return runHeadless(argc, argv);
     }
 
-    // QApplication rather than QGuiApplication only for the tray icon's
-    // menu, which Qt builds with widgets; the window itself is all QML.
-    QApplication app(argc, argv);
-    Diagnostics::install();
-    app.setApplicationName("fairfax");
-    app.setApplicationVersion(QStringLiteral(FAIRFAX_VERSION));
-
-    // Matches the window to fairfax.desktop, so the compositor (Wayland
-    // app_id) and the launcher pick up the installed icon.
-    app.setDesktopFileName("fairfax");
-    app.setWindowIcon(QIcon::fromTheme("fairfax"));
-
+    // The command line is described before any application exists, so --help
+    // and --version answer where there is no display (an SSH session), and
+    // --screenshot picks the offscreen platform when none is chosen.
+    QCoreApplication::setApplicationName("fairfax");
+    QCoreApplication::setApplicationVersion(QStringLiteral(FAIRFAX_VERSION));
     QCommandLineParser cli;
     cli.setApplicationDescription("A keyboard-first task manager for Omarchy.");
     cli.addHelpOption();
@@ -383,6 +376,35 @@ int main(int argc, char *argv[]) {
                     daemonOption, quickTextOption, selfTestOption, openOption, settingsOption, schemeOption,
                     evalOption, shotWindowOption, newWindowOption});
     cli.addPositionalArgument("url", "A fairfax:// link to open.", "[url]");
+    {
+        QStringList raw;
+        for (int i = 0; i < argc; ++i)
+            raw << QString::fromLocal8Bit(argv[i]);
+        cli.parse(raw);
+        if (cli.isSet("version")) {
+            QTextStream(stdout) << "fairfax " << FAIRFAX_VERSION << Qt::endl;
+            return 0;
+        }
+        if (cli.isSet("help")) {
+            QTextStream(stdout) << cli.helpText();
+            return 0;
+        }
+        if (cli.isSet(shotOption) && !qEnvironmentVariableIsSet("QT_QPA_PLATFORM"))
+            qputenv("QT_QPA_PLATFORM", "offscreen");
+    }
+
+    // QApplication rather than QGuiApplication only for the tray icon's
+    // menu, which Qt builds with widgets; the window itself is all QML.
+    QApplication app(argc, argv);
+    Diagnostics::install();
+    app.setApplicationName("fairfax");
+    app.setApplicationVersion(QStringLiteral(FAIRFAX_VERSION));
+
+    // Matches the window to fairfax.desktop, so the compositor (Wayland
+    // app_id) and the launcher pick up the installed icon.
+    app.setDesktopFileName("fairfax");
+    app.setWindowIcon(QIcon::fromTheme("fairfax"));
+
     cli.process(app);
     const QString openUrl = cli.positionalArguments().value(0);
 
