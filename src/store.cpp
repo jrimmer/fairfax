@@ -90,7 +90,15 @@ bool Store::open(const QString &path, QString *error) {
     if (!migrate(error))
         return false;
     load();
+    migrateSettings();
     return true;
+}
+
+void Store::migrateSettings() {
+    // "Alerts on date-only tasks fire at" used to share "tasks.defaultDueTime".
+    // It starts from that value once, so nobody's alert time changes.
+    if (!m_settings.contains("alerts.dateOnlyTime") && m_settings.contains("tasks.defaultDueTime"))
+        setSetting("alerts.dateOnlyTime", m_settings.value("tasks.defaultDueTime"));
 }
 
 int Store::schemaVersion() { return SchemaVersion; }
@@ -869,6 +877,7 @@ bool Store::replaceWith(const QString &file, QString *error) {
     m_undo.clear();
     m_redo.clear();
     reload();
+    migrateSettings();
     return true;
 }
 

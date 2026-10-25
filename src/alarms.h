@@ -27,6 +27,10 @@ namespace AlarmTimes {
 // date, completed task).
 QDateTime fireTime(const Alarm &alarm, const Task &task, int defaultDueMinutes);
 
+// Settings > Alerts > "Alerts on date-only tasks fire at" (alerts.dateOnlyTime),
+// in minutes after midnight. It is not the Tasks pane's "Default due time".
+int dateOnlyMinutes(const Store &store);
+
 // Where a "days before at HH:MM" alarm keeps its time of day.
 QDateTime clockTime(int minutes);
 

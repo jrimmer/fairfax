@@ -633,12 +633,12 @@ Window {
                     RowLayout {
                         Label { text: "Alerts on date-only tasks fire at"; Layout.preferredWidth: 260 }
                         ComboBox {
-                            objectName: "setting:tasks.defaultDueTime"
+                            objectName: "setting:alerts.dateOnlyTime"
                             readonly property var minutes: root.timeSteps
                             model: minutes.map(m => root.timeLabel(m))
                             implicitContentWidthPolicy: ComboBox.WidestText
-                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("tasks.defaultDueTime", 540))))
-                            onActivated: (i) => backend.setSetting("tasks.defaultDueTime", minutes[i])
+                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("alerts.dateOnlyTime", 540))))
+                            onActivated: (i) => backend.setSetting("alerts.dateOnlyTime", minutes[i])
                         }
                     }
                     RowLayout {
@@ -702,7 +702,7 @@ Window {
                             id: reminderTime
                             readonly property var minutes: [360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260]
                             model: minutes.map(m => ((m / 60) % 12 || 12) + ":00 " + (m < 720 ? "AM" : "PM"))
-                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("alerts.defaultDateOnlyTime", root.value("tasks.defaultDueTime", 540)))))
+                            currentIndex: Math.max(0, minutes.indexOf(Number(root.value("alerts.defaultDateOnlyTime", root.value("alerts.dateOnlyTime", 540)))))
                             onActivated: (i) => backend.setSetting("alerts.defaultDateOnlyTime", minutes[i])
                         }
                     }

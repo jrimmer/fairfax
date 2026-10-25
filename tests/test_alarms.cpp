@@ -124,6 +124,48 @@ private slots:
         QVERIFY(!d.alarmFor(dated(QDate(2026, 3, 10), 14 * 60)));
     }
 
+    void dateOnlyAlertsFireAtTheirOwnSetting() {
+        Fixture f;
+        f.store.setSetting("alerts.dateOnlyTime", 15 * 60);
+        f.store.setSetting("tasks.defaultDueTime", 7 * 60);
+        QCOMPARE(AlarmTimes::dateOnlyMinutes(f.store), 15 * 60);
+        Alarm a;
+        QCOMPARE(AlarmTimes::fireTime(a, dated(QDate(2026, 3, 10)), AlarmTimes::dateOnlyMinutes(f.store)),
+                 QDateTime(QDate(2026, 3, 10), QTime(15, 0)));
+        // Changing one leaves the other alone.
+        f.store.setSetting("tasks.defaultDueTime", 11 * 60);
+        QCOMPARE(AlarmTimes::dateOnlyMinutes(f.store), 15 * 60);
+        f.store.setSetting("alerts.dateOnlyTime", 8 * 60);
+        QCOMPARE(f.store.setting("tasks.defaultDueTime").toInt(), 11 * 60);
+    }
+
+    void dateOnlyAlertTimeStartsFromTheOldSharedSetting() {
+        QTemporaryDir dir;
+        const QString db = dir.filePath("upgrade.db");
+        {
+            Store s;
+            QVERIFY(s.open(db));
+            s.setSetting("tasks.defaultDueTime", 14 * 60);  // Only the old key, as before the upgrade.
+        }
+        {
+            Store s;
+            QVERIFY(s.open(db));
+            QCOMPARE(s.setting("alerts.dateOnlyTime").toInt(), 14 * 60);
+            QCOMPARE(s.setting("tasks.defaultDueTime").toInt(), 14 * 60);
+            s.setSetting("alerts.dateOnlyTime", 8 * 60);
+        }
+        Store again;  // Taken once: a later change to one does not come back from the other.
+        QVERIFY(again.open(db));
+        QCOMPARE(again.setting("alerts.dateOnlyTime").toInt(), 8 * 60);
+        QCOMPARE(again.setting("tasks.defaultDueTime").toInt(), 14 * 60);
+    }
+
+    void aFreshDatabaseHasNoAlertTimeUntilItIsSet() {
+        Fixture f;
+        QVERIFY(!f.store.setting("alerts.dateOnlyTime").isValid());
+        QCOMPARE(AlarmTimes::dateOnlyMinutes(f.store), 9 * 60);
+    }
+
     void settingDueDateAddsTheDefaultReminderOnce() {
         Fixture f;
         f.store.setSetting("alerts.defaultTimed", 0);

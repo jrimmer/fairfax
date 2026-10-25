@@ -130,7 +130,7 @@ lists finished tasks once you come back to it.
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
-| **Alerts on date-only tasks fire at** | 9:00 AM | The time of day for alerts on tasks that have a date but no time. See the caution below. |
+| **Alerts on date-only tasks fire at** | 9:00 AM | The time of day for alerts on tasks that have a date but no time. It is separate from **Default due time** in the Tasks pane. |
 | **Sound alerts repeat until dismissed** | Never | Repeat a *Message with Sound* alert every 2, 5 or 10 minutes until dealt with. A plain *Message* is shown once. |
 | **Badge shows** | Overdue + Today | What the number on the tray icon (and the Waybar module) counts: *Overdue + Today*, *Overdue*, *Today* or *None*. |
 
@@ -144,9 +144,6 @@ lists finished tasks once you come back to it.
 To silence one list, use **Mute Alerts** in its right-click menu. The pane also reminds you
 that alerts appear as notifications with *Complete* and *Snooze*, and that Fairfax must be
 running to deliver them.
-
-**Caution:** the *Alerts on date-only tasks fire at* time here and the **Default due
-time** in the Tasks pane are the same stored setting, so changing one changes the other.
 
 ## Sync
 

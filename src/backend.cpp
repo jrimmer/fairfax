@@ -2134,7 +2134,7 @@ QVariantMap Backend::taskInfo(qint64 id) const {
          }()},
         // The alert that fires next, as "Thu 15 Oct, 9:00 AM"; empty with none pending.
         {"nextAlarm", [&] {
-             const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+             const int defaultDue = AlarmTimes::dateOnlyMinutes(*m_store);
              QDateTime next;
              for (const auto &a : m_store->alarmsFor(t.id)) {
                  const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);

@@ -22,6 +22,10 @@ constexpr auto Interface = "org.freedesktop.Notifications";
 
 }  // namespace
 
+int AlarmTimes::dateOnlyMinutes(const Store &store) {
+    return store.setting("alerts.dateOnlyTime", 9 * 60).toInt();
+}
+
 QDateTime AlarmTimes::clockTime(int minutes) {
     return QDateTime(QDate(2000, 1, 1), QTime(0, 0).addSecs(qint64(minutes) * 60));
 }
@@ -52,7 +56,7 @@ QDateTime AlarmTimes::fireTime(const Alarm &a, const Task &t, int defaultDueMinu
 
 bool AlarmTimes::hasPending(const Store &store, const QDateTime &now) {
     Q_UNUSED(now);
-    const int defaultDue = store.setting("tasks.defaultDueTime", 9 * 60).toInt();
+    const int defaultDue = dateOnlyMinutes(store);
     for (const auto &a : store.alarms()) {
         if (a.deleted || !store.tasks().contains(a.taskId))
             continue;  // (an alarm can arrive before its task)
@@ -94,7 +98,7 @@ AlarmTimes::DefaultReminders AlarmTimes::DefaultReminders::load(const Store &sto
     DefaultReminders d;
     d.timedOffset = store.setting("alerts.defaultTimed", -1).toInt();
     d.dateOnlyDays = store.setting("alerts.defaultDateOnly", -1).toInt();
-    d.dateOnlyMinutes = store.setting("alerts.defaultDateOnlyTime", store.setting("tasks.defaultDueTime", 9 * 60)).toInt();
+    d.dateOnlyMinutes = store.setting("alerts.defaultDateOnlyTime", AlarmTimes::dateOnlyMinutes(store)).toInt();
     return d;
 }
 
@@ -186,7 +190,7 @@ AlarmService::AlarmService(Store *store, QObject *parent) : QObject(parent), m_s
 }
 
 QVector<Alarm> AlarmService::due(const QDateTime &now) const {
-    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    const int defaultDue = AlarmTimes::dateOnlyMinutes(*m_store);
     QVector<Alarm> result;
     for (const auto &a : m_store->alarms()) {
         if (!m_store->tasks().contains(a.taskId))
@@ -201,7 +205,7 @@ QVector<Alarm> AlarmService::due(const QDateTime &now) const {
 
 void AlarmService::check() {
     const QDateTime now = QDateTime::currentDateTime();
-    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    const int defaultDue = AlarmTimes::dateOnlyMinutes(*m_store);
     for (const auto &a : due(now)) {
         const Task t = m_store->task(a.taskId);
         const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
@@ -216,7 +220,7 @@ void AlarmService::check() {
 }
 
 void AlarmService::schedule() {
-    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    const int defaultDue = AlarmTimes::dateOnlyMinutes(*m_store);
     const QDateTime now = QDateTime::currentDateTime();
     QDateTime next;
     for (const auto &a : m_store->alarms()) {
@@ -384,7 +388,7 @@ int AlarmService::morningMinutes() const {
 void AlarmService::closeStale() {
     // A notification goes away once its task is completed, deleted or
     // re-dated (the alarm then has a different moment to fire at).
-    const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
+    const int defaultDue = AlarmTimes::dateOnlyMinutes(*m_store);
     for (auto it = m_notifications.begin(); it != m_notifications.end();) {
         const Alarm a = m_store->alarms().value(it.value());
         const Task t = m_store->task(a.taskId);

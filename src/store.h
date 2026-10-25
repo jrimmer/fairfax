@@ -153,6 +153,7 @@ private:
     QVariantMap cached(const QString &table, qint64 id) const;
     bool migrate(QString *error);
     void load();
+    void migrateSettings();
 
     QString m_connection;
     QString m_path;

@@ -207,7 +207,7 @@ inline void addListAndAlertCases(QVector<SettingCase> &v) {
 
         // ------------------------------------------------------------ Alerts
         {
-            K c{"tasks.defaultDueTime", "Alerts", "setting:tasks.defaultDueTime", K::Combo};
+            K c{"alerts.dateOnlyTime", "Alerts", "setting:alerts.dateOnlyTime", K::Combo};
             c.fromIndex = 18;  // 9:00 AM
             c.toIndex = 28;    // 2:00 PM
             c.stored = "840";
