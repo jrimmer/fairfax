@@ -761,6 +761,37 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(folderHas("Made before the button"), 15000);
     }
 
+    // The "Synced … ago" label at the foot of the sidebar stays between the
+    // calendar buttons and the sync button, even at the largest text size,
+    // switching to its short form ("now", "2m") when the full one won't fit.
+    void syncAgeLabelFitsTheFooter() {
+        QTemporaryDir remote;
+        QVERIFY(remote.isValid());
+        auto seed = [](Store &store) {
+            const Seed s = seedWorld(store);
+            store.setSetting("sync.auto", false);
+            store.setSetting("appearance.textSize", 8);
+            return s;
+        };
+        App app(seed, QString(), true);
+        QVERIFY(app.ok);
+        emit app.services().filePicker.picked(remote.path(), "sync-folder");
+        QTRY_VERIFY_WITH_TIMEOUT(app.services().folderSync->configured() && !app.services().folderSync->busy(), 15000);
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("syncAge") != nullptr && findItem("syncAge")->isVisible(), 5000);
+        QQuickItem *label = findItem("syncAge");
+        QQuickItem *calendar = findItem("calendarControls");
+        QQuickItem *button = findItem("syncButton");
+        QVERIFY(calendar && button);
+        QTRY_VERIFY_WITH_TIMEOUT(label->property("text").toString().size() > 0, 5000);
+        const QRectF l = label->mapRectToScene(QRectF(0, 0, label->width(), label->height()));
+        const QRectF c = calendar->mapRectToScene(QRectF(0, 0, calendar->width(), calendar->height()));
+        const QRectF b = button->mapRectToScene(QRectF(0, 0, button->width(), button->height()));
+        QVERIFY2(l.left() >= c.right(), "the label starts after the calendar buttons");
+        QVERIFY2(l.right() <= b.left(), "the label ends before the sync button");
+        QVERIFY2(label->property("contentWidth").toReal() <= label->width() + 0.5, "the text fits without spilling");
+        QVERIFY(!label->property("truncated").toBool());
+    }
+
     // Done carries a warning mark once 500 or more completed tasks pile up and
     // auto-delete is off; clicking it opens the auto-delete setting. Turning
     // auto-delete on takes the mark away.

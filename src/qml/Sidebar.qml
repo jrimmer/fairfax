@@ -251,25 +251,39 @@ Rectangle {
             // Sync, when any provider is set up (git, Todoist, a folder or
             // WebDAV): spins while syncing, shows when it last succeeded, and
             // turns red after a failure. The tooltip says how each one went.
+            // It keeps to the space between the calendar buttons and the sync
+            // button, and falls back to a short form ("2m") when the sidebar
+            // is too narrow for the full one.
             Text {
                 id: syncAge
-                visible: syncButton.visible
+                objectName: "syncAge"
+                visible: syncButton.visible && text !== ""
+                anchors.left: calendarControls.right
+                anchors.leftMargin: 6
                 anchors.right: syncButton.left
                 anchors.rightMargin: 2
                 anchors.verticalCenter: parent.verticalCenter
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideRight
                 color: syncHub && syncHub.failed ? theme.overdue : theme.muted
                 font.pixelSize: backend.fontSize - 3
                 property int tick: 0
-                text: {
+                // [full, short]
+                readonly property var parts: {
                     tick
-                    if (!syncHub) return ""
-                    if (syncHub.busy) return "Syncing…"
-                    if (syncHub.failed) return "Sync failed"
+                    if (!syncHub) return ["", ""]
+                    if (syncHub.busy) return ["Syncing…", ""]
+                    if (syncHub.failed) return ["Sync failed", "Failed"]
                     const t = syncHub.lastSync
-                    if (!t || isNaN(t.getTime())) return "Not synced"
+                    if (!t || isNaN(t.getTime())) return ["Not synced", ""]
                     const m = Math.floor((Date.now() - t.getTime()) / 60000)
-                    return m < 1 ? "Synced just now" : m < 60 ? "Synced " + m + " min ago" : m < 1440 ? "Synced " + Math.floor(m / 60) + " h ago" : "Synced " + Math.floor(m / 1440) + " d ago"
+                    if (m < 1) return ["Synced just now", "now"]
+                    if (m < 60) return ["Synced " + m + " min ago", m + "m"]
+                    if (m < 1440) return ["Synced " + Math.floor(m / 60) + " h ago", Math.floor(m / 60) + "h"]
+                    return ["Synced " + Math.floor(m / 1440) + " d ago", Math.floor(m / 1440) + "d"]
                 }
+                TextMetrics { id: syncAgeFull; font: syncAge.font; text: syncAge.parts[0] }
+                text: syncAgeFull.advanceWidth <= width ? parts[0] : parts[1]
                 Timer { interval: 30000; running: syncButton.visible; repeat: true; onTriggered: syncAge.tick++ }
             }
             IconButton {
@@ -322,6 +336,7 @@ Rectangle {
             // Show or hide the mini calendar, and beside it its display style.
             Row {
                 id: calendarControls
+                objectName: "calendarControls"
                 x: 40
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 0
