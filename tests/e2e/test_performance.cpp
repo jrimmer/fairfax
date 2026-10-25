@@ -214,7 +214,7 @@ private slots:
         CHECK_BUDGET("switch empty list to 80 tasks");
     }
 
-    void openTodayAndAll() {
+    void openToday() {
         App &app = *m_app;
         QVERIFY(app.openSource("list:" + QString::number(g_ids.empty)));
         QTest::qWait(50);
@@ -223,6 +223,12 @@ private slots:
         QVERIFY(measure("open Today", [&] { click(today); },
                         [&] { return app.backend().sourceKey() == "today" && visibleRows(app.window) >= 10; }));
         CHECK_BUDGET("open Today");
+    }
+
+    void openAll() {
+        App &app = *m_app;
+        QVERIFY(app.openSource("list:" + QString::number(g_ids.empty)));
+        QTest::qWait(50);
         QQuickItem *all = app.sidebarRow("all");
         QVERIFY(all);
         QVERIFY(measure("open All", [&] { click(all); },
@@ -242,7 +248,7 @@ private slots:
         CHECK_BUDGET("search: type a query");
     }
 
-    void quickEntryAndEditor() {
+    void openEditor() {
         App &app = *m_app;
         QVERIFY(app.openSource("list:" + QString::number(g_ids.big)));
         QTRY_VERIFY_WITH_TIMEOUT(visibleRows(app.window) >= 40, 5000);
@@ -252,8 +258,13 @@ private slots:
         QVERIFY(row);
         QVERIFY(measure("open the task editor", [&] { doubleClick(row); }, [&] { return findItem("editorTitle") != nullptr; }));
         CHECK_BUDGET("open the task editor");
-        app.press(Qt::Key_Escape);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorTitle"), 5000);
+    }
+
+    void quickEntry() {
+        App &app = *m_app;
+        QVERIFY(app.openSource("list:" + QString::number(g_ids.big)));
+        QTRY_VERIFY_WITH_TIMEOUT(visibleRows(app.window) >= 40, 5000);
+        settleWindow(app.window);
         QVERIFY(measure("open Quick Entry", [&] { app.press(Qt::Key_2, Qt::ShiftModifier | Qt::ControlModifier); },
                         [&] { QQuickWindow *q = windowTitled("Quick Entry"); return q && q->isExposed() && findItem("quickTitle"); }));
         CHECK_BUDGET("open Quick Entry");
