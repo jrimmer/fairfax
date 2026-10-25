@@ -441,6 +441,82 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, app.ids.oldThing), 5000);
         QVERIFY(rowVisible(app, app.ids.buyMilk));
     }
+
+    // "Show completed tasks for: Never" means at once: a task completed from
+    // Today or from a list stays struck through for about a second, then
+    // leaves the view; Ctrl+Z brings it back and it stays.
+    void neverShowCompletedDropsAfterASecond() {
+        App app;
+        QVERIFY(app.ok);
+        app.backend().setSetting("tasks.completedWindow", 0);
+        const QString keys[] = {"today", homeKey(app)};
+        const qint64 ids[] = {app.ids.buyMilk, app.ids.plants};
+        for (int i = 0; i < 2; ++i) {
+            QVERIFY(app.openSource(keys[i]));
+            const qint64 id = ids[i];
+            QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);
+            QVERIFY(selectRow(app, id));
+            app.press(Qt::Key_Period, Qt::ControlModifier);
+            QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 5000);
+            QVERIFY(rowVisible(app, id));
+            QTRY_VERIFY_WITH_TIMEOUT(strikeOut(id), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 3000);
+            app.press(Qt::Key_Z, Qt::ControlModifier);
+            QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).completed, 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);
+            QTest::qWait(1600);
+            QVERIFY(rowVisible(app, id));
+        }
+    }
+
+    // Completing several tasks at once drops them together; a task reopened
+    // within the second never disappears.
+    void neverShowCompletedKeepsAReopenedTask() {
+        App app;
+        QVERIFY(app.ok);
+        app.backend().setSetting("tasks.completedWindow", 0);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 a = app.ids.plants, b = app.ids.shelf;
+        QVERIFY(selectRow(app, a));
+        app.press(Qt::Key_Period, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(a).completed, 5000);
+        app.press(Qt::Key_Period, Qt::ControlModifier | Qt::AltModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(a).completed, 5000);
+        QTest::qWait(1800);
+        QVERIFY(rowVisible(app, a));
+        // Reopened and completed again: the later completion gets its own second.
+        app.press(Qt::Key_Period, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(a).completed, 5000);
+        QTest::qWait(600);
+        QVERIFY(rowVisible(app, a));
+        QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, a), 3000);
+        // Several at once.
+        app.backend().setSetting("tasks.completedWindow", 24 * 60);
+        app.backend().setSetting("tasks.completedWindow", 0);
+        QVERIFY(selectRow(app, b));
+        app.press(Qt::Key_Period, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(b).completed, 5000);
+        QVERIFY(rowVisible(app, b));
+        QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, b), 3000);
+    }
+
+    // With any other window the completed task stays until the view changes.
+    void aDayWindowKeepsTheCompletedTaskUntilTheViewChanges() {
+        App app;
+        QVERIFY(app.ok);
+        app.backend().setSetting("tasks.completedWindow", 24 * 60);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.plants;
+        QVERIFY(selectRow(app, id));
+        app.press(Qt::Key_Period, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).completed, 5000);
+        QTest::qWait(2000);
+        QVERIFY(rowVisible(app, id));
+        QVERIFY(strikeOut(id));
+        QVERIFY(app.openSource("all"));
+        QVERIFY(app.openSource(homeKey(app)));
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);   // Still inside the day.
+    }
 };
 
 REGISTER_TEST(E2ETasksLifecycle)

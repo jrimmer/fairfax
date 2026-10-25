@@ -860,6 +860,41 @@ void Backend::newTask(int type, bool subtask) {
     emit revealTask(t.id);
 }
 
+// With "Show completed tasks for: Never", a task just completed stays in the
+// view for a second so the click is seen, then leaves it. Each id gets a
+// deadline; the timer only drops ids whose deadline has passed and which are
+// still completed, so a task reopened (or completed again) meanwhile is never
+// hidden by an older timer.
+void Backend::scheduleCompletedDrop(const QVector<qint64> &ids) {
+    if (m_options.completedWindowMinutes != 0)
+        return;
+    const QDateTime deadline = QDateTime::currentDateTime().addMSecs(CompletedLingerMs);
+    for (auto id : ids)
+        m_dropAt.insert(id, deadline);
+    QTimer::singleShot(CompletedLingerMs, this, [this] { dropExpiredCompleted(); });
+}
+
+void Backend::dropExpiredCompleted() {
+    const QDateTime now = QDateTime::currentDateTime().addMSecs(50);
+    bool dropped = false;
+    for (auto it = m_dropAt.begin(); it != m_dropAt.end();) {
+        if (it.value() > now) {
+            ++it;
+            continue;
+        }
+        const qint64 id = it.key();
+        it = m_dropAt.erase(it);
+        if (m_options.completedWindowMinutes != 0 || !m_store->tasks().contains(id) || !m_store->task(id).completed)
+            continue;
+        dropped = m_options.keepVisible.remove(id) || dropped;
+    }
+    if (dropped) {
+        rebuild();
+        emit dataChanged();
+        emit myDayChanged();
+    }
+}
+
 void Backend::completeTask(Task t, bool done, const QDateTime &now) {
     if (t.completed == done)
         return;
@@ -945,6 +980,8 @@ void Backend::toggleComplete(qint64 id) {
         completeTask(m_store->task(i), !allDone, now);
     }
     m_store->commit();
+    if (!allDone)
+        scheduleCompletedDrop(ids);
     emit taskCompleted(!allDone);
     // One task is named; several are counted, as the visible toast does.
     if (ids.size() == 1)
@@ -971,6 +1008,8 @@ void Backend::setCompleted(bool done) {
         completeTask(m_store->task(i), done, now);
     }
     m_store->commit();
+    if (done)
+        scheduleCompletedDrop(ids);
     if (ids.isEmpty())
         return;
     if (ids.size() == 1)

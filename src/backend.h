@@ -777,6 +777,11 @@ private:
     bool m_cutting = false;
     QString m_status;
     QTimer m_clock;
+    // Never-show-completed: when each just-completed task leaves the view.
+    static constexpr int CompletedLingerMs = 1000;
+    QHash<qint64, QDateTime> m_dropAt;
+    void scheduleCompletedDrop(const QVector<qint64> &ids);
+    void dropExpiredCompleted();
     QTimer m_backupTimer;
     void maybeBackup();
     QDate m_lastDay;
