@@ -201,7 +201,7 @@ Item {
                 font.pixelSize: backend.fontSize + 5
                 Layout.alignment: Qt.AlignBaseline
             }
-            // My Day's capacity line: planned against the free time left today.
+            // My Day's capacity line: the day's tasks against the work day left.
             RowLayout {
                 objectName: "myDayCapacity"
                 visible: backend.sourceIsMyDay && !backend.myDayShutdown && (planned > 0 || without > 0)
@@ -212,12 +212,13 @@ Item {
                 baselineOffset: plannedLabel.y + plannedLabel.baselineOffset
                 readonly property int planned: Number(backend.myDayCapacityMap.plannedMinutes || 0)
                 readonly property int free: Number(backend.myDayCapacityMap.freeMinutes || 0)
+                readonly property bool dayOver: Number(backend.myDayCapacityMap.windowMinutes || 0) <= 0
                 readonly property int without: Number(backend.myDayCapacityMap.withoutDuration || 0)
                 readonly property bool over: planned > free
                 readonly property bool amber: !over && free > 0 && planned > free * 0.85
                 Text {
                     id: plannedLabel
-                    text: root.formatMinutes(parent.planned) + " planned"
+                    text: root.formatMinutes(parent.planned) + " of tasks"
                     color: parent.over ? theme.overdue : parent.amber ? theme.priorityMedium : theme.muted
                     font.pixelSize: backend.fontSize + 1
                 }
@@ -227,8 +228,8 @@ Item {
                     font.pixelSize: backend.fontSize + 1
                 }
                 Text {
-                    text: root.formatMinutes(parent.free) + " free"
-                    color: parent.over ? theme.overdue : parent.amber ? theme.priorityMedium : theme.muted
+                    text: parent.dayOver ? "work day over" : root.formatMinutes(parent.free) + " left in work day"
+                    color: parent.dayOver ? theme.muted : parent.over ? theme.overdue : parent.amber ? theme.priorityMedium : theme.muted
                     font.pixelSize: backend.fontSize + 1
                 }
                 Text {
@@ -238,8 +239,8 @@ Item {
                     font.pixelSize: backend.fontSize - 1
                 }
             }
-            // The shutdown review's summary line: completed today, planned and
-            // done minutes.
+            // The shutdown review's summary line: tasks done today, and the minutes
+            // done out of the minutes planned.
             RowLayout {
                 objectName: "myDaySummary"
                 visible: backend.sourceIsMyDay && backend.myDayShutdown
@@ -252,24 +253,24 @@ Item {
                 readonly property int done: Number(backend.myDaySummaryMap.doneMinutes || 0)
                 Text {
                     id: completedLabel
-                    text: "Completed today: " + parent.completed
+                    text: "Done today: " + parent.completed + (parent.completed === 1 ? " task" : " tasks")
                     color: theme.muted
                     font.pixelSize: backend.fontSize + 1
                 }
                 Text { text: "·"; color: theme.faint; font.pixelSize: backend.fontSize + 1 }
                 Text {
-                    text: "planned " + root.formatMinutes(parent.planned) + ", done " + root.formatMinutes(parent.done)
+                    text: root.formatMinutes(parent.done) + " of " + root.formatMinutes(parent.planned)
                     color: theme.muted
                     font.pixelSize: backend.fontSize + 1
                 }
             }
-            // The plan header's "Review today" opens the end-of-day review at
+            // The plan header's "Wrap up day" opens the end-of-day review at
             // any time (it also opens by itself once the work day is over);
-            // "Close Review" (or Return) goes back to the plan.
+            // "Back to plan" (or Return) leaves it.
             Button {
                 objectName: "myDayReview"
                 visible: backend.sourceIsMyDay && !backend.myDayShutdown
-                text: "Review today"
+                text: "Wrap up day"
                 flat: true
                 Layout.alignment: Qt.AlignBaseline
                 font.pixelSize: backend.fontSize - 1
@@ -278,7 +279,7 @@ Item {
             Button {
                 objectName: "myDayFinish"
                 visible: backend.sourceIsMyDay && backend.myDayShutdown
-                text: "Close Review"
+                text: "Back to plan"
                 flat: true
                 Layout.alignment: Qt.AlignBaseline
                 font.pixelSize: backend.fontSize - 1
@@ -579,7 +580,7 @@ Item {
         if (k === Qt.Key_Up) { backend.moveCursor(-1, shift); return done() }
         if (k === Qt.Key_Return || k === Qt.Key_Enter) {
             // The shutdown review finishes on Return, before the editor's
-            // Return; the Finish button does the same when it has the focus.
+            // Return; the Back to plan button does the same when it has the focus.
             if (backend.sourceIsMyDay && backend.myDayShutdown) { backend.myDayFinishReview(); return done() }
             // With the setting on, Return creates a new task and Ctrl+Return edits.
             const returnCreates = backend.settingFlag("tasks.returnCreates", false)

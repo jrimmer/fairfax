@@ -26,7 +26,7 @@ QDateTime now();
 void setClock(std::function<QDateTime()> clock);
 
 // One task in one section, with the short reason the row shows (empty for
-// Already today).
+// Today).
 struct Entry {
     qint64 taskId = 0;
     QString reason;
@@ -38,12 +38,12 @@ struct Sections {
     QVector<Entry> suggestions;   // Worth planning next, each task once.
 };
 
-// The day's plan. Overdue, Already today and Suggestions, with no task in two
+// The day's plan. Overdue, Today and Suggestions, with no task in two
 // sections. Empty while `myday.enabled` is off.
 Sections sections(const Store &store, const QDateTime &now);
 
 // The shutdown review's numbers. completedCount is how many tasks were
-// completed today; plannedMinutes is the open Already today set's durations,
+// completed today; plannedMinutes is the open Today set's durations,
 // as the capacity line counts them; doneMinutes is the durations of the tasks
 // completed today. Empty while `myday.enabled` is off.
 struct Summary {
@@ -64,7 +64,7 @@ bool shutdownPromptDue(const Store &store, const QDateTime &now);
 void markShutdownPrompted(Store &store, const QDate &day);
 
 // What the header line reports:
-//  - plannedMinutes: the durations of Already today's tasks (a project's
+//  - plannedMinutes: the durations of Today's tasks (a project's
 //    sub-tasks count once each, a parent project itself does not);
 //  - withoutDuration: how many of those tasks carry no duration;
 //  - blockedMinutes: the parts of today's timed task blocks inside the window;

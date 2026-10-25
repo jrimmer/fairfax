@@ -530,7 +530,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(app.row(w.alerted) != nullptr, 5000);
         QCOMPARE(reasonOf(w.alerted), QString("Alert 14:00"));
         // The section headings, in order.
-        QCOMPARE(sectionTitles(), (QStringList{"OVERDUE", "ALREADY TODAY", "SUGGESTIONS"}));
+        QCOMPARE(sectionTitles(), (QStringList{"OVERDUE", "TODAY", "COULD DO TODAY"}));
     }
 
     // An empty section emits no heading row, and a completely empty day shows
@@ -562,7 +562,7 @@ private slots:
         App app(seedOnePlanned);
         QVERIFY(app.ok);
         QVERIFY(app.openSource("myday"));
-        QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), QStringList{"ALREADY TODAY"}, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), QStringList{"TODAY"}, 5000);
         QQuickItem *cap = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((cap = findItem("myDayCapacity")) != nullptr, 5000);
         QVERIFY(cap->property("visible").toBool());
@@ -602,7 +602,7 @@ private slots:
         QQuickItem *cap = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((cap = findItem("myDayCapacity")) != nullptr, 5000);
         QVERIFY(cap->property("visible").toBool());
-        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("30m planned"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("30m of tasks"), 5000);
     }
 
     // The pane date, the capacity line and the Review today button share one
@@ -666,9 +666,9 @@ private slots:
         app.services().calendar.setClock([] { return QDateTime(QDate::currentDate(), QTime(9, 0)); });
         app.services().calendar.setSources({path});
         QVERIFY(app.openSource("myday"));
-        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("planned"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("of tasks"), 5000);
         // With no durations the planned side is zero and nothing is missing.
-        QVERIFY2(capacityText().contains("0m planned"), qPrintable(capacityText()));
+        QVERIFY2(capacityText().contains("0m of tasks"), qPrintable(capacityText()));
         // The event takes an hour out of the work day's window (9:00-17:00).
         const QVariantMap cap = app.backend().myDayCapacityMap();
         QCOMPARE(cap.value("freeMinutes").toInt(), 7 * 60);
@@ -679,7 +679,7 @@ private slots:
         app.store().begin("duration");
         app.store().putTask(t);
         app.store().commit();
-        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("1h 30m planned"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("1h 30m of tasks"), 5000);
         QCOMPARE(app.backend().myDayCapacityMap().value("plannedMinutes").toInt(), 90);
     }
 
@@ -1107,7 +1107,7 @@ private slots:
         QVERIFY(app.row(w.openUndated) != nullptr);
         QVERIFY(app.row(w.doneToday) == nullptr);
         QVERIFY(app.row(w.doneYesterday) == nullptr);
-        QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), (QStringList{"STILL TODAY"}), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), (QStringList{"NOT DONE YET"}), 5000);
         // The summary line replaces the capacity line.
         QQuickItem *summary = findItem("myDaySummary");
         QVERIFY(summary);
@@ -1119,19 +1119,72 @@ private slots:
                 parts << i->property("text").toString();
             return false;
         });
-        QCOMPARE(parts.join(' '), QString("Completed today: 2 · planned 1h 30m, done 45m"));
+        QCOMPARE(parts.join(' '), QString("Done today: 2 tasks · 45m of 1h 30m"));
         // Finish (Return) leaves the review for the plan.
         app.press(Qt::Key_Return);
         QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
-        QVERIFY(!sectionTitles().contains("STILL TODAY"));
-        QVERIFY(sectionTitles().contains("ALREADY TODAY"));
+        QVERIFY(!sectionTitles().contains("NOT DONE YET"));
+        QVERIFY(sectionTitles().contains("TODAY"));
         QVERIFY(findItem("myDaySummary") == nullptr);
         QQuickItem *capacity = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((capacity = findItem("myDayCapacity")) != nullptr, 5000);
         QVERIFY(capacity->property("visible").toBool());
     }
 
-    // "Review today" opens the review at any hour; before workEnd the shortcut
+    // The header wording: Wrap up day / Back to plan, the capacity line while
+    // the work day lasts and once it is over, and the summary's singular.
+    void headerWording() {
+        const QDate today = QDate::currentDate();
+        {
+            ClockPin pin(QDateTime(today, QTime(9, 0)));
+            App app(seedOnePlanned);
+            QVERIFY(app.ok);
+            QVERIFY(app.openSource("myday"));
+            QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayReview") != nullptr, 5000);
+            QCOMPARE(findItem("myDayReview")->property("text").toString(), QString("Wrap up day"));
+            QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("left in work day"), 5000);
+            QVERIFY2(capacityText().startsWith("0m of tasks · ") && capacityText().endsWith(" left in work day · 1 without a duration"),
+                     qPrintable(capacityText()));
+            QVERIFY(tk::clickNamed("myDayReview"));
+            QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(findItem("myDayFinish") != nullptr, 5000);
+            QCOMPARE(findItem("myDayFinish")->property("text").toString(), QString("Back to plan"));
+            QQuickItem *summary = findItem("myDaySummary");
+            QVERIFY(summary);
+            auto summaryText = [&] {
+                QStringList parts;
+                findIn(summary, [&](QQuickItem *i) {
+                    if (i->width() > 0 && i->metaObject()->indexOfProperty("text") >= 0)
+                        parts << i->property("text").toString();
+                    return false;
+                });
+                return parts.join(' ');
+            };
+            // No task done yet: zero is plural.
+            QTRY_COMPARE_WITH_TIMEOUT(summaryText(), QString("Done today: 0 tasks · 0m of 0m"), 5000);
+            Task t = app.store().task(onePlannedTask());
+            t.completed = true;
+            t.completedAt = QDateTime(today, QTime(9, 0));
+            t.duration = 20;
+            app.store().begin("done");
+            app.store().putTask(t);
+            app.store().commit();
+            QTRY_COMPARE_WITH_TIMEOUT(summaryText(), QString("Done today: 1 task · 20m of 0m"), 5000);
+        }
+        {
+            // Half past five: no window is left.
+            ClockPin pin(QDateTime(today, QTime(17, 30)));
+            App app(seedOnePlanned, QString(), false, false);
+            QVERIFY(app.ok);
+            QVERIFY(app.openSource("myday"));
+            QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+            QVERIFY(tk::clickNamed("myDayFinish"));
+            QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(capacityText(), QString("0m of tasks · work day over · 1 without a duration"), 5000);
+        }
+    }
+
+    // "Wrap up day" opens the review at any hour; before workEnd the shortcut
     // still opens the plan.
     void reviewTodayButtonOpensTheReviewBeforeWorkEnd() {
         const QDate today = QDate::currentDate();
@@ -1142,7 +1195,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
         QVERIFY(tk::clickNamed("myDayReview"));
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
-        QVERIFY(sectionTitles().contains("STILL TODAY"));
+        QVERIFY(sectionTitles().contains("NOT DONE YET"));
         QVERIFY(findItem("myDayReview") == nullptr);
         // Leaving My Day and coming back before workEnd is the plan again.
         QVERIFY(app.openSource("all"));

@@ -583,7 +583,7 @@ public:
     // Puts the task in the first free gap of its length, giving it a 30-minute
     // duration first when it has none.
     Q_INVOKABLE void myDayBlockNext(qint64 id);
-    // Expands the capped Overdue or Suggestions section of My Day.
+    // Expands the capped Overdue or Could do today section of My Day.
     Q_INVOKABLE void myDayExpand(const QString &section);
     // Plan-mode keys: the list's selected tasks as a plain id list, and the
     // four bare-key actions A, B, R and H. They act only while My Day is on

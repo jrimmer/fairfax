@@ -5165,13 +5165,13 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
     };
 
     if (m_myDayShutdown) {
-        // The shutdown review lists only the open Already today tasks, each
+        // The shutdown review lists only the open Today tasks, each
         // with its one-key choices Y, D and R.
-        addSection("today", "Still today", "progress", day.today, 0);
+        addSection("today", "Not done yet", "progress", day.today, 0);
     } else {
         addSection("overdue", "Overdue", "overdue", day.overdue, m_myDayOverdueExpanded ? 0 : 7);
-        addSection("today", "Already today", "progress", day.today, 0);
-        addSection("suggestions", "Suggestions", "", day.suggestions, m_myDaySuggestionsExpanded ? 0 : 15);
+        addSection("today", "Today", "progress", day.today, 0);
+        addSection("suggestions", "Could do today", "", day.suggestions, m_myDaySuggestionsExpanded ? 0 : 15);
     }
     // The sections only hold planned tasks; a brand-new task (Ctrl+N) and
     // other just-touched ones the user expects to see stay in the pane like

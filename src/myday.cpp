@@ -204,7 +204,7 @@ Sections sections(const Store &store, const QDateTime &now) {
         placed.insert(t.id);
     }
 
-    // Already today: the Today rules, minus anything overdue already sits in
+    // Today: the Today rules, minus anything overdue already sits in
     // the section above.
     QVector<Task> todayTasks;
     for (const auto &t : store.tasks()) {

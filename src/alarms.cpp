@@ -256,7 +256,7 @@ void AlarmService::showReviewNotification() {
     QDBusMessage call = QDBusMessage::createMethodCall(Service, Path, Interface, "Notify");
     QVariantMap hints{{"urgency", QVariant::fromValue<uchar>(1)}, {"category", "x-fairfax.myday"},
                       {"desktop-entry", "fairfax"}};
-    QStringList actions{"default", "Open", "myday-review", "Review today"};
+    QStringList actions{"default", "Open", "myday-review", "Wrap up day"};
     call << QStringLiteral("Fairfax") << uint(0) << QStringLiteral("fairfax") << title << body << actions << hints << int(0);
     const QDBusReply<uint> reply = QDBusConnection::sessionBus().call(call);
     if (reply.isValid())

@@ -205,13 +205,14 @@ offers your lists and `frfx done <Tab>` your open tasks.
 
 My Day is a daily plan built from the dates a task already has, not a separate field, so it
 survives every sync. Press `Ctrl+Shift+P` or click *My Day*, the first item in the sidebar
-above All, to open it. The screen gathers *Overdue*, *Already today* and *Suggestions*; each
+above All, to open it. The screen gathers *Overdue*, *Today* and *Could do today*; each
 suggestion says why it is there (starred, starting today, an alert today). A section with
 nothing in it is hidden, and an empty day shows *Nothing planned for today* rather than bare
 headings. The title is
-followed by the date and a capacity line such as `6h 30m planned · 5h free` (plus
-`· 3 without a duration` when some tasks have none), red when the plan is over the free
-time left in the work day and amber above 85%. The right pane shows the day's expanded
+followed by the date and a capacity line such as `6h 30m of tasks · 5h left in work day` (plus
+`· 3 without a duration` when some tasks have none), red when the tasks add up to more than
+the time left in the work day and amber above 85%. Once the work day is over the line ends
+with `work day over` instead. The right pane shows the day's expanded
 timeline; drag a row onto it to block out time, or drop the row on the compact Day Bar on a
 narrow window, where it moves above the list instead. *Add to today* sets a task's
 due date when it has none or one in the past, and its start date when its deadline is later;
@@ -222,11 +223,12 @@ rest of the day. They are in Settings → Shortcuts under *My Day* and can be re
 ordinary list those bare keys do nothing. `fairfax ctl myday` opens a running window on My Day.
 
 The day does not only start with a plan: after the work day's end (or any time through
-*Review today* in the plan header) My Day opens its shutdown review. It lists the tasks
-still due today, and the header reports `Completed today: N · planned Xh Ym, done Xh Ym`,
-where *done* sums the durations of the tasks completed today. `y` moves a task to
-tomorrow, `d` picks a date, `r` sends it back to its list, and Return (or *Close Review*) leaves
-the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
+*Wrap up day* in the plan header) My Day opens its shutdown review. It lists the tasks
+still due today under *Not done yet*, and the header reports `Done today: N tasks · Xh Ym of Xh Ym`,
+where the first time sums the durations of the tasks completed today and the second the
+durations of the day's tasks. `y` moves a task to
+tomorrow, `d` picks a date, `r` sends it back to its list, and Return (or *Back to plan*)
+leaves the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
 posts a "Review your day" notification at the work day's end that opens the review when
 clicked; it fires once a day.
 

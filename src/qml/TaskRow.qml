@@ -213,7 +213,7 @@ Item {
         height: root.lineHeight
         spacing: 10
 
-        // My Day's reason for a row in Overdue or Suggestions: a muted chip.
+        // My Day's reason for a row in Overdue or Could do today: a muted chip.
         Rectangle {
             objectName: "myDayReason:" + (root.r.taskId || 0)
             visible: !!root.r.reason
