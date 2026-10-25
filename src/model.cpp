@@ -48,6 +48,7 @@ QVariantMap Task::toMap() const {
         {"duration", duration},
         {"completed", completed},
         {"completed_at", stampValue(completedAt)},
+        {"abandoned", abandoned},
         {"action_type", actionType},
         {"action_value", actionValue},
         {"rec_frequency", recurrence.frequency},
@@ -90,6 +91,7 @@ Task Task::fromMap(const QVariantMap &m) {
     t.duration = m.value("duration").toInt();
     t.completed = m.value("completed").toBool();
     t.completedAt = stampFrom(m.value("completed_at"));
+    t.abandoned = t.completed && m.value("abandoned").toBool();
     t.actionType = m.value("action_type").toInt();
     t.actionValue = m.value("action_value").toString();
     t.recurrence.frequency = m.value("rec_frequency").toInt();

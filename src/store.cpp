@@ -15,7 +15,7 @@
 
 namespace {
 
-constexpr int SchemaVersion = 9;
+constexpr int SchemaVersion = 10;
 constexpr int UndoDepth = 200;
 
 // Every syncable table carries the same bookkeeping: a uid that is stable
@@ -277,6 +277,11 @@ bool Store::migrate(QString *error) {
     for (const char *table : {"tasks", "lists", "tags", "alarms", "attachments", "sections"})
         version9 << QStringLiteral("ALTER TABLE %1 ADD COLUMN pending TEXT NOT NULL DEFAULT ''").arg(table);
 
+    // Version 10 adds abandoned tasks ("won't do"): closed, but not done.
+    const QStringList version10{
+        QStringLiteral("ALTER TABLE tasks ADD COLUMN abandoned INTEGER NOT NULL DEFAULT 0"),
+    };
+
     QStringList steps;
     if (version < 1)
         steps += statements;
@@ -296,6 +301,8 @@ bool Store::migrate(QString *error) {
         steps += version8;
     if (version < 9)
         steps += version9;
+    if (version < 10)
+        steps += version10;
     steps << QStringLiteral("PRAGMA user_version = %1").arg(SchemaVersion);
 
     m_db.transaction();

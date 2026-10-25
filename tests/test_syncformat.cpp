@@ -449,6 +449,49 @@ private slots:
         QCOMPARE(repoTask(*r).value("priority").toInt(), 3);
     }
 
+    // `abandoned` is one more field: abandoning here and a title edit there
+    // are both kept, and the file carries completed and abandoned together.
+    void gitAbandonedMergesFieldByField() {
+        auto r = rig();
+        QVERIFY(r);
+        editFairfax(*r, [](Task &t) { t.completed = true; t.abandoned = true; t.completedAt = QDateTime::fromSecsSinceEpoch(T0 + 5); }, T0 + 5);
+        editAgent(*r, [](QJsonObject &o) { o["title"] = "Renamed elsewhere"; }, T0 + 10);
+        QVERIFY(r->sync->syncBlocking());
+        const Task t = fairfaxTask(*r);
+        QVERIFY(t.completed);
+        QVERIFY(t.abandoned);
+        QCOMPARE(t.title, QString("Renamed elsewhere"));
+        const QJsonObject o = repoTask(*r);
+        QVERIFY(o.value("completed").toBool());
+        QVERIFY(o.value("abandoned").toBool());
+        QCOMPARE(o.value("title").toString(), QString("Renamed elsewhere"));
+    }
+
+    // Another writer abandons, and Fairfax edits the notes meanwhile.
+    void gitAbandonedByAnotherWriterArrives() {
+        auto r = rig();
+        QVERIFY(r);
+        editFairfax(*r, [](Task &t) { t.notes = "my notes"; }, T0 + 5);
+        editAgent(*r, [](QJsonObject &o) { o["completed"] = true; o["completed_at"] = T0 + 10; o["abandoned"] = true; }, T0 + 10);
+        QVERIFY(r->sync->syncBlocking());
+        const Task t = fairfaxTask(*r);
+        QVERIFY(t.completed);
+        QVERIFY(t.abandoned);
+        QCOMPARE(t.notes, QString("my notes"));
+        QVERIFY(repoTask(*r).value("abandoned").toBool());
+    }
+
+    // A writer that knows nothing of `abandoned` completes a task: it is done.
+    void gitReaderWithoutAbandonedSeesAClosedTask() {
+        auto r = rig();
+        QVERIFY(r);
+        editAgent(*r, [](QJsonObject &o) { o["completed"] = true; o["completed_at"] = T0 + 10; }, T0 + 10);
+        QVERIFY(r->sync->syncBlocking());
+        const Task t = fairfaxTask(*r);
+        QVERIFY(t.completed);
+        QVERIFY(!t.abandoned);
+    }
+
     void gitTheNewerSideWinsAFieldBothChanged_data() {
         QTest::addColumn<qint64>("localAt");
         QTest::addColumn<qint64>("remoteAt");

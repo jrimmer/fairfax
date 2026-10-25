@@ -85,6 +85,7 @@ struct Task {
     int duration = 0;    // Minutes.
     bool completed = false;
     QDateTime completedAt;
+    bool abandoned = false;  // Closed as "won't do"; always with completed set, so older readers see it closed.
     int actionType = ActionType::None;
     QString actionValue;
     Recurrence recurrence;

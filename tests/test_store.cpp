@@ -415,6 +415,93 @@ private slots:
         QVERIFY(Store::newUid() != Store::newUid());
         QVERIFY(!Store::newUid().isEmpty());
     }
+
+    void abandonedPersists() {
+        qint64 id;
+        {
+            auto s = open();
+            id = put(*s, "Repaint the fence");
+            QVERIFY(!s->task(id).abandoned);
+            Task t = s->task(id);
+            t.completed = true;
+            t.completedAt = QDateTime::currentDateTime();
+            t.abandoned = true;
+            s->begin("Mark as Abandoned");
+            s->putTask(t);
+            s->commit();
+        }
+        auto s = open();
+        QVERIFY(s->task(id).completed);
+        QVERIFY(s->task(id).abandoned);
+    }
+
+    void abandonedUndoes() {
+        auto s = open();
+        const qint64 id = put(*s, "Repaint the fence");
+        Task t = s->task(id);
+        t.completed = true;
+        t.abandoned = true;
+        t.completedAt = QDateTime::currentDateTime();
+        s->begin("Mark as Abandoned");
+        s->putTask(t);
+        s->commit();
+        QVERIFY(s->undo());
+        QVERIFY(!s->task(id).completed);
+        QVERIFY(!s->task(id).abandoned);
+        auto again = open();
+        QVERIFY(!again->task(id).abandoned);
+    }
+
+    // A task cannot be abandoned without being closed: a record that says
+    // abandoned but open is read as open.
+    void abandonedNeedsCompleted() {
+        QVariantMap m = Task().toMap();
+        m["abandoned"] = true;
+        QVERIFY(!Task::fromMap(m).abandoned);
+        m["completed"] = true;
+        QVERIFY(Task::fromMap(m).abandoned);
+    }
+
+    // A database from before abandoning (schema version 9) gains the column
+    // when it is opened, its tasks not abandoned.
+    void migratesFromVersionNine() {
+        QCOMPARE(Store::schemaVersion(), 10);
+        qint64 id;
+        {
+            auto s = open();
+            id = put(*s, "Done long ago");
+            Task t = s->task(id);
+            t.completed = true;
+            t.completedAt = QDateTime::currentDateTime();
+            s->begin("done");
+            s->putTask(t);
+            s->commit();
+        }
+        {
+            const QString name = "downgrade";
+            {
+                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", name);
+                db.setDatabaseName(m_path);
+                QVERIFY(db.open());
+                QSqlQuery q(db);
+                if (!q.exec("ALTER TABLE tasks DROP COLUMN abandoned"))
+                    QSKIP("This SQLite cannot drop a column");
+                QVERIFY(q.exec("PRAGMA user_version = 9"));
+                db.close();
+            }
+            QSqlDatabase::removeDatabase(name);
+        }
+        auto s = open();
+        QVERIFY(s->task(id).completed);
+        QVERIFY(!s->task(id).abandoned);
+        Task t = s->task(id);
+        t.abandoned = true;
+        s->begin("abandon");
+        s->putTask(t);
+        s->commit();
+        auto reopened = open();
+        QVERIFY(reopened->task(id).abandoned);
+    }
 };
 
 REGISTER_TEST(StoreTest)

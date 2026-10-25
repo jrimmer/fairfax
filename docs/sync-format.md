@@ -90,7 +90,9 @@ or pushed that Fairfax keeps beside its local mirror (folder and WebDAV).
 Example. In Fairfax you complete a task. Before Fairfax syncs, another program pushes an edit of
 that task's `notes` with a newer `modified`. Whole-record "newest wins" would bring the task back
 not done. Fairfax sees `completed` and `completed_at` changed only locally and `notes` only in the
-file, so the task ends completed with the new notes, and `modified` is the newer of the two.
+file, so the task ends completed with the new notes, and `modified` is the newer of the two. The
+same goes for `abandoned`: it is one more field, merged on its own like `completed`, so one side
+abandoning a task while the other edits its title keeps both.
 
 **What a writer must do.**
 
@@ -436,6 +438,7 @@ Folder `tasks/`. See "Tasks in depth" below for how the fields work together.
 | `duration` | integer | Planned length in minutes | no | `0` |
 | `completed` | bool | The task is done | no | `false` |
 | `completed_at` | integer or null | Seconds since epoch, UTC, when it was completed; `null` if open | no | `null` |
+| `abandoned` | bool | Closed as "won't do" rather than done; always together with `completed` true | no | `false` |
 | `action_type` | integer | `0` none, `1` call, `2` message, `3` mail, `4` visit, `5` URL, `6` Google | no | `0` |
 | `action_value` | string | What the action acts on (a phone number, an address, a URL); empty for none | no | `""` |
 | `rec_frequency` | integer | `0` none (not repeating), `1` daily, `2` weekly, `3` monthly, `4` yearly, `5` weekdays | no | `0` |
@@ -465,6 +468,7 @@ Sample: `tasks/70000000-0000-4000-8000-000000000001.json`
 
 ```json
 {
+    "abandoned": false,
     "action_type": 5,
     "action_value": "https://example.com/launch",
     "collapsed": false,
@@ -522,6 +526,7 @@ Sample: `tasks/70000000-0000-4000-8000-000000000002.json`
 
 ```json
 {
+    "abandoned": false,
     "action_type": 0,
     "action_value": "",
     "collapsed": false,
@@ -561,12 +566,60 @@ Sample: `tasks/70000000-0000-4000-8000-000000000002.json`
 }
 ```
 
+An abandoned task. It is closed (`completed` true, so a reader that does not know `abandoned`
+sees it closed) but was not done:
+
+Sample: `tasks/70000000-0000-4000-8000-000000000006.json`
+
+```json
+{
+    "abandoned": true,
+    "action_type": 0,
+    "action_value": "",
+    "collapsed": false,
+    "completed": true,
+    "completed_at": 1791996400,
+    "created": 1791900000,
+    "deleted": false,
+    "due_date": null,
+    "due_time": -1,
+    "duration": 0,
+    "list_uid": "20000000-0000-4000-8000-000000000002",
+    "location_uids": [],
+    "modified": 1792000000,
+    "notes": "",
+    "parent_uid": "",
+    "priority": 0,
+    "rec_done": 0,
+    "rec_end_count": 0,
+    "rec_end_date": null,
+    "rec_end_type": 0,
+    "rec_frequency": 0,
+    "rec_from": 0,
+    "rec_interval": 1,
+    "rec_month_ordinal": 0,
+    "rec_month_weekday": 0,
+    "rec_weekdays": 0,
+    "section_uid": "",
+    "series_uid": "",
+    "sort_order": 4,
+    "starred": false,
+    "start_date": null,
+    "start_time": -1,
+    "tag_uids": [],
+    "title": "Repaint the fence",
+    "type": 0,
+    "uid": "70000000-0000-4000-8000-000000000006"
+}
+```
+
 A task that repeats every Monday and Wednesday at 09:00:
 
 Sample: `tasks/70000000-0000-4000-8000-000000000003.json`
 
 ```json
 {
+    "abandoned": false,
     "action_type": 0,
     "action_value": "",
     "collapsed": false,
@@ -626,6 +679,7 @@ Sample: `tasks/70000000-0000-4000-8000-000000000005.json`
 
 ```json
 {
+    "abandoned": false,
     "action_type": 0,
     "action_value": "",
     "collapsed": false,
@@ -673,13 +727,24 @@ in Fairfax also completes its open children, one record each. A writer that comp
 should do the same. Fairfax may later tombstone completed tasks automatically after a number of
 days the user chooses.
 
+**Abandoning.** To close a task without doing it ("won't do"), set `completed` to `true`,
+`completed_at` to the time and `abandoned` to `true`. Always set `completed` too: a reader that does
+not know `abandoned` then still sees the task closed. An abandoned task is not counted as done
+anywhere in Fairfax. To reopen it, set `completed` and `abandoned` to `false` and `completed_at` to
+`null`. A writer that clears `completed` and leaves `abandoned` true does not reopen it the way it
+means to: Fairfax ignores `abandoned` on an open task. Abandoning a project or checklist abandons its
+open children, one record each. Abandoning a repeating task works like completing it (see below),
+except that the copy it leaves behind has `abandoned` true and the live task's `rec_done` is not
+raised, so the occurrence does not count toward an end-after-N rule.
+
 **Repeating tasks.** Fairfax does not recompute anything from the rule when it reads a file. When
 a repeating task is completed in Fairfax, it leaves a copy behind and moves the task itself on:
 
 - the copy is a new task record with no repeat rule, `completed` true, `completed_at` set, and the
-  `series_uid` of the series (the original task's uid if it had none);
+  `series_uid` of the series (the original task's uid if it had none); when the occurrence was
+  abandoned instead, the copy also has `abandoned` true;
 - the live task keeps its uid, gets the next due date (and a start date moved by the same
-  amount), `rec_done` plus one, and `completed` false;
+  amount), `rec_done` plus one (unchanged for an abandoned occurrence), and `completed` false;
 - when the rule has run out (count or end date reached), the live task is simply completed.
 
 A writer that completes a repeating task should do the same, or else complete it as if it did
@@ -869,6 +934,17 @@ f=tasks/$TASK.json
 old=$(jq .modified "$f"); new=$(( NOW > old ? NOW : old + 1 ))
 jq -S --indent 4 --argjson m "$new" '.completed = true | .completed_at = $m | .modified = $m' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 git commit -am "Complete task: Call the plumber"
+git push origin main
+```
+
+**Abandon a task.** Close it as "won't do": set `completed`, `completed_at` and `abandoned`. Again for
+a task that does not repeat.
+
+```sh
+f=tasks/$TASK.json
+old=$(jq .modified "$f"); new=$(( NOW > old ? NOW : old + 1 ))
+jq -S --indent 4 --argjson m "$new" '.completed = true | .completed_at = $m | .abandoned = true | .modified = $m' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+git commit -am "Abandon task: Call the plumber"
 git push origin main
 ```
 
