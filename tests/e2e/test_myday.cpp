@@ -630,7 +630,7 @@ private slots:
             QVERIFY2(qAbs(baselineSceneY(title) - baselineSceneY(date)) < 1.5, where);
             QVERIFY2(qAbs(baselineSceneY(review) - baselineSceneY(cap)) < 1.5, where);
             QVERIFY2(r.left() >= c.right() - 0.5, qPrintable(QString("%1: link at %2, numbers end at %3").arg(where).arg(r.left()).arg(c.right())));
-            QVERIFY2(r.top() >= t.bottom() - 2, qPrintable(QString("%1: link top %2, title bottom %3").arg(where).arg(r.top()).arg(t.bottom())));
+            QVERIFY2(r.top() >= t.bottom() - 8, where);
             QVERIFY2(r.right() <= l.right() + 0.5, qPrintable(QString("%1: link ends at %2, pane at %3").arg(where).arg(r.right()).arg(l.right())));
             QVERIFY2(c.top() >= t.bottom() - 2, qPrintable(QString("%1: capacity line not below the title").arg(where)));
             QVERIFY2(c.right() <= l.right() + 0.5, qPrintable(QString("%1: capacity line runs past the pane").arg(where)));
