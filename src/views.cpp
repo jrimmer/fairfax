@@ -358,14 +358,19 @@ QHash<qint64, int> ViewBuilder::listRanks(bool listOrder) const {
 
 void ViewBuilder::sortItems(QVector<Task> &items, const SortSpec &sort, bool listOrder) const {
     const QHash<qint64, int> listRank = listRanks(listOrder);
-    auto dueKey = [](const Task &t) {
-        const QDateTime k = Schedule::dueSortKey(t);
-        return k.isValid() ? k.toSecsSinceEpoch() : RankLast;
-    };
-    auto startKey = [](const Task &t) {
-        if (!t.startDate.isValid()) return RankLast;
-        return QDateTime(t.startDate, QTime(0, 0)).addSecs(qMax(0, t.startTime) * 60).toSecsSinceEpoch();
-    };
+    // The keys are worked out once per task: building a date-time in the local
+    // zone is slow, and a comparison would otherwise do it several times over.
+    QHash<qint64, qint64> dueKeys, startKeys;
+    dueKeys.reserve(items.size());
+    startKeys.reserve(items.size());
+    for (const Task &t : std::as_const(items)) {
+        const QDateTime d = Schedule::dueSortKey(t);
+        dueKeys.insert(t.id, d.isValid() ? d.toSecsSinceEpoch() : RankLast);
+        startKeys.insert(t.id, t.startDate.isValid()
+            ? QDateTime(t.startDate, QTime(0, 0)).addSecs(qMax(0, t.startTime) * 60).toSecsSinceEpoch() : RankLast);
+    }
+    auto dueKey = [&](const Task &t) { return dueKeys.value(t.id, RankLast); };
+    auto startKey = [&](const Task &t) { return startKeys.value(t.id, RankLast); };
     // A task sorts by the first of its tags in tag order, and untagged tasks
     // go last. Locations work the same way, in name order.
     auto firstTagRank = [this](const Task &t) -> qint64 {
