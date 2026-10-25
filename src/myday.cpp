@@ -254,11 +254,12 @@ Summary summary(const Store &store, const QDateTime &now) {
         out.plannedMinutes += t.duration;
     }
 
-    // Done counts every task completed today; the minutes only those with a
+    // Done counts every task completed today (not the abandoned ones, which
+    // were closed without being done); the minutes only those with a
     // duration. A project's own duration is not time spent, so it is left out
     // of the sum, as the capacity line leaves it out.
     for (const auto &t : store.tasks()) {
-        if (t.deleted || !t.completed || !t.completedAt.isValid())
+        if (t.deleted || !t.completed || t.abandoned || !t.completedAt.isValid())
             continue;
         if (t.completedAt.date() != today)
             continue;

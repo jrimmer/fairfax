@@ -36,7 +36,7 @@ namespace {
 const QLocale English(QLocale::English, QLocale::UnitedKingdom);
 
 const QStringList TaskRoles{
-    "sectionId", "hasAlarm", "hasLocation", "hasAttachment", "pictureUrl", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "completed",
+    "sectionId", "hasAlarm", "hasLocation", "hasAttachment", "pictureUrl", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "childDone", "childLive", "completed", "abandoned",
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
     "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
@@ -895,19 +895,23 @@ void Backend::dropExpiredCompleted() {
     }
 }
 
-void Backend::completeTask(Task t, bool done, const QDateTime &now) {
+// `abandon` closes the task as "won't do" instead of done; it moves a repeating
+// task on the same way but does not count toward an end-after-N rule.
+void Backend::completeTask(Task t, bool done, const QDateTime &now, bool abandon) {
     if (t.completed == done)
         return;
+    abandon = abandon && done;
     if (done && t.recurrence.isSet()) {
         // Keep a completed copy for the record and move the task itself on to
         // its next occurrence; the last occurrence simply completes.
-        if (auto next = Recurrences::advance(t, now.date())) {
+        if (auto next = Recurrences::advance(t, now.date(), !abandon)) {
             Task copy = t;
             copy.id = m_store->nextId("tasks");
             copy.uid.clear();
             copy.recurrence = {};
             copy.completed = true;
             copy.completedAt = now;
+            copy.abandoned = abandon;
             if (copy.seriesUid.isEmpty())
                 copy.seriesUid = t.uid;
             m_store->putTask(copy);
@@ -924,13 +928,14 @@ void Backend::completeTask(Task t, bool done, const QDateTime &now) {
     }
     t.completed = done;
     t.completedAt = done ? now : QDateTime();
+    t.abandoned = abandon;
     m_store->putTask(t);
-    // Completing a project or checklist completes what's inside it.
+    // Completing (or abandoning) a project or checklist closes what's inside it.
     if (done && t.type != TaskType::Task) {
         ViewBuilder views(*m_store, now, scheduleSettings());
         for (const auto &c : views.children(t.id))
             if (!c.completed)
-                completeTask(c, true, now);
+                completeTask(c, true, now, abandon);
     }
 }
 
@@ -947,6 +952,7 @@ void Backend::archiveChildren(qint64 parentId, qint64 copyId) {
         if (c.completed) {
             c.completed = false;
             c.completedAt = {};
+            c.abandoned = false;
             m_store->putTask(c);
         }
     }
@@ -960,6 +966,7 @@ void Backend::reopenChildren(const Task &project) {
         if (c.completed) {
             c.completed = false;
             c.completedAt = {};
+            c.abandoned = false;
             m_store->putTask(c);
         }
     }
@@ -1018,6 +1025,52 @@ void Backend::setCompleted(bool done) {
     else
         emit announce(done ? QStringLiteral("Completed %1 tasks").arg(ids.size())
                            : QStringLiteral("Reopened %1 tasks").arg(ids.size()));
+}
+
+// Abandon closes tasks as "won't do". Open tasks in the targets are abandoned;
+// when every target is already abandoned, they are reopened instead. Tasks
+// that were completed are left alone.
+void Backend::toggleAbandon(qint64 id) {
+    const auto ids = targetIds(id);
+    if (ids.isEmpty())
+        return;
+    bool allAbandoned = true, anyOpen = false;
+    for (auto i : ids) {
+        const Task t = m_store->task(i);
+        allAbandoned = allAbandoned && t.abandoned;
+        anyOpen = anyOpen || !t.completed;
+    }
+    if (!allAbandoned && !anyOpen)
+        return;
+    setAbandonedFor(ids, !allAbandoned);
+}
+
+void Backend::setAbandoned(bool abandoned) {
+    const auto ids = targetIds();
+    if (!ids.isEmpty())
+        setAbandonedFor(ids, abandoned);
+}
+
+void Backend::setAbandonedFor(const QVector<qint64> &ids, bool abandoned) {
+    const QDateTime now = QDateTime::currentDateTime();
+    m_store->begin(abandoned ? "Mark as Abandoned" : "Mark as Not Abandoned");
+    for (auto i : ids) {
+        const Task t = m_store->task(i);
+        // Reopening touches abandoned tasks only; abandoning, open ones only.
+        if (abandoned ? t.completed : !t.abandoned)
+            continue;
+        m_options.keepVisible.insert(i);
+        completeTask(t, abandoned, now, abandoned);
+    }
+    m_store->commit();
+    if (abandoned)
+        scheduleCompletedDrop(ids);
+    if (ids.size() == 1)
+        emit announce(abandoned ? QStringLiteral("Abandoned: %1").arg(m_store->task(ids.first()).title)
+                                : QStringLiteral("Reopened: %1").arg(m_store->task(ids.first()).title));
+    else
+        emit announce(abandoned ? QStringLiteral("Abandoned %1 tasks").arg(ids.size())
+                                : QStringLiteral("Reopened %1 tasks").arg(ids.size()));
 }
 
 void Backend::setPriority(int priority, qint64 id) {
@@ -2112,6 +2165,8 @@ QVariantMap Backend::taskInfo(qint64 id) const {
     ViewBuilder views(*m_store, now, s);
     int total = 0, done = 0;
     for (const auto &c : views.children(t.id)) {
+        if (c.abandoned)
+            continue;
         ++total;
         if (c.completed) ++done;
     }
@@ -2119,7 +2174,7 @@ QVariantMap Backend::taskInfo(qint64 id) const {
         {"id", t.id}, {"title", t.title}, {"notes", t.notes}, {"type", t.type}, {"listName", list.name},
         {"listId", t.listId}, {"parentId", t.parentId}, {"parentType", t.parentId ? m_store->task(t.parentId).type : 0},
         {"listColor", list.color}, {"parent", t.parentId ? m_store->task(t.parentId).title : QString()},
-        {"priority", t.priority}, {"starred", t.starred}, {"completed", t.completed},
+        {"priority", t.priority}, {"starred", t.starred}, {"completed", t.completed}, {"abandoned", t.abandoned},
         {"start", t.startDate.isValid() ? Schedule::friendlyDateTime(t.startDate, t.startTime, now.date(), false) : QString()},
         {"due", t.dueDate.isValid() ? Schedule::friendlyDateTime(t.dueDate, t.dueTime, now.date(), false) : QString()},
         {"overdue", Schedule::isOverdue(t, now, s)}, {"hint", Schedule::dueHint(t, now, s)},
@@ -2201,7 +2256,7 @@ QVariantList Backend::findTasks(const QString &text, int limit, bool exact) cons
     for (const auto &t : hits.mid(0, limit)) {
         const TaskList l = m_store->list(t.listId);
         result.append(QVariantMap{{"id", t.id}, {"title", t.title}, {"listName", l.name}, {"listColor", l.color},
-                                  {"completed", t.completed}});
+                                  {"completed", t.completed}, {"abandoned", t.abandoned}});
     }
     return result;
 }
@@ -2968,7 +3023,7 @@ void Backend::copySelection() {
     QStringList lines;
     QVector<Task> trees;
     std::function<void(const Task &, int)> add = [&](const Task &t, int depth) {
-        lines << QString(depth * 2, ' ') + (t.completed ? "✓ " : "") + t.title;
+        lines << QString(depth * 2, ' ') + (t.abandoned ? "✗ " : t.completed ? "✓ " : "") + t.title;
         for (const auto &line : t.notes.split('\n', Qt::SkipEmptyParts))
             lines << QString(depth * 2 + 4, ' ') + line;
         ViewBuilder views(*m_store, QDateTime::currentDateTime(), scheduleSettings());
@@ -4153,13 +4208,15 @@ QString Backend::backupFolder() const {
 }
 
 QString Backend::diagnosticsReport(const QString &extra) const {
-    int open = 0, done = 0, scheduled = 0, subtasks = 0;
+    int open = 0, done = 0, abandoned = 0, scheduled = 0, subtasks = 0;
     const QDateTime now = QDateTime::currentDateTime();
     for (const auto &t : m_store->tasks()) {
         if (t.deleted)
             continue;
         if (t.parentId)
             ++subtasks;
+        else if (t.abandoned)
+            ++abandoned;
         else if (t.completed)
             ++done;
         else
@@ -4184,7 +4241,7 @@ QString Backend::diagnosticsReport(const QString &extra) const {
                .arg(QLocale::system().name(), QLocale::system().dayName(Schedule::resolveWeekStart(m_store->setting("general.weekStart", 0).toInt())))
         << QStringLiteral("Database: %1 (%2 KB)").arg(m_store->path()).arg((db.size() + 512) / 1024)
         << QStringLiteral("Schema version: %1").arg(Store::schemaVersion())
-        << QStringLiteral("Tasks: %1 open, %2 completed, %3 sub-tasks, %4 scheduled").arg(open).arg(done).arg(subtasks).arg(scheduled)
+        << QStringLiteral("Tasks: %1 open, %2 completed, %3 abandoned, %4 sub-tasks, %5 scheduled").arg(open).arg(done).arg(abandoned).arg(subtasks).arg(scheduled)
         << QStringLiteral("Lists: %1, tags: %2, alerts: %3").arg(lists).arg(tags).arg(m_store->alarms().size());
     if (!extra.trimmed().isEmpty())
         out << QString() << extra.trimmed();
@@ -5048,10 +5105,14 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         if (tag.id && !tag.deleted)
             tags << tag.name;
     }
-    int childCount = 0, childOpen = 0;
+    // Abandoned children are closed but not done, and no longer part of the
+    // work: they stay out of "N of M done" and the progress.
+    int childCount = 0, childOpen = 0, childDone = 0, childLive = 0;
     for (const auto &c : views.children(t.id)) {
         ++childCount;
         if (!c.completed) ++childOpen;
+        if (c.completed && !c.abandoned) ++childDone;
+        if (!c.abandoned) ++childLive;
     }
     const bool overdue = Schedule::isOverdue(t, now, s);
     QString dueTone;
@@ -5072,7 +5133,10 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         {"type", t.type},
         {"childCount", childCount},
         {"childOpen", childOpen},
+        {"childDone", childDone},
+        {"childLive", childLive},
         {"completed", t.completed},
+        {"abandoned", t.abandoned},
         {"overdue", overdue},
         {"starred", t.starred},
         {"priority", t.priority},
@@ -5094,7 +5158,7 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         // Hidden-by-default tasks shown on request read as dimmed, except in
         // Scheduled, where being scheduled is the point.
         {"dimmed", views.isPaused(t) || (Schedule::isScheduled(t, now) && m_source.kind != Source::Scheduled)},
-        {"progress", childCount ? (childCount - childOpen) * 100 / childCount : 0},
+        {"progress", childLive ? childDone * 100 / childLive : 0},
         {"hasAlarm", !m_store->alarmsFor(t.id).isEmpty()},
         {"hasLocation", !t.locationIds.isEmpty()},
         {"hasAttachment", !m_store->attachmentsFor(t.id).isEmpty()},
@@ -5355,7 +5419,7 @@ void Backend::rebuildEditor() {
                  QVariantList items;
                  ViewBuilder views(*m_store, now, scheduleSettings());
                  for (const auto &c : views.children(t.id))
-                     items.append(QVariantMap{{"id", c.id}, {"title", c.title}, {"completed", c.completed}});
+                     items.append(QVariantMap{{"id", c.id}, {"title", c.title}, {"completed", c.completed}, {"abandoned", c.abandoned}});
                  return items;
              }()},
             {"attachments", [&] {

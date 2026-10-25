@@ -184,7 +184,7 @@ QString durationTotal(int minutes) {
 
 QString dueHint(const Task &t, const QDateTime &now, const ScheduleSettings &s) {
     if (t.completed && t.completedAt.isValid())
-        return QStringLiteral("Completed ") + friendlyDate(t.completedAt.date(), now.date(), s.friendlyDates).toLower();
+        return QString(t.abandoned ? QStringLiteral("Abandoned ") : QStringLiteral("Completed ")) + friendlyDate(t.completedAt.date(), now.date(), s.friendlyDates).toLower();
     if (isScheduled(t, now)) {
         const QDateTime start = t.startTime >= 0 ? at(t.startDate, t.startTime) : QDateTime(t.startDate, QTime(0, 0));
         return QStringLiteral("Starts in ") + span(now.secsTo(start));

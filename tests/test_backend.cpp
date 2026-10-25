@@ -749,6 +749,122 @@ private slots:
         QCOMPARE(keptDone, 1);  // The copy keeps the children as they were checked.
     }
 
+    void abandoningClosesATaskAndUndoReopensIt() {
+        Fixture f;
+        const qint64 id = f.addTask("Repaint the fence");
+        QSignalSpy sounds(f.backend.get(), &Backend::taskCompleted);
+        QSignalSpy cheers(f.backend.get(), &Backend::celebrate);
+        f.backend->selectTask(id);
+        f.backend->toggleAbandon();
+        QVERIFY(f.store.task(id).completed);
+        QVERIFY(f.store.task(id).abandoned);
+        QVERIFY(f.store.task(id).completedAt.isValid());
+        // Closed, but never celebrated as done.
+        QCOMPARE(sounds.count(), 0);
+        QCOMPARE(cheers.count(), 0);
+
+        f.backend->undo();
+        QVERIFY(!f.store.task(id).completed);
+        QVERIFY(!f.store.task(id).abandoned);
+        QVERIFY(!f.store.task(id).completedAt.isValid());
+        f.backend->redo();
+        QVERIFY(f.store.task(id).abandoned);
+
+        // Toggling an abandoned task reopens it, and so does completing it again.
+        f.backend->toggleAbandon();
+        QVERIFY(!f.store.task(id).completed);
+        QVERIFY(!f.store.task(id).abandoned);
+        f.backend->setAbandoned(true);
+        QVERIFY(f.store.task(id).abandoned);
+        f.backend->toggleComplete(id);
+        QVERIFY(!f.store.task(id).completed);
+        QVERIFY(!f.store.task(id).abandoned);
+    }
+
+    // Done tasks are left as they are by Abandon; an abandoned one stays
+    // abandoned when it is completed over (it is already closed).
+    void abandonLeavesDoneTasksAlone() {
+        Fixture f;
+        const qint64 done = f.addTask("Done already");
+        f.backend->selectTask(done);
+        f.backend->toggleComplete(done);
+        QVERIFY(f.store.task(done).completed);
+        f.backend->selectTask(done);
+        f.backend->toggleAbandon();
+        QVERIFY(f.store.task(done).completed);
+        QVERIFY(!f.store.task(done).abandoned);
+    }
+
+    void abandoningRepeatingTaskSkipsTheOccurrenceWithoutCountingIt() {
+        Fixture f;
+        const qint64 id = f.addTask("Water plants");
+        f.backend->selectTask(id);
+        f.backend->setDueInDays(0);
+        f.backend->setRepeatPreset(id, 1);  // Daily.
+        Task t = f.store.task(id);
+        t.recurrence.endType = Repeat::AfterCount;
+        t.recurrence.endCount = 1;
+        f.store.begin("end after one");
+        f.store.putTask(t);
+        f.store.commit();
+
+        f.backend->selectTask(id);
+        f.backend->toggleAbandon();
+        const Task live = f.store.task(id);
+        QVERIFY(!live.completed);
+        QVERIFY(!live.abandoned);
+        QCOMPARE(live.dueDate, QDate::currentDate().addDays(1));
+        QCOMPARE(live.recurrence.occurrencesDone, 0);  // Skipped, not done: the end-after-1 rule is still open.
+        int copies = 0;
+        for (const auto &c : f.store.tasks())
+            if (c.id != id && !c.deleted && c.title == "Water plants") {
+                ++copies;
+                QVERIFY(c.completed);
+                QVERIFY(c.abandoned);
+                QVERIFY(!c.recurrence.isSet());
+                QCOMPARE(c.seriesUid, live.seriesUid);
+            }
+        QCOMPARE(copies, 1);
+
+        // One undo takes it all back.
+        f.backend->undo();
+        QCOMPARE(f.store.task(id).dueDate, QDate::currentDate());
+        for (const auto &c : f.store.tasks())
+            QVERIFY(c.id == id || c.deleted || c.title != "Water plants");
+
+        // Completing it instead does count, and with end-after-1 the series ends.
+        f.backend->selectTask(id);
+        f.backend->toggleComplete(id);
+        QVERIFY(f.store.task(id).completed);
+        QVERIFY(!f.store.task(id).abandoned);
+    }
+
+    void abandoningAProjectAbandonsItsOpenChildren() {
+        Fixture f;
+        const qint64 proj = f.addTask("Trip", TaskType::Project);
+        auto addChild = [&](const QString &title, bool done) {
+            Task c;
+            c.id = f.store.nextId("tasks");
+            c.listId = f.store.task(proj).listId;
+            c.parentId = proj;
+            c.title = title;
+            c.completed = done;
+            if (done) c.completedAt = QDateTime::currentDateTime().addDays(-1);
+            f.store.begin("child");
+            f.store.putTask(c);
+            f.store.commit();
+            return c.id;
+        };
+        const qint64 booked = addChild("Book flights", true);
+        const qint64 packed = addChild("Pack", false);
+        f.backend->selectTask(proj);
+        f.backend->toggleAbandon();
+        QVERIFY(f.store.task(proj).abandoned);
+        QVERIFY(f.store.task(packed).abandoned);
+        QVERIFY(f.store.task(booked).completed);
+        QVERIFY(!f.store.task(booked).abandoned);  // Already done: stays done.
+    }
+
     void repeatingTaskCarriesNotesWithoutStamps() {
         Fixture f;
         const qint64 id = f.addTask("Backup");

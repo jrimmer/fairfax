@@ -97,7 +97,7 @@ QDate next(const Recurrence &rule, const QDate &anchor) {
     }
 }
 
-std::optional<Task> advance(const Task &task, const QDate &completedOn) {
+std::optional<Task> advance(const Task &task, const QDate &completedOn, bool counts) {
     const Recurrence &rule = task.recurrence;
     QDate anchor;
     if (rule.from == Repeat::FromCompletion)
@@ -121,11 +121,12 @@ std::optional<Task> advance(const Task &task, const QDate &completedOn) {
     } else if (task.startDate.isValid()) {
         result.startDate = date;
     }
-    result.recurrence.occurrencesDone = rule.occurrencesDone + 1;
+    result.recurrence.occurrencesDone = rule.occurrencesDone + (counts ? 1 : 0);
     result.completed = false;
+    result.abandoned = false;
     result.completedAt = QDateTime();
 
-    if (rule.endType == Repeat::AfterCount && result.recurrence.occurrencesDone >= rule.endCount)
+    if (counts && rule.endType == Repeat::AfterCount && result.recurrence.occurrencesDone >= rule.endCount)
         return std::nullopt;
     if (rule.endType == Repeat::OnDate && rule.endDate.isValid()) {
         const QDate governing = result.dueDate.isValid() ? result.dueDate : result.startDate.isValid() ? result.startDate : date;

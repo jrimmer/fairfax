@@ -178,6 +178,35 @@ private slots:
         QCOMPARE(titles(build(Source{Source::Done})), QStringList{"done"});
     }
 
+    // An abandoned task is closed like a completed one: it leaves the lists and
+    // focus lists under the completed rule, shows in Done, and is found by
+    // `type: abandoned` there.
+    void abandonedTasksFollowTheCompletedRuleAndShowInDone() {
+        const auto l = addList("L");
+        addTask(l, "open");
+        addTask(l, "done", [](Task &t) { t.completed = true; t.completedAt = Now.addSecs(-3600); });
+        addTask(l, "dropped", [](Task &t) { t.completed = true; t.abandoned = true; t.completedAt = Now.addSecs(-3600); });
+        addTask(l, "dropped long ago", [](Task &t) { t.completed = true; t.abandoned = true; t.completedAt = Now.addDays(-10); });
+
+        // The default window is a day: the recent ones are listed, the old one is not.
+        QCOMPARE(sorted(titles(build(list(l)))), (QStringList{"done", "dropped", "open"}));
+        // "Never" hides both kinds.
+        ViewOptions never;
+        never.completedWindowMinutes = 0;
+        QCOMPARE(titles(build(list(l), never)), QStringList{"open"});
+        // All and the other focus lists leave closed tasks out.
+        QCOMPARE(titles(build(Source{Source::All})), QStringList{"open"});
+        // Done holds both, whatever the window says.
+        QCOMPARE(sorted(titles(build(Source{Source::Done}, never))), (QStringList{"done", "dropped", "dropped long ago"}));
+        // And can be narrowed to either kind by search.
+        ViewOptions abandoned;
+        abandoned.search = "type: abandoned";
+        QCOMPARE(sorted(titles(build(Source{Source::Done}, abandoned))), (QStringList{"dropped", "dropped long ago"}));
+        ViewOptions completed;
+        completed.search = "type: completed";
+        QCOMPARE(titles(build(Source{Source::Done}, completed)), QStringList{"done"});
+    }
+
     // ---- scheduled / paused ----
 
     void scheduledHiddenUnlessShowScheduled() {

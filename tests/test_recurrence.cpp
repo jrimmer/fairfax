@@ -194,6 +194,41 @@ private slots:
         QVERIFY(!Recurrences::advance(*b, QDate(2026, 7, 17)).has_value());
     }
 
+    // An abandoned occurrence is skipped, not done: the task moves on but the
+    // end-after-N count stays where it was.
+    void abandonedOccurrenceDoesNotCount() {
+        Task t;
+        t.dueDate = QDate(2026, 7, 15);
+        t.recurrence = rule(Repeat::Daily);
+        t.recurrence.endType = Repeat::AfterCount;
+        t.recurrence.endCount = 2;
+        auto a = Recurrences::advance(t, QDate(2026, 7, 15), false);
+        QVERIFY(a);
+        QCOMPARE(a->dueDate, QDate(2026, 7, 16));
+        QCOMPARE(a->recurrence.occurrencesDone, 0);
+        QVERIFY(!a->abandoned);
+        // Skipping any number of times never ends the series by count.
+        auto b = Recurrences::advance(*a, QDate(2026, 7, 16), false);
+        QVERIFY(b);
+        auto c = Recurrences::advance(*b, QDate(2026, 7, 17), false);
+        QVERIFY(c);
+        QCOMPARE(c->recurrence.occurrencesDone, 0);
+        // A done occurrence after skipped ones counts once.
+        auto d = Recurrences::advance(*c, QDate(2026, 7, 18));
+        QVERIFY(d);
+        QCOMPARE(d->recurrence.occurrencesDone, 1);
+    }
+
+    // An end date still ends the series, abandoned or not.
+    void abandonedOccurrenceStillEndsOnDate() {
+        Task t;
+        t.dueDate = QDate(2026, 7, 16);
+        t.recurrence = rule(Repeat::Daily);
+        t.recurrence.endType = Repeat::OnDate;
+        t.recurrence.endDate = QDate(2026, 7, 16);
+        QVERIFY(!Recurrences::advance(t, QDate(2026, 7, 16), false).has_value());
+    }
+
     void endOnDate() {
         Task t;
         t.dueDate = QDate(2026, 7, 15);

@@ -237,6 +237,9 @@ public:
     Q_INVOKABLE void newTask(int type = 0, bool subtask = false);
     Q_INVOKABLE void toggleComplete(qint64 id = 0);
     Q_INVOKABLE void setCompleted(bool done);
+    // Abandon: close as "won't do". Toggling reopens when every target is abandoned.
+    Q_INVOKABLE void toggleAbandon(qint64 id = 0);
+    Q_INVOKABLE void setAbandoned(bool abandoned);
     Q_INVOKABLE void setPriority(int priority, qint64 id = 0);
     Q_INVOKABLE void bumpPriority(int delta);
     Q_INVOKABLE void setStarred(int state, qint64 id = 0);  // 1 star, 0 unstar, -1 toggle.
@@ -696,7 +699,8 @@ private:
     ScheduleSettings scheduleSettings() const;
     QVector<qint64> targetIds(qint64 id = 0) const;
     void editTasks(const QString &label, const QVector<qint64> &ids, const std::function<void(Task &)> &edit);
-    void completeTask(Task task, bool done, const QDateTime &now);
+    void completeTask(Task task, bool done, const QDateTime &now, bool abandon = false);
+    void setAbandonedFor(const QVector<qint64> &ids, bool abandoned);
     // Copies a repeating project's children (as they stand) under its completed
     // copy and resets the live ones, then the same for their own children.
     void archiveChildren(qint64 parentId, qint64 copyId);

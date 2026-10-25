@@ -457,6 +457,7 @@ QVector<Section> ViewBuilder::sectionize(const QVector<Task> &items, const Sourc
         }
         case SortField::Status: {
             // The Status sort: what needs attention first.
+            if (t.abandoned) return {"st:abandoned", "Abandoned", {}, -1, 7};
             if (t.completed) return {"st:done", "Completed", {}, -1, 6};
             if (Schedule::isOverdue(t, m_now, m_settings)) return {"st:overdue", "Overdue", "overdue", -1, 0};
             if (Schedule::isInProgress(t, m_now)) return {"st:progress", "In Progress", "progress", -1, 1};

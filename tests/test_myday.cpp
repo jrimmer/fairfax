@@ -553,6 +553,29 @@ private slots:
         QCOMPARE(s.doneMinutes, 105);
     }
 
+    // An abandoned task was closed, not done: it is neither counted nor timed
+    // in "Done today", and it is not on the plan either.
+    void summaryLeavesOutAbandonedTasks() {
+        Fixture f;
+        f.add("Done", [](Task &t) {
+            t.completed = true;
+            t.completedAt = at(2026, 7, 15, 9, 0);
+            t.duration = 45;
+        });
+        f.add("Abandoned", [](Task &t) {
+            t.completed = true;
+            t.abandoned = true;
+            t.completedAt = at(2026, 7, 15, 10, 0);
+            t.duration = 60;
+            t.dueDate = Today;
+        });
+        const MyDay::Summary s = MyDay::summary(f.m_store, Now);
+        QCOMPARE(s.completedCount, 1);
+        QCOMPARE(s.doneMinutes, 45);
+        QCOMPARE(s.plannedMinutes, 0);
+        QVERIFY(MyDay::sections(f.m_store, Now).today.isEmpty());
+    }
+
     void summaryExcludesProjectsFromTheMinutes() {
         Fixture f;
         // A completed project's own duration is not time spent, as in capacity.

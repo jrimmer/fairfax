@@ -19,8 +19,10 @@ QDate next(const Recurrence &rule, const QDate &anchor);
 
 // The task moved to its next occurrence after being completed on
 // `completedOn`, or nothing when the end rule says this was the last one.
-// The returned task is not completed and has occurrencesDone incremented.
-std::optional<Task> advance(const Task &task, const QDate &completedOn);
+// The returned task is not completed and has occurrencesDone incremented,
+// unless `counts` is false (an abandoned occurrence: skipped, not done, so it
+// does not move an end-after-N rule toward its end).
+std::optional<Task> advance(const Task &task, const QDate &completedOn, bool counts = true);
 
 // A repeating task's notes as the next occurrence gets them: lines that are
 // only a date or time stamp (from Insert Time Stamp) are dropped.
