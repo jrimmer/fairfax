@@ -159,6 +159,16 @@ fi
 exec /usr/bin/uname "$@"
 STUB
 
+# id answers -u with STUB_UID when set, so a case can run "as root".
+cat >"$STUBS/id" <<'STUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-u" ] && [ -n "${STUB_UID:-}" ]; then
+    printf '%s\n' "$STUB_UID"
+    exit 0
+fi
+exec /usr/bin/id "$@"
+STUB
+
 # The fairfax stub logs the call; it can fail setup on demand.
 cat >"$STUBS/fairfax" <<'STUB'
 #!/usr/bin/env bash
@@ -176,7 +186,12 @@ chmod +x "$STUBS"/*
 # not find a pacman at all there.
 STUBS_NOPACMAN="$WORK/stubs-nopacman"
 mkdir -p "$STUBS_NOPACMAN"
-for s in sudo uname fairfax; do ln -s "$STUBS/$s" "$STUBS_NOPACMAN/$s"; done
+for s in sudo uname fairfax id; do ln -s "$STUBS/$s" "$STUBS_NOPACMAN/$s"; done
+
+# Pacman but no sudo anywhere on the PATH, for the root and no-sudo cases.
+STUBS_NOSUDO="$WORK/stubs-nosudo"
+mkdir -p "$STUBS_NOSUDO"
+for s in pacman uname fairfax id; do ln -s "$STUBS/$s" "$STUBS_NOSUDO/$s"; done
 
 # A PATH with the stubs, the host tools, and the host's pacman (Arch cases).
 TEST_PATH_ARCH="$STUBS:$PATH"
@@ -191,6 +206,7 @@ for tool in bash env curl sha256sum mktemp sed grep find awk install \
     ln -s "$real" "$REALBIN/$tool"
 done
 TEST_PATH_NO_PACMAN="$STUBS_NOPACMAN:$REALBIN"
+TEST_PATH_NO_SUDO="$STUBS_NOSUDO:$REALBIN"
 
 # --- harness ---------------------------------------------------------------
 
@@ -199,11 +215,12 @@ new_home() {
     export HOME="$HOME_DIR"
     export STUB_LOG="$HOME_DIR/stub.log"
     : >"$STUB_LOG"
-    export PACMAN_INSTALLED="" PACMAN_VERSION="" STUB_MACHINE="x86_64" FAIRFAX_SETUP_FAIL=""
+    export PACMAN_INSTALLED="" PACMAN_VERSION="" STUB_MACHINE="x86_64" FAIRFAX_SETUP_FAIL="" STUB_UID=""
     export FAIRFAX_RELEASE_URL="file://$RELEASE"
     export PATH="$TEST_PATH_ARCH"
 }
 use_no_pacman() { export PATH="$TEST_PATH_NO_PACMAN"; }
+use_no_sudo() { export PATH="$TEST_PATH_NO_SUDO"; }
 run() {
     set +e
     OUT=$(bash "$INSTALL" "$@" 2>&1)
@@ -234,6 +251,37 @@ log_has "sudo pacman -U --noconfirm" || fail "sudo used for pacman -U"
 log_has "fairfax setup omarchy" || fail "setup run on Omarchy fresh install"
 assert_contains "$OUT" "Super+Shift+T" "start line mentions Quick Entry when setup ran"
 ok "fresh Arch install"
+
+# Arch as root with no sudo installed (a container, a minimal server): pacman
+# runs directly, and the message doesn't mention sudo or a password.
+echo "== Arch as root without sudo =="
+new_home
+use_no_sudo
+export STUB_UID=0
+run
+assert_eq "$STATUS" 0 "root install without sudo exits 0"
+assert_contains "$OUT" "Running pacman -U fairfax-x86_64.pkg.tar.zst." "says it runs pacman directly"
+log_has "pacman -U --noconfirm" || fail "pacman -U called"
+log_lacks "sudo" || fail "no sudo used as root"
+ok "Arch as root without sudo"
+
+# Root with sudo available still skips sudo.
+new_home
+export STUB_UID=0
+run
+assert_eq "$STATUS" 0 "root install with sudo present exits 0"
+log_lacks "sudo" || fail "root never goes through sudo"
+ok "Arch as root with sudo present"
+
+# Not root and no sudo: a clear message, and nothing installed.
+new_home
+use_no_sudo
+export STUB_UID=1000
+run
+assert_eq "$STATUS" 1 "no root and no sudo exits 1"
+assert_contains "$OUT" "needs root, and sudo isn't installed" "explains what is missing"
+log_lacks "pacman -U" || fail "pacman not run without root"
+ok "Arch without root or sudo"
 
 # fresh Arch but not Omarchy: no setup
 new_home

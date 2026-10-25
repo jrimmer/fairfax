@@ -117,6 +117,28 @@ omarchy_wired=false
 installed_dir="$HOME/.local/share/fairfax"
 installed_version_file="$installed_dir/installed-version"
 
+# pacman needs root: run it directly when we already are root (a container or
+# a minimal server may have no sudo at all), through sudo otherwise.
+is_root() { [ "$(id -u)" -eq 0 ]; }
+say_root() {
+    if is_root; then
+        echo "Running $1."
+    else
+        echo "Running sudo $1; you may be asked for your password."
+    fi
+}
+as_root() {
+    if is_root; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        echo "install.sh: installing the pacman package needs root, and sudo isn't installed." >&2
+        echo "Run this as root, install sudo, or use --appimage for an install in your home folder." >&2
+        exit 1
+    fi
+}
+
 # --- uninstall ------------------------------------------------------------
 
 uninstall_arch() {
@@ -125,9 +147,9 @@ uninstall_arch() {
             fairfax setup omarchy --remove || true
         fi
     fi
-    echo "Running sudo pacman -R fairfax; you may be asked for your password."
+    say_root "pacman -R fairfax"
     # --noconfirm: under curl | bash, standard input is the script itself.
-    sudo pacman -R --noconfirm fairfax
+    as_root pacman -R --noconfirm fairfax
     echo "Fairfax is uninstalled."
 }
 
@@ -187,8 +209,8 @@ fi
 install_arch() {
     local file="fairfax-$machine.pkg.tar.zst"
     pkg=$(download "$file")
-    echo "Running sudo pacman -U $file; you may be asked for your password."
-    sudo pacman -U --noconfirm "$pkg"
+    say_root "pacman -U $file"
+    as_root pacman -U --noconfirm "$pkg"
 }
 
 install_appimage() {
