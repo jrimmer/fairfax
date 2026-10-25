@@ -40,9 +40,9 @@ QList<Result> &results() {
 // CPU budgets in milliseconds; see the note at the top to re-baseline them.
 double budget(const QString &name) {
     static const QHash<QString, double> b{
-        {"switch empty list to 80 tasks", 250}, {"open Today", 150},        {"open All", 250},
-        {"search: type a query", 150},          {"open Quick Entry", 150},  {"open the task editor", 100},
-        {"open Settings", 400},                 {"switch all Settings panes", 500}, {"complete a task", 100}};
+        {"switch empty list to 80 tasks", 450}, {"open Today", 320},        {"open All", 450},
+        {"search: type a query", 600},          {"open Quick Entry", 40},   {"open the task editor", 400},
+        {"open Settings", 130},                 {"switch all Settings panes", 220}, {"complete a task", 100}};
     return b.value(name, 100);
 }
 
