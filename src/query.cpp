@@ -414,7 +414,7 @@ bool startWithin(const Task &t, const QDate &from, const QDate &to) {
 }
 
 bool doneWithin(const Task &t, const QDate &from, const QDate &to) {
-    return t.completed && t.completedAt.isValid() && t.completedAt.date() >= from && t.completedAt.date() <= to;
+    return t.completed && !t.abandoned && t.completedAt.isValid() && t.completedAt.date() >= from && t.completedAt.date() <= to;
 }
 
 bool hasActiveChildren(const Task &t, const QueryContext &c) {
@@ -527,6 +527,9 @@ const QHash<QString, Predicate> &typePresets() {
             return dueWindowIntersects(t, a, b) || startWithin(t, a, b);
         });
         add({"overdue", "tasksoverdue"}, [](T t, C c) { return Schedule::isOverdue(t, c.now, c.settings); });
+        // Closed tasks: done ones, and those abandoned ("won't do").
+        add({"completed"}, [](T t, C) { return t.completed && !t.abandoned; });
+        add({"abandoned"}, [](T t, C) { return t.abandoned; });
         add({"donetoday"}, [day](T t, C c) { return doneWithin(t, day(c), day(c)); });
         add({"doneyesterday"}, [day](T t, C c) { return doneWithin(t, day(c).addDays(-1), day(c).addDays(-1)); });
         add({"donethisweek"}, [week](T t, C c) {
@@ -655,7 +658,7 @@ LeafFactory timeFactory(TimeField field, QStringList *errors) {
             switch (field) {
             case TimeField::Modified: v = t.modified; break;
             case TimeField::Created: v = t.created; break;
-            case TimeField::Completed: v = t.completed ? t.completedAt : QDateTime(); break;
+            case TimeField::Completed: v = t.completed && !t.abandoned ? t.completedAt : QDateTime(); break;
             }
             if (!v.isValid()) return false;
             const QDateTime cutoff = c.now.addMSecs(-ms);
@@ -777,7 +780,7 @@ Query Query::parse(const QString &input, QString *error) {
     const QRegularExpression &keyword = keywordPattern();
 
     // A negated value (!donetoday) does not ask for completed tasks.
-    static const QRegularExpression doneTypes(QStringLiteral(R"((?<![!\w])done(?:today|yesterday|thisweek)\b)"),
+    static const QRegularExpression doneTypes(QStringLiteral(R"((?<![!\w])(?:done(?:today|yesterday|thisweek)|completed|abandoned)\b)"),
                                               QRegularExpression::CaseInsensitiveOption);
 
     QStringList errors;

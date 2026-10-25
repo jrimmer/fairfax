@@ -73,7 +73,8 @@ const char *QueryGrammar = R"(Fairfax search queries combine free text and keywo
     starttomorrow, startthisweek, inprogress, scheduled, paused, hiprio, medprio,
     lowprio, prio, noprio, starred, repeat, alarms, note, duration, due, nodue,
     start, nostart, anytag, notag, anylocation, nolocation, capturedmail, donetoday,
-    doneyesterday, donethisweek, emptyproj, emptychck, alltasks. Separate values
+    doneyesterday, donethisweek, completed (done, not abandoned), abandoned (closed
+    as "won't do"), emptyproj, emptychck, alltasks. Separate values
     with commas or OR, e.g. type: hiprio OR medprio.
   - tags: tag names (comma separated, quote names with spaces); tags: ~ means no
     tag and tags: ? means any tag. A leading ! excludes, e.g. tags: !work.

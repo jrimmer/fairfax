@@ -134,6 +134,29 @@ private slots:
         QCOMPARE(toType(all({clause("location", false, "anylocation")})), QString("anylocation"));
     }
 
+    // The Status rule: Completed means done, Abandoned means closed as "won't do",
+    // and the two never overlap.
+    void statusRule() {
+        addTask("Finished", [](Task &t) { t.completed = true; t.completedAt = Now.addDays(-1); });
+        addTask("Wont do", [](Task &t) { t.completed = true; t.abandoned = true; t.completedAt = Now.addDays(-1); });
+        QCOMPARE(toType(all({clause("status", false, "abandoned")})), QString("abandoned"));
+        QCOMPARE(toType(all({clause("status", true, "completed")})), QString("!completed"));
+        QCOMPARE(parsed("abandoned"), QString("all(status=abandoned)"));
+        QCOMPARE(parsed("completed OR abandoned"), QString("any(status=completed status=abandoned)"));
+        QCOMPARE(titles("type: abandoned"), QStringList{"Wont do"});
+        QCOMPARE(titles("type: completed"), QStringList{"Finished"});
+        QCOMPARE(titles("type: !abandoned").contains("Wont do"), false);
+        // Naming either asks for closed tasks, like the done-today types.
+        QVERIFY(Query::parse("type: abandoned").namesCompleted());
+        QVERIFY(Query::parse("type: completed").namesCompleted());
+        QVERIFY(!Query::parse("type: !abandoned").namesCompleted());
+        // The recency filters count done tasks only.
+        QVERIFY(titles("completed: 7d").contains("Finished"));
+        QVERIFY(!titles("completed: 7d").contains("Wont do"));
+        QVERIFY(!titles("type: donetoday OR doneyesterday").contains("Wont do"));
+        QVERIFY(titles("type: donetoday OR doneyesterday").contains("Finished"));
+    }
+
     void emptyAndOddTrees() {
         QCOMPARE(toType({}), QString());
         QCOMPARE(toType(all({})), QString());

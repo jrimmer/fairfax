@@ -41,6 +41,7 @@ const std::vector<Property> &table() {
         {"duration", "Duration", "has", "doesn't have", {{"duration", "a duration"}}, nullptr},
         {"completion", "Completion", "completed", "not completed",
          {{"donetoday", "Today"}, {"doneyesterday", "Yesterday"}, {"donethisweek", "This Week"}}, nullptr},
+        {"status", "Status", "is", "is not", {{"completed", "Completed"}, {"abandoned", "Abandoned"}}, nullptr},
         {"alarm", "Alarm", "has", "doesn't have", {{"alarms", "an alarm"}}, nullptr},
         {"starred", "Starred", "is", "is not", {{"starred", "Starred"}}, nullptr},
         {"priority", "Priority", "is", "is not",
