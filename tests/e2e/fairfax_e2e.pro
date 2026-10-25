@@ -45,6 +45,9 @@ SOURCES += test_gaps_menus.cpp
 # Screen reader guard and shared component naming.
 SOURCES += test_accessibility.cpp
 
+# Interaction timings on a realistic database, against CPU budgets.
+SOURCES += test_performance.cpp
+
 # Mail to Fairfax end-to-end tests: Settings > Mail and the connector against a fake IMAP server.
 SOURCES += test_shortcuts.cpp
 SOURCES += test_mail.cpp test_mail_oauth.cpp
