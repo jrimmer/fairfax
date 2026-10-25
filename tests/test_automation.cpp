@@ -332,6 +332,79 @@ private slots:
         QCOMPARE(code(m_auto->run("complete_task", {{"task_id", "999"}})), "not_found");
     }
 
+    void abandonAndUnabandon() {
+        const qint64 a = addTask({{"title", "A"}, {"list_id", id(m_work)}});
+        const qint64 b = addTask({{"title", "B"}, {"list_id", id(m_work)}});
+        const qint64 done = addTask({{"title", "Done"}, {"list_id", id(m_work)}});
+        ok("complete_task", {{"task_id", id(done)}});
+
+        const auto r = ok("abandon_task", {{"task_ids", QJsonArray{id(a), id(b), id(done)}}});
+        QCOMPARE(r["item_count"].toInt(), 3);
+        for (const qint64 t : {a, b}) {
+            QVERIFY(m_store->task(t).completed && m_store->task(t).abandoned);
+        }
+        // A done task stays done, not abandoned.
+        QVERIFY(m_store->task(done).completed && !m_store->task(done).abandoned);
+        const auto first = r["tasks"].toArray().first().toObject();
+        QVERIFY(first["completed"].toBool());
+        QVERIFY(first["abandoned"].toBool());
+        QVERIFY(first["completed_at"].isString());
+
+        // One undo takes back the whole batch.
+        QVERIFY(m_store->undo());
+        QVERIFY(!m_store->task(a).completed && !m_store->task(a).abandoned);
+        QVERIFY(!m_store->task(b).completed);
+
+        ok("abandon_task", {{"task_id", id(a)}});
+        QVERIFY(m_store->task(a).abandoned);
+        // Abandoned tasks are in the done focus list and flagged as abandoned.
+        QCOMPARE(ok("query_tasks", {{"focus", "done"}})["total_count"].toInt(), 2);
+        QCOMPARE(ok("query_tasks", {{"search", "type: abandoned"}, {"include_completed", true}})["total_count"].toInt(), 1);
+        QCOMPARE(ok("query_tasks", {{"search", "type: completed"}, {"include_completed", true}})["total_count"].toInt(), 1);
+
+        // Unabandon reopens abandoned tasks only; uncomplete reopens them too.
+        const auto u = ok("unabandon_task", {{"task_ids", QJsonArray{id(a), id(done)}}});
+        QVERIFY(!u["tasks"].toArray().first().toObject()["abandoned"].toBool());
+        QVERIFY(!m_store->task(a).completed && !m_store->task(a).abandoned);
+        QVERIFY(!m_store->task(a).completedAt.isValid());
+        QVERIFY(m_store->task(done).completed);
+        ok("abandon_task", {{"task_id", id(b)}});
+        ok("uncomplete_task", {{"task_id", id(b)}});
+        QVERIFY(!m_store->task(b).completed && !m_store->task(b).abandoned);
+
+        QCOMPARE(code(m_auto->run("abandon_task", {{"task_id", "999"}})), "not_found");
+        QCOMPARE(code(m_auto->run("abandon_task", {{"task_ids", QJsonArray{}}})), "invalid_arguments");
+    }
+
+    void abandoningRepeatingTaskSkipsToTheNextOccurrence() {
+        const qint64 t = addTask({{"title", "Water plants"}, {"list_id", id(m_work)}, {"due_date", "2026-07-10"}});
+        Task rec = m_store->task(t);
+        rec.recurrence.frequency = Repeat::Weekly;
+        rec.recurrence.interval = 1;
+        rec.recurrence.weekdays = 1 << (QDate(2026, 7, 10).dayOfWeek() - 1);
+        rec.recurrence.endType = Repeat::AfterCount;
+        rec.recurrence.endCount = 2;
+        m_store->begin("make repeating");
+        m_store->putTask(rec);
+        m_store->commit();
+
+        const auto r = ok("abandon_task", {{"task_id", id(t)}})["task"].toObject();
+        QVERIFY(!r["completed"].toBool());
+        QVERIFY(!r["abandoned"].toBool());
+        QCOMPARE(r["due_date"].toString(), "2026-07-17");
+        QCOMPARE(m_store->task(t).recurrence.occurrencesDone, 0);  // Skipped, not counted.
+        int copies = 0;
+        for (const auto &c : m_store->tasks())
+            if (c.completed && c.abandoned && c.title == "Water plants" && !c.recurrence.isSet()) {
+                ++copies;
+                QCOMPARE(c.seriesUid, rec.uid);
+            }
+        QCOMPARE(copies, 1);
+        QVERIFY(m_store->undo());
+        QCOMPARE(m_store->task(t).dueDate, QDate(2026, 7, 10));
+        QCOMPARE(liveTasks(), 1);
+    }
+
     void completingProjectCompletesChildren() {
         const qint64 p = addTask({{"title", "P"}, {"list_id", id(m_work)}, {"task_type", "project"}});
         ok("create_task", {{"title", "K1"}, {"parent_task_id", id(p)}});
@@ -379,6 +452,7 @@ private slots:
             {"duplicate_task", {{"task_id", id(a)}}},
             {"move_task", {{"task_id", id(a)}, {"list_id", id(m_inbox)}}},
             {"complete_task", {{"task_id", id(a)}}},
+            {"abandon_task", {{"task_id", id(a)}}},
             {"pause_tag", {{"tag_name", "t"}}},
             {"delete_task", {{"task_id", id(a)}}},
         };

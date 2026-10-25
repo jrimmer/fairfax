@@ -588,6 +588,7 @@ struct Automation::Impl {
         o["priority"] = kPriorityNames.value(t.priority);
         o["starred"] = t.starred;
         o["completed"] = t.completed;
+        o["abandoned"] = t.abandoned;
         o["completed_at"] = t.completedAt.isValid() ? QJsonValue(t.completedAt.toString(Qt::ISODate)) : QJsonValue();
         o["start_date"] = dateValue(t.startDate);
         o["start_time"] = timeValue(t.startDate.isValid() ? t.startTime : -1);
@@ -727,17 +728,20 @@ struct Automation::Impl {
     // Mirrors Backend::completeTask so the app and automation agree: a
     // repeating task leaves a completed copy behind and moves on, and
     // completing a project or checklist completes what is inside it.
-    void completeTree(Task t, bool done, const QDateTime &when) {
+    // Abandoning does the same, but does not count toward an end-after-N rule.
+    void completeTree(Task t, bool done, const QDateTime &when, bool abandon = false) {
         if (t.completed == done)
             return;
+        abandon = abandon && done;
         if (done && t.recurrence.isSet()) {
-            if (auto next = Recurrences::advance(t, when.date())) {
+            if (auto next = Recurrences::advance(t, when.date(), !abandon)) {
                 Task copy = t;
                 copy.id = s.nextId("tasks");
                 copy.uid.clear();
                 copy.recurrence = {};
                 copy.completed = true;
                 copy.completedAt = when;
+                copy.abandoned = abandon;
                 if (copy.seriesUid.isEmpty())
                     copy.seriesUid = t.uid;
                 s.putTask(copy);
@@ -748,11 +752,12 @@ struct Automation::Impl {
         }
         t.completed = done;
         t.completedAt = done ? when : QDateTime();
+        t.abandoned = abandon;
         s.putTask(t);
         if (done && t.type != TaskType::Task)
             for (const auto &c : childrenOf(t.id))
                 if (!c.completed)
-                    completeTree(c, true, when);
+                    completeTree(c, true, when, abandon);
     }
 
     void deleteTree(qint64 id, QSet<qint64> &done) {
@@ -1306,6 +1311,28 @@ struct Automation::Impl {
     QJsonObject completeTask(const QJsonObject &args) { return setCompleted(args, true); }
     QJsonObject uncompleteTask(const QJsonObject &args) { return setCompleted(args, false); }
 
+    // Abandon closes tasks as "won't do"; unabandon reopens abandoned ones and
+    // leaves tasks that were completed alone. Tasks already closed stay as they are.
+    QJsonObject setAbandoned(const QJsonObject &args, bool abandon) {
+        const QList<Task> tasks = findTasks(args);
+        const QDateTime when = now();
+        s.begin(abandon ? "Mark as Abandoned" : "Mark as Not Abandoned");
+        for (const auto &t : tasks) {
+            const Task current = s.task(t.id);
+            if (abandon ? !current.completed : current.abandoned)
+                completeTree(current, abandon, when, abandon);
+        }
+        commit();
+        QList<Task> after;
+        for (const auto &t : tasks)
+            after.append(s.task(t.id));
+        QJsonObject out = collection("tasks", taskArray(after));
+        out["task"] = out["tasks"].toArray().first();
+        return out;
+    }
+    QJsonObject abandonTask(const QJsonObject &args) { return setAbandoned(args, true); }
+    QJsonObject unabandonTask(const QJsonObject &args) { return setAbandoned(args, false); }
+
     // ----- tags
 
     QJsonObject setPaused(const QJsonObject &args, bool paused) {
@@ -1532,7 +1559,12 @@ const QList<Command> &commands() {
         c << Command{"complete_task",
                      "Mark tasks done. A repeating task keeps a completed copy and advances to its next occurrence, so do not retry blindly.",
                      taskIds, {}, &I::completeTask};
-        c << Command{"uncomplete_task", "Mark tasks not done.", taskIds, {}, &I::uncompleteTask};
+        c << Command{"uncomplete_task", "Mark tasks not done. Also reopens abandoned tasks.", taskIds, {}, &I::uncompleteTask};
+        c << Command{"abandon_task",
+                     "Close tasks without doing them (\"won't do\"). An abandoned task is never counted as done. A repeating task keeps an "
+                     "abandoned copy and advances to its next occurrence without counting toward an end-after-N rule, so do not retry blindly.",
+                     taskIds, {}, &I::abandonTask};
+        c << Command{"unabandon_task", "Reopen abandoned tasks. Tasks that were completed are left as they are.", taskIds, {}, &I::unabandonTask};
         c << Command{"list_alarms", "List a task's alarms.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::listAlarms};
         c << Command{"add_alarm",
                      "Add an alarm to a task (at most 10). relative: offset_seconds before (negative) the due moment; "
