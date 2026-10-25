@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.0.3 (unreleased)
+## 1.0.3 (2026-10-25)
 
+- My Day's header fits at any window width: the "of tasks · left in work day"
+  line now sits under the title, so Wrap up day is never cut off.
 - `fairfax import` in the terminal now takes a backup first, the way Settings
   does, and prints the backup's name. To go back, restore it in Settings >
   Backups (Ctrl+Z can't reach an import made from the terminal). A file that
