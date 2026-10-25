@@ -60,14 +60,34 @@ branch. Use `main`.
 Fairfax only reads the files that differ between the last commit it synced and the remote head.
 A change that is not in a commit is invisible to it.
 
-**Merging is per record.** For each file, Fairfax compares the file's `modified` with its local
-copy's `modified`.
+**Merging is per record, and per field.** Fairfax compares each changed file with its local copy
+of the record, and with the base: the file as it was when Fairfax last synced it, the last version
+both sides agreed on. The record is merged three ways, field by field:
 
-- The larger `modified` wins, and the whole record is replaced. There is no field-level merge.
-- If both are equal and the content differs, the file whose serialized text sorts higher (bytewise)
-  wins. Both machines pick the same side.
+- A field changed only in the file (its value differs from the base) is taken from the file. A
+  field changed only locally keeps the local value. A field both sides changed, to different values,
+  goes to the side with the larger `modified` (if those are equal, the side whose serialized
+  file text sorts higher, bytewise; both machines pick the same side).
+- `tag_uids` and `location_uids` merge as sets: what either side added is kept, what either side
+  removed is removed. `ext` merges the same way per writer key (`ext.acme-sync` is one unit).
+- A field the file leaves out is not a change; Fairfax keeps its value. (To reset a field, write
+  its default.)
+- `modified_by` follows the side that won; `modified` becomes the larger of the two. If the merge
+  produced a record neither side had, Fairfax writes it back in the same sync.
+- A tombstone against edits: the tombstone wins only if its `modified` is larger. Otherwise the
+  record stays live with the other side's edits.
+- With no base (the first time Fairfax sees a file, or a base it cannot read) the old rule applies:
+  the larger `modified` replaces the whole record, a tie going to the higher serialized text.
 - A record that Fairfax does not have yet is inserted.
 - A file that is deleted in git deletes the local record outright. Prefer a tombstone (below).
+
+The base is the file in the last commit Fairfax synced (git), or a copy of each file as last pulled
+or pushed that Fairfax keeps beside its local mirror (folder and WebDAV).
+
+Example. In Fairfax you complete a task. Before Fairfax syncs, another program pushes an edit of
+that task's `notes` with a newer `modified`. Whole-record "newest wins" would bring the task back
+not done. Fairfax sees `completed` and `completed_at` changed only locally and `notes` only in the
+file, so the task ends completed with the new notes, and `modified` is the newer of the two.
 
 **What a writer must do.**
 
@@ -75,8 +95,8 @@ copy's `modified`.
 2. Set `modified` to the current time, as an integer count of seconds since 1970-01-01 UTC.
 3. When changing a record, make `modified` strictly greater than the value it had. Use the larger
    of now and the old value plus one.
-4. Write all the fields the record needs (see the field tables). A missing field gets its
-   default, and Fairfax then writes the defaulted record back, so omissions are not preserved.
+4. Write all the fields the record needs (see the field tables). In a new record a missing field
+   gets its default. In a record Fairfax already has, a missing field is left as it was.
 5. Keep the fields you read and do not understand. Fairfax keeps `ext` (below) and drops every other key it
    does not know, so put your own data under `ext.<your-name>`.
 

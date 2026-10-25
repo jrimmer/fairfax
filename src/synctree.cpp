@@ -16,9 +16,11 @@
 #include "store.h"
 #include "views.h"
 
-// Conflict handling: records are merged one by one, the newer `modified`
-// wins (a tie with different content is broken by comparing the serialized
-// bytes, so both machines pick the same side). Store::begin(..., keepStamps)
+// Conflict handling: records are merged one by one, field by field against
+// the version both sides last agreed on, or, with no such version, the newer
+// `modified` wins as a whole (a tie with different content is broken by
+// comparing the serialized bytes, so both machines pick the same side).
+// Store::begin(..., keepStamps)
 // lets a merged-in remote record keep its own `modified`, so the stamp that
 // is written back is the true edit time and nothing ping-pongs between
 // machines.
@@ -226,6 +228,117 @@ bool resolvePending(Kind kind, QVariantMap &map, const Maps &x) {
     return changed;
 }
 
+// Three-way choice for one value: what changed on one side only is taken, and
+// a value both sides changed (to different things) goes to the winning side.
+QJsonValue threeWay(const QJsonValue &base, const QJsonValue &local, const QJsonValue &remote, bool remoteWins) {
+    if (local == remote)
+        return local;
+    const bool localChanged = local != base, remoteChanged = remote != base;
+    if (remoteChanged && !localChanged)
+        return remote;
+    if (localChanged && !remoteChanged)
+        return local;
+    return remoteWins ? remote : local;
+}
+
+QSet<QString> uidSet(const QJsonArray &uids) {
+    QSet<QString> set;
+    for (const auto &v : uids)
+        if (!v.toString().isEmpty())
+            set.insert(v.toString());
+    return set;
+}
+
+// Merges one record that changed on both sides since `base`, the file as it
+// was when the two last agreed. `remoteWins` says whose `modified` is the
+// larger (ties already broken). Only fields Fairfax knows are merged, as
+// `local` (what Fairfax exports now) lists them; a field the other writer's
+// file leaves out is not a change.
+//
+//  - a field changed on one side only is taken from that side, a field both
+//    changed goes to the winning side;
+//  - tag and location lists merge as sets, `ext` per writer key;
+//  - `modified_by` follows the winning side, `modified` is the larger;
+//  - a tombstone beats the other side's edits only if it is the newer.
+QJsonObject mergeRecords(const QJsonObject &base, const QJsonObject &local, const QJsonObject &remote, bool remoteWins) {
+    const qint64 localModified = local.value("modified").toVariant().toLongLong();
+    const qint64 remoteModified = remote.value("modified").toVariant().toLongLong();
+    const bool localDeleted = local.value("deleted").toBool(), remoteDeleted = remote.value("deleted").toBool();
+    if (localDeleted != remoteDeleted) {
+        const qint64 deletedAt = localDeleted ? localModified : remoteModified;
+        const qint64 editedAt = localDeleted ? remoteModified : localModified;
+        const bool tombstoneWins = deletedAt > editedAt;
+        return localDeleted == tombstoneWins ? local : remote;
+    }
+
+    QJsonObject out = local;
+    QStringList keys = local.keys();
+    for (const char *k : {"ext", "modified_by"})
+        if (!keys.contains(k))
+            keys << k;
+    for (const QString &key : std::as_const(keys)) {
+        if (key == "uid" || key == "modified")
+            continue;
+        if (key == "modified_by") {
+            const QJsonObject &winner = remoteWins ? remote : local;
+            if (winner.contains(key))
+                out.insert(key, winner.value(key));
+            else
+                out.remove(key);
+            continue;
+        }
+        if (!remote.contains(key))
+            continue;
+        if (key == "ext") {
+            const QJsonObject b = base.value(key).toObject(), l = local.value(key).toObject(), r = remote.value(key).toObject();
+            QSet<QString> writers;
+            for (const QJsonObject *o : {&b, &l, &r})
+                for (const QString &w : o->keys())
+                    writers.insert(w);
+            QJsonObject merged;
+            for (const QString &w : std::as_const(writers)) {
+                const QJsonValue v = threeWay(b.value(w), l.value(w), r.value(w), remoteWins);
+                if (!v.isUndefined())
+                    merged.insert(w, v);
+            }
+            if (merged.isEmpty())
+                out.remove(key);
+            else
+                out.insert(key, merged);
+            continue;
+        }
+        if (key == "tag_uids" || key == "location_uids") {
+            const QJsonArray la = local.value(key).toArray(), ra = remote.value(key).toArray();
+            const QSet<QString> b = uidSet(base.value(key).toArray()), l = uidSet(la), r = uidSet(ra);
+            QSet<QString> keep = l | r;
+            keep -= b - l;
+            keep -= b - r;
+            if (keep == l) {
+                out.insert(key, la);
+            } else if (keep == r) {
+                out.insert(key, ra);
+            } else {
+                QJsonArray merged;
+                for (const auto &v : la)
+                    if (keep.contains(v.toString()))
+                        merged.append(v);
+                for (const auto &v : ra)
+                    if (keep.contains(v.toString()) && !l.contains(v.toString()))
+                        merged.append(v);
+                out.insert(key, merged);
+            }
+            continue;
+        }
+        const QJsonValue v = threeWay(base.value(key), local.value(key), remote.value(key), remoteWins);
+        if (v.isUndefined())
+            out.remove(key);
+        else
+            out.insert(key, v);
+    }
+    out.insert("modified", qMax(localModified, remoteModified));
+    return out;
+}
+
 qint64 stampOf(const QDateTime &t) { return t.isValid() ? t.toSecsSinceEpoch() : 0; }
 
 
@@ -419,7 +532,7 @@ bool writeTree(const Store &store, const QString &directory, const QDateTime &no
 }
 
 int readTree(Store &store, const QString &directory, const QStringList &onlyPaths, const QStringList &removedPaths,
-             QString *error) {
+             QString *error, const QHash<QString, QByteArray> &bases) {
     Q_UNUSED(error);
     const QDir root(directory);
 
@@ -539,12 +652,22 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
             const qint64 localModified = local.value(in.uid).modified;
             const QVariantMap localMap = local.value(in.uid).map;
             const qint64 remoteModified = in.obj.value("modified").toVariant().toLongLong();
-            bool take = remoteModified > localModified;
-            if (remoteModified == localModified) {
-                const QByteArray local = bytesOf(toJson(Kind(k), localMap, x));
-                take = in.bytes > local;
+            const QJsonObject localObj = toJson(Kind(k), localMap, x);
+            const QByteArray localBytes = bytesOf(localObj);
+            const bool remoteWins = remoteModified > localModified || (remoteModified == localModified && in.bytes > localBytes);
+            // With the file as it was at the last sync, merge field by field.
+            const QJsonDocument baseDoc = QJsonDocument::fromJson(bases.value(QString("%1/%2.json").arg(Folders[k], in.uid)));
+            if (baseDoc.isObject()) {
+                Incoming merged = in;
+                merged.obj = mergeRecords(baseDoc.object(), localObj, in.obj, remoteWins);
+                if (bytesOf(merged.obj) != localBytes) {
+                    ids[k].insert(in.uid, existing);
+                    apply[k].append(merged);
+                }
+                continue;
             }
-            if (take) {
+            // Without one, the newer record replaces the other as a whole.
+            if (remoteWins) {
                 ids[k].insert(in.uid, existing);
                 apply[k].append(in);
             }
@@ -809,6 +932,24 @@ void saveState(const QString &file, const State &state) {
 
 bool isRecordFile(const QString &path) { return path != "Store.json" && !path.startsWith("attachment-files/"); }
 
+// The record files as they were when the remote and this machine last agreed
+// (what was last pulled or pushed), kept beside the mirror: the base of the
+// three-way merge.
+QString baseFile(const QString &mirror, const QString &path) { return mirror + ".base/" + path; }
+
+QByteArray readFileBytes(const QString &file) {
+    QFile f(file);
+    return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+}
+
+void writeBase(const QString &mirror, const QString &path, const QByteArray &bytes) {
+    const QString file = baseFile(mirror, path);
+    QDir().mkpath(QFileInfo(file).absolutePath());
+    QSaveFile f(file);
+    if (f.open(QIODevice::WriteOnly) && f.write(bytes) == bytes.size())
+        f.commit();
+}
+
 }  // namespace
 
 Outcome sync(Store &store, Remote &remote, const QString &mirror, FirstSync first, const QDateTime &now) {
@@ -838,6 +979,7 @@ Outcome sync(Store &store, Remote &remote, const QString &mirror, FirstSync firs
 
     // Pull what changed on the remote since the last sync.
     QStringList changed, removed;
+    QHash<QString, QByteArray> bases, pulled;
     if (!(isFirst && first == FirstSync::ReplaceServer)) {
         for (auto it = listing.cbegin(); it != listing.cend(); ++it) {
             const QString &path = it.key();
@@ -847,6 +989,21 @@ Outcome sync(Store &store, Remote &remote, const QString &mirror, FirstSync firs
             QByteArray bytes;
             if (!remote.get(path, &bytes, &out.error))
                 return out;
+            if (isRecordFile(path)) {
+                // The base is the file as last synced. Without a saved copy (a
+                // mirror from before there were any) the mirror's own file will
+                // do, if it is exactly what the state says was last synced.
+                QByteArray base = readFileBytes(baseFile(mirror, path));
+                if (base.isEmpty()) {
+                    const QByteArray old = readFileBytes(root.filePath(path));
+                    const auto last = state.constFind(path);
+                    if (last != state.constEnd() && !old.isEmpty() && last->hash == hashOf(old))
+                        base = old;
+                }
+                if (!base.isEmpty())
+                    bases.insert(path, base);
+                pulled.insert(path, bytes);
+            }
             QDir().mkpath(QFileInfo(root.filePath(path)).absolutePath());
             QSaveFile f(root.filePath(path));
             if (!f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size() || !f.commit()) {
@@ -863,13 +1020,18 @@ Outcome sync(Store &store, Remote &remote, const QString &mirror, FirstSync firs
                 continue;
             state.remove(path);
             QFile::remove(root.filePath(path));
-            if (isRecordFile(path))
+            if (isRecordFile(path)) {
                 removed << path;
+                QFile::remove(baseFile(mirror, path));
+            }
         }
         if (isFirst && first == FirstSync::ReplaceLocal)
             wipeLocal(store);
         if (!changed.isEmpty() || !removed.isEmpty())
-            out.changedLocally = readTree(store, mirror, changed.isEmpty() ? QStringList{"-"} : changed, removed, &out.error);
+            out.changedLocally = readTree(store, mirror, changed.isEmpty() ? QStringList{"-"} : changed, removed, &out.error, bases);
+        // What was pulled is now the last version the remote is known to hold.
+        for (auto it = pulled.cbegin(); it != pulled.cend(); ++it)
+            writeBase(mirror, it.key(), it.value());
     }
 
     QString writeError;
@@ -907,6 +1069,8 @@ Outcome sync(Store &store, Remote &remote, const QString &mirror, FirstSync firs
             return out;
         }
         pushedNow.insert(path);
+        if (isRecordFile(path))
+            writeBase(mirror, path, bytes);
         state.insert(path, {QString(), hashOf(bytes)});
         ++out.pushed;
     }
@@ -927,6 +1091,7 @@ Outcome sync(Store &store, Remote &remote, const QString &mirror, FirstSync firs
             return out;
         }
         state.remove(path);
+        QFile::remove(baseFile(mirror, path));
         ++out.removed;
     }
 

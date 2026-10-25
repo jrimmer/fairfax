@@ -145,6 +145,120 @@ QStringList importAndCompare(const QMap<QString, QByteArray> &samples, const QMa
 class SyncFormatTest : public QObject {
     Q_OBJECT
 
+    // The base is T0, a Fairfax edit comes at T0 + 5 and another writer's at
+    // T0 + 10 unless a test says otherwise, so which side is newer is never
+    // a matter of timing.
+    static constexpr qint64 T0 = 1700000000;
+
+    // Fairfax (a store syncing through git) and another writer's clone of the
+    // same repository, sharing one list and one task "Base".
+    struct Rig {
+        QTemporaryDir dir;
+        QString bare, agent, list = "20000000-0000-4000-8000-0000000000C1", task = "70000000-0000-4000-8000-0000000000C1";
+        Store store;
+        std::unique_ptr<GitSync> sync;
+        qint64 listId = 0;
+
+        QString taskFile() const { return agent + "/tasks/" + task + ".json"; }
+    };
+
+    static QJsonObject baseTask(const QString &list, const QString &uid) {
+        return {{"uid", uid}, {"title", "Base"}, {"notes", "base notes"}, {"list_uid", list}, {"created", T0}, {"modified", T0}};
+    }
+
+    // `synced` leaves Fairfax synced at T0; otherwise the repository holds the
+    // task but Fairfax has never seen it.
+    std::unique_ptr<Rig> rig(bool synced = true) {
+        auto r = std::make_unique<Rig>();
+        [&] { QVERIFY(r->dir.isValid()); }();
+        r->bare = r->dir.filePath("remote.git");
+        r->agent = r->dir.filePath("agent");
+        [&] {
+            QVERIFY(git(r->dir.path(), {"init", "--bare", "-q", "-b", "main", r->bare}));
+            QVERIFY(git(r->dir.path(), {"clone", "-q", r->bare, r->agent}));
+            QVERIFY(git(r->agent, {"checkout", "-q", "-B", "main"}));
+        }();
+        writeFile(r->agent + "/lists/" + r->list + ".json",
+                  QJsonDocument(QJsonObject{{"name", "L"}, {"modified", T0}}).toJson(QJsonDocument::Indented));
+        writeFile(r->taskFile(), QJsonDocument(baseTask(r->list, r->task)).toJson(QJsonDocument::Indented));
+        [&] {
+            QVERIFY(git(r->agent, {"add", "-A"}));
+            QVERIFY(git(r->agent, {"commit", "-q", "-m", "Base"}));
+            QVERIFY(git(r->agent, {"push", "-q", "origin", "main"}));
+        }();
+        QString err;
+        [&] { QVERIFY2(r->store.open(r->dir.filePath("fairfax.db"), &err), qPrintable(err)); }();
+        if (!synced) {
+            // Fairfax already has the task under the same uid, from somewhere else.
+            TaskList l;
+            l.id = r->store.nextId("lists");
+            l.uid = r->list;
+            l.name = "L";
+            l.modified = QDateTime::fromSecsSinceEpoch(T0);
+            Task t;
+            t.id = r->store.nextId("tasks");
+            t.uid = r->task;
+            t.listId = l.id;
+            t.title = "Base";
+            t.notes = "base notes";
+            t.modified = QDateTime::fromSecsSinceEpoch(T0);
+            r->store.begin("seed", false, true);
+            r->store.putList(l);
+            r->store.putTask(t);
+            r->store.commit();
+            r->listId = l.id;
+        }
+        r->sync = std::make_unique<GitSync>(&r->store, r->dir.filePath("wc"));
+        if (synced) {
+            r->sync->setRemote(r->bare);
+            [&] { QTRY_VERIFY_WITH_TIMEOUT(!r->sync->busy(), 30000); }();
+            for (const auto &t : r->store.tasks())
+                if (t.uid == r->task)
+                    return r;
+            [&] { QFAIL("the task did not arrive"); }();
+        }
+        return r;
+    }
+
+    static Task fairfaxTask(Rig &r) {
+        for (const auto &t : r.store.tasks())
+            if (t.uid == r.task)
+                return t;
+        return Task();
+    }
+
+    static void editFairfax(Rig &r, const std::function<void(Task &)> &edit, qint64 modified) {
+        Task t = fairfaxTask(r);
+        edit(t);
+        t.modified = QDateTime::fromSecsSinceEpoch(modified);
+        r.store.begin("edit", false, true);
+        r.store.putTask(t);
+        r.store.commit();
+    }
+
+    // Another writer: start from the newest files, change the record, push.
+    static void editAgent(Rig &r, const std::function<void(QJsonObject &)> &edit, qint64 modified) {
+        [&] {
+            QVERIFY(git(r.agent, {"fetch", "-q", "origin"}));
+            QVERIFY(git(r.agent, {"reset", "-q", "--hard", "origin/main"}));
+        }();
+        QJsonObject o = parse(readFile(r.taskFile()));
+        edit(o);
+        o["modified"] = modified;
+        writeFile(r.taskFile(), QJsonDocument(o).toJson(QJsonDocument::Indented));
+        [&] {
+            QVERIFY(git(r.agent, {"commit", "-q", "-am", "Change task"}));
+            QVERIFY(git(r.agent, {"push", "-q", "origin", "main"}));
+        }();
+    }
+
+    // The task file as the repository now holds it.
+    static QJsonObject repoTask(Rig &r) {
+        git(r.agent, {"fetch", "-q", "origin"});
+        git(r.agent, {"reset", "-q", "--hard", "origin/main"});
+        return parse(readFile(r.taskFile()));
+    }
+
     static bool git(const QString &dir, const QStringList &args) {
         QProcess p;
         p.setWorkingDirectory(dir);
@@ -292,6 +406,161 @@ private slots:
 
         change(kNow + 10, [](QJsonObject &o) { o["deleted"] = true; });
         QCOMPARE(titleOf(plain), QString("<none>"));
+    }
+
+    void gitCompletionRaceKeepsTheNotesEdit_data() {
+        QTest::addColumn<qint64>("localAt");
+        QTest::addColumn<qint64>("remoteAt");
+        QTest::newRow("remote newer") << T0 + 5 << T0 + 10;
+        QTest::newRow("remote older") << T0 + 10 << T0 + 5;
+    }
+    void gitCompletionRaceKeepsTheNotesEdit() {
+        QFETCH(qint64, localAt);
+        QFETCH(qint64, remoteAt);
+        auto r = rig();
+        QVERIFY(r);
+        editFairfax(*r, [&](Task &t) { t.completed = true; t.completedAt = QDateTime::fromSecsSinceEpoch(localAt); }, localAt);
+        editAgent(*r, [](QJsonObject &o) { o["notes"] = "edited by another writer"; }, remoteAt);
+        QVERIFY(r->sync->syncBlocking());
+        const Task t = fairfaxTask(*r);
+        QVERIFY(t.completed);
+        QCOMPARE(t.notes, QString("edited by another writer"));
+        QCOMPARE(t.modified.toSecsSinceEpoch(), qMax(localAt, remoteAt));
+        const QJsonObject o = repoTask(*r);
+        QVERIFY(o.value("completed").toBool());
+        QCOMPARE(o.value("notes").toString(), QString("edited by another writer"));
+    }
+
+    void gitEditsToDifferentFieldsAreBothKept() {
+        auto r = rig();
+        QVERIFY(r);
+        editFairfax(*r, [](Task &t) { t.title = "Local title"; t.starred = true; }, T0 + 5);
+        editAgent(*r, [](QJsonObject &o) { o["priority"] = 3; }, T0 + 10);
+        QVERIFY(r->sync->syncBlocking());
+        const Task t = fairfaxTask(*r);
+        QCOMPARE(t.title, QString("Local title"));
+        QVERIFY(t.starred);
+        QCOMPARE(t.priority, 3);
+        QCOMPARE(repoTask(*r).value("title").toString(), QString("Local title"));
+        QCOMPARE(repoTask(*r).value("priority").toInt(), 3);
+    }
+
+    void gitTheNewerSideWinsAFieldBothChanged_data() {
+        QTest::addColumn<qint64>("localAt");
+        QTest::addColumn<qint64>("remoteAt");
+        QTest::addColumn<QString>("title");
+        QTest::newRow("remote newer") << T0 + 5 << T0 + 10 << "Remote title";
+        QTest::newRow("local newer") << T0 + 10 << T0 + 5 << "Local title";
+    }
+    void gitTheNewerSideWinsAFieldBothChanged() {
+        QFETCH(qint64, localAt);
+        QFETCH(qint64, remoteAt);
+        QFETCH(QString, title);
+        auto r = rig();
+        QVERIFY(r);
+        editFairfax(*r, [](Task &t) { t.title = "Local title"; t.notes = "local notes"; }, localAt);
+        editAgent(*r, [](QJsonObject &o) { o["title"] = "Remote title"; }, remoteAt);
+        QVERIFY(r->sync->syncBlocking());
+        QCOMPARE(fairfaxTask(*r).title, title);
+        QCOMPARE(fairfaxTask(*r).notes, QString("local notes"));
+        QCOMPARE(repoTask(*r).value("title").toString(), title);
+    }
+
+    void gitTagSetsMergeAddsAndRemoves() {
+        auto r = rig();
+        QVERIFY(r);
+        const QString tagA = "50000000-0000-4000-8000-0000000000C1", tagB = "50000000-0000-4000-8000-0000000000C2",
+                      tagC = "50000000-0000-4000-8000-0000000000C3";
+        // Three tags, and the task carries A and B.
+        QVERIFY(git(r->agent, {"fetch", "-q", "origin"}));
+        QVERIFY(git(r->agent, {"reset", "-q", "--hard", "origin/main"}));
+        for (const auto &tag : {tagA, tagB, tagC})
+            writeFile(r->agent + "/tags/" + tag + ".json",
+                      QJsonDocument(QJsonObject{{"name", tag.right(2)}, {"modified", T0}}).toJson(QJsonDocument::Indented));
+        QJsonObject withTags = parse(readFile(r->taskFile()));
+        withTags["tag_uids"] = QJsonArray{tagA, tagB};
+        withTags["modified"] = T0 + 2;
+        writeFile(r->taskFile(), QJsonDocument(withTags).toJson(QJsonDocument::Indented));
+        QVERIFY(git(r->agent, {"add", "-A"}));
+        QVERIFY(git(r->agent, {"commit", "-q", "-m", "Tags"}));
+        QVERIFY(git(r->agent, {"push", "-q", "origin", "main"}));
+        QVERIFY(r->sync->syncBlocking());
+        QCOMPARE(fairfaxTask(*r).tagIds.size(), 2);
+        // Fairfax adds C; the other writer removes A.
+        QList<qint64> all;
+        for (auto it = r->store.tags().cbegin(); it != r->store.tags().cend(); ++it)
+            all << it->id;
+        editFairfax(*r, [&](Task &t) { t.tagIds = all; }, T0 + 5);
+        editAgent(*r, [&](QJsonObject &o) { o["tag_uids"] = QJsonArray{tagB}; }, T0 + 10);
+        QVERIFY(r->sync->syncBlocking());
+        QSet<QString> got;
+        for (qint64 id : fairfaxTask(*r).tagIds)
+            got.insert(r->store.tag(id).uid);
+        QCOMPARE(got, (QSet<QString>{tagB, tagC}));
+        QSet<QString> inRepo;
+        for (const auto &v : repoTask(*r).value("tag_uids").toArray())
+            inRepo.insert(v.toString());
+        QCOMPARE(inRepo, got);
+    }
+
+    void gitTombstoneAgainstEdit_data() {
+        QTest::addColumn<bool>("fairfaxDeletes");
+        QTest::addColumn<qint64>("deleteAt");
+        QTest::addColumn<qint64>("editAt");
+        QTest::addColumn<bool>("endsDeleted");
+        QTest::newRow("remote delete newer than local edit") << false << T0 + 10 << T0 + 5 << true;
+        QTest::newRow("remote delete older than local edit") << false << T0 + 5 << T0 + 10 << false;
+        QTest::newRow("local delete newer than remote edit") << true << T0 + 10 << T0 + 5 << true;
+        QTest::newRow("local delete older than remote edit") << true << T0 + 5 << T0 + 10 << false;
+    }
+    void gitTombstoneAgainstEdit() {
+        QFETCH(bool, fairfaxDeletes);
+        QFETCH(qint64, deleteAt);
+        QFETCH(qint64, editAt);
+        QFETCH(bool, endsDeleted);
+        auto r = rig();
+        QVERIFY(r);
+        if (fairfaxDeletes) {
+            editFairfax(*r, [](Task &t) { t.deleted = true; }, deleteAt);
+            editAgent(*r, [](QJsonObject &o) { o["notes"] = "edited"; }, editAt);
+        } else {
+            editFairfax(*r, [](Task &t) { t.notes = "edited"; }, editAt);
+            editAgent(*r, [](QJsonObject &o) { o["deleted"] = true; }, deleteAt);
+        }
+        QVERIFY(r->sync->syncBlocking());
+        QCOMPARE(fairfaxTask(*r).deleted, endsDeleted);
+        // (a tombstone this old is pruned from the files on write)
+        QVERIFY(repoTask(*r).value("deleted").toBool() == endsDeleted || (endsDeleted && repoTask(*r).isEmpty()));
+        if (!endsDeleted)
+            QCOMPARE(fairfaxTask(*r).notes, QString("edited"));
+    }
+
+    void gitWithoutABaseTheWholeRecordRuleApplies() {
+        auto r = rig(false);  // never synced: no commit to take a base from
+        QVERIFY(r);
+        editFairfax(*r, [](Task &t) { t.title = "Local title"; }, T0 + 5);
+        editAgent(*r, [](QJsonObject &o) { o["priority"] = 3; }, T0 + 10);
+        r->sync->setRemote(r->bare);
+        QTRY_VERIFY_WITH_TIMEOUT(!r->sync->busy(), 30000);
+        QCOMPARE(fairfaxTask(*r).priority, 3);
+        QCOMPARE(fairfaxTask(*r).title, QString("Base"));
+    }
+
+    void gitFilesWithoutTheNewFieldsMerge() {
+        auto r = rig();
+        QVERIFY(r);
+        editFairfax(*r, [](Task &t) { t.priority = Priority::High; }, T0 + 5);
+        // A writer that leaves out every field it does not know.
+        git(r->agent, {"fetch", "-q", "origin"});
+        git(r->agent, {"reset", "-q", "--hard", "origin/main"});
+        writeFile(r->taskFile(), QJsonDocument(QJsonObject{{"title", "Edited by a small tool"}, {"list_uid", r->list}, {"modified", T0 + 10}}).toJson(QJsonDocument::Indented));
+        QVERIFY(git(r->agent, {"commit", "-q", "-am", "Small tool"}));
+        QVERIFY(git(r->agent, {"push", "-q", "origin", "main"}));
+        QVERIFY(r->sync->syncBlocking());
+        const Task t = fairfaxTask(*r);
+        QCOMPARE(t.title, QString("Edited by a small tool"));
+        QCOMPARE(t.priority, int(Priority::High));
+        QCOMPARE(t.notes, QString("base notes"));
     }
 
     // A writer may commit a task before its list and tag: the task keeps

@@ -48,6 +48,7 @@ void TreeProvider::setStatus(const QString &status) {
 
 void TreeProvider::resetState() {
     QDir(mirror()).removeRecursively();
+    QDir(mirror() + ".base").removeRecursively();
     QFile::remove(mirror() + ".state.json");
     m_store->setSetting(m_key + ".lastSync", QString());
     m_needsChoice = false;

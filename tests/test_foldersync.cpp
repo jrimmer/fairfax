@@ -351,6 +351,7 @@ private slots:
             QCOMPARE(readJson(b.mirror + "/" + it.key() + "/" + it.value() + ".json").value("ext").toObject(), ext);
     }
 
+private:
     // The other writer's files name records that have not been committed yet.
     static void writeRefFiles(const QString &folder, qint64 base, bool dependencies) {
         auto put = [&](const QString &kind, const QString &uid, QJsonObject o) {
@@ -372,6 +373,7 @@ private slots:
         put("tasks", "K9", {{"title", "Late"}, {"list_uid", "L1"}});
     }
 
+private slots:
     void referencesToMissingRecordsAreKeptUntilTheyArrive() {
         const QString folder = m_dir.filePath("refs1"); QDir().mkpath(folder);
         SyncTree::FolderRemote remote(folder);
@@ -455,6 +457,294 @@ private slots:
         QVERIFY(syncs(*a.store, remote, a.mirror));
         QCOMPARE(a.store->task(id).listId, other);
         QCOMPARE(readJson(folder + "/tasks/K1.json").value("list_uid").toString(), a.store->list(other).uid);
+    }
+
+private:
+    // ---- three-way merge ------------------------------------------------
+    // Edits are made with explicit `modified` stamps so which side is newer is
+    // never a matter of timing: the base is T0, the local edit comes at T0 + 5
+    // unless a test says otherwise, and the other writer's at T0 + 10.
+
+    static constexpr qint64 T0 = 1700000000;
+
+    static qint64 addTaskAt(Store &s, const QString &title, qint64 list, qint64 modified, const QList<qint64> &tags = {}) {
+        Task t;
+        t.id = s.nextId("tasks");
+        t.listId = list;
+        t.title = title;
+        t.notes = "base notes";
+        t.tagIds = tags;
+        t.modified = QDateTime::fromSecsSinceEpoch(modified);
+        s.begin("add", false, true);
+        s.putTask(t);
+        s.commit();
+        return t.id;
+    }
+
+    static qint64 addTagAt(Store &s, const QString &name) {
+        Tag t;
+        t.id = s.nextId("tags");
+        t.name = name;
+        t.modified = QDateTime::fromSecsSinceEpoch(T0);
+        s.begin("add", false, true);
+        s.putTag(t);
+        s.commit();
+        return t.id;
+    }
+
+    static void editLocal(Store &s, qint64 id, const std::function<void(Task &)> &edit, qint64 modified) {
+        Task t = s.task(id);
+        edit(t);
+        t.modified = QDateTime::fromSecsSinceEpoch(modified);
+        s.begin("edit", false, true);
+        s.putTask(t);
+        s.commit();
+    }
+
+    // What another program does: change the file in the shared folder.
+    static void editFile(const QString &file, const std::function<void(QJsonObject &)> &edit, qint64 modified) {
+        QJsonObject o = readJson(file);
+        edit(o);
+        o["modified"] = modified;
+        QTest::qSleep(20);  // the folder provider spots a change by size and time
+        writeJson(file, o);
+    }
+
+    // One machine, one shared task "Base" (notes "base notes"), synced at T0.
+    struct Shared {
+        QString folder;
+        std::unique_ptr<SyncTree::FolderRemote> remote;
+        Machine a;
+        qint64 list = 0, task = 0;
+        QString file;
+    };
+    std::unique_ptr<Shared> shared(const QString &name) {
+        auto sh = std::make_unique<Shared>();
+        sh->folder = m_dir.filePath(name);
+        QDir().mkpath(sh->folder);
+        sh->remote = std::make_unique<SyncTree::FolderRemote>(sh->folder);
+        sh->a = machine("a");
+        sh->list = addList(*sh->a.store, "L");
+        sh->task = addTaskAt(*sh->a.store, "Base", sh->list, T0);
+        sh->file = taskFile(sh->folder, *sh->a.store, sh->task);
+        return sh;
+    }
+
+private slots:
+    void completionRaceKeepsTheNotesEdit_data() {
+        QTest::addColumn<qint64>("localAt");
+        QTest::addColumn<qint64>("remoteAt");
+        QTest::newRow("remote newer") << T0 + 5 << T0 + 10;
+        QTest::newRow("remote older") << T0 + 10 << T0 + 5;
+    }
+    void completionRaceKeepsTheNotesEdit() {
+        QFETCH(qint64, localAt);
+        QFETCH(qint64, remoteAt);
+        auto sh = shared(QString("race%1").arg(++m_n));
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        // The user completes the task; before Fairfax syncs, another writer
+        // edits its notes.
+        editLocal(*sh->a.store, sh->task, [&](Task &t) { t.completed = true; t.completedAt = QDateTime::fromSecsSinceEpoch(localAt); }, localAt);
+        editFile(sh->file, [](QJsonObject &o) { o["notes"] = "edited by another writer"; }, remoteAt);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        const Task t = sh->a.store->task(sh->task);
+        QVERIFY(t.completed);
+        QCOMPARE(t.completedAt.toSecsSinceEpoch(), localAt);
+        QCOMPARE(t.notes, QString("edited by another writer"));
+        QCOMPARE(t.modified.toSecsSinceEpoch(), qMax(localAt, remoteAt));
+        // The merged record went back to the folder, and to a second machine.
+        const QJsonObject o = readJson(sh->file);
+        QVERIFY(o.value("completed").toBool());
+        QCOMPARE(o.value("notes").toString(), QString("edited by another writer"));
+        QCOMPARE(o.value("modified").toInteger(), qMax(localAt, remoteAt));
+        Machine b = machine("b");
+        QVERIFY(syncs(*b.store, *sh->remote, b.mirror));
+        const Task bt = b.store->task(find(*b.store, "Base"));
+        QVERIFY(bt.completed);
+        QCOMPARE(bt.notes, QString("edited by another writer"));
+    }
+
+    void editsToDifferentFieldsAreBothKept() {
+        auto sh = shared("fields1");
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.title = "Local title"; t.starred = true; }, T0 + 5);
+        editFile(sh->file, [](QJsonObject &o) { o["priority"] = 3; o["due_date"] = "2030-01-02"; }, T0 + 10);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        const Task t = sh->a.store->task(sh->task);
+        QCOMPARE(t.title, QString("Local title"));
+        QVERIFY(t.starred);
+        QCOMPARE(t.priority, 3);
+        QCOMPARE(t.dueDate, QDate(2030, 1, 2));
+        QCOMPARE(readJson(sh->file).value("title").toString(), QString("Local title"));
+        QCOMPARE(readJson(sh->file).value("priority").toInt(), 3);
+    }
+
+    void theNewerSideWinsAFieldBothChanged_data() {
+        QTest::addColumn<qint64>("localAt");
+        QTest::addColumn<qint64>("remoteAt");
+        QTest::addColumn<QString>("title");
+        QTest::newRow("remote newer") << T0 + 5 << T0 + 10 << "Remote title";
+        QTest::newRow("local newer") << T0 + 10 << T0 + 5 << "Local title";
+    }
+    void theNewerSideWinsAFieldBothChanged() {
+        QFETCH(qint64, localAt);
+        QFETCH(qint64, remoteAt);
+        QFETCH(QString, title);
+        auto sh = shared(QString("same%1").arg(++m_n));
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.title = "Local title"; t.notes = "local notes"; }, localAt);
+        editFile(sh->file, [](QJsonObject &o) { o["title"] = "Remote title"; }, remoteAt);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        QCOMPARE(sh->a.store->task(sh->task).title, title);
+        QCOMPARE(readJson(sh->file).value("title").toString(), title);
+        // The notes only the local side changed survive either way.
+        QCOMPARE(sh->a.store->task(sh->task).notes, QString("local notes"));
+    }
+
+    void tagSetsMergeAddsAndRemoves() {
+        const QString folder = m_dir.filePath("tags1"); QDir().mkpath(folder);
+        SyncTree::FolderRemote remote(folder);
+        Machine a = machine("a");
+        const qint64 list = addList(*a.store, "L");
+        const qint64 t1 = addTagAt(*a.store, "one"), t2 = addTagAt(*a.store, "two"), t3 = addTagAt(*a.store, "three");
+        const qint64 id = addTaskAt(*a.store, "Base", list, T0, {t1, t2});
+        const QString file = taskFile(folder, *a.store, id);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        // Here: add three. There: remove one (and add nothing). Result: two, three.
+        editLocal(*a.store, id, [&](Task &t) { t.tagIds = {t1, t2, t3}; }, T0 + 5);
+        editFile(file, [&](QJsonObject &o) { o["tag_uids"] = QJsonArray{a.store->tag(t2).uid}; }, T0 + 10);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QSet<QString> got;
+        for (qint64 tag : a.store->task(id).tagIds)
+            got.insert(a.store->tag(tag).uid);
+        QCOMPARE(got, (QSet<QString>{a.store->tag(t2).uid, a.store->tag(t3).uid}));
+        QSet<QString> inFile;
+        for (const auto &v : readJson(file).value("tag_uids").toArray())
+            inFile.insert(v.toString());
+        QCOMPARE(inFile, got);
+    }
+
+    void tombstoneAgainstEdit_data() {
+        QTest::addColumn<bool>("localDeletes");
+        QTest::addColumn<qint64>("deleteAt");
+        QTest::addColumn<qint64>("editAt");
+        QTest::addColumn<bool>("endsDeleted");
+        QTest::newRow("remote delete newer than local edit") << false << T0 + 10 << T0 + 5 << true;
+        QTest::newRow("remote delete older than local edit") << false << T0 + 5 << T0 + 10 << false;
+        QTest::newRow("local delete newer than remote edit") << true << T0 + 10 << T0 + 5 << true;
+        QTest::newRow("local delete older than remote edit") << true << T0 + 5 << T0 + 10 << false;
+    }
+    void tombstoneAgainstEdit() {
+        QFETCH(bool, localDeletes);
+        QFETCH(qint64, deleteAt);
+        QFETCH(qint64, editAt);
+        QFETCH(bool, endsDeleted);
+        auto sh = shared(QString("tomb%1").arg(++m_n));
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        if (localDeletes) {
+            editLocal(*sh->a.store, sh->task, [](Task &t) { t.deleted = true; }, deleteAt);
+            editFile(sh->file, [](QJsonObject &o) { o["notes"] = "edited"; }, editAt);
+        } else {
+            editLocal(*sh->a.store, sh->task, [](Task &t) { t.notes = "edited"; }, editAt);
+            editFile(sh->file, [](QJsonObject &o) { o["deleted"] = true; }, deleteAt);
+        }
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        QCOMPARE(sh->a.store->task(sh->task).deleted, endsDeleted);
+        // (a tombstone this old is pruned from the files on write)
+        QVERIFY(readJson(sh->file).value("deleted").toBool() == endsDeleted || (endsDeleted && readJson(sh->file).isEmpty()));
+        if (!endsDeleted)
+            QCOMPARE(sh->a.store->task(sh->task).notes, QString("edited"));
+    }
+
+    void withoutABaseTheWholeRecordRuleApplies_data() {
+        QTest::addColumn<bool>("corruptInstead");
+        QTest::newRow("base missing") << false;
+        QTest::newRow("base unreadable") << true;
+    }
+    void withoutABaseTheWholeRecordRuleApplies() {
+        QFETCH(bool, corruptInstead);
+        auto sh = shared(QString("nobase%1").arg(++m_n));
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        const QString uid = sh->a.store->task(sh->task).uid;
+        const QString baseFile = sh->a.mirror + ".base/tasks/" + uid + ".json";
+        QVERIFY(QFile::exists(baseFile));
+        if (corruptInstead) {
+            QFile f(baseFile);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("not json");
+        } else {
+            QVERIFY(QDir(sh->a.mirror + ".base").removeRecursively());
+        }
+        // The mirror copy is no use as a base either once it differs from what
+        // was last synced; drop it so nothing can stand in.
+        QVERIFY(QFile::remove(sh->a.mirror + "/tasks/" + uid + ".json"));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.title = "Local title"; }, T0 + 5);
+        editFile(sh->file, [](QJsonObject &o) { o["priority"] = 3; }, T0 + 10);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        // Today's rule: the newer record replaces the other as a whole.
+        const Task t = sh->a.store->task(sh->task);
+        QCOMPARE(t.priority, 3);
+        QCOMPARE(t.title, QString("Base"));
+    }
+
+    void filesWithoutTheNewFieldsMerge() {
+        // Files written before ext and modified_by existed, and a writer
+        // that leaves out fields it does not know.
+        auto sh = shared("old1");
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.priority = Priority::High; t.starred = true; }, T0 + 5);
+        QJsonObject minimal{{"title", "Edited by a small tool"}, {"list_uid", sh->a.store->list(sh->list).uid}, {"modified", T0 + 10}};
+        writeJson(sh->file, minimal);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        const Task t = sh->a.store->task(sh->task);
+        QCOMPARE(t.title, QString("Edited by a small tool"));
+        // Fields the small tool never mentioned are left as they were.
+        QCOMPARE(t.priority, int(Priority::High));
+        QVERIFY(t.starred);
+        QCOMPARE(t.notes, QString("base notes"));
+        QCOMPARE(readJson(sh->file).value("priority").toInt(), int(Priority::High));
+    }
+
+    void extMergesPerWriter() {
+        auto sh = shared("extmerge1");
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        // Two writers keep data on the task; each changes its own part.
+        editFile(sh->file, [](QJsonObject &o) { o["ext"] = QJsonObject{{"alpha", QJsonObject{{"n", 1}}}, {"beta", QJsonObject{{"n", 1}}}}; }, T0 + 2);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.ext = R"({"alpha":{"n":2},"beta":{"n":1}})"; }, T0 + 5);
+        editFile(sh->file, [](QJsonObject &o) { o["ext"] = QJsonObject{{"alpha", QJsonObject{{"n", 1}}}, {"beta", QJsonObject{{"n", 9}}}, {"gamma", 1}}; }, T0 + 10);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        QCOMPARE(sh->a.store->task(sh->task).ext, QString(R"({"alpha":{"n":2},"beta":{"n":9},"gamma":1})"));
+    }
+
+    void modifiedByFollowsTheWinningSide() {
+        auto sh = shared("by2");
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.title = "Local"; t.modifiedBy = "fairfax@here"; }, T0 + 5);
+        editFile(sh->file, [](QJsonObject &o) { o["notes"] = "Remote"; o["modified_by"] = "acme-sync"; }, T0 + 10);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        QCOMPARE(sh->a.store->task(sh->task).modifiedBy, QString("acme-sync"));
+        QCOMPARE(sh->a.store->task(sh->task).title, QString("Local"));
+        // And the other way round.
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.title = "Local again"; t.modifiedBy = "fairfax@here"; }, T0 + 30);
+        editFile(sh->file, [](QJsonObject &o) { o["notes"] = "Remote again"; o["modified_by"] = "acme-sync"; }, T0 + 20);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        QCOMPARE(sh->a.store->task(sh->task).modifiedBy, QString("fairfax@here"));
+        QCOMPARE(sh->a.store->task(sh->task).notes, QString("Remote again"));
+    }
+
+    void anUnchangedRemoteFileDoesNotDisturbLocalEdits() {
+        // The other side touched nothing that matters (same content, new
+        // timestamp on the file): the local edit stands and is pushed.
+        auto sh = shared("same2");
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        editLocal(*sh->a.store, sh->task, [](Task &t) { t.title = "Local title"; }, T0 + 5);
+        QJsonObject o = readJson(sh->file);
+        QTest::qSleep(20);
+        writeJson(sh->file, o);
+        QVERIFY(syncs(*sh->a.store, *sh->remote, sh->a.mirror));
+        QCOMPARE(sh->a.store->task(sh->task).title, QString("Local title"));
+        QCOMPARE(readJson(sh->file).value("title").toString(), QString("Local title"));
     }
 
     void junkFilesInTheFolderAreIgnored() {

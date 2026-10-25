@@ -17,7 +17,8 @@
 // Files are pretty-printed with sorted keys so diffs stay readable.
 //
 // A sync never produces git conflicts: fetch; merge the remote's changed
-// files into the database record by record (the newer `modified` wins);
+// files into the database record by record (field by field against the
+// version in the last commit synced; see synctree.h);
 // move HEAD onto the remote with `git reset --soft`; write every file from
 // the merged database; commit on top; push. A rejected push (someone pushed
 // meanwhile) simply runs the cycle again. Deletions are tombstones

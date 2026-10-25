@@ -20,10 +20,14 @@
 // tag_uids, task_uid), never by local ids, which differ per machine.
 // Files are pretty-printed with sorted keys so diffs stay readable.
 //
-// Conflicts are settled record by record: the newer `modified` wins, and a
-// tie is broken by comparing the serialized bytes so every machine picks the
-// same side. Deletions are tombstones ("deleted": true), pruned 60 days
-// after the deletion.
+// Conflicts are settled record by record. When both sides changed a record
+// since the last sync, the two versions are merged field by field against the
+// file as it was at that sync (see mergeRecords in synctree.cpp); the side
+// with the larger `modified` wins a field both changed, and a tie is broken
+// by comparing the serialized bytes so every machine picks the same side.
+// Without that earlier version the newer `modified` replaces the whole record.
+// Deletions are tombstones ("deleted": true), pruned 60 days after the
+// deletion.
 //
 // Lists the user marked "Don't Sync This List" are skipped in both
 // directions, together with their tasks, sections, alarms and attachments.
@@ -45,13 +49,16 @@ bool writeTree(const Store &store, const QString &directory, const QDateTime &no
 
 // Merges the record files under `directory` into the store as one
 // non-undoable change: records new to this machine are inserted, records
-// whose file is newer than the local copy (by `modified`) are updated, and
-// records whose files are listed in `removedPaths` (relative paths deleted
-// on the remote since the last sync) are deleted locally. `onlyPaths`, when
-// non-empty, limits reading to those relative paths. Returns how many local
-// records changed.
+// whose files are listed in `removedPaths` (relative paths deleted on the
+// remote since the last sync) are deleted locally, and a record that exists
+// on both sides is merged. `bases` holds, by relative path, each file as it
+// was when this machine last synced it; with one, the record is merged field
+// by field (three-way), without one the file with the newer `modified`
+// replaces the local copy as a whole. `onlyPaths`, when non-empty, limits
+// reading to those relative paths. Returns how many local records changed.
 int readTree(Store &store, const QString &directory, const QStringList &onlyPaths = {},
-             const QStringList &removedPaths = {}, QString *error = nullptr);
+             const QStringList &removedPaths = {}, QString *error = nullptr,
+             const QHash<QString, QByteArray> &bases = {});
 
 // Deletes every local record that is not excluded from sync, for "Replace
 // Local" on a first sync. Not undoable; callers take a safety backup first.

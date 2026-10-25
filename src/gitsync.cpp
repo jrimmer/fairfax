@@ -44,6 +44,46 @@ void runGit(QObject *owner, const QString &dir, const QStringList &args, GitDone
     p->start("git", args);
 }
 
+// The files at `commit` (the last one this machine synced), by path, for the
+// three-way merge: a path the commit does not hold is left out. Blocks, but
+// only on a local object lookup.
+QHash<QString, QByteArray> blobsAt(const QString &dir, const QString &commit, const QStringList &paths) {
+    QHash<QString, QByteArray> blobs;
+    if (commit.isEmpty() || paths.isEmpty())
+        return blobs;
+    QProcess p;
+    p.setWorkingDirectory(dir);
+    p.start("git", {"cat-file", "--batch"});
+    if (!p.waitForStarted(10000))
+        return blobs;
+    QByteArray request;
+    for (const auto &path : paths)
+        request += commit.toUtf8() + ':' + path.toUtf8() + '\n';
+    p.write(request);
+    p.closeWriteChannel();
+    if (!p.waitForFinished(60000)) {
+        p.kill();
+        p.waitForFinished(5000);
+        return blobs;
+    }
+    // Each answer is "<id> blob <size>\n<content>\n" or "<name> missing\n".
+    const QByteArray out = p.readAllStandardOutput();
+    int at = 0;
+    for (const auto &path : paths) {
+        const int eol = out.indexOf('\n', at);
+        if (eol < 0)
+            break;
+        const QList<QByteArray> head = out.mid(at, eol - at).split(' ');
+        at = eol + 1;
+        if (head.size() == 3 && head.at(1) == "blob") {
+            const int size = head.at(2).toInt();
+            blobs.insert(path, out.mid(at, size));
+            at += size + 1;
+        }
+    }
+    return blobs;
+}
+
 }  // namespace
 
 GitSync::GitSync(Store *store, const QString &directory, QObject *parent)
@@ -329,8 +369,10 @@ void GitSync::runCycle(std::function<void(bool ok, const QString &message)> done
             if (code)
                 return fail(lastLine(err));
             QString error;
+            // The base of each merge is the file as of the last commit synced.
+            const auto bases = blobsAt(dir, m_store->setting("git.lastCommit").toString(), c->changed);
             m_applying = true;
-            c->total += GitSyncFiles::readTree(*m_store, dir, c->changed, c->removed, &error);
+            c->total += GitSyncFiles::readTree(*m_store, dir, c->changed, c->removed, &error, bases);
             m_applying = false;
             c->add();
         });
