@@ -13,11 +13,11 @@ namespace {
 
 using SL = QStringList;
 
-const SL Everything{"Get a haircut one day", "Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job",
-                    "Call: Tim", "Renew passport", "Read the handbook", "Pack the notebook", "Visit the bookshop",
+const SL Everything{"Learn a language one day", "Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat",
+                    "Call: Sam", "Renew passport", "Read the handbook", "Pack the notebook", "Visit the bookshop",
                     "Review the project", "Pick a subject", "Rejected idea", "Call the plumber", "Pay Stephen",
                     "Thank Alexander", "Ring John", "Quiet title", "Email a@b.com", "Tag text #garden thing",
-                    "Buy bread and butter", "Walk or run", "Elsewhere job offer"};
+                    "Buy bread and butter", "Walk or run", "Elsewhere flat offer"};
 
 qint64 textTask(App &app, const QString &title) {
     for (const Task &t : app.store().tasks())
@@ -69,45 +69,43 @@ private slots:
 
     void worldBaseline() { SMART_SHOWS(*m_app, Everything); }
 
-    // The operator table (smart-lists.md, Full Text Search Operators), with
-    // Soundex off. "word: A bare word matches anywhere inside a word"; "word1
-    // word2: Implicit AND"; "word1 OR word2"; "word1 AND word2"; "word -word2
-    // excludes a word"; "!word"; "word*" prefix; "*word" suffix; "*word*"
-    // contains; "exact phrase"; "*" matches every task.
+    // Full-text operators, with Soundex off: plain words match inside longer
+    // words; implicit AND; OR and AND; -word and !word exclude; word* prefix;
+    // *word suffix; *word* contains; "exact phrase"; "*" matches every task.
     void fullTextOperators_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
         QTest::newRow("bare word matches inside words") << "ject" << SL{"Review the project", "Pick a subject", "Rejected idea"};
-        QTest::newRow("implicit and") << "new job" << SL{"Find a new job", "Call: Mum, tell about my new job"};
-        QTest::newRow("excluded with dash") << "new job -find" << SL{"Call: Mum, tell about my new job"};
-        QTest::newRow("excluded with bang") << "new job !find" << SL{"Call: Mum, tell about my new job"};
-        QTest::newRow("bang alone") << "!call" << without(Everything, SL{"Call: Mum, tell about my new job", "Call: Tim", "Call the plumber"});
-        QTest::newRow("short words") << "a day" << SL{"Get a haircut one day", "Buy a new car some day"};
+        QTest::newRow("implicit and") << "new flat" << SL{"Find a new flat", "Call: Ana, mention the new flat"};
+        QTest::newRow("excluded with dash") << "new flat -find" << SL{"Call: Ana, mention the new flat"};
+        QTest::newRow("excluded with bang") << "new flat !find" << SL{"Call: Ana, mention the new flat"};
+        QTest::newRow("bang alone") << "!call" << without(Everything, SL{"Call: Ana, mention the new flat", "Call: Sam", "Call the plumber"});
+        QTest::newRow("short words") << "a day" << SL{"Learn a language one day", "Buy a new bike some day"};
         QTest::newRow("or") << "Call OR new"
-                            << SL{"Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job", "Call: Tim",
+                            << SL{"Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat", "Call: Sam",
                                   "Call the plumber", "Renew passport"};
         QTest::newRow("or in lowercase") << "call or new"
-                                         << SL{"Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job",
-                                               "Call: Tim", "Call the plumber", "Renew passport"};
-        QTest::newRow("explicit and") << "new AND job" << SL{"Find a new job", "Call: Mum, tell about my new job"};
-        QTest::newRow("and in lowercase") << "new and job" << SL{"Find a new job", "Call: Mum, tell about my new job"};
-        QTest::newRow("prefix wildcard") << "new*" << SL{"Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job"};
+                                         << SL{"Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat",
+                                               "Call: Sam", "Call the plumber", "Renew passport"};
+        QTest::newRow("explicit and") << "new AND flat" << SL{"Find a new flat", "Call: Ana, mention the new flat"};
+        QTest::newRow("and in lowercase") << "new and flat" << SL{"Find a new flat", "Call: Ana, mention the new flat"};
+        QTest::newRow("prefix wildcard") << "new*" << SL{"Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat"};
         QTest::newRow("suffix wildcard") << "*book" << SL{"Read the handbook", "Pack the notebook"};
         QTest::newRow("contains wildcard") << "*ject*" << SL{"Review the project", "Pick a subject", "Rejected idea"};
-        QTest::newRow("exact phrase") << "\"new job\"" << SL{"Find a new job", "Call: Mum, tell about my new job"};
-        QTest::newRow("phrase in order") << "\"a new\"" << SL{"Buy a new car some day", "Find a new job"};
-        QTest::newRow("phrase out of order") << "\"job new\"" << SL{};
+        QTest::newRow("exact phrase") << "\"new flat\"" << SL{"Find a new flat", "Call: Ana, mention the new flat"};
+        QTest::newRow("phrase in order") << "\"a new\"" << SL{"Buy a new bike some day", "Find a new flat"};
+        QTest::newRow("phrase out of order") << "\"flat new\"" << SL{};
         QTest::newRow("star matches every task") << "*" << Everything;
         QTest::newRow("quoted and") << "\"and\"" << SL{"Read the handbook", "Thank Alexander", "Buy bread and butter"};
         QTest::newRow("quoted or") << "\"or\"" << SL{"Walk or run", "Renew passport"};
-        QTest::newRow("case is ignored") << "NEW JOB" << SL{"Find a new job", "Call: Mum, tell about my new job"};
-        QTest::newRow("negated phrase") << "new -\"new job\"" << SL{"Buy a new car some day", "Renew passport"};
-        QTest::newRow("brackets") << "new (job OR car)"
-                                  << SL{"Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job"};
-        QTest::newRow("prefix and word") << "new* job" << SL{"Find a new job", "Call: Mum, tell about my new job"};
+        QTest::newRow("case is ignored") << "NEW FLAT" << SL{"Find a new flat", "Call: Ana, mention the new flat"};
+        QTest::newRow("negated phrase") << "new -\"new flat\"" << SL{"Buy a new bike some day", "Renew passport"};
+        QTest::newRow("brackets") << "new (flat OR bike)"
+                                  << SL{"Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat"};
+        QTest::newRow("prefix and word") << "new* flat" << SL{"Find a new flat", "Call: Ana, mention the new flat"};
         QTest::newRow("notes are searched") << "plumber" << SL{"Call the plumber", "Quiet title"};
         QTest::newRow("tag names are searched") << "tagged" << SL{"Quiet title"};
-        QTest::newRow("exclude within matches") << "call -plumber" << SL{"Call: Mum, tell about my new job", "Call: Tim"};
+        QTest::newRow("exclude within matches") << "call -plumber" << SL{"Call: Ana, mention the new flat", "Call: Sam"};
         QTest::newRow("hash in text") << "#garden" << SL{"Tag text #garden thing"};
         QTest::newRow("hash finds a tag") << "#tagged" << SL{"Quiet title"};
         QTest::newRow("at finds a tag") << "@tagged" << SL{"Quiet title"};
@@ -122,9 +120,9 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "Free text is matched against each task's title, notes, and searchable
-    // metadata" and "You can't free-text-search for the literal words and /
-    // or on their own; wrap them in quotes": a lone operator filters nothing.
+    // Free text matches a task's title, notes and searchable metadata. The
+    // words and / or alone are not searched as text (quote them), so a lone
+    // operator filters nothing.
     void loneOperatorFiltersNothing() {
         App &app = *m_app;
         SMART_QUERY(app, "or", Everything);
@@ -132,10 +130,9 @@ private slots:
         SMART_QUERY(app, "\"and\"", (SL{"Read the handbook", "Thank Alexander", "Buy bread and butter"}));
     }
 
-    // "Soundex Search: sound-alike matching. It tolerates common spelling
-    // mistakes, missing letters, and pronunciation variants": plumver finds
-    // plumber, Steven finds Stephen, alexnder finds Alexander, Jon finds John.
-    // Full Text on its own does not.
+    // Soundex matches sound-alikes despite misspellings and dropped letters:
+    // plumver finds plumber, Steven finds Stephen, alexnder finds Alexander, Jon
+    // finds John. Full Text on its own does not.
     void soundsLikeFindsMisspellings_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -164,9 +161,8 @@ private slots:
         SMART_SHOWS(app, SL{});
     }
 
-    // "A few characters change matching mode automatically: including # or @
-    // in your text, or wrapping the whole query in "quotes", turns Soundex off
-    // for that search so the match stays literal."
+    // A # or @ in the text, or quotes around the whole query, turn Soundex off
+    // for that search so the match stays literal.
     void literalSearchesStayLiteralWithSoundex() {
         App &app = *m_app;
         app.backend().setSoundex(true);
@@ -176,7 +172,7 @@ private slots:
         SMART_QUERY(app, "#gardn", SL{});
         SMART_QUERY(app, "a@b.com", SL{"Email a@b.com"});
         SMART_QUERY(app, "a@b.cum", SL{});
-        SMART_QUERY(app, "new job -find", (SL{"Call: Mum, tell about my new job"}));
+        SMART_QUERY(app, "new flat -find", (SL{"Call: Ana, mention the new flat"}));
     }
 
     // The same switch lives in Search Options ("The Soundex switch").
@@ -198,15 +194,15 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
     }
 
-    // "Quick Find (F while focused on the Task List): jumps the selection to
-    // the first task whose title matches, without filtering anything out."
-    // "Search (⌘F): filters… The list collapses to just the results."
+    // Quick Find (F with the task list focused) moves the selection to the first
+    // title match and filters nothing; Search (Ctrl+F) filters the list down to
+    // the results.
     void quickFindJumpsSearchFilters() {
         App &app = *m_app;
         // Quick Find: the list keeps every row, only the selection moves.
-        QVERIFY(selectRowText(app, "Call: Tim"));
-        const qint64 tim = textTask(app, "Call: Tim");
-        QCOMPARE(app.backend().currentTaskId(), tim);
+        QVERIFY(selectRowText(app, "Call: Sam"));
+        const qint64 sam = textTask(app, "Call: Sam");
+        QCOMPARE(app.backend().currentTaskId(), sam);
         parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
@@ -226,23 +222,22 @@ private slots:
         SMART_SHOWS(app, Everything);
     }
 
-    // Task Find bar: "Type any part of the task title. Matching tasks highlight,
-    // and the selection moves to the first match right away. ↑ / ↓ step through
-    // the other matches, wrapping around at the ends. Press Return to land on the
-    // focused match and close the bar, or Esc to close it where you are; either
-    // way the selection stays put."
+    // Task Find bar: typing highlights matching titles and selects the first
+    // match; up and down step through the others, wrapping at the ends. Return
+    // lands on the focused match and closes the bar, Esc closes it in place; either
+    // way the selection stays put.
     void taskFindBarKeys() {
         App &app = *m_app;
-        QVERIFY(selectRowText(app, "Call: Tim"));
+        QVERIFY(selectRowText(app, "Call: Sam"));
         const qint64 start = app.backend().currentTaskId();
         // The keyboard moves the highlight here, so the pointer is out of the way:
         // the bar highlights whatever it rests on.
         parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
-        app.type("job");
+        app.type("flat");
         QTRY_COMPARE_WITH_TIMEOUT(barItems().size(), 3, 5000);
-        QCOMPARE(sorted(barItems()), sorted(SL{"Find a new job", "Call: Mum, tell about my new job", "Elsewhere job offer"}));
+        QCOMPARE(sorted(barItems()), sorted(SL{"Find a new flat", "Call: Ana, mention the new flat", "Elsewhere flat offer"}));
         QCOMPARE(commandBar()->property("highlighted").toInt(), 0);
         QTRY_COMPARE_WITH_TIMEOUT(app.task(app.backend().currentTaskId()).title, barItems().at(0), 5000);
         app.press(Qt::Key_Down);
@@ -268,8 +263,8 @@ private slots:
         parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
-        app.type("tim");
-        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Call: Tim"}), 5000);
+        app.type("sam");
+        QTRY_COMPARE_WITH_TIMEOUT(barItems(), (SL{"Call: Sam"}), 5000);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().currentTaskId(), start, 5000);
         app.press(Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!barOpen(), 5000);
@@ -277,11 +272,11 @@ private slots:
         QCOMPARE(paneTitles(app), sorted(Everything));
     }
 
-    // "Type any part of the task title. Matching tasks highlight, and the
-    // selection moves to the first match right away."
+    // Typing in the find bar highlights matching titles and moves the selection
+    // to the first match.
     void taskFindMovesSelectionWhileTyping() {
         App &app = *m_app;
-        QVERIFY(selectRowText(app, "Call: Tim"));
+        QVERIFY(selectRowText(app, "Call: Sam"));
         parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);
@@ -293,11 +288,11 @@ private slots:
         QCOMPARE(app.backend().currentTaskId(), textTask(app, "Read the handbook"));
     }
 
-    // "An exact-match toggle on the bar switches between loose and exact word
-    // matching; each bar remembers its own setting."
+    // The bar's exact-match toggle switches between loose and exact word
+    // matching, and each bar remembers its own setting.
     void findBarExactMatchToggle() {
         App &app = *m_app;
-        QVERIFY(selectRowText(app, "Call: Tim"));
+        QVERIFY(selectRowText(app, "Call: Sam"));
         parkPointer(app.window);
         app.press(Qt::Key_F);
         QTRY_VERIFY_WITH_TIMEOUT(barOpen(), 5000);

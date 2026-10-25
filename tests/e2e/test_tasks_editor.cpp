@@ -211,9 +211,8 @@ private slots:
         QVERIFY(!badge("rowStar", id));
     }
 
-    // "While you're editing a task, set priority without leaving the keyboard:
-    // ⌥⌘0 None, ⌥⌘1 Low, ⌥⌘2 Medium, ⌥⌘3 High, and ⌥⌘S to toggle the star."
-    // (task-editor.md; Ctrl stands in for Command.)
+    // While editing, priority is set from the keyboard: Alt+Ctrl+0 None, 1 Low,
+    // 2 Medium, 3 High, and Alt+Ctrl+S toggles the star.
     void prioritySetByEditorShortcuts() {
         App app;
         QVERIFY(app.ok);

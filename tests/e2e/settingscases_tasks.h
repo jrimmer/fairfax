@@ -203,7 +203,7 @@ inline void addTaskCases(QVector<SettingCase> &v) {
         {
             K c{"tasks.useDefaultDueTime", "Tasks", "setting:tasks.useDefaultDueTime", K::Check, false};
             c.prepare = [](Store &st, Seed &) { st.setSetting("tasks.defaultDueTime", 14 * 60); };
-            // "The time a task gets the first time you give it a due date without choosing one."
+            // A new due date gets this time when none is picked.
             c.effect = SK_EFFECT {
                 SK_APP
                 showSource(app, listKey(s.ids.home));

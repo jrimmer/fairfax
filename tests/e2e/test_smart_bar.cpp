@@ -113,9 +113,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!searchOpen(), 5000);
     }
 
-    // "The scope control decides whether the search covers only the list
-    // you're currently in or every list you have. ⌥⌘F (Toggle Search Scope)
-    // flips it without opening the panel."
+    // The scope control switches the search between the current list and every
+    // list; Ctrl+Alt+F flips it without opening the panel.
     void searchInListVersusAll() {
         App &app = *m_app;
         QVERIFY(pane(app, lk(listId("Garden"))));
@@ -144,8 +143,8 @@ private slots:
         SMART_SHOWS(app, specTitles([](const Spec &s) { return shownInAll(s) && s.list == "Garden"; }));
     }
 
-    // "Search Options… a This List / All Lists scope control, and an Include
-    // Scheduled checkbox."
+    // Search Options offers a This List / All Lists scope and an Include
+    // Scheduled checkbox.
     void searchOptionsScopeAndScheduled() {
         App &app = *m_app;
         QVERIFY(pane(app, lk(listId("Work"))));
@@ -167,9 +166,8 @@ private slots:
         QVERIFY(closeBuilder(app));
     }
 
-    // The presets menu: "The Presets menu inside the field is the quick one.
-    // It drops ready-made queries into the field… Whatever it inserts is
-    // ordinary search text, so you can edit it by hand afterwards."
+    // The presets menu inside the field inserts ready-made queries as ordinary
+    // search text, which can be edited by hand afterwards.
     void presetsMenu_data() {
         QTest::addColumn<QString>("entry");
         QTest::addColumn<QString>("query");
@@ -233,9 +231,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Launch project"}), 5000);
     }
 
-    // "On (default): opening a project keeps the Smart List's rule or your
-    // current search applied to its sub-tasks, so you only see the sub-tasks
-    // that match."
+    // With the setting on, opening a project from a Smart List or mid-search
+    // lists only the matching sub-tasks.
     void inheritSearchOnFiltersSubtasksOfSearch() {
         App &app = *m_app;
         setInherit(app, true);
@@ -253,10 +250,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(projectView(app), sorted(SL{"Launch project", "Launch step one", "Launch step later", "Launch step done"}), 5000);
     }
 
-    // "A Smart List's rule counts as a search here even though you did not
-    // type it, and that includes its date range. Sub-tasks in a project are
-    // matched on their own dates, so a project opened from a Smart List such
-    // as Next 5 Days shows only the sub-tasks dated within those days."
+    // A Smart List's rule, date range included, counts as a search here.
+    // Sub-tasks use their own dates, so opening a project from a Smart List
+    // like Next 5 Days lists only sub-tasks dated in that span.
     void inheritSearchFromSmartList() {
         App &app = *m_app;
         // A Smart List whose rule the project and one of its sub-tasks meet.

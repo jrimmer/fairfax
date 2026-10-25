@@ -56,8 +56,7 @@ private slots:
         QCOMPARE(app.backend().sourceKey(), lk(a));
     }
 
-    // "List Jump Bar: … Regular lists, Smart Lists, built-in Focus lists, and
-    // even the projects … all match by name." (search-and-jump-bars.md)
+    // The jump bar matches Smart Lists by name along with other lists.
     void jumpBarReachesSmartLists() {
         App app(seedSmart);
         QVERIFY(app.ok);

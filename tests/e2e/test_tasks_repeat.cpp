@@ -110,9 +110,8 @@ private slots:
         QCOMPARE(app.task(id).recurrence.interval, 2);
     }
 
-    // "On some days of the week: tick any combination of Mon through Sun",
-    // "every N weeks", "after completion" and "Ends: After a number of
-    // occurrences" (repeating-tasks.md).
+    // Custom weekly rule: any combination of weekdays, every N weeks, repeating
+    // after completion, and ending after a number of occurrences.
     void customWeeklyRule() {
         App app;
         QVERIFY(app.ok);
@@ -211,7 +210,8 @@ private slots:
     }
 
     // Completing a repeating task leaves a finished copy in history and moves
-    // the active task to its next occurrence. Daily, due today: tomorrow next; Done shows the copy.
+    // the active task to its next occurrence. Daily, due today: tomorrow next;
+    // Done shows the copy.
     void completingDailyMovesDueAndKeepsACopy() {
         App app(milkWith([](Task &t) { t.recurrence.frequency = Repeat::Daily; }));
         QVERIFY(app.ok);
@@ -272,9 +272,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(app.task(app.ids.buyMilk).dueDate, today.addMonths(1), 5000);
     }
 
-    // "Repeat from Completion: the next occurrence is calculated from the date
-    // you marked the task complete." A task due five days ago that repeats
-    // every 3 days after completion is next due three days from today.
+    // Repeating from completion counts the next occurrence from the day the task
+    // was marked done. A task due five days ago that repeats every 3 days after
+    // completion is next due three days from today.
     void completingAfterCompletion() {
         const QDate today = QDate::currentDate();
         App app(milkWith([](Task &t) {
@@ -292,8 +292,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("d:" + isoOf(today.addDays(3))), 5000);
     }
 
-    // "If the task has reached its End after count... the final occurrence
-    // simply completes."
+    // A task that has reached its end count simply completes on the final
+    // occurrence.
     void endAfterCountStopsTheSeries() {
         const QDate today = QDate::currentDate();
         App app(milkWith([](Task &t) {

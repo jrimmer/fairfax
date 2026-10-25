@@ -113,8 +113,7 @@ private slots:
         SMART_SHOWS(app, Hi + Med);
     }
 
-    // "Joined with all (AND) or any (OR) at the top": the other join. Match
-    // All / Any change the same rows' query live.
+    // The other join: Match All / Any change the same rows' query live.
     void allModeJoinsRowsWithAnd() {
         App &app = *m_app;
         openFresh();
@@ -177,9 +176,8 @@ private slots:
         SMART_SHOWS(app, allShown());
     }
 
-    // The named pickers: "Searching for … a named list, a named tag or tag
-    // group … type those as query keywords (plain text, lists:, tags:,
-    // taggroups:)": the sheet writes them for you.
+    // The named pickers write criteria for lists, tags and tag groups into the
+    // query for you (lists:, tags:, taggroups:).
     void pickerChips_data() {
         QTest::addColumn<QString>("tab");
         QTest::addColumn<QStringList>("include");
@@ -254,8 +252,8 @@ private slots:
             return;
     }
 
-    // Free text, a rule row and a tag together: "build the structure
-    // visually, then add the text and named criteria in the field".
+    // Free text, a rule row and a tag together: rows build the structure, and
+    // the field adds text and named criteria.
     void freeTextAndChipsTogether() {
         openFresh();
         if (QTest::currentTestFailed())
@@ -272,8 +270,7 @@ private slots:
             return;
     }
 
-    // "For finer expressions, hold the Option key to create a sub-filter, a
-    // nested rule group": Add group, with And / Or / Not joins.
+    // Add group makes a nested rule group, with And / Or / Not joins.
     void groupsOfWholeFilters() {
         openFresh();
         if (QTest::currentTestFailed())
@@ -301,8 +298,7 @@ private slots:
         QVERIFY(closeBuilder(*m_app));
     }
 
-    // "The keyword syntax is most useful for refining a saved rule": the
-    // QUERY box can be typed into, and the rows follow.
+    // The QUERY box can be typed into, and the rows follow.
     void queryBoxEditedByHand() {
         openFresh();
         if (QTest::currentTestFailed())
@@ -323,9 +319,8 @@ private slots:
         QVERIFY(closeBuilder(*m_app));
     }
 
-    // "Once your search returns the perspective you want, click the [+] button
-    // … There is no naming prompt. The Smart List is created straight away and
-    // named after the query." The save button next to the typed query.
+    // The save button next to the typed query makes a Smart List at once, with
+    // no naming prompt, named after the query.
     void saveSearchBarQueryAsSmartList() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
@@ -369,11 +364,9 @@ private slots:
                             "Plumber for office", "Rent overdue", "Fence in 6 days", "Launch project"}));
     }
 
-    // "To change a Smart List's rule, select the Smart List in the sidebar and
-    // its rule appears in the search bar. Adjust the query (or the date filter
-    // and rule builder)… the Smart List … is updated in place and the
-    // perspective changes immediately." Edit Search… reads the rule back into
-    // the sheet; Update writes it.
+    // Selecting a Smart List shows its rule in the search bar, and editing it
+    // updates the list in place. Edit Search… reads the rule back into the
+    // sheet; Update writes it.
     void editSearchChangesTheRule() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
@@ -452,8 +445,7 @@ private slots:
         QCOMPARE(smartLists(app).size(), 2);
     }
 
-    // Renaming: "Rename it in the Lists Panel whenever you like" (smart-lists.md,
-    // Saving a Filter) by double-click, by the menu's Rename…, and in Edit List.
+    // Renaming: by double-click, by the menu's Rename…, and in Edit List.
     void renameSmartList() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
@@ -524,9 +516,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!app.sidebarRow(lk(id)), 5000);
     }
 
-    // "By default a Smart List leaves completed tasks out, so the view stays on
-    // what's still outstanding." The sheet's Completed switch: Default,
-    // Include, Exclude.
+    // Smart Lists omit completed tasks unless told otherwise. The sheet's
+    // Completed switch: Default, Include, Exclude.
     void completedSwitchOnSheet() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
@@ -552,8 +543,8 @@ private slots:
         choose("completedDefault", 0, open);
     }
 
-    // "Include Scheduled brings tasks with a future start date into the
-    // results, and it's remembered when you save the search as a Smart List."
+    // Include Scheduled pulls in tasks that start later, and the choice is
+    // saved with the Smart List.
     void includeScheduledSwitchOnSheet() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
@@ -581,10 +572,8 @@ private slots:
         QVERIFY(closeBuilder(app));
     }
 
-    // The sheet's due-date options, saved with the rule: "Without Due Date:
-    // only tasks with no due date (perfect for a Someday Smart List)", "Date
-    // Range: a fixed From … To", "Dynamic Range: Next N days / weeks / months /
-    // years".
+    // The sheet's due-date options, saved with the rule: no due date, a fixed
+    // From … To range, and a dynamic Next N days / weeks / months / years range.
     void dateRangeOptions() {
         App &app = *m_app;
         const SL dated = specTitles([](const Spec &s) { return shownInAll(s) && s.due != NoDay; });
@@ -672,10 +661,10 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, lk(id)).undone, (DueToday + Overdue).size(), 5000);
     }
 
-    // "To require high priority as well, edit the search field to read: type:
+    // Requiring high priority too means editing the field to read: type:
     // (duetoday OR overdue) AND hiprio. The parentheses group the two date
-    // choices… Adding high priority as a third rule in the same Any group would
-    // also include high-priority tasks due on other days."
+    // choices; adding it as another rule in the Any group would let in tasks
+    // due on other days that are high priority.
     void combineTodayAndOverdueWithPriority() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
@@ -695,10 +684,9 @@ private slots:
         SMART_SHOWS(app, SL{"Rent overdue"});
     }
 
-    // "A separate date range in Search Options still narrows the results, even
-    // when the rules use Any. If the range is limited to today, older overdue
-    // tasks remain excluded. Click the active date-filter control again to turn
-    // it off."
+    // A date range set in Search Options keeps narrowing Any rules: limited to
+    // today, older overdue tasks stay out. Clicking the active date-filter
+    // control again turns it off.
     void dateRangeStillNarrowsAnyRules() {
         App &app = *m_app;
         openFresh();

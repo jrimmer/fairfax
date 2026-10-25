@@ -68,9 +68,8 @@ private slots:
         QCOMPARE(liveGroupsNamed(app, "Discarded"), 0);
     }
 
-    // "Right-clicking a List Group gives you a shorter menu: Rename..., Color
-    // grouped lists..., and Delete." (lists-and-list-groups.md) Double-clicking
-    // the header renames too.
+    // A group's context menu is shorter (Rename, Colour, Delete), and
+    // double-clicking the header renames it too.
     void renameGroup() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -162,8 +161,7 @@ private slots:
         QCOMPARE(shownName(groupHeader(id)), QString("Personal"));
     }
 
-    // "Color grouped lists... (recolors every list inside the group in one
-    // step)" and "List groups can be color-coded too." (lists-and-list-groups.md)
+    // Colouring a group recolours every list inside it in one step.
     void colourGroup() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -209,9 +207,8 @@ private slots:
         QCOMPARE(liveList(app, app.ids.work).color, 2);
     }
 
-    // "collapse the group when you don't need to see what's inside" and
-    // "Expand all List Groups / Collapse all List Groups: see the View menu."
-    // (lists-and-list-groups.md)
+    // Groups collapse and expand one at a time, and the View menu has entries
+    // for collapsing and expanding them all.
     void collapseAndExpandGroups() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -330,9 +327,8 @@ private slots:
         }
     }
 
-    // "Drag a list onto a List Group to move it inside." (lists-and-list-groups.md)
-    // Into a group by its header, between groups by dropping on one of its
-    // lists, and out to the top level; each undone by dragging back.
+    // Dragging a list: into a group by its header, between groups by dropping
+    // on one of its lists, and out to the top level; each undone by dragging back.
     void moveListsBetweenGroupsByDragging() {
         App app(seedLists);
         QVERIFY(app.ok);

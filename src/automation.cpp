@@ -406,7 +406,7 @@ void applyFields(Task &t, const Fields &f) {
     if (f.recurrence)
         t.recurrence = *f.recurrence;
     if (t.recurrence.isSet() && !t.dueDate.isValid() && !t.startDate.isValid())
-        invalid("recurrence needs a due date or start date.");
+        invalid("recurrence needs a due or start date.");
     if (t.dueTime >= 0 && !t.dueDate.isValid())
         invalid("due_time requires a due date.");
     if (t.startTime >= 0 && !t.startDate.isValid())
@@ -1369,7 +1369,7 @@ struct Automation::Impl {
                 invalid("offset_seconds must be a whole number of minutes.");
             al.offset = int(-secs / 60);
             if (!t.dueDate.isValid() && !t.startDate.isValid())
-                invalid("A relative alarm needs the task to have a due date or start date.");
+                invalid("A relative alarm needs a due or start date on the task.");
         } else if (kind == Alarm::Absolute) {
             if (!hasAt || hasOffset || hasDays || hasTime)
                 invalid("An absolute alarm takes at only, formatted yyyy-MM-dd HH:mm.");
@@ -1382,7 +1382,7 @@ struct Automation::Impl {
             al.offset = parseInt(args["days_before"], "days_before", 0, 365);
             al.at = AlarmTimes::clockTime(parseTime(args["time_of_day"], "time_of_day"));
             if (!t.dueDate.isValid() && !t.startDate.isValid())
-                invalid("A days_before alarm needs the task to have a due date or start date.");
+                invalid("A days_before alarm needs a due or start date on the task.");
         }
         al.id = s.nextId("alarms");
         s.begin("Add Alert");
@@ -1519,7 +1519,7 @@ const QList<Command> &commands() {
                      {}, &I::queryTasks};
         c << Command{"list_subtasks", "List the sub-tasks of a project or checklist.",
                      {{"task_id", str("The project or checklist.")}, {"include_completed", flag("Default true.")}}, {"task_id"}, &I::listSubtasks};
-        c << Command{"selected_tasks", "Return the tasks currently selected in the Fairfax window.", {}, {}, &I::selectedTasks};
+        c << Command{"selected_tasks", "The tasks highlighted in the Fairfax window.", {}, {}, &I::selectedTasks};
         c << Command{"create_task", "Create a task, project or checklist, optionally with sub-tasks. One undoable change.",
                      taskWriteProps(true), {"title"}, &I::createTask};
         c << Command{"update_task", "Change a task's fields. Omitted fields stay as they are. One undoable change.", update, {"task_id"}, &I::updateTask};
@@ -1527,7 +1527,7 @@ const QList<Command> &commands() {
                      {{"task_id", str("Task id or uid.")}, {"action", actionSchema()}}, {"task_id", "action"}, &I::updateTaskAction};
         c << Command{"delete_task", "Delete tasks and everything inside them. Undoable in the app.", taskIds, {}, &I::deleteTask};
         c << Command{"duplicate_task", "Duplicate a task with its sub-tasks.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::duplicateTask};
-        c << Command{"move_task", "Move tasks to another list, or into a project or checklist. Give exactly one of list_id or parent_task_id.",
+        c << Command{"move_task", "Move tasks to a list or under a project or checklist. Pass list_id or parent_task_id, not both.",
                      merged(taskIds, {{"list_id", str("Destination list.")}, {"parent_task_id", str("Destination project or checklist.")}}), {}, &I::moveTask};
         c << Command{"complete_task",
                      "Mark tasks done. A repeating task keeps a completed copy and advances to its next occurrence, so do not retry blindly.",

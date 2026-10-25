@@ -438,8 +438,8 @@ Window {
                             backend.setInboxEnabled(checked)
                         }
                     }
-                    Toggle { key: "nl.quickEntry"; fallback: true; label: "Detect dates and details as you type in Quick Entry" }
-                    Toggle { key: "nl.editor"; fallback: true; label: "Detect dates and details as you type in the task editor" }
+                    Toggle { key: "nl.quickEntry"; fallback: true; label: "Pick out dates and details while typing in Quick Entry" }
+                    Toggle { key: "nl.editor"; fallback: true; label: "Pick out dates and details while typing in the task editor" }
                     RowLayout {
                         Label { text: "Show completed tasks for"; Layout.preferredWidth: 220 }
                         ComboBox {
@@ -468,7 +468,7 @@ Window {
                         }
                     }
                     Toggle { key: "tasks.alwaysDefaultList"; fallback: false; label: "Always use the default list for new tasks"; note: "Otherwise a task added from the main window goes to the list you are viewing." }
-                    Toggle { key: "tasks.overdueUsesTime"; fallback: false; label: "Due time taken into account when marking a task overdue" }
+                    Toggle { key: "tasks.overdueUsesTime"; fallback: false; label: "Count a task overdue once its due time has passed" }
                     RowLayout {
                         Label { text: "Default due date for new tasks"; Layout.preferredWidth: 220 }
                         ComboBox {
@@ -522,7 +522,7 @@ Window {
                             onActivated: (i) => backend.setSetting("tasks.defaultDueTime", root.timeSteps[i])
                         }
                     }
-                    Hint { Layout.topMargin: 0; text: "The time a task gets the first time you give it a due date without choosing one. Leave it off to keep dates without a clock time." }
+                    Hint { Layout.topMargin: 0; text: "The time given to a new due date when none is picked. Leave it off to keep dates without a clock time." }
                     RowLayout {
                         Label { text: "Auto-delete completed tasks"; Layout.preferredWidth: 220 }
                         ComboBox {

@@ -1,6 +1,5 @@
-// End-to-end scenarios for live updates: "its rule keeps applying as your
-// tasks change, so the list is always up to date" (smart-lists.md, Saving a
-// Filter as a Smart List). With a Smart List open, a task is changed through
+// End-to-end scenarios for live updates: a Smart List keeps applying its
+// rule as tasks change. With a Smart List open, a task is changed through
 // the keyboard, the way a user does; the list loses it, undo gives it back,
 // and a new task typed into the list with the property joins it, all without
 // selecting the list again. The sidebar's count follows each step.

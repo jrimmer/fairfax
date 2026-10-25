@@ -276,9 +276,9 @@ private slots:
     }
 
     void dateRange() {
-        const QString text = QStringLiteral("Work on the science project 19 July to 21 July");
+        const QString text = QStringLiteral("Sand the garden fence 19 July to 21 July");
         const auto e = parse(text);
-        QCOMPARE(e.title, QStringLiteral("Work on the science project"));
+        QCOMPARE(e.title, QStringLiteral("Sand the garden fence"));
         QCOMPARE(e.startDate, QDate(2026, 7, 19));
         QCOMPARE(e.dueDate, QDate(2026, 7, 21));
         QCOMPARE(spanTexts(text, e), (QStringList{QStringLiteral("start:19 July"), QStringLiteral("date:21 July")}));
@@ -314,8 +314,8 @@ private slots:
         QCOMPARE(e.title, QStringLiteral("Field trip"));
         QCOMPARE(e.startDate, QDate(2026, 7, 19));
         QCOMPARE(e.dueDate, QDate(2026, 7, 21));
-        e = parse(QStringLiteral("Revise for the maths test from Monday until Friday #study"));
-        QCOMPARE(e.title, QStringLiteral("Revise for the maths test"));
+        e = parse(QStringLiteral("Practise the piano piece from Monday until Friday #study"));
+        QCOMPARE(e.title, QStringLiteral("Practise the piano piece"));
         QCOMPARE(e.startDate, QDate(2026, 7, 20));
         QCOMPARE(e.dueDate, QDate(2026, 7, 24));
         e = parse(QStringLiteral("Course from Monday to Friday"));
@@ -343,19 +343,19 @@ private slots:
         QCOMPARE(e.title, QStringLiteral("Tidy the store room"));
         QCOMPARE(e.startDate, QDate(2026, 7, 16));
         QCOMPARE(e.dueDate, QDate(2026, 7, 17));
-        e = parse(QStringLiteral("Prepare the workshop starting tomorrow at 3pm ending Friday at 5pm"));
-        QCOMPARE(e.title, QStringLiteral("Prepare the workshop"));
+        e = parse(QStringLiteral("Set up the stall starting tomorrow at 3pm ending Saturday at 5pm"));
+        QCOMPARE(e.title, QStringLiteral("Set up the stall"));
         QCOMPARE(e.startTime, mins(15));
-        QCOMPARE(e.dueDate, QDate(2026, 7, 17));
+        QCOMPARE(e.dueDate, QDate(2026, 7, 18));
         QCOMPARE(e.dueTime, mins(17));
         e = parse(QStringLiteral("Essay begins Monday, due Friday"));
         QCOMPARE(e.title, QStringLiteral("Essay"));
         QCOMPARE(e.startDate, QDate(2026, 7, 20));
         QCOMPARE(e.dueDate, QDate(2026, 7, 24));
-        e = parse(QStringLiteral("Garden clean-up starts Saturday 9am and finishes Sunday 4pm"));
-        QCOMPARE(e.title, QStringLiteral("Garden clean-up"));
+        e = parse(QStringLiteral("Attic sort-out starts Saturday 10am and finishes Sunday 4pm"));
+        QCOMPARE(e.title, QStringLiteral("Attic sort-out"));
         QCOMPARE(e.startDate, QDate(2026, 7, 18));
-        QCOMPARE(e.startTime, mins(9));
+        QCOMPARE(e.startTime, mins(10));
         QCOMPARE(e.dueDate, QDate(2026, 7, 19));
         QCOMPARE(e.dueTime, mins(16));
         e = parse(QStringLiteral("Redecorate begins 5 September and is due 8 September"));
@@ -505,16 +505,16 @@ private slots:
         QCOMPARE(e.title, QStringLiteral("Ring the clinic"));
         QCOMPARE(e.alertOffsets, QList<int>{30});
         QCOMPARE(e.dueTime, mins(15));
-        e = parse(QStringLiteral("Submit the report Friday at 5pm alarm 1 hour before"));
-        QCOMPARE(e.title, QStringLiteral("Submit the report"));
+        e = parse(QStringLiteral("Send the invoice Thursday at 5pm alarm 1 hour before"));
+        QCOMPARE(e.title, QStringLiteral("Send the invoice"));
         QCOMPARE(e.alertOffsets, QList<int>{60});
-        e = parse(QStringLiteral("Collect the cake Saturday at 4pm alert 10m, 30m"));
-        QCOMPARE(e.title, QStringLiteral("Collect the cake"));
-        QCOMPARE(e.alertOffsets, (QList<int>{10, 30}));
+        e = parse(QStringLiteral("Fetch the parcel Saturday at 4pm alert 15m, 45m"));
+        QCOMPARE(e.title, QStringLiteral("Fetch the parcel"));
+        QCOMPARE(e.alertOffsets, (QList<int>{15, 45}));
         e = parse(QStringLiteral("Call Friday at 3pm remind me 2h before"));
         QCOMPARE(e.title, QStringLiteral("Call"));
         QCOMPARE(e.alertOffsets, QList<int>{120});
-        e = parse(QStringLiteral("Book a car service next Friday at 9am alert 1h"));
+        e = parse(QStringLiteral("Book a boiler check next Friday at 9am alert 1h"));
         QCOMPARE(e.alertOffsets, QList<int>{60});
         QCOMPARE(e.dueDate, QDate(2026, 7, 24));
         e = parse(QStringLiteral("Call Friday alert 1d"));
@@ -688,8 +688,8 @@ private slots:
         QCOMPARE(e.location, QStringLiteral("Central Library"));
         QCOMPARE(e.dueDate, QDate(2026, 7, 16));
         QCOMPARE(e.dueTime, mins(16));
-        e = parse(QStringLiteral("Drop the books at @ Central Library and buy bread"), {}, places);
-        QCOMPARE(e.title, QStringLiteral("Drop the books at and buy bread"));
+        e = parse(QStringLiteral("Return the DVDs at @ Central Library and buy eggs"), {}, places);
+        QCOMPARE(e.title, QStringLiteral("Return the DVDs at and buy eggs"));
         QCOMPARE(e.location, QStringLiteral("Central Library"));
         e = parse(QStringLiteral("Collect the prescription @ pharmacy #errands"), {}, places);
         QCOMPARE(e.location, QStringLiteral("Pharmacy"));
@@ -878,8 +878,8 @@ private slots:
     }
 
     void combinedManualExamples() {
-        auto e = parse(QStringLiteral("Pick up the kids from school tomorrow at 3pm #family"));
-        QCOMPARE(e.title, QStringLiteral("Pick up the kids from school"));
+        auto e = parse(QStringLiteral("Meet Anna at the station tomorrow at 3pm #family"));
+        QCOMPARE(e.title, QStringLiteral("Meet Anna at the station"));
         QCOMPARE(e.dueDate, QDate(2026, 7, 16));
         QCOMPARE(e.dueTime, mins(15));
         QCOMPARE(e.tags, QStringList{QStringLiteral("family")});
@@ -909,8 +909,8 @@ private slots:
         QCOMPARE(e.dueTime, mins(13));
         QCOMPARE(e.title, QStringLiteral("Drop the donation off"));
 
-        e = parse(QStringLiteral("Work on the science project 19 July to 21 July !!"));
-        QCOMPARE(e.title, QStringLiteral("Work on the science project"));
+        e = parse(QStringLiteral("Sand the garden fence 19 July to 21 July !!"));
+        QCOMPARE(e.title, QStringLiteral("Sand the garden fence"));
         QCOMPARE(e.startDate, QDate(2026, 7, 19));
         QCOMPARE(e.dueDate, QDate(2026, 7, 21));
         QCOMPARE(e.priority, 2);
@@ -920,15 +920,15 @@ private slots:
         QCOMPARE(e.startDate, QDate(2026, 7, 18));
         QVERIFY(!e.dueDate.isValid());
 
-        e = parse(QStringLiteral("Redecorate the hallway begins 5 September, due 8 September !!"));
-        QCOMPARE(e.title, QStringLiteral("Redecorate the hallway"));
-        QCOMPARE(e.startDate, QDate(2026, 9, 5));
-        QCOMPARE(e.dueDate, QDate(2026, 9, 8));
+        e = parse(QStringLiteral("Repaint the landing begins 6 September, due 9 September !!"));
+        QCOMPARE(e.title, QStringLiteral("Repaint the landing"));
+        QCOMPARE(e.startDate, QDate(2026, 9, 6));
+        QCOMPARE(e.dueDate, QDate(2026, 9, 9));
         QCOMPARE(e.priority, 2);
 
-        e = parse(QStringLiteral("Renew the car insurance every year on September 5 #home"));
-        QCOMPARE(e.title, QStringLiteral("Renew the car insurance"));
-        QCOMPARE(e.dueDate, QDate(2026, 9, 5));
+        e = parse(QStringLiteral("Renew the van insurance every year on September 7 #home"));
+        QCOMPARE(e.title, QStringLiteral("Renew the van insurance"));
+        QCOMPARE(e.dueDate, QDate(2026, 9, 7));
         QCOMPARE(e.recurrence.frequency, int(Repeat::Yearly));
     }
 

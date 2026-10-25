@@ -136,8 +136,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(shownName(app.sidebarRow(lk(app.ids.home))), QString("Home"), 5000);
     }
 
-    // "You can edit any of these later from Task > Edit List with the list
-    // selected, or by right-clicking the list." (lists-and-list-groups.md)
+    // The list can be edited later from the Edit List sheet or its context menu.
     void renameInEditList() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -205,8 +204,7 @@ private slots:
         QCOMPARE(liveList(app, app.ids.work).groupId, world().personal);
     }
 
-    // Deleting all tasks empties the list but keeps the list, its colour and
-    // its settings.
+    // Clearing a list's tasks leaves the list, its colour and its settings in place.
     void deleteAllTasksKeepsList() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -275,8 +273,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 5000);
     }
 
-    // "or choose Custom to open the macOS color picker for any shade you like."
-    // (lists-and-list-groups.md) Any hex colour typed in the picker sticks.
+    // Custom opens a colour picker; any hex colour typed there sticks.
     void colourCustomFromMenu() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -338,9 +335,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(bandColour(app, app.ids.home), before, 5000);
     }
 
-    // "Exclude Completed keeps the list's finished tasks out of view (the item
-    // reads Include Completed once it's on)." (lists-and-list-groups.md) The
-    // Edit List sheet has the same switch with three states.
+    // Exclude Completed hides the list's finished tasks (the item then reads
+    // Include Completed). The Edit List sheet has the same switch with three
+    // states.
     void completedModeHidesAndShowsCompleted() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -401,9 +398,8 @@ private slots:
         QCOMPARE(liveList(app, app.ids.work).completedMode, 0);
     }
 
-    // "You can independently exclude a list from: All, Today, Done. ... The
-    // list and its tasks are still visible when you click into the list
-    // directly" (lists-and-list-groups.md). Both the menu and Edit List do it.
+    // A list can be left out of All, Today and Done separately, yet its tasks
+    // stay visible when you open it directly. Both the menu and Edit List do it.
     void focusListExclusions() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -522,8 +518,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!liveList(app, app.ids.home).muteAlerts, 5000);
     }
 
-    // "Archive List: ... Archived lists and their tasks stay out of active
-    // views" and "restored at any time" (lists-and-list-groups.md).
+    // Archived lists and their tasks leave the active views, and can be
+    // restored later.
     void archiveAndRestore() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -630,8 +626,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 5000);
     }
 
-    // "Overdue count: to the left of the list name, in red... Undone count: to
-    // the right of a list name" and "These counts are live" (lists-and-list-groups.md).
+    // Each list shows an overdue count on its left and an undone count on its
+    // right, and both follow the tasks live.
     void listCountsFollowTasks() {
         App app(seedLists);
         QVERIFY(app.ok);

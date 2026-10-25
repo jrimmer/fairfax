@@ -31,8 +31,8 @@ class E2ETasksLifecycle : public QObject {
     static QString homeKey(App &app) { return "list:" + QString::number(app.ids.home); }
 
 private slots:
-    // Ticking the checkbox completes a task: the row is struck through, Done lists it,
-    // and clicking its checkbox there reopens it.
+    // Ticking the checkbox completes a task: the row is struck through, Done
+    // lists it, and clicking its checkbox there reopens it.
     void completeAndReopenWithCheckbox() {
         App app;
         QVERIFY(app.ok);
@@ -347,7 +347,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!app.task(a).deleted && !app.task(b).deleted, 5000);
     }
 
-    // "Drag tasks onto a list in the sidebar to move them" (the drop hint reads
+    // Dragging tasks onto a sidebar list moves them (the drop hint reads
     // "Drop to Move"); one undo puts the task back.
     void dragOntoSidebarList() {
         App app;

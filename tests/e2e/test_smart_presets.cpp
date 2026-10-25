@@ -80,11 +80,10 @@ private slots:
         QVERIFY(allShown().size() > 50);
     }
 
-    // "`alltasks` Any task (Project, Checklist, Sub-task, or Task) in a flat
-    // view"; "`task` Top-level plain Tasks only"; … "`emptychck` Checklists
-    // with no active sub-tasks" (smart-lists.md, type: Presets for Task
-    // Structure). Checklist items and sub-tasks of plain tasks nest under
-    // their parent in Fairfax, so `subtasks` lists project children only.
+    // Structure presets: `alltasks` is every task in a flat view, `task` only
+    // top-level plain tasks, `emptychck` checklists with no active sub-tasks.
+    // Checklist items and sub-tasks of plain tasks nest under their parent in
+    // Fairfax, so `subtasks` lists project children only.
     void typeStructure_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -104,8 +103,8 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`action` Tasks with any Action attached; `call` Call action; `sms`
-    // Message; `email` Mail; `browse` Browse (URL); `visit` Visit; `google`".
+    // Action presets: `action` for any action, then `call`, `sms`, `email`,
+    // `browse`, `visit` and `google` for one kind each.
     void typeActions_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -127,8 +126,7 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`audio` Tasks with audio attachments; `pict` picture attachments;
-    // `note` Tasks with notes; `capturedmail` Tasks captured from an email".
+    // Attachment and note presets: `audio`, `pict`, `note` and `capturedmail`.
     // Fairfax has no mail capture, so that preset matches nothing.
     void typeAttachmentsNotesCapture_data() {
         QTest::addColumn<QString>("query");
@@ -163,12 +161,10 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`starred`, `alarms`, `repeat`, `duration`, `inprogress`: Not-completed
-    // tasks whose start date or duration window is currently active,
-    // `scheduled`: Not-completed tasks with a future start date, `paused`:
-    // Tasks belonging to a paused tag" (type: Presets for Status and
-    // Tracking). Scheduled and paused tasks are hidden by default, but a query
-    // that asks for them by name shows them.
+    // Status presets: `starred`, `alarms`, `repeat`, `duration` and
+    // `inprogress` (active start or duration window), `scheduled` (future start
+    // date) and `paused` (paused tag). Scheduled and paused tasks are hidden by
+    // default, but a query that asks for them by name shows them.
     void typeStatusTracking_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -206,9 +202,8 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`due` Has a due date; `nodue` No due date; `start` Has a start date;
-    // `nostart` No start date" (type: Presets for Has a Date). A future start
-    // date makes a task scheduled, which is hidden unless asked for.
+    // Date presets: `due`, `nodue`, `start` and `nostart`. A future start date
+    // makes a task scheduled, which is hidden unless asked for.
     void typeHasDate_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -223,10 +218,9 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`duetoday`/`today` Due today; `duetomorrow`/`tomorrow` Due tomorrow;
-    // `duethisweek` Due this week" (type: Presets for Due Date). "Tokens that
-    // check the due date also match a task whose duration counts back into
-    // that day or week."
+    // Due presets: `duetoday`/`today`, `duetomorrow`/`tomorrow` and
+    // `duethisweek`. Tasks whose duration window covers that day or week match
+    // too.
     void typeDueDate_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -261,10 +255,9 @@ private slots:
         SMART_SHOWS(app, SL{"Starts today"});
     }
 
-    // "`anytoday` Start or due date is today; `anytomorrow`; `anythisweek`;
-    // `thisweek` Start or due date is this week (alias for `anythisweek`)".
-    // "Watch the asymmetry: bare `today` and `tomorrow` match the due date
-    // only, but bare `thisweek` matches start or due."
+    // Start-or-due presets: `anytoday`, `anytomorrow`, `anythisweek` and its
+    // alias `thisweek`. Careful: bare `today` and `tomorrow` look at the due date
+    // only, while bare `thisweek` looks at start or due.
     void typeStartOrDue() {
         App &app = *m_app;
         SMART_QUERY(app, "type: anytoday", DueToday + SL{"Starts today"});

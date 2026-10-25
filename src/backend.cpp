@@ -4891,7 +4891,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         return c;
     };
 
-    // The GTD Inbox, when present, sits in its own group above the focus lists.
+    // The Inbox, when enabled, gets a group of its own ahead of the focus lists.
     // My Day is the first entry of the views list, above everything else.
     if (myDayEnabled())
         rows.append({{"key", "myday"}, {"kind", "focus"}, {"sourceKey", "myday"}, {"title", "My Day"},

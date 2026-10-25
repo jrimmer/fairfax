@@ -641,7 +641,7 @@ ImportResult importIcs(Store &store, const QString &path, qint64 fallbackListId)
     }
     const QList<Parsed> todos = allFromIcs(file.readAll());
     if (todos.isEmpty()) {
-        result.error = QStringLiteral("The selected calendar file does not contain any tasks.");
+        result.error = QStringLiteral("No tasks were found in that calendar file.");
         return result;
     }
 

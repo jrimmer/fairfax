@@ -403,11 +403,11 @@ inline Seed seedText(Store &store) {
     t.name = "tagged";
     store.putTag(t);
     const struct { const char *title, *notes; int list; } rows[] = {
-        {"Get a haircut one day", "", 0},
-        {"Buy a new car some day", "", 0},
-        {"Find a new job", "", 0},
-        {"Call: Mum, tell about my new job", "", 0},
-        {"Call: Tim", "", 0},
+        {"Learn a language one day", "", 0},
+        {"Buy a new bike some day", "", 0},
+        {"Find a new flat", "", 0},
+        {"Call: Ana, mention the new flat", "", 0},
+        {"Call: Sam", "", 0},
         {"Renew passport", "", 0},
         {"Read the handbook", "", 0},
         {"Pack the notebook", "", 0},
@@ -424,7 +424,7 @@ inline Seed seedText(Store &store) {
         {"Tag text #garden thing", "", 0},
         {"Buy bread and butter", "", 0},
         {"Walk or run", "", 0},
-        {"Elsewhere job offer", "", 1},
+        {"Elsewhere flat offer", "", 1},
     };
     double order = 0;
     for (const auto &r : rows) {

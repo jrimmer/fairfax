@@ -112,8 +112,8 @@ bool inToday(const Task &t, const QDateTime &now, const ScheduleSettings &s) {
         return false;
     if (s.todayIncludesStarred && t.starred)
         return true;
-    // The start date wins while scheduled tasks are hidden, even over a
-    // duration window that reaches back past it.
+    // With scheduled tasks hidden, a future start date keeps the task out,
+    // even if a duration window reaches back past it.
     if (isScheduled(t, now))
         return false;
     const QDate today = now.date();

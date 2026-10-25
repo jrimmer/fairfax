@@ -122,9 +122,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!windowTitled("Quick Entry"), 5000);
     }
 
-    // "You can also switch styles from the main window... the calendar button,
-    // the one that shows and hides the Mini Calendar... a Display style: menu"
-    // and "Shade Weekends" (mini-calendar.md). Every choice shows at once.
+    // The Mini Calendar button and the display style menu change the calendar,
+    // and Shade Weekends is a separate switch. Every choice shows at once.
     void settingsApplyLive() {
         App app;
         QVERIFY(app.ok);
@@ -173,10 +172,8 @@ private slots:
         QVERIFY(!dotsShown());
     }
 
-    // "Click a day to filter the current task list to just the tasks for that
-    // date. Click the same day again to clear the filter." and "Click and drag
-    // across several days to filter the task list to that range."
-    // (mini-calendar.md)
+    // Clicking a day filters the task list to that date and clicking it again
+    // clears the filter; dragging across days filters to the range.
     void miniCalendarFiltersDays() {
         App app;
         QVERIFY(app.ok);

@@ -125,8 +125,8 @@ class E2EMiscTags : public QObject {
     }
 
 private slots:
-    // "Open the right utility panel and switch to Tags to see your tags, each
-    // with a count of tasks" (tags.md): alphabetical, grouped under TAGS.
+    // The utility panel's Tags tab lists every tag with its task count:
+    // alphabetical, grouped under TAGS.
     void panelListsTagsWithCounts() {
         App app(seedMisc);
         QVERIFY(app.ok);
@@ -176,8 +176,8 @@ private slots:
         QCOMPARE(panelRows(app), (QStringList{"[Tags]", "apple", "fresh", "garden", "mango", "zebra"}));
     }
 
-    // "Filter by another tag to add it to the filter; ... repeat on a filtering
-    // tag to take it back out." The clear button empties the filter at once.
+    // Clicking a tag filters by it, clicking a second one narrows further, and
+    // clicking an active one removes it. The clear button empties the filter at once.
     void clickingATagFiltersAndClickingAgainClears() {
         App app(seedMisc);
         QVERIFY(app.ok);
@@ -215,7 +215,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(rowIds().size() > 3, 5000);
     }
 
-    // "Right-click → Rename...: the change applies to every task using that tag."
+    // Renaming a tag renames it on every task that uses it.
     void renameATagAndTasksFollow() {
         App app(seedMisc);
         QVERIFY(app.ok);
@@ -243,8 +243,7 @@ private slots:
         QCOMPARE(app.store().tag(mw().mango).name, QString("mango"));
     }
 
-    // "A rename to a name that's already taken by another tag is rejected, so
-    // tags always stay unique" (tags.md).
+    // Renaming a tag to an existing name is refused, so tags stay unique.
     void renameToATakenNameIsRejected() {
         App app(seedMisc);
         QVERIFY(app.ok);
@@ -409,8 +408,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(panelRows(app).size(), 6, 5000);
     }
 
-    // "Pausing a tag: every task that carries that tag is hidden from view";
-    // "Task > Show Paused" shows them without resuming; Resume brings them back.
+    // A paused tag hides its tasks; Show Paused reveals them without
+    // resuming, and Resume brings them back.
     void pauseAndResumeATag() {
         App app(seedMisc);
         QVERIFY(app.ok);
@@ -472,8 +471,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(panelRows(app), (QStringList{"[Tags]", "apple", "garden", "mango", "zebra"}), 5000);
     }
 
-    // "Drag a tag from the panel onto a task in the list" tags it; "drag a
-    // selection of tasks onto a tag" tags them all; dropped on a group, the group's tags.
+    // Dragging a tag onto a task tags it; dragging selected tasks onto a tag
+    // tags them all; dropped on a group, they get the group's tags.
     void dragTagsOntoTasksAndTasksOntoTags() {
         App app(seedMisc);
         QVERIFY(app.ok);

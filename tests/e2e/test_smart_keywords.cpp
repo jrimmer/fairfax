@@ -89,9 +89,9 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "Include every tag that belongs to one or more named Tag Groups… As
-    // with a tags: exclusion, excluding a group that contains tags, such as
-    // taggroups: !Someday, only matches tasks that have at least one tag."
+    // taggroups: matches the tags of the named groups. Like a tags: exclusion,
+    // excluding a group (taggroups: !Someday) only matches tasks with at least
+    // one tag.
     void tagGroupsKeyword_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -133,9 +133,7 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "groups: projects  # all tasks in the Projects list group"; "groups:
-    // home, work  # tasks in either group"; "groups: !home  # exclude the Home
-    // group" (Filter by List Group).
+    // groups: takes one or more list groups, and !name excludes a group.
     void groupsKeyword_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -152,8 +150,7 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "lists: Work, Home  # tasks from the Work or Home lists"; "lists:
-    // !Archive  # everything except the Archive list" (Filter by List).
+    // lists: takes one or more lists, and !name excludes a list.
     void listsKeyword_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -175,10 +172,9 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`lists:` is scope-replacing: a resolved `lists:` filter searches across
-    // all of your lists, regardless of which list is currently selected.
-    // `groups:` and `completed:` behave the same way. The remaining keywords
-    // stay inside whichever list you're searching."
+    // lists:, groups: and completed: replace the scope: a resolved filter
+    // searches every list, whatever list is selected. The other keywords stay
+    // inside the list being searched.
     void listsGroupsCompletedReplaceScope() {
         App &app = *m_app;
         QVERIFY(pane(app, lk(listId("Garden"))));
@@ -192,11 +188,10 @@ private slots:
         SMART_SHOWS(app, inLists(SL{"Garden"}));
     }
 
-    // "All three take the same relative-time value: a number plus a unit,
-    // where the units are mins, h, d, w, m, y. Long spellings work too (3
-    // days, 2 weeks, 1 month), and the number can be fractional (1.5h, 0.5d).
-    // A plain value (or one prefixed with <) means within the last …; prefix
-    // with > for more than … ago."
+    // created: and modified: take a relative time: a number and a unit (mins,
+    // h, d, w, m, y), long spellings (3 days, 2 weeks, 1 month) and fractions
+    // (1.5h, 0.5d). A bare value or a < prefix means within the last such span;
+    // a > prefix means longer ago than that.
     void createdAndModified_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -228,8 +223,8 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "`completed:` automatically widens the search to include completed tasks
-    // (and across all your lists), so you don't have to unhide them first."
+    // completed: widens the search to completed tasks and to every list, so
+    // nothing has to be unhidden first.
     void completedKeyword_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -249,9 +244,8 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "type: overdue tags: home OR school  # overdue and (tagged home or
-    // school); The OR lives inside the tags: section; it does not spill over
-    // into type:" (Combining Keywords).
+    // Keywords are ANDed together: in "type: overdue tags: home OR school",
+    // the OR stays inside tags: and does not spill into type:.
     void keywordsAreAnded_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");
@@ -277,11 +271,9 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // "To turn a section into an alternative instead, put a standalone OR
-    // immediately in front of its keyword: type: overdue OR tags: urgent…
-    // plumber type: hiprio OR tags: urgent OR completed: 1d returns (text
-    // plumber and high priority) or (tagged urgent) or (completed in the last
-    // day)."
+    // A standalone OR before a keyword makes that section an alternative:
+    // "plumber type: hiprio OR tags: urgent OR completed: 1d" gives plumber text
+    // with high priority, or urgent-tagged tasks, or tasks completed within a day.
     void orBranches_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");

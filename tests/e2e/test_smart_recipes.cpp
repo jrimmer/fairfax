@@ -101,7 +101,7 @@ private slots:
         QTest::newRow("Not tagged waiting, untagged too") << "tags: ~ OR !waiting" << without(allShown(), SL{"Invoice overdue"});
         QTest::newRow("Has a tag, but not waiting") << "tags: !waiting" << without(Tagged, SL{"Invoice overdue"});
         QTest::newRow("Tagged home or errands") << "tags: home, errands" << SL{"Milk today", "Parcel tomorrow"};
-        QTest::newRow("At work but not blocked") << "tags: work AND !blocked" << SL{"Email boss", "Play tagged work", "Call work"};
+        QTest::newRow("Work tag minus blocked tag") << "tags: work AND !blocked" << SL{"Email boss", "Play tagged work", "Call work"};
         QTest::newRow("Contexts group minus phone") << "taggroups: Contexts tags: !phone" << without(Contexts, SL{"Call mum"});
         QTest::newRow("Has at least one tag") << "type: anytag" << Tagged;
         QTest::newRow("Completely untagged") << "type: notag" << without(allShown(), Tagged);

@@ -685,7 +685,7 @@ private slots:
         };
         fresh();
         const qint64 l = m_store->lists().begin().key();
-        for (const char *s : {"Get a haircut one day", "Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job", "Call: Tim"})
+        for (const char *s : {"Learn a language one day", "Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat", "Call: Sam"})
             addTask(l, s);
         auto live = [&](const QString &q) {
             const Query query = Query::parse(q);
@@ -696,12 +696,12 @@ private slots:
             out.sort();
             return out;
         };
-        QCOMPARE(live("new job"), sorted({"Find a new job", "Call: Mum, tell about my new job"}));
-        QCOMPARE(live("new job -find"), sorted({"Call: Mum, tell about my new job"}));
-        QCOMPARE(live("a day"), sorted({"Get a haircut one day", "Buy a new car some day"}));
+        QCOMPARE(live("new flat"), sorted({"Find a new flat", "Call: Ana, mention the new flat"}));
+        QCOMPARE(live("new flat -find"), sorted({"Call: Ana, mention the new flat"}));
+        QCOMPARE(live("a day"), sorted({"Learn a language one day", "Buy a new bike some day"}));
         QCOMPARE(live("Call OR new"),
-                 sorted({"Buy a new car some day", "Find a new job", "Call: Mum, tell about my new job", "Call: Tim"}));
-        QCOMPARE(live("\"new job\""), sorted({"Find a new job", "Call: Mum, tell about my new job"}));
+                 sorted({"Buy a new bike some day", "Find a new flat", "Call: Ana, mention the new flat", "Call: Sam"}));
+        QCOMPARE(live("\"new flat\""), sorted({"Find a new flat", "Call: Ana, mention the new flat"}));
         QCOMPARE(live("ject"), QStringList());
     }
 

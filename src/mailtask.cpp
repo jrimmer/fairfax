@@ -18,7 +18,7 @@ namespace MailTask {
 
 namespace {
 
-constexpr int kMaxNotes = 10000;  // "Up to 10,000 characters of notes per task."
+constexpr int kMaxNotes = 10000;  // Longer bodies are cut off.
 constexpr int kMaxTitle = 1000;
 constexpr int kMaxDepth = 12;     // Multiparts nested deeper than this are junk.
 

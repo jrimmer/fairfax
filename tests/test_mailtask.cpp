@@ -242,7 +242,7 @@ private slots:
     // ------------------------------------------------------------ title
 
     void importPlainTextMakesATask() {
-        // "The subject becomes the task's title... The plain-text body becomes the task's notes."
+        // Subject -> title, plain-text body -> notes.
         const MailTask::Result r = go(fixture("plain.eml"), options());
         QVERIFY(r.ok());
         const Task t = m_store->task(r.taskId);
@@ -313,17 +313,17 @@ private slots:
     // ------------------------------------------------------------ filing instructions
 
     void manualExample() {
-        // "Subject: Pick up the dry cleaning due(tomorrow) list(Errands)" ->
-        // "a task titled 'Pick up the dry cleaning' in your Errands list, due tomorrow."
-        const Task t = made("Pick up the dry cleaning due(tomorrow) list(Errands)");
-        QCOMPARE(t.title, "Pick up the dry cleaning");
+        // A subject with due() and list() instructions: the instructions leave the
+        // title, the task lands in that list and is due tomorrow.
+        const Task t = made("Return the library books due(tomorrow) list(Errands)");
+        QCOMPARE(t.title, "Return the library books");
         QCOMPARE(t.listId, m_errands);
         QCOMPARE(t.dueDate, QDate(2026, 10, 14));
         QCOMPARE(t.dueTime, -1);
     }
 
     void startAndDue() {
-        // "start(...) Sets a start date. due(...) Sets a due date, with a time when you include one."
+        // start() sets the start date; due() sets the due date, with a time if given.
         const Task t = made("Plan trip start(today) due(tomorrow 3pm)");
         QCOMPARE(t.title, "Plan trip");
         QCOMPARE(t.startDate, QDate(2026, 10, 13));
@@ -358,7 +358,7 @@ private slots:
     }
 
     void badListFallsBackToTheDestination() {
-        // "If a named list doesn't exist, the task simply lands in your chosen destination list."
+        // An unknown list name leaves the task in the destination list.
         MailTask::Options o;
         o.listId = m_home;
         Task t = made("Mow lawn list(Nowhere)", "x", o);
@@ -396,7 +396,7 @@ private slots:
     }
 
     void actions() {
-        // "Supported action types are call, message, url, visit, and google." (email and mail also.)
+        // Action types: call, message, url, visit and google (plus email and mail).
         struct Case { const char *text; int type; const char *value; };
         const Case cases[] = {{"action(call, 0793273373)", ActionType::Call, "0793273373"},
                               {"action(message, +44 7700 900123)", ActionType::Message, "+44 7700 900123"},
@@ -439,7 +439,7 @@ private slots:
     // ------------------------------------------------------------ checklists
 
     void checklistOnlyNumberedLines() {
-        // "a body that is only numbered items becomes just the checklist, with no notes."
+        // A body made only of numbered items turns into the checklist, no notes.
         const Task t = made("Saturday shopping list(Home)", "\n1. Milk\n\n2. Coffee beans\n\n3. Bird seed\n");
         QCOMPARE(t.type, int(TaskType::Checklist));
         QCOMPARE(t.listId, m_home);
@@ -457,7 +457,7 @@ private slots:
     }
 
     void textBeforeTheFirstNumberKeepsANormalTask() {
-        // "Start the body with 1.: text before the first numbered line keeps the message a normal task."
+        // Text before the first numbered line keeps the message an ordinary task.
         const QString body = "Things I need:\n1. Milk\n2. Eggs";
         const Task t = made("Shopping", body);
         QCOMPARE(t.type, int(TaskType::Task));
@@ -468,7 +468,8 @@ private slots:
     }
 
     void mixedBodyKeepsTheFullTextInTheNotes() {
-        // "When the body mixes numbered lines with other text, the full message text is kept in the checklist's notes."
+        // A body mixing numbered lines with other text is kept whole in the
+        // checklist's notes.
         const QString body = "1. Milk\n2. Eggs\nThanks, Sam";
         const Task t = made("Shopping", body);
         QCOMPARE(t.type, int(TaskType::Checklist));
@@ -486,8 +487,8 @@ private slots:
         QTest::newRow("get outlook") << "Get Outlook for Android\n3. Not an item";
     }
     void signatureEndsTheChecklist() {
-        // "A signature ('Sent from my iPhone' and the like) ends the checklist rather than becoming
-        // an item, and stays in the notes with the rest of the message."
+        // A signature ends the checklist instead of becoming an item, and is kept in
+        // the notes along with the remainder of the message.
         QFETCH(QString, signature);
         const QString body = "1. Milk\n2. Eggs\n\n" + signature;
         const Task t = made("Shopping", body);
@@ -507,7 +508,7 @@ private slots:
     // ------------------------------------------------------------ notes
 
     void notesAreCappedAt10000Characters() {
-        // "The plain-text body becomes the task's notes, up to 10,000 characters."
+        // Notes are capped at 10,000 characters.
         QCOMPARE(made("Long", QString(10000, 'a')).notes.size(), 10000);
         const Task t = made("Longer", QString(12000, 'b'));
         QCOMPARE(t.notes.size(), 10000);

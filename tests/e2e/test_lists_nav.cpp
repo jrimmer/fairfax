@@ -27,10 +27,8 @@ class E2EListNavigation : public QObject {
     Q_OBJECT
 
 private slots:
-    // "Focus Lists... All, Today, Starred, Scheduled, Done" and "Use the
-    // keyboard shortcuts ⌘0–⌘5 to jump between Focus Lists."
-    // (lists-and-list-groups.md) Clicking a row and pressing its shortcut land
-    // on the same tasks.
+    // The focus lists have shortcuts for jumping between them (Ctrl+0 to
+    // Ctrl+5). Clicking a row and pressing its shortcut land on the same tasks.
     void focusListsShowTheirTasks() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -131,10 +129,9 @@ private slots:
         }
     }
 
-    // "List Jump Bar: Jump to a List by Name... Regular lists, Smart Lists,
-    // built-in Focus lists, and even the projects and checklists... all match
-    // by name." (search-and-jump-bars.md) J opens it, clicking the list's name
-    // does too, Return goes, Escape leaves.
+    // The list jump bar finds lists, Smart Lists, focus lists, projects and
+    // checklists by name. J opens it, clicking the list's name does too, Return
+    // goes, Escape leaves.
     void listJumpBar() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -200,9 +197,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), lk(w.errands), 5000);
     }
 
-    // "Quick Open (⇧⌘O): type a few letters and jump to any task, list,
-    // project, or sub-task anywhere in the app, with your recently used tasks
-    // and lists offered the moment it opens." (search-and-jump-bars.md)
+    // Quick Open takes a few letters and jumps to any task, list, project or
+    // sub-task, offering recent items as soon as it opens.
     void quickOpen() {
         App app(seedLists);
         QVERIFY(app.ok);
@@ -281,11 +277,9 @@ private slots:
         }
     }
 
-    // "Disclosure Triangle: Jump to a Project or Checklist... Click it and the
-    // panel reveals every project and checklist inside that list. Click any of
-    // them to highlight it" (lists-and-list-groups.md), and the project view:
-    // the title becomes the project's, with the list as an arrow badge that
-    // takes you back (Ctrl+Alt+J does both ways).
+    // A list's disclosure triangle reveals its projects and checklists; clicking
+    // one opens the project view: the title becomes the project's, with the list
+    // as an arrow badge that takes you back (Ctrl+Alt+J does both ways).
     void projectViewAndBack() {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
