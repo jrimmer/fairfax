@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.3 (unreleased)
+
+- `fairfax import` in the terminal now takes a backup first, the way Settings
+  does, and prints the backup's name. To go back, restore it in Settings >
+  Backups (Ctrl+Z can't reach an import made from the terminal). A file that
+  can't be imported leaves no backup and changes nothing.
+- "Alerts on date-only tasks fire at" (Settings > Alerts) and "Default due
+  time" (Settings > Tasks) no longer change each other. Each keeps its own time;
+  on upgrade, the alert time starts from your current default due time, so no
+  alert moves.
+- `fairfax --version` and `fairfax --help` now work over SSH or in any shell
+  without a display, instead of crashing. `--screenshot` no longer needs a
+  display either.
+- The README's keyboard table now lists every default shortcut, the My Day
+  review's `r` key is described correctly (it moves the task to tomorrow), and
+  the README mentions that a place can be paused like a tag.
+
 ## 1.0.2 (2026-10-25)
 
 ### Faster
