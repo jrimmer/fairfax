@@ -260,37 +260,37 @@ private slots:
         QCOMPARE(titleOf(plain), QString("Call the plumber"));
         QCOMPARE(titleOf("70000000-0000-4000-8000-000000000005"), QString("<none>"));  // the tombstone
 
-        // Edit the plain task, then complete it, each with a larger `modified`.
+        // Edit, complete and delete the plain task the way the document's
+        // writing section does: start from the newest files (Fairfax has
+        // pushed its own write-back meanwhile), change the record with a
+        // larger `modified`, commit, push.
         const QString file = agent + "/tasks/" + plain + ".json";
-        QJsonObject obj = parse(readFile(file));
-        obj["title"] = "Call the plumber about the tap";
-        obj["modified"] = kNow;
-        writeFile(file, QJsonDocument(obj).toJson(QJsonDocument::Indented));
-        QVERIFY(git(agent, {"commit", "-q", "-am", "Edit task"}));
-        QVERIFY(git(agent, {"push", "-q", "origin", "main"}));
-        QVERIFY(sync.syncBlocking());
+        auto change = [&](qint64 modified, const std::function<void(QJsonObject &)> &edit) {
+            QVERIFY(git(agent, {"fetch", "-q", "origin"}));
+            QVERIFY(git(agent, {"reset", "-q", "--hard", "origin/main"}));
+            QJsonObject obj = parse(readFile(file));
+            QVERIFY(obj.value("modified").toInteger() < modified);
+            edit(obj);
+            obj["modified"] = modified;
+            writeFile(file, QJsonDocument(obj).toJson(QJsonDocument::Indented));
+            QVERIFY(git(agent, {"commit", "-q", "-am", "Change task"}));
+            QVERIFY(git(agent, {"push", "-q", "origin", "main"}));
+            QVERIFY(sync.syncBlocking());
+        };
+        change(kNow, [](QJsonObject &o) { o["title"] = "Call the plumber about the tap"; });
         QCOMPARE(titleOf(plain), QString("Call the plumber about the tap"));
 
-        obj["completed"] = true;
-        obj["completed_at"] = kNow + 5;
-        obj["modified"] = kNow + 5;
-        writeFile(file, QJsonDocument(obj).toJson(QJsonDocument::Indented));
-        QVERIFY(git(agent, {"commit", "-q", "-am", "Complete task"}));
-        QVERIFY(git(agent, {"push", "-q", "origin", "main"}));
-        QVERIFY(sync.syncBlocking());
+        change(kNow + 5, [](QJsonObject &o) {
+            o["completed"] = true;
+            o["completed_at"] = kNow + 5;
+        });
         bool completed = false;
         for (const auto &t : store.tasks())
             if (t.uid == plain)
                 completed = t.completed && t.completedAt.toSecsSinceEpoch() == kNow + 5;
         QVERIFY(completed);
 
-        // A delete by tombstone.
-        obj["deleted"] = true;
-        obj["modified"] = kNow + 10;
-        writeFile(file, QJsonDocument(obj).toJson(QJsonDocument::Indented));
-        QVERIFY(git(agent, {"commit", "-q", "-am", "Delete task"}));
-        QVERIFY(git(agent, {"push", "-q", "origin", "main"}));
-        QVERIFY(sync.syncBlocking());
+        change(kNow + 10, [](QJsonObject &o) { o["deleted"] = true; });
         QCOMPARE(titleOf(plain), QString("<none>"));
     }
 };
