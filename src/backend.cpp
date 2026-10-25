@@ -4149,7 +4149,7 @@ void Backend::updateSmartList(qint64 listId, const QString &name, const QString 
 // ------------------------------------------------------- backups & files
 
 QString Backend::backupFolder() const {
-    return QFileInfo(m_store->path()).absolutePath() + "/backups";
+    return m_store->backupFolder();
 }
 
 QString Backend::diagnosticsReport(const QString &extra) const {
@@ -4236,22 +4236,13 @@ void Backend::maybeBackup() {
 }
 
 bool Backend::backupNow(const QString &reason) {
-    const QString name = QStringLiteral("Fairfax_(%1)%2.db")
-                             .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd-HH_mm_ss"),
-                                  reason.isEmpty() ? QString() : "_" + reason);
     QString error;
-    if (!m_store->backupTo(backupFolder() + "/" + name, &error)) {
+    const QString name = m_store->takeBackup(reason, &error);
+    if (name.isEmpty()) {
         setStatus("Backup failed: " + error);
         return false;
     }
-    m_store->setSetting("backup.last", QDateTime::currentSecsSinceEpoch());
-    // Keep at most N automatic backups; safety backups taken before a
-    // restore or import are pruned the same way.
-    const int keep = qMax(1, m_store->setting("backup.keep", 10).toInt());
-    QDir dir(backupFolder());
-    const auto files = dir.entryInfoList({"Fairfax_*.db"}, QDir::Files, QDir::Time);
-    for (int i = keep; i < files.size(); ++i)
-        QFile::remove(files.at(i).absoluteFilePath());
+    m_store->pruneBackups();
     if (reason.isEmpty())
         setStatus("Backed up to " + name);
     return true;

@@ -113,6 +113,15 @@ public:
     // consistent file even while the app is writing.
     bool backupTo(const QString &file, QString *error = nullptr);
 
+    // The backups folder beside the database, and a named backup in it:
+    // "Fairfax_(date-time)_reason.db". Returns the file name, or an empty
+    // string with `error` set. Both the app and `fairfax import` use this.
+    // pruneBackups() removes the oldest beyond "backup.keep"; takeBackup()
+    // does not do that itself, so a caller can discard its own backup first.
+    QString backupFolder() const;
+    QString takeBackup(const QString &reason, QString *error = nullptr);
+    void pruneBackups();
+
     // Replaces the whole database with `file` (a backup), after checking it
     // opens as a Fairfax database. Undo history is cleared: there is no
     // undoing past a restore, which is why a safety backup is made first.

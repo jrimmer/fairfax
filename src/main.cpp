@@ -303,18 +303,7 @@ int runHeadless(int argc, char *argv[]) {
             err << "usage: fairfax import <task database | tasks.ics | TickTick-backup.csv | Things.json | OmniFocus.taskpaper> [--db PATH]" << Qt::endl;
             return 2;
         }
-        const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive) ? Exchange::importIcs(store, file, 0)
-                               : Exchange::isTickTickBackup(file)          ? Exchange::importTickTick(store, file)
-                               : file.endsWith(".json", Qt::CaseInsensitive) && Exchange::isThingsExport(file) ? Exchange::importThings(store, file)
-                               : Exchange::isTaskPaper(file)               ? Exchange::importOmniFocus(store, file)
-                                                                           : Exchange::importTaskDatabase(store, file);
-        if (!r.error.isEmpty()) {
-            err << "fairfax: import failed: " << r.error << Qt::endl;
-            return 1;
-        }
-        out << QStringLiteral("Imported %1 lists, %2 tasks, %3 tags, %4 alerts").arg(r.lists).arg(r.tasks).arg(r.tags).arg(r.alarms)
-            << (r.updated ? QStringLiteral("; filled in %1 earlier imports").arg(r.updated) : QString()) << "." << Qt::endl;
-        return 0;
+        return Cli::importFile(store, file, out, err);
     }
     Automation automation(store);
     if (mode == "ctl" && args.value(2) == "myday") {

@@ -21,9 +21,10 @@ Importing the same TickTick backup a second time adds only what is new, so you c
 repeat it safely while you are settling in.
 
 You can also import from a terminal with `fairfax import FILE`. Fairfax recognises the
-kind of file by looking inside it. Note that the terminal command does **not** take a
-backup first and cannot be undone with Ctrl+Z. If you use it, press **Back Up Now** in
-[Settings → Backups](08-sync-and-backups.md) beforehand.
+kind of file by looking inside it. Like the Settings route, the terminal command takes a
+backup first and prints its name. It cannot be undone with Ctrl+Z, though; to go back,
+restore that backup in [Settings → Backups](08-sync-and-backups.md). If the file cannot
+be imported, no backup is kept and nothing changes.
 
 ## From TickTick
 
@@ -77,7 +78,7 @@ Lists, groups, tags, dates, repeats and alerts come across.
 
 Press **Ctrl+Z** straight after an import from Settings. If you have done other things
 since, or you imported from the terminal, go to
-[Settings → Backups](08-sync-and-backups.md). Every import from Settings left a backup
+[Settings → Backups](08-sync-and-backups.md). Every import left a backup
 named `before-import` in the list. **Restore** it for everything, or use **Lists…** to
 bring back just the lists you want.
 

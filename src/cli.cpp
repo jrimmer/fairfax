@@ -18,6 +18,7 @@
 #endif
 
 #include "automation.h"
+#include "exchange.h"
 #include "mailtask.h"
 #include "query.h"
 #include "schedule.h"
@@ -117,6 +118,31 @@ int show(Store &store, const Source &source, const QString &search, QTextStream 
 }  // namespace
 
 namespace Cli {
+
+int importFile(Store &store, const QString &file, QTextStream &out, QTextStream &err) {
+    QString backupError;
+    const QString backup = store.takeBackup(QStringLiteral("before-import"), &backupError);
+    if (backup.isEmpty()) {
+        err << "fairfax: import failed: could not take a backup first: " << backupError << Qt::endl;
+        return 1;
+    }
+    const ImportResult r = file.endsWith(".ics", Qt::CaseInsensitive) ? Exchange::importIcs(store, file, 0)
+                           : Exchange::isTickTickBackup(file)          ? Exchange::importTickTick(store, file)
+                           : file.endsWith(".json", Qt::CaseInsensitive) && Exchange::isThingsExport(file) ? Exchange::importThings(store, file)
+                           : Exchange::isTaskPaper(file)               ? Exchange::importOmniFocus(store, file)
+                                                                       : Exchange::importTaskDatabase(store, file);
+    if (!r.error.isEmpty()) {
+        QFile::remove(store.backupFolder() + "/" + backup);  // Nothing was imported, so nothing to go back to.
+        err << "fairfax: import failed: " << r.error << Qt::endl;
+        return 1;
+    }
+    store.pruneBackups();
+    out << QStringLiteral("Imported %1 lists, %2 tasks, %3 tags, %4 alerts").arg(r.lists).arg(r.tasks).arg(r.tags).arg(r.alarms)
+        << (r.updated ? QStringLiteral("; filled in %1 earlier imports").arg(r.updated) : QString()) << "." << Qt::endl;
+    out << "Backed up first: " << backup << Qt::endl
+        << "To undo the import, restore that backup in Settings > Backups." << Qt::endl;
+    return 0;
+}
 
 int add(Store &store, const QStringList &words, QTextStream &out, QTextStream &err) {
     const QString text = words.join(' ').trimmed();

@@ -1,5 +1,6 @@
 #include "store.h"
 
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -796,6 +797,30 @@ bool Store::backupTo(const QString &file, QString *error) {
         return false;
     }
     return true;
+}
+
+QString Store::backupFolder() const {
+    return QFileInfo(m_path).absolutePath() + "/backups";
+}
+
+QString Store::takeBackup(const QString &reason, QString *error) {
+    const QString name = QStringLiteral("Fairfax_(%1)%2.db")
+                             .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd-HH_mm_ss"),
+                                  reason.isEmpty() ? QString() : "_" + reason);
+    if (!backupTo(backupFolder() + "/" + name, error))
+        return {};
+    setSetting("backup.last", QDateTime::currentSecsSinceEpoch());
+    return name;
+}
+
+void Store::pruneBackups() {
+    // Keep at most N automatic backups; safety backups taken before a
+    // restore or import are pruned the same way.
+    const int keep = qMax(1, setting("backup.keep", 10).toInt());
+    QDir dir(backupFolder());
+    const auto files = dir.entryInfoList({"Fairfax_*.db"}, QDir::Files, QDir::Time);
+    for (int i = keep; i < files.size(); ++i)
+        QFile::remove(files.at(i).absoluteFilePath());
 }
 
 bool Store::replaceWith(const QString &file, QString *error) {

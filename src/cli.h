@@ -30,6 +30,14 @@ int add(Store &store, const QStringList &words, QTextStream &out, QTextStream &e
 // Prints a line per message. Returns 0 when everything was added or was a
 // duplicate, 1 on an unreadable message or a store error, 2 on bad usage.
 int importMail(Store &store, const QStringList &args, QIODevice &in, QTextStream &out, QTextStream &err);
+// `fairfax import FILE` (a task database, .ics, or another app's export), with
+// `file` the path. Like Settings > Import & Export it takes a "before-import"
+// backup first, through Store::takeBackup, and prints its name after the
+// usual "Imported ..." line. The undo history lives in the running app's
+// memory, so the import can't be undone with Ctrl+Z from here; the output says
+// to restore the backup in Settings > Backups instead. A failed import removes
+// its backup again, since nothing changed. Returns 0, or 1 on any failure.
+int importFile(Store &store, const QString &file, QTextStream &out, QTextStream &err);
 // True when the program was started under the shorthand name: `frfx` on
 // Linux and macOS (usually a symlink); on Windows also `frfx.exe`, with
 // backslash paths and any letter case. `windowsStyle` picks the Windows

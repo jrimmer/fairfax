@@ -67,7 +67,7 @@ private slots:
         QVERIFY(m_dir.isValid());
         qputenv("NO_COLOR", "1");  // The CLI paints only for a terminal; keep the output plain even then.
         m_store = std::make_unique<Store>();
-        QVERIFY(m_store->open(path(QStringLiteral("cli-%1.db").arg(QTest::currentTestFunction()))));
+        QVERIFY(m_store->open(path(QStringLiteral("%1/cli.db").arg(QTest::currentTestFunction()))));
         TaskList inbox, work;
         inbox.id = m_store->nextId("lists");
         inbox.kind = ListKind::Inbox;
@@ -248,6 +248,71 @@ private slots:
         QCOMPARE(again.code, 0);
         QCOMPARE(again.out, "");
         QCOMPARE(tasks().size(), 1);
+    }
+
+    // A calendar file with one task, to import.
+    QString sourceFile() {
+        return write(path("source.ics"),
+                     "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:cli-import-1\r\n"
+                     "SUMMARY:Imported task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n");
+    }
+
+    QStringList backupFiles() const { return QDir(m_store->backupFolder()).entryList({"Fairfax_*.db"}, QDir::Files); }
+
+    Run importFile(const QString &file) {
+        Run run;
+        QTextStream out(&run.out), err(&run.err);
+        run.code = Cli::importFile(*m_store, file, out, err);
+        out.flush();
+        err.flush();
+        return run;
+    }
+
+    void importTakesABackupFirst() {
+        QVERIFY(backupFiles().isEmpty());
+        const Run r = importFile(sourceFile());
+        QCOMPARE(r.err, "");
+        QCOMPARE(r.code, 0);
+        QCOMPARE(tasks().size(), 1);
+        QCOMPARE(tasks().first().title, "Imported task");
+        const QStringList backups = backupFiles();
+        QCOMPARE(backups.size(), 1);
+        QVERIFY(backups.first().endsWith("_before-import.db"));
+        QVERIFY2(r.out.startsWith("Imported ") && r.out.contains(", 1 tasks, 0 tags, 0 alerts."), qPrintable(r.out));
+        QVERIFY2(r.out.contains("Backed up first: " + backups.first()), qPrintable(r.out));
+        QVERIFY2(r.out.contains("Settings > Backups"), qPrintable(r.out));
+
+        // The backup holds the state from before the import.
+        Store before;
+        QVERIFY(before.open(m_store->backupFolder() + "/" + backups.first()));
+        int count = 0;
+        for (const Task &t : before.tasks())
+            count += !t.deleted;
+        QCOMPARE(count, 0);
+        QCOMPARE(before.lists().size(), 2);
+    }
+
+    void importIsOneUndoStepWithinTheStore() {
+        // The undo history is in memory, so only this process could use it;
+        // the import is still a single step.
+        QVERIFY(importFile(sourceFile()).code == 0);
+        QCOMPARE(m_store->undoLabel(), "Import Calendar");
+        QVERIFY(m_store->undo());
+        QCOMPARE(tasks().size(), 0);
+    }
+
+    void aFailedImportTakesNoBackupAndChangesNothing() {
+        const QString bad = write(path("bad.db"), "this is not a database at all");
+        const Run r = importFile(bad);
+        QCOMPARE(r.code, 1);
+        QVERIFY2(r.err.startsWith("fairfax: import failed: "), qPrintable(r.err));
+        QCOMPARE(r.out, "");
+        QVERIFY(backupFiles().isEmpty());
+        QCOMPARE(tasks().size(), 0);
+        QCOMPARE(m_store->lists().size(), 2);
+        const Run missing = importFile(path("nope.ics"));
+        QCOMPARE(missing.code, 1);
+        QVERIFY(backupFiles().isEmpty());
     }
 
     void shorthandNameFromArgv0() {
