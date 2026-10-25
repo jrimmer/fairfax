@@ -626,6 +626,7 @@ private slots:
             QQuickItem *line = findItem("myDayLine");
             QVERIFY2(title && date && review && cap && line, where);
             const QRectF t = rect(title), r = rect(review), c = rect(cap), l = rect(line);
+            QVERIFY2(qAbs(baselineSceneY(title) - baselineSceneY(date)) < 1.5, where);
             QVERIFY2(qAbs(baselineSceneY(review) - baselineSceneY(date)) < 1.5, where);
             QVERIFY2(r.left() >= rect(date).right() - 0.5, where);
             QVERIFY2(r.right() <= l.right() + 0.5, qPrintable(QString("%1: button ends at %2, pane at %3").arg(where).arg(r.right()).arg(l.right())));
@@ -635,6 +636,24 @@ private slots:
         assertFits("default window");
         app.window->resize(900, 760);
         assertFits("900 wide");
+    }
+
+    // On Today the title and the date share a baseline too.
+    void todayTitleAndDateShareABaseline() {
+        App app(seedOnePlanned);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("today"));
+        QTRY_VERIFY_WITH_TIMEOUT(findItem("paneDate") != nullptr && findItem("paneDate")->isVisible(), 5000);
+        for (const QSize &size : {QSize(0, 0), QSize(900, 760)}) {
+            if (size.width() > 0)
+                app.window->resize(size);
+            QTest::qWait(300);
+            QQuickItem *title = findItem("paneTitle");
+            QQuickItem *date = findItem("paneDate");
+            QVERIFY(title && date);
+            QVERIFY2(qAbs(baselineSceneY(title) - baselineSceneY(date)) < 1.5,
+                     qPrintable(QString("%1 vs %2").arg(baselineSceneY(title)).arg(baselineSceneY(date))));
+        }
     }
 
     // The right pane's Day title only shows with calendar sources; without any

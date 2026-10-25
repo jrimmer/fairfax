@@ -188,6 +188,7 @@ Item {
                 font.pixelSize: backend.fontSize + 9
                 font.weight: Font.Bold
                 elide: Text.ElideRight
+                Layout.alignment: Qt.AlignBaseline
                 Layout.maximumWidth: root.width * 0.45
                 Accessible.role: Accessible.Button
                 Accessible.name: backend.sourceTitle

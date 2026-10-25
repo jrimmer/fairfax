@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- On My Day and Today the date now sits on the same baseline as the title
+  instead of floating a little high.
 - The task menu no longer has a blank band above Star when model suggestions
   are off; hidden entries (here and in the Inbox, search and place menus) take
   no room.
