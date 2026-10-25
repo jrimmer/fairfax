@@ -357,7 +357,11 @@ private slots:
                                                   + QStringLiteral("BEGIN:VEVENT\nUID:b\nSUMMARY:Lunch\nDTSTART:%1T120000Z\nDTEND:%1T130000Z\nEND:VEVENT\n").arg(d)));
 
         QQmlEngine engine;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 11, 0)
         std::unique_ptr<QQmlPropertyMap> themeMap(QQmlPropertyMap::create());
+#else
+        auto themeMap = std::make_unique<QQmlPropertyMap>();
+#endif
         QQmlPropertyMap &theme = *themeMap;
         for (const char *name : {"foreground", "muted", "faint", "divider", "overdue", "today", "accent", "raised", "background"})
             theme.insert(name, QColor("#808080"));

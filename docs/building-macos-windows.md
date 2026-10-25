@@ -19,7 +19,7 @@ brew install qt                 # Qt 6.8 or later
 ```
 
 Or use the Qt online installer and point the script at its macOS kit:
-`export QTDIR=$HOME/Qt/6.8.3/macos`. For a nicer icon, `brew install librsvg`.
+`export QTDIR=$HOME/Qt/6.12.0/macos`. For a nicer icon, `brew install librsvg`.
 
 ### Build
 
@@ -78,8 +78,8 @@ ticket. Unsigned builds open after right-click > Open, or
 1. Visual Studio 2022 Build Tools with the C++ workload:
    `winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive"`
 2. Qt 6.8 or later for MSVC 2022 64-bit, from the Qt online installer, or
-   `pip install aqtinstall` then `aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:\Qt`.
-   Then `$env:QTDIR = "C:\Qt\6.8.3\msvc2022_64"` (or have `qmake6` on PATH).
+   `pip install aqtinstall` then `aqt install-qt windows desktop 6.12.0 win64_msvc2022_64 -O C:\Qt`.
+   Then `$env:QTDIR = "C:\Qt\6.12.0\msvc2022_64"` (or have `qmake6` on PATH).
 3. Optional: Inno Setup for the installer (`winget install JRSoftware.InnoSetup`),
    `jom` for parallel compiles (it ships with Qt Creator), and ImageMagick
    (otherwise the app draws its own icon).
