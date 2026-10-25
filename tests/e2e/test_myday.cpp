@@ -211,10 +211,10 @@ Seed seedBlockKeys(Store &store) {
 }
 
 // The shutdown review's world: two open tasks still today (one 90 minutes,
-// one without a duration), one completed today for 45 minutes, and one
-// completed yesterday that must not count anywhere.
+// one without a duration), one completed today for 45 minutes, one completed
+// yesterday and one abandoned today (an hour), which must not count anywhere.
 struct ShutdownWorld {
-    qint64 openLong = 0, openUndated = 0, doneToday = 0, doneYesterday = 0;
+    qint64 openLong = 0, openUndated = 0, doneToday = 0, doneYesterday = 0, abandonedToday = 0;
 };
 ShutdownWorld &shutdownWorld() {
     static ShutdownWorld w;
@@ -252,6 +252,13 @@ Seed seedShutdown(Store &store) {
         t.duration = 120;
         t.completed = true;
         t.completedAt = QDateTime(today.addDays(-1), QTime(17, 0));
+    });
+    w.abandonedToday = task("Dropped today", [&](Task &t) {
+        t.dueDate = today;
+        t.duration = 60;
+        t.completed = true;
+        t.abandoned = true;
+        t.completedAt = QDateTime(today, QTime(13, 0));
     });
     store.commit();
     shutdownWorld() = w;
@@ -1196,6 +1203,7 @@ private slots:
         QVERIFY(app.row(w.openUndated) != nullptr);
         QVERIFY(app.row(w.doneToday) == nullptr);
         QVERIFY(app.row(w.doneYesterday) == nullptr);
+        QVERIFY(app.row(w.abandonedToday) == nullptr);
         QTRY_COMPARE_WITH_TIMEOUT(sectionTitles(), (QStringList{"NOT DONE YET"}), 5000);
         // The summary line replaces the capacity line.
         QQuickItem *summary = findItem("myDaySummary");
@@ -1208,6 +1216,7 @@ private slots:
                 parts << i->property("text").toString();
             return false;
         });
+        // The task abandoned today is neither counted nor timed as done.
         QCOMPARE(parts.join(' '), QString("Done today: 2 tasks · 45m of 1h 30m"));
         // Finish (Return) leaves the review for the plan.
         app.press(Qt::Key_Return);
@@ -1340,6 +1349,36 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().statusMessage(), QString("Moved to tomorrow"), 5000);
         app.press(Qt::Key_Z, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+    }
+
+    // In the review W abandons, beside Y for tomorrow: the task is closed
+    // without being done, so "Done today" does not grow, and Ctrl+Z reopens it.
+    void reviewAbandonKeyClosesWithoutCountingAsDone() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(17, 30)));
+        App app(seedShutdown, QString(), false, false);
+        QVERIFY(app.ok);
+        app.press(Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+        const ShutdownWorld &w = shutdownWorld();
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(w.openUndated) != nullptr && app.row(w.openLong) != nullptr, 5000);
+        QCOMPARE(app.backend().myDaySummary().value("completedCount").toInt(), 2);
+
+        QVERIFY(tk::selectRow(app, w.openUndated));
+        app.press(Qt::Key_W);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(w.openUndated).abandoned, 5000);
+        QVERIFY(app.task(w.openUndated).completed);
+        QCOMPARE(app.backend().myDaySummary().value("completedCount").toInt(), 2);
+        QCOMPARE(app.backend().myDaySummary().value("doneMinutes").toInt(), 45);
+        // Y still moves the other one to tomorrow.
+        QVERIFY(tk::selectRow(app, w.openLong));
+        app.press(Qt::Key_Y);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(w.openLong).dueDate, today.addDays(1), 5000);
+        // Both undo, newest first.
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(w.openLong).dueDate, today, 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(w.openUndated).completed && !app.task(w.openUndated).abandoned, 5000);
     }
 
     // The end-of-day reminder fires once after workEnd when the setting is on,

@@ -70,6 +70,7 @@ QList<Command> buildCommands() {
     add("list.collapse", "Task list (bare keys)", "Collapse project", {"C"}, Context::List);
     add("list.performAction", "Task list (bare keys)", "Perform action", {"P"}, Context::List);
     add("list.openLinks", "Task list (bare keys)", "Open links", {"U"}, Context::List);
+    add("list.abandon", "Task list (bare keys)", "Abandon (won't do)", {"W"}, Context::List);
     add("list.defer", "Task list (bare keys)", "Defer…", {"D"}, Context::List);
     add("list.schedule", "Task list (bare keys)", "Schedule…", {"K"}, Context::List);
     add("list.time", "Task list (bare keys)", "Due Time…", {"E"}, Context::List);
@@ -98,6 +99,7 @@ QList<Command> buildCommands() {
     add("task.newList", "New & edit", "New list", {"Ctrl+Shift+N"});
     add("task.complete", "New & edit", "Complete / reopen", {"Ctrl+."});
     add("task.reopen", "New & edit", "Reopen", {"Ctrl+Alt+."});
+    add("task.abandon", "New & edit", "Abandon / reopen", {"Ctrl+Alt+A"});
     add("task.duplicate", "New & edit", "Duplicate", {"Ctrl+D"});
     add("task.delete", "New & edit", "Delete", {"Ctrl+Backspace"});
     add("edit.finish", "New & edit", "Finish editing", {"Ctrl+Return"}, Context::App, true);

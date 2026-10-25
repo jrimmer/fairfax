@@ -33,6 +33,12 @@ ScrollingMenu {
                                         ["In 2 Weeks", 14], ["In a Month", 30]]
 
     MenuItem { text: root.row.completed ? "Mark as Not Completed" : "Mark as Completed"; onTriggered: backend.toggleComplete() }
+    MenuItem {
+        objectName: "abandonTask"
+        text: root.row.abandoned ? "Mark as Not Abandoned" : "Abandon"
+        enabled: !root.row.completed || !!root.row.abandoned
+        onTriggered: backend.toggleAbandon()
+    }
     MenuItem { text: "Edit"; onTriggered: backend.beginEdit(root.row.taskId) }
     MenuSeparator {}
     MenuItem { text: "Due Today"; onTriggered: backend.setDueInDays(0) }

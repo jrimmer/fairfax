@@ -26,7 +26,7 @@ Item {
     readonly property real indent: (r.depth || 0) * 28
     readonly property bool hasCrumb: !!r.breadcrumb
     height: lineHeight + (hasCrumb ? backend.fontSize + 2 : 0) + (showNotes ? backend.fontSize + 2 : 0)
-    opacity: r.dimmed ? 0.55 : 1
+    opacity: r.dimmed ? 0.55 : r.abandoned ? 0.75 : 1
 
     // What a screen reader reads for this row: the title, then the facts a
     // sighted user sees on it, comma-separated. The date uses the same
@@ -36,7 +36,7 @@ Item {
         if (root.r.type === 1 || root.r.type === 2) {
             parts.push(root.r.type === 1 ? "project" : "checklist")
             if ((root.r.childCount || 0) > 0)
-                parts.push(((root.r.childCount || 0) - (root.r.childOpen || 0)) + " of " + root.r.childCount + " done")
+                parts.push((root.r.childDone || 0) + " of " + (root.r.childLive || 0) + " done")
             parts.push(root.r.collapsed ? "collapsed" : "expanded")
         }
         if (root.r.startText)
@@ -55,7 +55,9 @@ Item {
             parts.push("tagged " + (root.r.tags || []).join(", "))
         if (root.r.hasNotes)
             parts.push("has notes")
-        if (root.r.completed)
+        if (root.r.abandoned)
+            parts.push("abandoned")
+        else if (root.r.completed)
             parts.push("completed")
         return parts.join(", ")
     }
@@ -123,7 +125,8 @@ Item {
             color: root.r.completed ? theme.muted : "transparent"
             border.width: 1.3
             border.color: root.r.overdue && backend.overdueInRed ? theme.overdue : theme.faint
-            Icon { anchors.centerIn: parent; visible: root.r.completed; name: "check"; size: 12; stroke: 2.4; color: theme.background }
+            Icon { anchors.centerIn: parent; visible: root.r.completed && !root.r.abandoned; name: "check"; size: 12; stroke: 2.4; color: theme.background }
+            Icon { anchors.centerIn: parent; visible: !!root.r.abandoned; name: "close"; size: 11; stroke: 2.4; color: theme.background }
         }
         Icon {
             anchors.centerIn: parent
@@ -143,7 +146,7 @@ Item {
             border.color: theme.today
             Text {
                 anchors.centerIn: parent
-                text: root.r.completed ? "✓" : (root.r.childOpen || "")
+                text: root.r.abandoned ? "✗" : root.r.completed ? "✓" : (root.r.childOpen || "")
                 color: root.r.completed ? theme.background : theme.today
                 font.pixelSize: 10
                 font.bold: true
@@ -177,6 +180,7 @@ Item {
         font.pixelSize: backend.fontSize
         font.strikeout: root.r.completed
         color: !root.r.title ? theme.faint
+             : root.r.abandoned ? theme.faint
              : root.r.completed ? theme.muted
              : root.r.overdue ? root.overdueTitle : theme.foreground
     }
@@ -226,6 +230,23 @@ Item {
                 id: reasonText
                 anchors.centerIn: parent
                 text: root.r.reason || ""
+                color: theme.muted
+                font.pixelSize: backend.fontSize - 3
+            }
+        }
+        // The mark on a task closed as "won't do".
+        Rectangle {
+            objectName: "rowAbandoned:" + (root.r.taskId || 0)
+            visible: !!root.r.abandoned
+            anchors.verticalCenter: parent.verticalCenter
+            width: abandonedText.implicitWidth + 12
+            height: abandonedText.implicitHeight + 4
+            radius: height / 2
+            color: theme.mix(theme.background, theme.foreground, 0.08)
+            Text {
+                id: abandonedText
+                anchors.centerIn: parent
+                text: "Abandoned"
                 color: theme.muted
                 font.pixelSize: backend.fontSize - 3
             }

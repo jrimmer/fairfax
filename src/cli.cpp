@@ -76,7 +76,8 @@ QString line(const Store &store, const Task &t, const QDateTime &now, const Sche
     QString text = paint(QStringLiteral("%1").arg(t.id, 4), "2") + "  ";
     const bool overdue = Schedule::isOverdue(t, now, s);
     QString title = t.title;
-    if (t.completed) title = paint("✓ " + title, "2;9");
+    if (t.abandoned) title = paint("✗ " + title, "2;9");
+    else if (t.completed) title = paint("✓ " + title, "2;9");
     else if (overdue) title = paint(title, "31");
     text += title;
     QStringList extra;

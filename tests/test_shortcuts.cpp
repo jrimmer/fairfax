@@ -61,6 +61,20 @@ private slots:
         QVERIFY(Shortcuts::groups().contains("Quick Entry"));
     }
 
+    // Abandon: Ctrl+Alt+A anywhere (Ctrl+Shift+D is Export) and the bare W in
+    // the task list, which is also the My Day review's key beside Y for tomorrow.
+    void abandonHasItsKeys() {
+        const Shortcuts::Command *app = Shortcuts::command("task.abandon");
+        const Shortcuts::Command *bare = Shortcuts::command("list.abandon");
+        QVERIFY(app && bare);
+        QCOMPARE(app->defaults, QStringList{"Ctrl+Alt+A"});
+        QCOMPARE(bare->defaults, QStringList{"W"});
+        QCOMPARE(app->group, QString("New & edit"));
+        QCOMPARE(bare->group, QString("Task list (bare keys)"));
+        QVERIFY(contextOf("list.abandon") == Shortcuts::Context::List);
+        QCOMPARE(Shortcuts::command("app.export")->defaults, QStringList{"Ctrl+Shift+D"});
+    }
+
     void defaultsRoundTrip() {
         for (const Shortcuts::Command &c : Shortcuts::commands()) {
             QVERIFY2(!c.defaults.isEmpty(), qPrintable("no default for " + c.id));

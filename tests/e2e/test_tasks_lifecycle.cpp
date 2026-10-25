@@ -87,6 +87,108 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!strikeOut(id), 5000);
     }
 
+    // The context menu: "Abandon" closes the task as "won't do". It leaves the
+    // list like a completed one, shows in Done struck through with an
+    // "Abandoned" mark, and "Mark as Not Abandoned" reopens it.
+    void abandonFromMenuShowsInDoneWithTheMark() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.buyMilk;
+        QVERIFY(!badge("rowAbandoned", id));
+        QVERIFY(contextMenuOn(app, id));
+        QVERIFY(clickMenu("Abandon"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).abandoned, 5000);
+        QVERIFY(app.task(id).completed);
+        QTRY_VERIFY_WITH_TIMEOUT(strikeOut(id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowAbandoned", id), 5000);
+
+        // It is not on the open lists any more.
+        QVERIFY(app.openSource("all"));
+        QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 5000);
+
+        // Done lists it, struck through and marked; an ordinary completed task is not marked.
+        app.press(Qt::Key_5, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("done"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id) && rowVisible(app, app.ids.oldThing), 5000);
+        QVERIFY(strikeOut(id));
+        QVERIFY(badge("rowAbandoned", id));
+        QVERIFY(!badge("rowAbandoned", app.ids.oldThing));
+        QVERIFY(!app.task(app.ids.oldThing).abandoned);
+
+        // The menu on an abandoned task offers to take it back; on a done one, nothing to abandon.
+        QVERIFY(contextMenuOn(app, id));
+        QVERIFY(clickMenu("Mark as Not Abandoned"));
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).completed && !app.task(id).abandoned, 5000);
+        QVERIFY(contextMenuOn(app, app.ids.oldThing));
+        QQuickItem *nothing = steadyMenuItem("Abandon", 3000);
+        QVERIFY(nothing);
+        QVERIFY(!nothing->isEnabled());
+        app.press(Qt::Key_Escape);
+    }
+
+    // Ctrl+Alt+A abandons the selected task and again reopens it; the bare W
+    // does the same in the task list.
+    void abandonFromTheShortcutsAndUndo() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.buyMilk;
+        QVERIFY(selectRow(app, id));
+        app.press(Qt::Key_A, Qt::ControlModifier | Qt::AltModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).abandoned, 5000);
+        QVERIFY(app.task(id).completed);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowAbandoned", id), 5000);
+        app.press(Qt::Key_A, Qt::ControlModifier | Qt::AltModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).completed && !app.task(id).abandoned, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowAbandoned", id), 5000);
+
+        app.press(Qt::Key_W);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).abandoned, 5000);
+
+        // Undo works like completing: one step back to open, redo abandons again.
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).completed && !app.task(id).abandoned, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!badge("rowAbandoned", id), 5000);
+        app.press(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).abandoned, 5000);
+        // Ctrl+. on an abandoned task reopens it, as the checkbox does.
+        app.press(Qt::Key_Period, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).completed && !app.task(id).abandoned, 5000);
+    }
+
+    // The editor's own button, beside Delete.
+    void abandonFromTheEditor() {
+        App app;
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.plants;
+        QVERIFY(openEditor(app, id));
+        QVERIFY(clickNamed("editorAbandon"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).abandoned, 5000);
+        QVERIFY(app.task(id).completed);
+    }
+
+    // "Show completed tasks for: Never" applies to abandoned tasks too: the
+    // row stays struck through for a second, then leaves; undo brings it back.
+    void neverShowCompletedDropsAnAbandonedTask() {
+        App app;
+        QVERIFY(app.ok);
+        app.backend().setSetting("tasks.completedWindow", 0);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.plants;
+        QVERIFY(selectRow(app, id));
+        app.press(Qt::Key_A, Qt::ControlModifier | Qt::AltModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).abandoned, 5000);
+        QVERIFY(rowVisible(app, id));
+        QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 3000);
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.task(id).abandoned, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);
+        QTest::qWait(1600);
+        QVERIFY(rowVisible(app, id));
+    }
+
     // "Edit > Undo (⌘Z)" and Redo (⌘⇧Z) (backups.md), through a run of edits.
     void undoAndRedoWalkThroughEdits() {
         App app;

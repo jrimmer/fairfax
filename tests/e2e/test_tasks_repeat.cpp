@@ -243,6 +243,42 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(liveCopies(app, "Buy milk"), 1, 5000);
     }
 
+    // Abandoning a repeating task skips this occurrence: the task moves to the
+    // next one, an abandoned copy waits in Done, and the occurrence is not
+    // counted toward an "end after" rule. One undo puts it all back.
+    void abandoningDailySkipsTheOccurrence() {
+        App app(milkWith([](Task &t) {
+            t.recurrence.frequency = Repeat::Daily;
+            t.recurrence.endType = Repeat::AfterCount;
+            t.recurrence.endCount = 2;
+        }));
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(homeKey(app)));
+        const qint64 id = app.ids.buyMilk;
+        const QDate today = QDate::currentDate();
+        QVERIFY(selectRow(app, id));
+        app.press(Qt::Key_A, Qt::ControlModifier | Qt::AltModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today.addDays(1), 5000);
+        QVERIFY(!app.task(id).completed && !app.task(id).abandoned);
+        QCOMPARE(app.task(id).recurrence.occurrencesDone, 0);
+        QCOMPARE(liveCopies(app, "Buy milk"), 2);
+
+        app.press(Qt::Key_5, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("done"), 5000);
+        qint64 copy = 0;
+        for (const Task &t : app.store().tasks())
+            if (!t.deleted && t.title == "Buy milk" && t.id != id) copy = t.id;
+        QVERIFY(copy);
+        QVERIFY(app.task(copy).completed && app.task(copy).abandoned);
+        QVERIFY(!app.task(copy).recurrence.isSet());
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, copy), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowAbandoned", copy), 5000);
+
+        app.press(Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.task(id).dueDate, today, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(liveCopies(app, "Buy milk"), 1, 5000);
+    }
+
     // Weekly on Monday, Wednesday and Friday: the next occurrence is the next
     // of those days after the due date.
     void completingWeeklyOnChosenDays() {

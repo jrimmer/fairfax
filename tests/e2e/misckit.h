@@ -421,6 +421,9 @@ inline QList<KeyRow> &keyRows() {
     auto tagsAre = [](QStringList names) {
         return [names](App &a) { return tk::tagNames(a, a.task(a.ids.plants)) == names; };
     };
+    auto abandonedIs = [](bool on) {
+        return [on](App &a) { return a.task(a.ids.plants).abandoned == on && a.task(a.ids.plants).completed == on; };
+    };
     auto deleted = [](bool gone) { return [gone](App &a) { return a.task(a.ids.plants).deleted == gone; }; };
 
     // ---- bare keys, task selected, list focused
@@ -444,6 +447,10 @@ inline QList<KeyRow> &keyRows() {
     add({"=", "task selected", {}, Qt::Key_Equal, none, "", prio(1), KeyRow::CtrlZ, prio(0)});
     add({"-", "task with priority", [](App &a) { return homeWith(a, a.ids.electricity); }, Qt::Key_Minus, none, "", prio(2, true),
          KeyRow::CtrlZ, prio(3, true)});
+
+    // ---- abandon: closed as "won't do", never counted as done
+    add({"w", "task selected", {}, Qt::Key_W, none, "", abandonedIs(true), KeyRow::CtrlZ, abandonedIs(false)});
+    add({"Ctrl+Alt+A", "task selected", {}, Qt::Key_A, ctrlAlt, "", abandonedIs(true), KeyRow::Again, abandonedIs(false)});
 
     // ---- bare keys that open the command bar
     add({"d", "task selected", {}, Qt::Key_D, none, "+3d", dueIs(4), KeyRow::CtrlZ, dueIs(1)});

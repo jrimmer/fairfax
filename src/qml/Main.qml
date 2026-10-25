@@ -272,6 +272,7 @@ ApplicationWindow {
     AppShortcut { sequences: backend.shortcutMap["view.expandProjects"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setAllCollapsed(false) }
     AppShortcut { sequences: backend.shortcutMap["task.complete"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleComplete() }
     AppShortcut { sequences: backend.shortcutMap["task.reopen"] || []; enabled: !backend.recordingShortcut; onActivated: backend.setCompleted(false) }
+    AppShortcut { sequences: backend.shortcutMap["task.abandon"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleAbandon() }
     AppShortcut { sequences: backend.shortcutMap["task.duplicate"] || []; enabled: !backend.recordingShortcut; onActivated: backend.duplicateSelection() }
     AppShortcut { sequences: backend.shortcutMap["task.delete"] || []; enabled: !backend.recordingShortcut; onActivated: backend.deleteSelection() }
     AppShortcut { sequences: backend.shortcutMap["view.showScheduled"] || []; enabled: !backend.recordingShortcut; onActivated: backend.showScheduled = !backend.showScheduled }

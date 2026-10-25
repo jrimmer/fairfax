@@ -65,6 +65,7 @@ Popup {
                     font.pixelSize: backend.fontSize + 3
                     font.weight: Font.DemiBold
                     font.strikeout: !!root.t.completed
+                    opacity: root.t.abandoned ? 0.6 : 1
                 }
                 Icon { visible: !!root.t.starred; name: "starred"; filled: true; size: 16; color: theme.star }
                 // Copy the task out in the forms the Quick Look offers.

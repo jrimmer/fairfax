@@ -124,7 +124,8 @@ Item {
                         model: [["Overdue", "type: overdue"], ["Due Today", "type: duetoday"], ["Due This Week", "type: duethisweek"],
                                 ["In Progress", "type: inprogress"], ["High Priority", "type: hiprio"], ["Starred", "type: starred"],
                                 ["Without Due Date", "type: nodue"], ["Repeating", "type: repeat"], ["With Alerts", "type: alarms"],
-                                ["Empty Projects and Checklists", "type: emptyproj OR emptychck"], ["Recently Completed", "completed: 7d"]]
+                                ["Empty Projects and Checklists", "type: emptyproj OR emptychck"], ["Recently Completed", "completed: 7d"],
+                                ["Completed Only", "type: completed"], ["Abandoned", "type: abandoned"]]
                         MenuItem {
                             required property var modelData
                             text: modelData[0]
@@ -660,6 +661,7 @@ Item {
         case "list.collapse": backend.toggleCollapsed(); return true
         case "list.performAction": backend.performAction(); return true
         case "list.openLinks": backend.openLinks(); return true
+        case "list.abandon": backend.toggleAbandon(); return true
         case "list.defer": root.command("defer"); return true
         case "list.schedule": root.command("schedule"); return true
         case "list.time": root.command("time"); return true

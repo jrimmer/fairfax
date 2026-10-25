@@ -117,7 +117,7 @@ Popup {
                     const r = backend.sidebar.get(i)
                     if (r.sourceKey && like(r.title)) list.push({ label: r.title, sub: "List", color: r.kind === "focus" ? -1 : r.color, key: r.sourceKey })
                 }
-                list = list.slice(0, 4).concat(backend.findTasks(input.text, 10, exact).map(t => ({ label: t.title, sub: t.listName, color: t.listColor, id: t.id, task: true })))
+                list = list.slice(0, 4).concat(backend.findTasks(input.text, 10, exact).map(t => ({ label: t.title, sub: t.abandoned ? t.listName + " · Abandoned" : t.listName, color: t.listColor, id: t.id, task: true })))
             } else {
                 // Nothing typed yet: where you have been lately.
                 list = backend.recentItems(8)

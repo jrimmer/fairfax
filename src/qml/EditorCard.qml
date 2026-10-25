@@ -137,6 +137,16 @@ Item {
                 tip: "Suggest Steps…"
                 onClicked: backend.suggestSteps(root.e.id)
             }
+            // Close the task as "won't do"; on an abandoned task it reopens it.
+            IconButton {
+                objectName: "editorAbandon"
+                icon: "close"
+                size: 14
+                enabled: !root.e.completed || !!root.e.abandoned
+                tip: root.e.abandoned ? "Mark as Not Abandoned" : "Abandon (" + (backend.shortcutMap, backend.shortcutText("task.abandon")) + ")"
+                Accessible.name: root.e.abandoned ? "Mark as not abandoned" : "Abandon"
+                onClicked: backend.toggleAbandon(root.e.id)
+            }
             IconButton { objectName: "editorDelete"; icon: "trash"; size: 14; color: theme.overdue; tip: "Delete"; onClicked: backend.deleteSelection() }
             TextEdit { id: clip; visible: false }
             ScrollingMenu {
@@ -587,7 +597,8 @@ Item {
                                 color: modelData.completed ? theme.muted : "transparent"
                                 border.width: 1.2
                                 border.color: theme.faint
-                                Icon { anchors.centerIn: parent; visible: modelData.completed; name: "check"; size: 10; stroke: 2.4; color: theme.surface }
+                                Icon { anchors.centerIn: parent; visible: !!modelData.abandoned; name: "close"; size: 9; stroke: 2.4; color: theme.surface }
+                                Icon { anchors.centerIn: parent; visible: modelData.completed && !modelData.abandoned; name: "check"; size: 10; stroke: 2.4; color: theme.surface }
                                 MouseArea { anchors.fill: parent; anchors.margins: -3; onClicked: backend.toggleComplete(modelData.id) }
                             }
                             Plain.TextField {
