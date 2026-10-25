@@ -183,6 +183,27 @@ for the moment with **Ctrl+O**. A repeating task is different: completing it
 keeps a done copy and moves the task on to its next date. See
 [Repeats and alerts](06-repeats-and-alerts.md).
 
+## Abandon a task you will not do
+
+Some tasks you decide not to do. Completing them would be a small lie, and
+deleting them throws the record away. **Abandon** closes the task as "won't do":
+
+- **Mouse:** right-click the task and choose **Abandon**. The editor has an Abandon
+  button (the ✕ beside the trash can) too.
+- **Keyboard:** select it and press **w**, or **Ctrl+Alt+A** from anywhere.
+
+An abandoned task closes the way a completed one does. It leaves your lists under the
+same **Show completed tasks for** setting, and it appears in *Done*, but struck
+through, dimmed and marked **Abandoned**. It is never counted as done: not in My Day's
+*Done today*, and not in any total. Press **w** or **Ctrl+Alt+A** again (or choose
+**Mark as Not Abandoned**) to reopen it, or press **Ctrl+Z**, just as for a
+completed task. In a project, abandoning the project abandons the tasks still open
+inside it; tasks you had already done stay done.
+
+To see only one kind in *Done*, open the search presets (the small arrow beside the
+search box) and choose **Abandoned** or **Completed Only**. A repeating task is
+different: see [Repeats and alerts](06-repeats-and-alerts.md).
+
 ## Start dates and due dates
 
 Fairfax keeps two dates, and the difference is the most useful thing to learn.
@@ -242,7 +263,7 @@ They are called *focus lists* because each answers one question.
 | **Today** | Ctrl+2 | What is due today, what is overdue, and what you have started |
 | **Starred** | Ctrl+3 | Every starred task |
 | **Scheduled** | Ctrl+4 | Tasks hidden until their start date |
-| **Done** | Ctrl+5 | Tasks you have completed |
+| **Done** | Ctrl+5 | Tasks you have completed, and the ones you abandoned |
 
 Tasks that wait in *Scheduled* come back by themselves on their start day. A
 task you add while *Today* is open is due today. A task you add in *Starred* is

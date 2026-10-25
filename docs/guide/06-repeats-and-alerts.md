@@ -39,6 +39,11 @@ When you complete a repeating task, Fairfax keeps a done copy in *Done* and move
 the task on to its next date. You never have to re-create it. If the repeat has an
 end (after N times, or on a date), the last occurrence simply completes.
 
+You can also **abandon** a repeating task (right-click → **Abandon**, **w** or
+**Ctrl+Alt+A**). That skips this occurrence: the task moves on to its next date and
+an abandoned copy waits in *Done*. A skipped occurrence is not a finished one, so it
+does not count toward "end after N times".
+
 ### From the due date, or from when you finished
 
 By default, the next date counts from the *due date*. A bill due on the 1st stays

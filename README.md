@@ -103,7 +103,7 @@ frfx Call Sam tomorrow 3pm #family !!    # add a task
 frfx                                     # Today, numbered
 frfx ls Personal                         # a list (or all, starred, scheduled, done)
 frfx find dentist                        # search everything; the search syntax works
-frfx done 347                            # complete by number
+frfx done 347                            # complete by number (frfx undone 347 reopens it)
 frfx help
 ```
 
@@ -131,7 +131,8 @@ offers your lists and `frfx done <Tab>` your open tasks.
   [+], and Alt+click on [+] (or right-click) for a sub-filter; it also sets a due-date range
   (between two dates, in the next N days to years, or no due date) and whether the list
   includes completed or scheduled tasks. `lists:`, `groups:` and `completed:` search every
-  list, and `completed:` or `type: donetoday` find finished tasks; `type: scheduled` and
+  list, and `completed:` or `type: donetoday` find finished tasks, `type: abandoned` the
+  abandoned ones and `type: completed` the done ones; `type: scheduled` and
   `type: paused` find the tasks that are otherwise hidden. Parentheses can group
   whole filters, `tags: home OR (lists: Work type: starred)`, and Search Options has a
   group row, a This list / All lists scope, an Include Scheduled switch and a Sounds like
@@ -153,7 +154,15 @@ offers your lists and `frfx done <Tab>` your open tasks.
 - **Focus Filter.** The sun in the sort bar narrows any list to tasks that are overdue,
   due today, this week, high priority, starred and so on, each list remembering its own.
 - **Repeats.** Completing a repeating task keeps a done copy and moves it to the next
-  occurrence, from its due date or from the day you finished it.
+  occurrence, from its due date or from the day you finished it. Abandoning one skips that
+  occurrence the same way, without counting toward an "end after N times" rule.
+- **Abandoning.** A task you will not do can be abandoned instead of completed: right-click →
+  Abandon, the editor's ✕ button, `w` or `Ctrl+Alt+A`. It closes like a completed task, so it
+  leaves the lists under the same "Show completed tasks for" setting and lands in *Done*, but
+  struck through, dimmed and marked *Abandoned*. It is never counted as done: not in
+  *Done today*, not in My Day. Ctrl+Z undoes it like a completion, and the same entry (or key)
+  reopens an abandoned task. `type: abandoned` in the search box, or *Abandoned* in the Search
+  Presets, narrows Done to the abandoned tasks, and `type: completed` to the done ones.
 - **The editor.** Typeable dates with a calendar (click the field or press ↓; ⌥1–⌥4 for Today,
   Tomorrow, the day after, a week), a full repeat editor (every N days/weeks/months/years,
   chosen weekdays, "2nd Tuesday", "last Friday", ending after N times or on a date, from
@@ -228,7 +237,8 @@ The day does not only start with a plan: after the work day's end (or any time t
 still due today under *Not done yet*, and the header reports `Done today: N tasks · Xh Ym of Xh Ym`,
 where the first time sums the durations of the tasks completed today and the second the
 durations of the day's tasks. `y` moves a task to
-tomorrow, `d` picks a date, `r` takes it off today (its date moves to tomorrow, as in the plan), and Return (or the *Back to plan* link)
+tomorrow, `w` abandons it ("won't do": it is closed without being done and does not count in
+*Done today*), `d` picks a date, `r` takes it off today (its date moves to tomorrow, as in the plan), and Return (or the *Back to plan* link)
 leaves the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
 posts a "Review your day" notification at the work day's end that opens the review when
 clicked; it fires once a day.
@@ -276,7 +286,8 @@ around, Orca reads the task list, the sidebar counts, the editor's fields, the S
 panes, the search builder rules and each popup's title.
 
 Changes a screen reader would otherwise miss are spoken as they happen: completing or
-reopening a task ("Completed: Call Sam", or "Completed 3 tasks" for a selection), moving it
+reopening a task ("Completed: Call Sam", or "Completed 3 tasks" for a selection; "Abandoned: …"
+for an abandoned one), moving it
 to another list, deleting, undoing and redoing, and copying or pasting tasks. A sync or mail
 failure interrupts assertively ("Sync failed: …", "Mail: …"), since the sidebar's warning
 mark is not visible to a screen reader user.
@@ -312,6 +323,7 @@ the table spells them Ctrl and Alt.
 | `Ctrl+N` / `Ctrl+Alt+N` / `Ctrl+Shift+Alt+N` / `Alt+N` | New task / project / checklist / sub-task |
 | `Ctrl+Shift+N` | New list |
 | `Ctrl+.` / `Ctrl+Alt+.` | Complete or reopen / reopen |
+| `w` / `Ctrl+Alt+A` | Abandon ("won't do"): close the task without doing it; again to reopen |
 | `Ctrl+L` / `Ctrl+R` | Move to list… / Tag… |
 | `Ctrl+Shift+Alt+1` / `Ctrl+Shift+Alt+2` / `Ctrl+Shift+Alt+3` | Convert to task / project / checklist |
 | `Ctrl+Alt+0`…`Ctrl+Alt+3` | Priority none…high while editing |
@@ -353,7 +365,7 @@ the table spells them Ctrl and Alt.
   Fairfax, Settings → Import & Export → From TickTick…, or from a terminal:
   `fairfax import ~/Downloads/TickTick-backup-*.csv`. Lists, folders, tags, dates (in each
   task's time zone), repeats, reminders, priorities, checklists, sub-tasks, sections and
-  completed history come across, and importing the same backup again adds only what's new
+  completed history come across (items marked "Won't Do" come in abandoned), and importing the same backup again adds only what's new
   (and fills in sections for tasks an earlier import brought in).
 - **From a task database:** `fairfax import tasks.db`, an SQLite file whose tables Fairfax
   recognises by content; Settings → Import & Export → From a task database….
@@ -362,7 +374,8 @@ the table spells them Ctrl and Alt.
   checklists; "when" becomes the start date and the deadline the due date.
 - **From OmniFocus:** File → Export → TaskPaper, then `fairfax import export.taskpaper` (or
   From OmniFocus…). Folders become list groups and projects lists; `@due`, `@defer`, `@done`,
-  `@estimate`, `@flagged` and tags come across, and indented lines become notes.
+  `@estimate`, `@flagged` and tags come across (`@dropped` items come in abandoned), and
+  indented lines become notes.
 - **From anything with iCalendar export:** `fairfax import tasks.ics`.
 
 Every import is one step that Ctrl+Z undoes, and a backup is taken first.
@@ -474,7 +487,12 @@ vendor `X-*` properties and a `<Something Meta>` notes block) ride along in each
 unchanged, so another client, such as Reminders, on the same server keeps its own data. Dates,
 repeats, priorities, tags, sub-tasks and alerts all sync; a wrong password is reported in the
 status line, and **Disconnect** forgets the account and its links without deleting a single
-task on either side.
+task on either side. An abandoned task is a VTODO with `STATUS:CANCELLED` (a done one stays
+`STATUS:COMPLETED`), and a cancelled to-do from another client arrives abandoned. Todoist
+closes an abandoned task and gives it an `abandoned` label, which another Fairfax reads back
+as abandoned; that label is reserved and never becomes a tag. In the per-task sync files
+an abandoned task has `abandoned: true` together with `completed: true`, so a program that
+does not know the field still sees it closed (see `docs/sync-format.md`).
 
 Right-click a list and choose **Don't Sync This List** to keep it, and its tasks, on this
 machine only; every sync provider skips it. Setting a list to **Don't sync** in the CalDAV
@@ -507,7 +525,9 @@ start_date, priority, duration, created, modified, completed). `create_task` and
 "end_rule": {...}}`, or `{"frequency": "none"}` to clear it) and `location_update`
 (`{"mode": "append", "location_ids": [...]}`). Alarms have their own commands:
 `list_alarms`, `add_alarm` (relative with `offset_seconds`, absolute with `at`, or
-`days_before` with `time_of_day`) and `remove_alarm`.
+`days_before` with `time_of_day`) and `remove_alarm`. `abandon_task` closes tasks as "won't
+do" (never counted as done; a repeating task skips to its next occurrence) and
+`unabandon_task` reopens them; tasks report `abandoned` next to `completed`.
 
 The URL scheme lives under `fairfax://x-callback-url/<action>`:
 `add` (with `task`, `note`, `forlist`, `forparentname`, `due`, `duetime`, `start`, `repeat`,

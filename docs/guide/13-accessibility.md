@@ -24,7 +24,7 @@ What it gives you:
 Changes that you might otherwise miss are announced as they happen:
 
 - Completing or reopening a task: "Completed: Call Sam", or "Completed 3 tasks" when you
-  have several selected.
+  have several selected. Abandoning is announced the same way: "Abandoned: Call Sam".
 - Moving a task to another list, deleting, undoing and redoing.
 - Copying and pasting tasks.
 

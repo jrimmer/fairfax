@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- Abandon a task: close it as "won't do" instead of completing it. Right-click
+  a task and choose Abandon, use the Abandon button in the editor, or press `w`
+  or Ctrl+Alt+A (the same again reopens it). An abandoned task leaves the
+  lists under the same "Show completed tasks for" setting, including Never, and
+  shows in Done struck through and dimmed with an Abandoned mark. It is never
+  counted as done: not in My Day's Done today, not in the day's totals.
+  Ctrl+Z undoes it like a completion.
+- Abandoning a repeating task skips that occurrence and moves on to the next,
+  like completing it, but does not count toward an "end after N times" rule.
+- My Day's end-of-day review takes `w` to abandon a task, beside `y` for
+  tomorrow.
+- Search: `type: abandoned` finds abandoned tasks and `type: completed` the done
+  ones; the search rule builder has a Status rule, and Search Presets has
+  Completed Only and Abandoned, which narrow Done to one or the other.
+- `fairfax ctl` and the MCP server have `abandon_task` and `unabandon_task`, and
+  tasks report `abandoned`. `uncomplete_task` also reopens an abandoned task.
+- Sync: tasks have a new `abandoned` field (an abandoned task also has
+  `completed: true`, so older versions and other programs see it closed),
+  documented in docs/sync-format.md. CalDAV writes `STATUS:CANCELLED` for an
+  abandoned task and reads it back; Todoist closes it and adds an "abandoned"
+  label (that label is not shown as a tag).
+- Imports: TickTick's "Won't Do" tasks, OmniFocus's `@dropped` items and
+  Things' canceled items now come in as abandoned, instead of with an
+  "abandoned" or "canceled" tag.
+- Done's list, exports and printouts show abandoned tasks as such: the CSV
+  Completed column says Abandoned, text export uses `[-]`, and a printout
+  crosses the box.
 - On My Day and Today the date now sits on the same baseline as the title
   instead of floating a little high.
 - Wrap up day is now a quiet link at the end of the numbers line under the

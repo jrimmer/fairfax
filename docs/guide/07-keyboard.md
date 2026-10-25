@@ -75,6 +75,7 @@ These are the defaults. Where two keys are listed, either one works.
 | **Space** | Quick Look |
 | **Ctrl+.** | Complete or reopen |
 | **Ctrl+Alt+.** | Reopen |
+| **Ctrl+Alt+A** | Abandon ("won't do"), or reopen an abandoned task |
 | **Ctrl+D** | Duplicate |
 | **Delete** / **Backspace** / **Ctrl+Backspace** | Delete |
 | **Ctrl+Alt+P** / **Ctrl+Alt+C** | Project / checklist from the selection |
@@ -90,6 +91,7 @@ These are the defaults. Where two keys are listed, either one works.
 |---|---|
 | **t** | Due today |
 | **y** | Due tomorrow |
+| **w** | Abandon ("won't do"), or reopen an abandoned task |
 | **Ctrl+T** | Start today |
 | **d** | Defer… (type `tom 3pm`, `fri`, `in 2w`, `18d`, or an offset such as `+3d`) |
 | **k** | Schedule… (the same, for the start date) |
@@ -157,7 +159,7 @@ These are the defaults. Where two keys are listed, either one works.
 | **h** | Hide for today |
 
 In the end-of-day review, **y**, **d** and **r** move a task to tomorrow, pick a date,
-and take it off today. **Return** leaves the review. See [My Day](05-my-day.md).
+and take it off today, and **w** abandons it. **Return** leaves the review. See [My Day](05-my-day.md).
 
 ### The app
 

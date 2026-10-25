@@ -120,13 +120,14 @@ The review shows:
   open.
 - A summary in the header, such as **Done today: 3 tasks · 1h 10m of 4h 25m**. It
   counts the tasks you completed today, how much time they took, and how much you
-  had planned.
+  had planned. Tasks you abandoned are not counted: they were closed, not done.
 
 Go through the list and decide each one with a single key:
 
 | Key | What it does |
 |---|---|
 | **y** | Move it to tomorrow |
+| **w** | Abandon it ("won't do"): it is closed without being done, and is not counted in **Done today** |
 | **d** | Pick another date |
 | **r** | Take it off today (today's date moves to tomorrow) |
 | **Return** | Leave the review |

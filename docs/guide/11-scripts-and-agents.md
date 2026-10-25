@@ -47,6 +47,7 @@ fairfax ctl query_tasks focus=today
 fairfax ctl create_task '{"title": "Call Sam tomorrow 3pm #family", "natural_language": true}'
 fairfax ctl create_task title="Call Sam" due_date=2026-10-12
 fairfax ctl complete_task task_id=347
+fairfax ctl abandon_task task_id=348              # "won't do": closed, not counted as done
 fairfax ctl myday                                 # open My Day in the running window
 ```
 
@@ -59,7 +60,7 @@ The commands cover lists, tasks, alerts, tags and the window:
 | Group | Commands |
 |---|---|
 | Looking things up | `list_lists`, `list_list_groups`, `list_smart_lists`, `list_tags`, `list_tag_groups`, `list_locations`, `get_default_task_destination`, `get_task`, `list_subtasks`, `query_tasks`, `selected_tasks` |
-| Changing tasks | `create_task`, `update_task`, `update_task_action`, `delete_task`, `duplicate_task`, `move_task`, `complete_task`, `uncomplete_task` |
+| Changing tasks | `create_task`, `update_task`, `update_task_action`, `delete_task`, `duplicate_task`, `move_task`, `complete_task`, `uncomplete_task`, `abandon_task`, `unabandon_task` |
 | Alerts | `list_alarms`, `add_alarm`, `remove_alarm` |
 | Tags | `pause_tag`, `unpause_tag` |
 | The window | `select_list`, `select_list_group`, `select_smart_list`, `select_focus`, `myday`, `open_task` |
@@ -79,7 +80,11 @@ A few things worth knowing:
 - `add_alarm` takes `trigger_type`: relative (with `offset_seconds`), absolute (with `at`)
   or days-before (with `days_before` and `time_of_day`).
 - Completing a repeating task keeps a done copy and advances the task, so do not
-  re-run it blindly.
+  re-run it blindly. `abandon_task` does the same, keeping an abandoned copy, and
+  skips the occurrence without counting it toward "end after N times".
+- `abandon_task` closes tasks without doing them; they are not counted as done, and
+  tasks report `abandoned` beside `completed`. `unabandon_task` reopens abandoned
+  tasks and leaves ones you completed alone; `uncomplete_task` reopens both.
 
 `fairfax ctl url '<link>'` runs a `fairfax://` link (below) from the terminal.
 

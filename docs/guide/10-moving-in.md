@@ -35,6 +35,7 @@ be imported, no backup is kept and nothing changes.
 
 Lists, folders, tags, dates (in each task's own time zone), repeats, reminders,
 priorities, checklists, sub-tasks, sections and your completed history all come across.
+Tasks you marked **Won't Do** come in as abandoned.
 
 ## From Things
 
@@ -44,7 +45,7 @@ priorities, checklists, sub-tasks, sections and your completed history all come 
 
 Areas become lists, projects stay projects, and checklist items stay checklists. Things'
 "when" becomes the **start date** and its deadline becomes the **due date**. Tags,
-flags and notes come across too.
+flags and notes come across too, and canceled items come in as abandoned.
 
 ## From OmniFocus
 
@@ -53,7 +54,8 @@ flags and notes come across too.
    `fairfax import export.taskpaper`.
 
 Folders become list groups and projects become lists. Due and defer dates, completion,
-estimates, flags and tags come across, and indented lines become notes.
+estimates, flags and tags come across, and indented lines become notes. Items marked
+`@dropped` come in as abandoned.
 
 ## From an iCalendar file
 

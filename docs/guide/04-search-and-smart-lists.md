@@ -35,7 +35,8 @@ list or a group (see below) always looks everywhere.
 
 The small arrow beside the search box opens **Search Presets**: Overdue, Due Today,
 Due This Week, In Progress, High Priority, Starred, Without Due Date, Repeating,
-With Alerts, Empty Projects and Checklists, and Recently Completed. Pick one and
+With Alerts, Empty Projects and Checklists, Recently Completed, Completed Only and
+Abandoned. Pick one and
 the search box fills in the matching search for you. That is also a gentle way to
 learn the syntax.
 
@@ -76,6 +77,8 @@ Words search a task's title, its notes and its tags.
 | `type: scheduled` | Tasks hidden until their start date |
 | `type: paused` | Tasks hidden by a paused tag or place |
 | `type: donetoday` | Finished today (also `doneyesterday`, `donethisweek`) |
+| `type: completed` | Tasks you finished, not the abandoned ones |
+| `type: abandoned` | Tasks you abandoned ("won't do") |
 | `type: capturedmail` | Tasks that arrived from [mail](09-mail.md) |
 | `tags: home` | Tasks tagged "home" |
 | `tags: home, garden` | Tagged either (a comma means "or") |
@@ -86,7 +89,7 @@ Words search a task's title, its notes and its tags.
 | `locations: Office` | Tasks at that place |
 | `modified: 3d` | Changed in the last 3 days |
 | `created: 2w` | Created in the last 2 weeks |
-| `completed: 7d` | Completed in the last 7 days |
+| `completed: 7d` | Completed in the last 7 days (abandoned tasks do not count) |
 | `created: >2w` | Created *more than* 2 weeks ago |
 
 A few notes:
@@ -97,7 +100,8 @@ A few notes:
 - Use parentheses to group whole filters: `tags: home OR (lists: Work type: starred)`.
 - Time units are `min`, `h`, `d` (the default), `w`, `m` (months) and `y`.
 - `lists:`, `groups:` and `completed:` always search every list, and `completed:`
-  or `type: donetoday` find finished tasks.
+  or `type: donetoday` find finished tasks, as do `type: completed` and
+  `type: abandoned`. In *Done*, those two narrow the list to one kind.
 - Scheduled and paused tasks are hidden from normal views. `type: scheduled` and
   `type: paused` find them anyway.
 
@@ -112,7 +116,8 @@ search for you and shows it live at the bottom, where you can also edit it by ha
 The builder has sections, top to bottom:
 
 - **Contains words.** Plain words, "phrases", `-exclude`, `OR` and wildcards.
-- **Search presets.** A row per rule, such as *Priority is High* or *Tag is not set*.
+- **Search presets.** A row per rule, such as *Priority is High*, *Tag is not set* or
+  *Status is Abandoned*.
   Choose **Match All** or **Match Any** at the top. Use **[−]** to remove a row and
   **[+]** to add one. **Alt+click** the **[+]** (or right-click it) to add a
   *sub-filter*, a group of rules inside the rules.

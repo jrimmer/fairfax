@@ -18,7 +18,8 @@ things hold for all of them:
   press **Ctrl+S** (or click the sync button at the bottom of the sidebar).
 - The sidebar's footer shows when sync last worked. A warning mark appears if
   something went wrong, and the Sync pane says what.
-- When two machines changed the same task, the newest edit wins.
+- When two machines changed the same task, the newest edit wins, field by field:
+  abandoning a task on one machine and renaming it on another keeps both.
 - Sync is off in demo mode.
 
 ## Git: one private repository
@@ -75,7 +76,9 @@ Calendars that exist on the server but have no matching list arrive as new lists
 an account group. Dates, repeats, priorities, tags, sub-tasks and alerts sync. Other
 apps' extra data on a task (properties Fairfax does not know about) is kept and sent
 back unchanged, so another app on the same server does not lose its own information.
-A wrong password shows in the status line. **Disconnect** forgets the account and its
+An abandoned task is saved as a cancelled to-do (`STATUS:CANCELLED`), and a task that
+another app cancels arrives abandoned; a task you completed stays completed. A wrong
+password shows in the status line. **Disconnect** forgets the account and its
 links without deleting a single task on either side.
 
 Apple's iCloud Reminders created on iOS 13 or later are not stored in CalDAV, so they
@@ -90,7 +93,9 @@ For two-way sync with Todoist, so your phone sees your tasks.
    your keyring.
 
 Lists, tags, dates, repeats, priority and sub-tasks sync. Start dates, stars and task
-types ride along in a small block in each task's description in Todoist. List groups,
+types ride along in a small block in each task's description in Todoist. An abandoned
+task is closed in Todoist and gets an `abandoned` label, which Fairfax on your other
+computers reads back as abandoned (the label is never shown as a tag). List groups,
 Smart Lists and alerts stay on your computer. If you also use git sync, turn Todoist
 on for **one machine only**.
 
