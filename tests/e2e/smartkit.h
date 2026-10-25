@@ -666,6 +666,21 @@ inline bool openBuilder(App &app) {
     return waitUntil([] { return builderOpen(); });
 }
 
+// Clicks the sheet's query box until it has the keyboard focus, as a user
+// does. The sheet swallows a click made while it is still opening, so wait
+// for it to finish opening and click again if the first one did not take.
+inline bool focusQueryBox(QQuickItem *box) {
+    if (!waitUntil([] { return builder() && builder()->property("opened").toBool(); }))
+        return false;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        QTest::qWait(100);
+        clickSteady(box);
+        if (waitUntil([&] { return box->property("activeFocus").toBool(); }, 1500))
+            return true;
+    }
+    return false;
+}
+
 inline bool closeBuilder(App &app) {
     if (!builderOpen())
         return true;

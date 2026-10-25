@@ -396,8 +396,7 @@ private slots:
         if (QTest::currentTestFailed())
             return;
         LIST_ITEM(box, findItem("preview"));
-        click(box);
-        QTRY_VERIFY_WITH_TIMEOUT(box->property("activeFocus").toBool(), 5000);
+        QVERIFY(focusQueryBox(box));
         m_app->type("type: starred AND (note OR duration)");
         QTRY_COMPARE_WITH_TIMEOUT(ruleText("0"), QString("Starred / is"), 5000);
         QTRY_COMPARE_WITH_TIMEOUT(ruleText("1.0"), QString("Note / has"), 5000);

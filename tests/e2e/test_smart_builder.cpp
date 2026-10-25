@@ -304,8 +304,7 @@ private slots:
         if (QTest::currentTestFailed())
             return;
         LIST_ITEM(box, findItem("preview"));
-        click(box);
-        QTRY_VERIFY_WITH_TIMEOUT(box->property("activeFocus").toBool(), 5000);
+        QVERIFY(focusQueryBox(box));
         m_app->type("type: hiprio OR medprio tags: urgent");
         QTRY_COMPARE_WITH_TIMEOUT(ruleText("0"), QString("Priority / is / High"), 5000);
         QCOMPARE(ruleText("1"), QString("Priority / is / Medium"));
