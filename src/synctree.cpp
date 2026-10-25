@@ -90,6 +90,7 @@ QString extText(const QJsonValue &value) {
 QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     map.remove("id");
     const QString ext = map.take("ext").toString();
+    const QString modifiedBy = map.take("modified_by").toString();
     QJsonArray tagUids;
     QJsonArray locationUids;
     switch (kind) {
@@ -116,6 +117,8 @@ QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     const QJsonObject extObject = QJsonDocument::fromJson(ext.toUtf8()).object();
     if (!extObject.isEmpty())
         obj.insert("ext", extObject);
+    if (!modifiedBy.isEmpty())
+        obj.insert("modified_by", modifiedBy);
     if (kind == KTask) {
         obj.insert("tag_uids", tagUids);
         obj.insert("location_uids", locationUids);
@@ -128,6 +131,7 @@ QByteArray bytesOf(const QJsonObject &obj) { return QJsonDocument(obj).toJson(QJ
 QVariantMap fromJson(Kind kind, const QJsonObject &obj, const Maps &x, qint64 id) {
     QVariantMap map = obj.toVariantMap();
     map.insert("ext", extText(obj.value("ext")));
+    map.insert("modified_by", obj.value("modified_by").toString());
     auto swapBack = [&](const char *uidKey, const char *idKey, Kind target) {
         const QString u = map.take(uidKey).toString();
         map.insert(idKey, u.isEmpty() ? 0 : x.uid[target].value(u, 0));

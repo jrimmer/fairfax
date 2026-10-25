@@ -97,6 +97,7 @@ struct Task {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static Task fromMap(const QVariantMap &map);
@@ -112,6 +113,7 @@ struct ListGroup {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static ListGroup fromMap(const QVariantMap &map);
@@ -159,6 +161,7 @@ struct TaskList {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static TaskList fromMap(const QVariantMap &map);
@@ -173,6 +176,7 @@ struct TagGroup {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static TagGroup fromMap(const QVariantMap &map);
@@ -188,6 +192,7 @@ struct Tag {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static Tag fromMap(const QVariantMap &map);
@@ -211,6 +216,7 @@ struct Alarm {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static Alarm fromMap(const QVariantMap &map);
@@ -229,6 +235,7 @@ struct Location {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static Location fromMap(const QVariantMap &map);
@@ -250,6 +257,7 @@ struct Attachment {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static Attachment fromMap(const QVariantMap &map);
@@ -266,6 +274,7 @@ struct ListSection {
     QDateTime modified;
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
+    QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
 
     QVariantMap toMap() const;
     static ListSection fromMap(const QVariantMap &map);

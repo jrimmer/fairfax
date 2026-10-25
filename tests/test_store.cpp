@@ -391,6 +391,26 @@ private slots:
         QCOMPARE(s->task(id).ext, ext);
     }
 
+    void localChangesAreSignedAndSyncWritesAreNot() {
+        auto s = open();
+        const qint64 id = put(*s, "Mine");
+        const QString who = "fairfax@" + QSysInfo::machineHostName();
+        QCOMPARE(s->task(id).modifiedBy, who);
+        // A merged-in record keeps its own author and stamp.
+        Task t = s->task(id);
+        t.modifiedBy = "other-tool";
+        t.modified = QDateTime::fromSecsSinceEpoch(1700000000);
+        s->begin("sync", false, true);
+        s->putTask(t);
+        s->commit();
+        QCOMPARE(s->task(id).modifiedBy, QString("other-tool"));
+        QCOMPARE(s->task(id).modified.toSecsSinceEpoch(), qint64(1700000000));
+        rename(*s, id, "Mine again");
+        QCOMPARE(s->task(id).modifiedBy, who);
+        auto reopened = open();
+        QCOMPARE(reopened->task(id).modifiedBy, who);
+    }
+
     void newUidsAreUnique() {
         QVERIFY(Store::newUid() != Store::newUid());
         QVERIFY(!Store::newUid().isEmpty());

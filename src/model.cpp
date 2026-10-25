@@ -67,7 +67,7 @@ QVariantMap Task::toMap() const {
         {"location_ids", idsToString(locationIds)},
         {"created", stampValue(created)},
         {"modified", stampValue(modified)},
-        {"deleted", deleted}, {"ext", ext},
+        {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy},
     };
 }
 
@@ -111,12 +111,13 @@ Task Task::fromMap(const QVariantMap &m) {
     t.modified = stampFrom(m.value("modified"));
     t.deleted = m.value("deleted").toBool();
     t.ext = m.value("ext").toString();
+    t.modifiedBy = m.value("modified_by").toString();
     return t;
 }
 
 QVariantMap ListGroup::toMap() const {
     return {{"id", id}, {"uid", uid}, {"name", name}, {"sort_order", order},
-            {"collapsed", collapsed}, {"color", color}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"collapsed", collapsed}, {"color", color}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 ListGroup ListGroup::fromMap(const QVariantMap &m) {
@@ -130,6 +131,7 @@ ListGroup ListGroup::fromMap(const QVariantMap &m) {
     g.modified = stampFrom(m.value("modified"));
     g.deleted = m.value("deleted").toBool();
     g.ext = m.value("ext").toString();
+    g.modifiedBy = m.value("modified_by").toString();
     return g;
 }
 
@@ -155,7 +157,7 @@ QVariantMap TaskList::toMap() const {
         {"include_scheduled", includeScheduled},
         {"mute_alerts", muteAlerts},
         {"modified", stampValue(modified)},
-        {"deleted", deleted}, {"ext", ext},
+        {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy},
     };
 }
 
@@ -183,12 +185,13 @@ TaskList TaskList::fromMap(const QVariantMap &m) {
     l.modified = stampFrom(m.value("modified"));
     l.deleted = m.value("deleted").toBool();
     l.ext = m.value("ext").toString();
+    l.modifiedBy = m.value("modified_by").toString();
     return l;
 }
 
 QVariantMap TagGroup::toMap() const {
     return {{"id", id}, {"uid", uid}, {"name", name}, {"sort_order", order},
-            {"collapsed", collapsed}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"collapsed", collapsed}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 TagGroup TagGroup::fromMap(const QVariantMap &m) {
@@ -201,12 +204,13 @@ TagGroup TagGroup::fromMap(const QVariantMap &m) {
     g.modified = stampFrom(m.value("modified"));
     g.deleted = m.value("deleted").toBool();
     g.ext = m.value("ext").toString();
+    g.modifiedBy = m.value("modified_by").toString();
     return g;
 }
 
 QVariantMap Tag::toMap() const {
     return {{"id", id}, {"uid", uid}, {"group_id", groupId}, {"name", name}, {"paused", paused},
-            {"sort_order", order}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"sort_order", order}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 Tag Tag::fromMap(const QVariantMap &m) {
@@ -220,13 +224,14 @@ Tag Tag::fromMap(const QVariantMap &m) {
     t.modified = stampFrom(m.value("modified"));
     t.deleted = m.value("deleted").toBool();
     t.ext = m.value("ext").toString();
+    t.modifiedBy = m.value("modified_by").toString();
     return t;
 }
 
 QVariantMap Alarm::toMap() const {
     return {{"id", id}, {"uid", uid}, {"task_id", taskId}, {"kind", kind}, {"offset_minutes", offset},
             {"at", stampValue(at)}, {"sound", sound}, {"snoozed_until", stampValue(snoozedUntil)},
-            {"fired_for", stampValue(firedFor)}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"fired_for", stampValue(firedFor)}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 Alarm Alarm::fromMap(const QVariantMap &m) {
@@ -243,12 +248,13 @@ Alarm Alarm::fromMap(const QVariantMap &m) {
     a.modified = stampFrom(m.value("modified"));
     a.deleted = m.value("deleted").toBool();
     a.ext = m.value("ext").toString();
+    a.modifiedBy = m.value("modified_by").toString();
     return a;
 }
 
 QVariantMap Location::toMap() const {
     return {{"id", id}, {"uid", uid}, {"name", name}, {"address", address}, {"latitude", latitude},
-            {"longitude", longitude}, {"paused", paused}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"longitude", longitude}, {"paused", paused}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 Location Location::fromMap(const QVariantMap &m) {
@@ -263,12 +269,13 @@ Location Location::fromMap(const QVariantMap &m) {
     l.modified = stampFrom(m.value("modified"));
     l.deleted = m.value("deleted").toBool();
     l.ext = m.value("ext").toString();
+    l.modifiedBy = m.value("modified_by").toString();
     return l;
 }
 
 QVariantMap Attachment::toMap() const {
     return {{"id", id}, {"uid", uid}, {"task_id", taskId}, {"kind", kind}, {"name", name}, {"file_name", fileName},
-            {"bytes", bytes}, {"created", stampValue(created)}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"bytes", bytes}, {"created", stampValue(created)}, {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 Attachment Attachment::fromMap(const QVariantMap &m) {
@@ -284,12 +291,13 @@ Attachment Attachment::fromMap(const QVariantMap &m) {
     a.modified = stampFrom(m.value("modified"));
     a.deleted = m.value("deleted").toBool();
     a.ext = m.value("ext").toString();
+    a.modifiedBy = m.value("modified_by").toString();
     return a;
 }
 
 QVariantMap ListSection::toMap() const {
     return {{"id", id}, {"uid", uid}, {"list_id", listId}, {"name", name}, {"sort_order", order},
-            {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}};
+            {"modified", stampValue(modified)}, {"deleted", deleted}, {"ext", ext}, {"modified_by", modifiedBy}};
 }
 
 ListSection ListSection::fromMap(const QVariantMap &m) {
@@ -302,6 +310,7 @@ ListSection ListSection::fromMap(const QVariantMap &m) {
     s.modified = stampFrom(m.value("modified"));
     s.deleted = m.value("deleted").toBool();
     s.ext = m.value("ext").toString();
+    s.modifiedBy = m.value("modified_by").toString();
     return s;
 }
 

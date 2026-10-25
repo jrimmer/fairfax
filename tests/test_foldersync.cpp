@@ -289,6 +289,43 @@ private slots:
         QVERIFY(!readJson(file).contains("ext"));
     }
 
+    void modifiedByNamesTheLastWriter() {
+        const QString folder = m_dir.filePath("by1"); QDir().mkpath(folder);
+        SyncTree::FolderRemote remote(folder);
+        Machine a = machine("a"), b = machine("b");
+        const QString me = "fairfax@" + QSysInfo::machineHostName();
+        const qint64 id = addTask(*a.store, "Task");
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        const QString file = taskFile(folder, *a.store, id);
+        QCOMPARE(readJson(file).value("modified_by").toString(), me);
+        // Another writer's edit keeps its name, here and on the next machine, and
+        // writing the file back in canonical form does not sign it.
+        QJsonObject obj = readJson(file);
+        obj["title"] = "Edited elsewhere";
+        obj["modified_by"] = "acme-sync@laptop";
+        obj["modified"] = obj.value("modified").toInteger() + 10;
+        writeJson(file, obj);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(a.store->task(id).modifiedBy, QString("acme-sync@laptop"));
+        QCOMPARE(readJson(file).value("modified_by").toString(), QString("acme-sync@laptop"));
+        QVERIFY(syncs(*b.store, remote, b.mirror));
+        QCOMPARE(b.store->task(find(*b.store, "Edited elsewhere")).modifiedBy, QString("acme-sync@laptop"));
+        // A file without it stays without it.
+        obj.remove("modified_by");
+        obj["modified"] = obj.value("modified").toInteger() + 10;
+        writeJson(file, obj);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QVERIFY(!readJson(file).contains("modified_by"));
+        // An edit here signs it.
+        Task t = a.store->task(id);
+        t.title = "Edited here";
+        a.store->begin("edit");
+        a.store->putTask(t);
+        a.store->commit();
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(readJson(file).value("modified_by").toString(), me);
+    }
+
     void everyRecordKindKeepsExt() {
         const QString folder = m_dir.filePath("ext2"); QDir().mkpath(folder);
         SyncTree::FolderRemote remote(folder);

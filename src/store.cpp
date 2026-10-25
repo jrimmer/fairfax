@@ -8,6 +8,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QSysInfo>
 #include <QUuid>
 #include <algorithm>
 
@@ -35,6 +36,15 @@ template <typename Record>
 void startRecord(Record &r) {
     r.uid = Store::newUid();
     r.ext.clear();
+    r.modifiedBy.clear();
+}
+
+// A local change: stamped with the time and with this machine as its author.
+template <typename Record>
+void stampLocal(Record &r) {
+    static const QString writer = QStringLiteral("fairfax@") + QSysInfo::machineHostName();
+    r.modified = QDateTime::currentDateTime();
+    r.modifiedBy = writer;
 }
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
@@ -237,10 +247,12 @@ bool Store::migrate(QString *error) {
             created INTEGER))"),
     };
 
-    // Version 9 keeps other writers' data (the sync files' "ext") as JSON text.
+    // Version 9 keeps other writers' data (the sync files' "ext") as JSON text
+    // and who last changed a record ("modified_by").
     QStringList version9;
     for (const char *table : {"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections"})
-        version9 << QStringLiteral("ALTER TABLE %1 ADD COLUMN ext TEXT NOT NULL DEFAULT ''").arg(table);
+        version9 << QStringLiteral("ALTER TABLE %1 ADD COLUMN ext TEXT NOT NULL DEFAULT ''").arg(table)
+                 << QStringLiteral("ALTER TABLE %1 ADD COLUMN modified_by TEXT NOT NULL DEFAULT ''").arg(table);
 
     QStringList steps;
     if (version < 1)
@@ -360,7 +372,7 @@ void Store::putTask(const Task &t) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     if (!copy.created.isValid())
         copy.created = copy.modified;
     record("tasks", copy.id, cached("tasks", copy.id), copy.toMap());
@@ -371,7 +383,7 @@ void Store::putList(const TaskList &l) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("lists", copy.id, cached("lists", copy.id), copy.toMap());
 }
 
@@ -380,7 +392,7 @@ void Store::putGroup(const ListGroup &g) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("list_groups", copy.id, cached("list_groups", copy.id), copy.toMap());
 }
 
@@ -389,7 +401,7 @@ void Store::putTag(const Tag &t) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("tags", copy.id, cached("tags", copy.id), copy.toMap());
 }
 
@@ -398,7 +410,7 @@ void Store::putAlarm(const Alarm &a) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("alarms", copy.id, cached("alarms", copy.id), copy.toMap());
 }
 
@@ -407,7 +419,7 @@ void Store::putLocation(const Location &l) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("locations", copy.id, cached("locations", copy.id), copy.toMap());
 }
 
@@ -416,7 +428,7 @@ void Store::putSection(const ListSection &section) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("sections", copy.id, cached("sections", copy.id), copy.toMap());
 }
 
@@ -436,7 +448,7 @@ void Store::putAttachment(const Attachment &a) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     if (!copy.created.isValid())
         copy.created = copy.modified;
     record("attachments", copy.id, cached("attachments", copy.id), copy.toMap());
@@ -488,7 +500,7 @@ void Store::putTagGroup(const TagGroup &g) {
     if (copy.uid.isEmpty())
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
-        copy.modified = QDateTime::currentDateTime();
+        stampLocal(copy);
     record("tag_groups", copy.id, cached("tag_groups", copy.id), copy.toMap());
 }
 

@@ -116,6 +116,12 @@ rest of the file). It is omitted when empty. Put your own data under one key tha
 the copy a repeating task leaves behind) does not copy `ext`. Numbers inside `ext` are read as
 doubles, so integers above 2^53 lose precision; store such values as strings.
 
+**Who changed it.** Every record may carry `"modified_by": "<who>"`, a free-form string naming the
+machine or program that last changed it. Fairfax sets it to `fairfax@<hostname>` whenever it
+changes a record on that machine (not when it only rewrites a file in canonical form), and keeps
+whatever another writer put there otherwise. Set it to your program's name when you change a
+record. Fairfax does not show it.
+
 **Excluded lists.** A user can mark a list "Don't Sync This List" on one machine. That machine
 neither writes nor imports the list's files or anything that belongs to it. Another machine's
 files for it stay in the repository untouched.
@@ -134,6 +140,7 @@ Folder `list-groups/`. A group holds lists in the sidebar.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `list-groups/10000000-0000-4000-8000-000000000001.json`
 
@@ -176,6 +183,7 @@ Folder `lists/`. A list holds tasks. A list is normal, the Inbox, or a Smart Lis
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `lists/20000000-0000-4000-8000-000000000001.json`
 
@@ -194,6 +202,7 @@ Sample: `lists/20000000-0000-4000-8000-000000000001.json`
     "include_scheduled": false,
     "kind": 0,
     "modified": 1792000000,
+    "modified_by": "fairfax@desktop",
     "mute_alerts": false,
     "name": "Website",
     "separated": true,
@@ -251,6 +260,7 @@ Folder `sections/`. A section is a heading inside a list that groups tasks.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `sections/30000000-0000-4000-8000-000000000001.json`
 
@@ -278,6 +288,7 @@ Folder `tag-groups/`.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `tag-groups/40000000-0000-4000-8000-000000000001.json`
 
@@ -306,6 +317,7 @@ Folder `tags/`.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `tags/50000000-0000-4000-8000-000000000001.json`
 
@@ -352,6 +364,7 @@ Folder `locations/`. A saved place a task can carry.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `locations/60000000-0000-4000-8000-000000000001.json`
 
@@ -411,6 +424,7 @@ Folder `tasks/`. See "Tasks in depth" below for how the fields work together.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 A project with a subtask, tags, a location and a deadline at 17:00:
 
@@ -439,6 +453,7 @@ Sample: `tasks/70000000-0000-4000-8000-000000000001.json`
         "60000000-0000-4000-8000-000000000001"
     ],
     "modified": 1792000000,
+    "modified_by": "acme-sync@laptop",
     "notes": "Check the checklist first.\nThen announce.",
     "parent_uid": "",
     "priority": 3,
@@ -687,6 +702,7 @@ user adds them; the importer does not).
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `alarms/80000000-0000-4000-8000-000000000001.json`
 
@@ -743,6 +759,7 @@ file; the bytes are a separate file in `attachment-files/`.
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
 | `ext` | object | Data of other writers, kept as is (see "Data from other writers") | no | omitted |
+| `modified_by` | string | Who last changed it: a machine or program name | no | omitted |
 
 Sample: `attachments/90000000-0000-4000-8000-000000000001.json`
 
