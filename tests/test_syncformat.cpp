@@ -126,6 +126,10 @@ QStringList importAndCompare(const QMap<QString, QByteArray> &samples, const QMa
         }
         if (path == "Store.json" && got != sample)
             problems << "Store.json differs from what Fairfax writes";
+        // A complete sample must also be laid out exactly as Fairfax writes
+        // it, so a writer copying the samples' style is never reformatted.
+        if (got == sample && back.trimmed() != it.value().trimmed())
+            problems << path + ": Fairfax writes this record in a different layout than the sample shows";
     }
     // The document must name every field Fairfax writes for a kind.
     for (const auto &folder : kFolders) {

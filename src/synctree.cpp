@@ -145,7 +145,18 @@ QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     return obj;
 }
 
-QByteArray bytesOf(const QJsonObject &obj) { return QJsonDocument(obj).toJson(QJsonDocument::Indented); }
+// Indented, with sorted keys, and with empty arrays and objects written as []
+// and {} on one line rather than spread over two, the way most JSON writers
+// lay them out, so a file another program wrote in that style isn't rewritten.
+// A raw newline can't occur inside a JSON string, so only structure matches.
+QByteArray bytesOf(const QJsonObject &obj) {
+    static const QRegularExpression emptyArray(QStringLiteral("\\[\\n\\s*\\]"));
+    static const QRegularExpression emptyObject(QStringLiteral("\\{\\n\\s*\\}"));
+    QString text = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Indented));
+    text.replace(emptyArray, QStringLiteral("[]"));
+    text.replace(emptyObject, QStringLiteral("{}"));
+    return text.toUtf8();
+}
 
 // `defaultList` stands in for a task whose list is not here yet, so it shows
 // up somewhere; its file keeps naming the real list (see "pending").
