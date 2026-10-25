@@ -21,6 +21,19 @@ Menu {
         untagChoices = backend.selectionTags()
     }
 
+    // The style's own list, with its height held at the window's: it follows the list's
+    // contentHeight, which ListView re-estimates as the menu scrolls, and the menu
+    // then resized (and sprang back to the top) on every step. The cap leaves the
+    // height alone once the menu is taller than the window.
+    contentItem: ListView {
+        implicitHeight: Math.min(contentHeight, root.window ? root.window.height - root.topPadding - root.bottomPadding : contentHeight)
+        model: root.contentModel
+        interactive: root.window ? contentHeight + root.topPadding + root.bottomPadding > root.height : false
+        clip: true
+        currentIndex: root.currentIndex
+        ScrollIndicator.vertical: ScrollIndicator {}
+    }
+
     function isoIn(days) {
         const d = new Date()
         d.setDate(d.getDate() + days)

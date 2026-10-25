@@ -157,6 +157,14 @@ bool fillCommandBar(App &app, const QString &kind, const QString &text) {
     return waitUntil([] { return commandBarClosed(); });
 }
 
+// The ListView that lays out an open menu's entries, found from one of them.
+QQuickItem *menuList(QQuickItem *entry) {
+    for (QQuickItem *i = entry; i; i = i->parentItem())
+        if (i->inherits("QQuickListView"))
+            return i;
+    return nullptr;
+}
+
 }  // namespace
 
 class E2EGapsMenus : public QObject {
@@ -205,6 +213,49 @@ private slots:
         }
         QVERIFY(!shown.first()->inherits("QQuickMenuSeparator"));
         QVERIFY(!shown.last()->inherits("QQuickMenuSeparator"));
+        closeMenus(app);
+    }
+
+    // In a window shorter than the menu, scrolling the menu keeps it where it was
+    // put: it does not spring back to the top.
+    void taskMenuStaysScrolledInAShortWindow() {
+        App app(seedMisc);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        app.window->resize(1180, 480);
+        QVERIFY(tk::waitFor([&] { return app.window->height() <= 480; }));
+        const QString name = QString("taskRow:%1").arg(app.ids.buyMilk);
+        QVERIFY(tk::waitItem(name) && tk::settled(name));
+        QQuickItem *row = app.row(app.ids.buyMilk);
+        click(row, Qt::RightButton, pointIn(row, 0.4, 0.5));
+        QQuickItem *edit = nullptr;
+        QVERIFY(tk::waitFor([&] { return (edit = tk::steadyMenuItem("Edit", 200)) != nullptr; }));
+        QQuickItem *list = menuList(edit);
+        QVERIFY(list);
+        auto contentY = [&] { return list->property("contentY").toReal(); };
+        QVERIFY(list->property("contentHeight").toReal() > list->height() + 50);
+        QWindow *w = edit->window();
+        const QPointF at = edit->mapToScene(QPointF(edit->width() / 2, edit->height() / 2));
+        const QPointF global = w->mapToGlobal(at.toPoint());
+        const qreal start = contentY();
+        for (int i = 0; i < 4; ++i) {
+            QWheelEvent ev(at, global, QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(w, &ev);
+            QTest::qWait(30);
+        }
+        const qreal wheeled = contentY();
+        QVERIFY2(wheeled > start + 20, qPrintable(QString::number(wheeled)));
+        QTest::qWait(1000);
+        QVERIFY2(contentY() >= wheeled - 1, qPrintable(QString("wheel: %1 -> %2").arg(wheeled).arg(contentY())));
+        // The pointer then moves over an entry, as a reader's does.
+        QTest::mouseMove(w, at.toPoint());
+        QTest::qWait(300);
+        QVERIFY2(contentY() >= wheeled - 1, qPrintable(QString("hover: %1 -> %2").arg(wheeled).arg(contentY())));
+        // And a position set directly holds as well.
+        const qreal bottom = list->property("contentHeight").toReal() - list->height();
+        list->setProperty("contentY", bottom);
+        QTest::qWait(1000);
+        QVERIFY2(contentY() >= bottom - 1, qPrintable(QString("set: %1 -> %2").arg(bottom).arg(contentY())));
         closeMenus(app);
     }
 

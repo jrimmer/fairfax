@@ -5,6 +5,8 @@
 - The task menu no longer has a blank band above Star when model suggestions
   are off; hidden entries (here and in the Inbox, search and place menus) take
   no room.
+- The task menu can be scrolled when the window is shorter than it is; it no
+  longer jumps back to the top.
 
 ## 1.0.3 (2026-10-25)
 
