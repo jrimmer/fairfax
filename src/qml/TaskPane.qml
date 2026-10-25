@@ -135,6 +135,7 @@ Item {
                     MenuItem {
                         objectName: "searchAskEnglish"
                         visible: backend.agentEnabled
+                        height: visible ? implicitHeight : 0
                         text: "Ask in plain English…\t" + backend.shortcutText("view.askEnglish")
                         onTriggered: root.openAskSheet()
                     }

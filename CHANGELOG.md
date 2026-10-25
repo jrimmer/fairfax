@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The task menu no longer has a blank band above Star when model suggestions
+  are off; hidden entries (here and in the Inbox, search and place menus) take
+  no room.
+
 ## 1.0.3 (2026-10-25)
 
 - My Day's header fits at any window width: the "of tasks · left in work day"

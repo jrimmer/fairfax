@@ -170,6 +170,44 @@ private slots:
     }
     void cleanupTestCase() { QDesktopServices::unsetUrlHandler("mailto"); }
 
+    // ------------------------------------------------------- menu layout
+
+    // With the model suggestions off, the entries that belong to them take no
+    // room: the visible entries (and separators) follow one another with no gap,
+    // and no separator opens, closes or doubles up the menu.
+    void taskMenuHasNoGapWhereEntriesAreHidden() {
+        App app(seedMisc);
+        QVERIFY(app.ok);
+        QVERIFY(!app.backend().agentEnabled());
+        QVERIFY(app.openSource(lk(app.ids.home)));
+        QVERIFY(contextMenuOn(app, app.ids.buyMilk));
+        QQuickItem *edit = tk::steadyMenuItem("Edit");
+        QVERIFY(edit);
+        QQuickItem *content = edit->parentItem();
+        QVERIFY(content);
+        for (const char *name : {"suggestPriorities", "suggestSteps"}) {
+            QQuickItem *hidden = findItem(name, false);
+            QVERIFY2(hidden, name);
+            QVERIFY2(!hidden->isVisible(), name);
+            QCOMPARE(hidden->height(), 0.0);
+        }
+        QList<QQuickItem *> shown;
+        for (QQuickItem *i : content->childItems())
+            if (i->isVisible() && (i->inherits("QQuickMenuItem") || i->inherits("QQuickMenuSeparator")))
+                shown << i;
+        std::sort(shown.begin(), shown.end(), [](QQuickItem *a, QQuickItem *b) { return a->y() < b->y(); });
+        QVERIFY(shown.size() > 20);
+        QCOMPARE(shown.first()->y(), 0.0);
+        for (int i = 1; i < shown.size(); ++i) {
+            const QString at = shown[i]->property("text").toString() + " after " + shown[i - 1]->property("text").toString();
+            QVERIFY2(qAbs(shown[i]->y() - (shown[i - 1]->y() + shown[i - 1]->height())) < 0.5, qPrintable(at));
+            QVERIFY2(!(shown[i]->inherits("QQuickMenuSeparator") && shown[i - 1]->inherits("QQuickMenuSeparator")), qPrintable(at));
+        }
+        QVERIFY(!shown.first()->inherits("QQuickMenuSeparator"));
+        QVERIFY(!shown.last()->inherits("QQuickMenuSeparator"));
+        closeMenus(app);
+    }
+
     // ------------------------------------------------------- sort direction
 
     // The arrow beside the sort button reverses the order: the rows turn over, each list remembers its own

@@ -114,6 +114,7 @@ Menu {
     MenuItem {
         objectName: "suggestPriorities"
         visible: backend.agentEnabled && backend.selectionCount > 1
+        height: visible ? implicitHeight : 0
         text: "Suggest Priorities"
         onTriggered: backend.suggestPriorities()
     }
@@ -122,6 +123,7 @@ Menu {
     MenuItem {
         objectName: "suggestSteps"
         visible: backend.agentEnabled
+        height: visible ? implicitHeight : 0
         text: "Suggest Steps…"
         onTriggered: backend.suggestSteps(root.row.taskId)
     }

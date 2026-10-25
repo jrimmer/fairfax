@@ -877,10 +877,11 @@ Rectangle {
                 MenuItem {
                     objectName: "triageInboxMenu"
                     visible: backend.agentEnabled
+                    height: visible ? implicitHeight : 0
                     text: "Triage Inbox"
                     onTriggered: backend.triageInbox()
                 }
-                MenuSeparator { visible: backend.agentEnabled }
+                MenuSeparator { visible: backend.agentEnabled; height: visible ? implicitHeight : 0 }
                 MenuItem { text: "Edit List…"; onTriggered: editListDialog.edit(item.row.listId) }
             }
             Menu {

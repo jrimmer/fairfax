@@ -512,7 +512,7 @@ Window {
         property var places: []
         onAboutToShow: places = backend.locationChoices()
         CheckItem { text: "None"; on: !root.locationId; onTriggered: root.setPlace(0) }
-        MenuSeparator { visible: placeMenu.places.length > 0 }
+        MenuSeparator { visible: placeMenu.places.length > 0; height: visible ? implicitHeight : 0 }
         Repeater {
             model: placeMenu.places
             CheckItem {
