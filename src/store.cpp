@@ -37,6 +37,8 @@ void startRecord(Record &r) {
     r.uid = Store::newUid();
     r.ext.clear();
     r.modifiedBy.clear();
+    if constexpr (requires { r.pending; })
+        r.pending.clear();
 }
 
 // A local change: stamped with the time and with this machine as its author.
@@ -45,6 +47,14 @@ void stampLocal(Record &r) {
     static const QString writer = QStringLiteral("fairfax@") + QSysInfo::machineHostName();
     r.modified = QDateTime::currentDateTime();
     r.modifiedBy = writer;
+}
+
+// A pending reference stands for a uid Fairfax cannot resolve yet. Moving the
+// record somewhere else (a local edit) ends it.
+void dropPending(QString &pending, const char *key) {
+    QJsonObject o = QJsonDocument::fromJson(pending.toUtf8()).object();
+    o.remove(key);
+    pending = o.isEmpty() ? QString() : QString::fromUtf8(QJsonDocument(o).toJson(QJsonDocument::Compact));
 }
 
 QString errorText(const QSqlQuery &query) { return query.lastError().text(); }
@@ -247,12 +257,16 @@ bool Store::migrate(QString *error) {
             created INTEGER))"),
     };
 
-    // Version 9 keeps other writers' data (the sync files' "ext") as JSON text
-    // and who last changed a record ("modified_by").
+    // Version 9 keeps other writers' data (the sync files' "ext") as JSON text,
+    // who last changed a record ("modified_by"), and the uids a record names
+    // that are not here yet ("pending").
     QStringList version9;
     for (const char *table : {"tasks", "lists", "list_groups", "tags", "tag_groups", "alarms", "locations", "attachments", "sections"})
         version9 << QStringLiteral("ALTER TABLE %1 ADD COLUMN ext TEXT NOT NULL DEFAULT ''").arg(table)
                  << QStringLiteral("ALTER TABLE %1 ADD COLUMN modified_by TEXT NOT NULL DEFAULT ''").arg(table);
+
+    for (const char *table : {"tasks", "lists", "tags", "alarms", "attachments", "sections"})
+        version9 << QStringLiteral("ALTER TABLE %1 ADD COLUMN pending TEXT NOT NULL DEFAULT ''").arg(table);
 
     QStringList steps;
     if (version < 1)
@@ -375,6 +389,17 @@ void Store::putTask(const Task &t) {
         stampLocal(copy);
     if (!copy.created.isValid())
         copy.created = copy.modified;
+    if (!m_pending.keepStamps && !copy.pending.isEmpty()) {
+        const auto old = m_tasks.constFind(copy.id);
+        if (old != m_tasks.cend()) {
+            if (old->listId != copy.listId)
+                dropPending(copy.pending, "list_uid");
+            if (old->sectionId != copy.sectionId)
+                dropPending(copy.pending, "section_uid");
+            if (old->parentId != copy.parentId)
+                dropPending(copy.pending, "parent_uid");
+        }
+    }
     record("tasks", copy.id, cached("tasks", copy.id), copy.toMap());
 }
 
@@ -384,6 +409,11 @@ void Store::putList(const TaskList &l) {
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         stampLocal(copy);
+    if (!m_pending.keepStamps && !copy.pending.isEmpty()) {
+        const auto old = m_lists.constFind(copy.id);
+        if (old != m_lists.cend() && old->groupId != copy.groupId)
+            dropPending(copy.pending, "group_uid");
+    }
     record("lists", copy.id, cached("lists", copy.id), copy.toMap());
 }
 
@@ -402,6 +432,11 @@ void Store::putTag(const Tag &t) {
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         stampLocal(copy);
+    if (!m_pending.keepStamps && !copy.pending.isEmpty()) {
+        const auto old = m_tags.constFind(copy.id);
+        if (old != m_tags.cend() && old->groupId != copy.groupId)
+            dropPending(copy.pending, "group_uid");
+    }
     record("tags", copy.id, cached("tags", copy.id), copy.toMap());
 }
 
@@ -429,6 +464,11 @@ void Store::putSection(const ListSection &section) {
         startRecord(copy);
     if (!m_pending.keepStamps || !copy.modified.isValid())
         stampLocal(copy);
+    if (!m_pending.keepStamps && !copy.pending.isEmpty()) {
+        const auto old = m_sections.constFind(copy.id);
+        if (old != m_sections.cend() && old->listId != copy.listId)
+            dropPending(copy.pending, "list_uid");
+    }
     record("sections", copy.id, cached("sections", copy.id), copy.toMap());
 }
 

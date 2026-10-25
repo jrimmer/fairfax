@@ -50,7 +50,7 @@ QJsonObject projection(const QString &entity, QVariantMap m) {
         p.insert("deleted", m.value("deleted"));
         return QJsonObject::fromVariantMap(p);
     }
-    for (const char *k : {"modified", "sort_order", "collapsed", "created", "id", "location_ids", "ext", "modified_by"})
+    for (const char *k : {"modified", "sort_order", "collapsed", "created", "id", "location_ids", "ext", "modified_by", "pending"})
         m.remove(k);
     return QJsonObject::fromVariantMap(m);
 }

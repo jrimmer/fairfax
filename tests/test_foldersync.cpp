@@ -351,6 +351,112 @@ private slots:
             QCOMPARE(readJson(b.mirror + "/" + it.key() + "/" + it.value() + ".json").value("ext").toObject(), ext);
     }
 
+    // The other writer's files name records that have not been committed yet.
+    static void writeRefFiles(const QString &folder, qint64 base, bool dependencies) {
+        auto put = [&](const QString &kind, const QString &uid, QJsonObject o) {
+            o["modified"] = base;
+            writeJson(folder + "/" + kind + "/" + uid + ".json", o);
+        };
+        if (!dependencies) {
+            put("tasks", "K1", {{"title", "Waiting"}, {"list_uid", "L1"}, {"section_uid", "S1"}, {"parent_uid", "P1"},
+                                {"tag_uids", QJsonArray{"T1", "T2"}}, {"location_uids", QJsonArray{"LOC1"}}});
+            put("alarms", "A1", {{"task_uid", "K9"}, {"offset_minutes", 5}});
+            put("attachments", "AT1", {{"task_uid", "K9"}, {"name", "a.png"}, {"file_name", "AT1.png"}});
+            return;
+        }
+        put("lists", "L1", {{"name", "Projects"}});
+        put("tags", "T1", {{"name", "first"}});
+        put("sections", "S1", {{"name", "Phase"}, {"list_uid", "L1"}});
+        put("tasks", "P1", {{"title", "Parent"}, {"list_uid", "L1"}});
+        put("locations", "LOC1", {{"name", "Shop"}});
+        put("tasks", "K9", {{"title", "Late"}, {"list_uid", "L1"}});
+    }
+
+    void referencesToMissingRecordsAreKeptUntilTheyArrive() {
+        const QString folder = m_dir.filePath("refs1"); QDir().mkpath(folder);
+        SyncTree::FolderRemote remote(folder);
+        Machine a = machine("a");
+        const qint64 home = addList(*a.store, "Home");
+        const qint64 base = 1700000000;
+        writeRefFiles(folder, base, false);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+
+        // The task shows in the default list, and its file keeps naming everything.
+        const qint64 id = find(*a.store, "Waiting");
+        QVERIFY(id);
+        QCOMPARE(a.store->task(id).listId, home);
+        QVERIFY(a.store->task(id).tagIds.isEmpty());
+        auto expectFile = [&](const QStringList &tags) {
+            const QJsonObject o = readJson(folder + "/tasks/K1.json");
+            QCOMPARE(o.value("list_uid").toString(), QString("L1"));
+            QCOMPARE(o.value("section_uid").toString(), QString("S1"));
+            QCOMPARE(o.value("parent_uid").toString(), QString("P1"));
+            QStringList got;
+            for (const auto &v : o.value("tag_uids").toArray())
+                got << v.toString();
+            QCOMPARE(got, tags);
+            QCOMPARE(o.value("location_uids").toArray().size(), 1);
+            QCOMPARE(o.value("location_uids").toArray().at(0).toString(), QString("LOC1"));
+        };
+        expectFile({"T1", "T2"});
+        QCOMPARE(a.store->alarms().size(), 1);
+        QCOMPARE(a.store->alarms().begin()->taskId, qint64(0));
+        QCOMPARE(readJson(folder + "/alarms/A1.json").value("task_uid").toString(), QString("K9"));
+        QCOMPARE(a.store->attachments().size(), 1);
+        QCOMPARE(readJson(folder + "/attachments/AT1.json").value("task_uid").toString(), QString("K9"));
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        expectFile({"T1", "T2"});
+
+        // The list, one tag, the section, the parent, the place and the alarm's task arrive.
+        writeRefFiles(folder, base, true);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        const Task t = a.store->task(id);
+        QCOMPARE(a.store->list(t.listId).uid, QString("L1"));
+        QCOMPARE(t.tagIds.size(), 1);
+        QCOMPARE(a.store->tag(t.tagIds.first()).uid, QString("T1"));
+        QCOMPARE(a.store->sections().value(t.sectionId).uid, QString("S1"));
+        QCOMPARE(a.store->task(t.parentId).uid, QString("P1"));
+        QCOMPARE(t.locationIds.size(), 1);
+        QCOMPARE(a.store->alarms().begin()->taskId, find(*a.store, "Late"));
+        QCOMPARE(a.store->attachments().begin()->taskId, find(*a.store, "Late"));
+        expectFile({"T1", "T2"});  // the second tag is still not here
+
+        // The second tag arrives later still.
+        QJsonObject tag{{"name", "second"}, {"modified", base}};
+        writeJson(folder + "/tags/T2.json", tag);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(a.store->task(id).tagIds.size(), 2);
+        expectFile({"T1", "T2"});
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(a.store->task(id).tagIds.size(), 2);
+        expectFile({"T1", "T2"});
+    }
+
+    void movingATaskEndsItsPendingList() {
+        const QString folder = m_dir.filePath("refs2"); QDir().mkpath(folder);
+        SyncTree::FolderRemote remote(folder);
+        Machine a = machine("a");
+        const qint64 home = addList(*a.store, "Home");
+        const qint64 other = addList(*a.store, "Other");
+        QCOMPARE(home + 1, other);
+        const qint64 base = 1700000000;
+        writeRefFiles(folder, base, false);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        const qint64 id = find(*a.store, "Waiting");
+        Task t = a.store->task(id);
+        t.listId = other;
+        a.store->begin("move");
+        a.store->putTask(t);
+        a.store->commit();
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(readJson(folder + "/tasks/K1.json").value("list_uid").toString(), a.store->list(other).uid);
+        // The list it used to wait for turns up; the task stays where the user put it.
+        writeRefFiles(folder, base, true);
+        QVERIFY(syncs(*a.store, remote, a.mirror));
+        QCOMPARE(a.store->task(id).listId, other);
+        QCOMPARE(readJson(folder + "/tasks/K1.json").value("list_uid").toString(), a.store->list(other).uid);
+    }
+
     void junkFilesInTheFolderAreIgnored() {
         const QString folder = m_dir.filePath("shared2"); QDir().mkpath(folder);
         SyncTree::FolderRemote remote(folder);

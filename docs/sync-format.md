@@ -103,11 +103,21 @@ attachments; they are hidden with their task. A writer can tombstone them too.
 | `location_uids` | task | locations |
 | `task_uid` | alarm, attachment | task |
 
-An empty string means "none". References are resolved once, when the file is imported, against
-the records Fairfax then has (the same import counts). A reference to a uid it does not know
-becomes "none", and the next write-back stores the empty value, so the link is lost for good.
-Commit referenced records in the same commit as, or before, the records that point at them.
-New alarms and attachments whose task is unknown are not imported at all.
+An empty string means "none". A reference to a uid Fairfax does not have (yet) is kept as it is:
+Fairfax remembers the raw uid, writes it back unchanged, and resolves it whenever the named record
+arrives in a later sync. So a writer may commit a task before its list, tag, section, parent or
+place, and an alarm or attachment before its task; committing referenced records first is still
+tidier, because until the record arrives:
+
+- a task whose `list_uid` is unknown shows in the default list for new tasks (Settings, Tasks,
+  Default list) on that machine, while its file keeps naming the real list. Moving the task to
+  another list in Fairfax ends the wait: the file then names the new list;
+- a task whose `section_uid` or `parent_uid` is unknown shows without a section, or at the top level;
+- unknown `tag_uids` and `location_uids` entries are kept but not shown, next to the ones that
+  resolve;
+- an alarm or attachment whose task is unknown is stored but does nothing (an alarm never fires).
+
+A reference that never resolves stays in the file for good; Fairfax never rewrites it to "none".
 
 **Data from other writers.** Every record kind may carry an `ext` object: `"ext": {"<writer-name>": {...}}`.
 Fairfax stores it as it is, never reads into it, and writes it back unchanged (keys sorted like the
@@ -418,8 +428,8 @@ Folder `tasks/`. See "Tasks in depth" below for how the fields work together.
 | `series_uid` | string | Shared by a repeating task and the completed copies it left behind; `""` if none | no | `""` |
 | `sort_order` | number | Position among siblings (same list and parent), ascending | no | `0` |
 | `collapsed` | bool | A project or checklist is shown collapsed | no | `false` |
-| `tag_uids` | array of string | Tags on the task; unknown uids are dropped | no | `[]` |
-| `location_uids` | array of string | Locations on the task; unknown uids are dropped | no | `[]` |
+| `tag_uids` | array of string | Tags on the task; a uid Fairfax does not have yet is kept | no | `[]` |
+| `location_uids` | array of string | Locations on the task; a uid Fairfax does not have yet is kept | no | `[]` |
 | `created` | integer or null | Seconds since epoch, UTC; if absent Fairfax uses `modified` | no | `modified` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |
@@ -676,8 +686,8 @@ uid. Children belong in the parent's list; give them the parent's `list_uid`. A 
 (`type` 1) and a checklist (`type` 2) are tasks that are meant to have children; a plain task
 (`type` 0) can have them too. Nesting is by `parent_uid` only. Do not make cycles.
 
-**Tags and locations.** `tag_uids` and `location_uids` are arrays of uids of existing, undeleted
-records. The order is not significant.
+**Tags and locations.** `tag_uids` and `location_uids` are arrays of uids of tags and locations.
+Use uids of undeleted records. The order is not significant.
 
 **Ordering.** Within one list and one parent, tasks are ordered by `sort_order` ascending when the
 list sorts manually (`sort_field` 8). Fairfax creates a new task with one more than the largest
@@ -788,6 +798,10 @@ Work in your own clone of the repository, never in Fairfax's own working copy: F
 one to the remote on every sync. Do not create or edit `Store.json`. Set `GIT_TERMINAL_PROMPT=0`
 if there is no terminal.
 
+Keep your own data under `ext.<your-name>` and set `modified_by` to your program's name whenever
+you change a record. You may commit a record before the records it names (a task before its list);
+Fairfax keeps the references until those arrive, though committing lists first is still tidier.
+
 Every example below assumes `cd` into the clone, `git pull --ff-only` just done, and these shell
 variables:
 
@@ -798,7 +812,7 @@ LIST=20000000-0000-4000-8000-000000000002   # an existing list's uid
 TASK=70000000-0000-4000-8000-000000000004   # an existing task's uid
 ```
 
-**Create a task.** Write a new file and commit it. The list must already exist.
+**Create a task.** Write a new file and commit it. Commit its list first, or in the same commit.
 
 ```sh
 cat > "tasks/$UID_NEW.json" <<EOF
@@ -902,7 +916,7 @@ programs. Nothing here has been changed in the code.
     that, with an older copy, may bring the record back. I could not confirm this from the code.
 18. **The code comment in `src/gitsync.h` says the cycle uses `git reset --soft`.** The code runs
     `git reset --hard origin/<branch>`. This document follows the code.
-19. **A task with an empty or unknown `list_uid` is imported with no list.** I could not confirm
+19. **A task with an empty `list_uid` is imported with no list.** I could not confirm
     from the code how every view shows such a task. Writers should always give a list.
 20. **Fairfax deletes unreadable `.json` files from the record folders** when it writes. A writer
     that produces a malformed file loses it without warning.

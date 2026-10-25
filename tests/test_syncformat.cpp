@@ -293,6 +293,80 @@ private slots:
         change(kNow + 10, [](QJsonObject &o) { o["deleted"] = true; });
         QCOMPARE(titleOf(plain), QString("<none>"));
     }
+
+    // A writer may commit a task before its list and tag: the task keeps
+    // naming them in the repository, and joins them when they arrive.
+    void gitKeepsReferencesToRecordsNotCommittedYet() {
+        QString err;
+        QTemporaryDir dir;
+        const QString bare = dir.filePath("remote.git");
+        QVERIFY(git(dir.path(), {"init", "--bare", "-q", "-b", "main", bare}));
+        const QString agent = dir.filePath("agent");
+        QVERIFY(git(dir.path(), {"clone", "-q", bare, agent}));
+        QVERIFY(git(agent, {"checkout", "-q", "-B", "main"}));
+        const QString task = "70000000-0000-4000-8000-0000000000A1";
+        const QString list = "20000000-0000-4000-8000-0000000000A1";
+        const QString tag = "50000000-0000-4000-8000-0000000000A1";
+        auto commit = [&](const QString &message) {
+            QVERIFY(git(agent, {"add", "-A"}));
+            QVERIFY(git(agent, {"commit", "-q", "-m", message}));
+            QVERIFY(git(agent, {"push", "-q", "origin", "main"}));
+        };
+        writeFile(agent + "/tasks/" + task + ".json",
+                  QJsonDocument(QJsonObject{{"title", "Early bird"}, {"list_uid", list}, {"tag_uids", QJsonArray{tag}}, {"modified", kNow}})
+                      .toJson(QJsonDocument::Indented));
+        commit("Add a task");
+
+        Store store;
+        QVERIFY2(store.open(dir.filePath("fairfax.db"), &err), qPrintable(err));
+        TaskList home;
+        home.id = store.nextId("lists");
+        home.name = "Home";
+        store.begin("list");
+        store.putList(home);
+        store.commit();
+        GitSync sync(&store, dir.filePath("wc"));
+        sync.setRemote(bare);
+        QTRY_VERIFY_WITH_TIMEOUT(!sync.busy(), 30000);
+
+        auto theTask = [&] {
+            for (const auto &t : store.tasks())
+                if (t.uid == task)
+                    return t;
+            return Task();
+        };
+        auto fileUids = [&](const char *key) {
+            const QJsonObject o = parse(readFile(sync.directory() + "/tasks/" + task + ".json"));
+            QStringList out;
+            if (o.value(key).isArray())
+                for (const auto &v : o.value(key).toArray())
+                    out << v.toString();
+            else
+                out << o.value(key).toString();
+            return out;
+        };
+        QCOMPARE(theTask().title, QString("Early bird"));
+        QCOMPARE(theTask().listId, home.id);
+        QVERIFY(theTask().tagIds.isEmpty());
+        QCOMPARE(fileUids("list_uid"), QStringList{list});
+        QCOMPARE(fileUids("tag_uids"), QStringList{tag});
+        QVERIFY(sync.syncBlocking());
+        QCOMPARE(fileUids("list_uid"), QStringList{list});
+        QCOMPARE(fileUids("tag_uids"), QStringList{tag});
+
+        QVERIFY(git(agent, {"pull", "-q", "--ff-only", "origin", "main"}));
+        writeFile(agent + "/lists/" + list + ".json",
+                  QJsonDocument(QJsonObject{{"name", "Projects"}, {"modified", kNow}}).toJson(QJsonDocument::Indented));
+        writeFile(agent + "/tags/" + tag + ".json",
+                  QJsonDocument(QJsonObject{{"name", "errand"}, {"modified", kNow}}).toJson(QJsonDocument::Indented));
+        commit("Add the list and the tag");
+        QVERIFY(sync.syncBlocking());
+        QCOMPARE(store.list(theTask().listId).uid, list);
+        QCOMPARE(theTask().tagIds.size(), 1);
+        QCOMPARE(store.tag(theTask().tagIds.first()).uid, tag);
+        QCOMPARE(fileUids("list_uid"), QStringList{list});
+        QCOMPARE(fileUids("tag_uids"), QStringList{tag});
+    }
 };
 
 REGISTER_TEST(SyncFormatTest)

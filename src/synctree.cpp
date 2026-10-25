@@ -12,7 +12,9 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include "schedule.h"
 #include "store.h"
+#include "views.h"
 
 // Conflict handling: records are merged one by one, the newer `modified`
 // wins (a tie with different content is broken by comparing the serialized
@@ -58,27 +60,46 @@ Maps buildMaps(const Store &s) {
     return m;
 }
 
-void swapRef(QVariantMap &map, const char *idKey, const char *uidKey, const QHash<qint64, QString> &rev) {
-    const qint64 id = map.take(idKey).toLongLong();
-    map.insert(uidKey, rev.value(id));
-}
+// The references a record kind holds, by the uid key of its file and the id
+// column of the database. A list reference holds many ids, comma-separated.
+struct RefSpec {
+    const char *uidKey;
+    const char *idKey;
+    Kind target;
+    bool list;
+};
 
-QJsonArray uidList(const QString &ids, const QHash<qint64, QString> &rev) {
-    QJsonArray uids;
-    for (const auto &part : ids.split(',', Qt::SkipEmptyParts)) {
-        const QString u = rev.value(part.toLongLong());
-        if (!u.isEmpty())
-            uids.append(u);
+QVector<RefSpec> refsOf(Kind kind) {
+    switch (kind) {
+    case KList: return {{"group_uid", "group_id", KGroup, false}};
+    case KTag: return {{"group_uid", "group_id", KTagGroup, false}};
+    case KAlarm:
+    case KAttachment: return {{"task_uid", "task_id", KTask, false}};
+    case KSection: return {{"list_uid", "list_id", KList, false}};
+    case KTask:
+        return {{"list_uid", "list_id", KList, false},
+                {"section_uid", "section_id", KSection, false},
+                {"parent_uid", "parent_id", KTask, false},
+                {"tag_uids", "tag_ids", KTag, true},
+                {"location_uids", "location_ids", KLocation, true}};
+    default: return {};
     }
-    return uids;
 }
 
-QString idList(const QJsonArray &uids, const QHash<QString, qint64> &uid) {
-    QStringList ids;
-    for (const auto &v : uids)
-        if (const qint64 id = uid.value(v.toString(), 0))
-            ids << QString::number(id);
-    return ids.join(',');
+// A reference to a record this machine does not have yet is kept in the
+// record's "pending" column, as JSON keyed like the file: a uid string, or an
+// array of uids for a list reference.
+QJsonObject pendingOf(const QString &text) { return QJsonDocument::fromJson(text.toUtf8()).object(); }
+
+QString pendingText(const QJsonObject &pending) {
+    return pending.isEmpty() ? QString() : QString::fromUtf8(QJsonDocument(pending).toJson(QJsonDocument::Compact));
+}
+
+// The uid a single reference stands for: the pending one if there is one,
+// else the uid of the record its id names.
+QString refUid(const QVariantMap &map, const char *idKey, const char *uidKey, const QHash<qint64, QString> &rev) {
+    const QString raw = pendingOf(map.value("pending").toString()).value(uidKey).toString();
+    return raw.isEmpty() ? rev.value(map.value(idKey).toLongLong()) : raw;
 }
 
 // "ext" is stored as compact JSON text: a writer's own data, never interpreted.
@@ -91,77 +112,118 @@ QJsonObject toJson(Kind kind, QVariantMap map, const Maps &x) {
     map.remove("id");
     const QString ext = map.take("ext").toString();
     const QString modifiedBy = map.take("modified_by").toString();
-    QJsonArray tagUids;
-    QJsonArray locationUids;
-    switch (kind) {
-    case KList: swapRef(map, "group_id", "group_uid", x.rev[KGroup]); break;
-    case KTag: swapRef(map, "group_id", "group_uid", x.rev[KTagGroup]); break;
-    case KAlarm: swapRef(map, "task_id", "task_uid", x.rev[KTask]); break;
-    case KAttachment: swapRef(map, "task_id", "task_uid", x.rev[KTask]); break;
-    case KSection: swapRef(map, "list_id", "list_uid", x.rev[KList]); break;
-    case KTask: {
-        swapRef(map, "list_id", "list_uid", x.rev[KList]);
-        swapRef(map, "section_id", "section_uid", x.rev[KSection]);
-        swapRef(map, "parent_id", "parent_uid", x.rev[KTask]);
-        locationUids = uidList(map.take("location_ids").toString(), x.rev[KLocation]);
-        for (const auto &part : map.take("tag_ids").toString().split(',', Qt::SkipEmptyParts)) {
-            const QString u = x.rev[KTag].value(part.toLongLong());
-            if (!u.isEmpty())
-                tagUids.append(u);
+    const QJsonObject pending = pendingOf(map.value("pending").toString());
+    QJsonObject lists;
+    for (const RefSpec &r : refsOf(kind)) {
+        if (!r.list) {
+            map.insert(r.uidKey, refUid(map, r.idKey, r.uidKey, x.rev[r.target]));
+            map.remove(r.idKey);
+            continue;
         }
-        break;
+        QJsonArray uids;
+        for (const auto &part : map.take(r.idKey).toString().split(',', Qt::SkipEmptyParts)) {
+            const QString u = x.rev[r.target].value(part.toLongLong());
+            if (!u.isEmpty())
+                uids.append(u);
+        }
+        for (const auto &v : pending.value(r.uidKey).toArray())
+            if (!v.toString().isEmpty() && !uids.contains(v))
+                uids.append(v);
+        lists.insert(r.uidKey, uids);
     }
-    default: break;
-    }
+    map.remove("pending");
     QJsonObject obj = QJsonObject::fromVariantMap(map);
+    for (auto it = lists.begin(); it != lists.end(); ++it)
+        obj.insert(it.key(), it.value());
     const QJsonObject extObject = QJsonDocument::fromJson(ext.toUtf8()).object();
     if (!extObject.isEmpty())
         obj.insert("ext", extObject);
     if (!modifiedBy.isEmpty())
         obj.insert("modified_by", modifiedBy);
-    if (kind == KTask) {
-        obj.insert("tag_uids", tagUids);
-        obj.insert("location_uids", locationUids);
-    }
     return obj;
 }
 
 QByteArray bytesOf(const QJsonObject &obj) { return QJsonDocument(obj).toJson(QJsonDocument::Indented); }
 
-QVariantMap fromJson(Kind kind, const QJsonObject &obj, const Maps &x, qint64 id) {
+// `defaultList` stands in for a task whose list is not here yet, so it shows
+// up somewhere; its file keeps naming the real list (see "pending").
+QVariantMap fromJson(Kind kind, const QJsonObject &obj, const Maps &x, qint64 id, qint64 defaultList = 0) {
     QVariantMap map = obj.toVariantMap();
     map.insert("ext", extText(obj.value("ext")));
     map.insert("modified_by", obj.value("modified_by").toString());
-    auto swapBack = [&](const char *uidKey, const char *idKey, Kind target) {
-        const QString u = map.take(uidKey).toString();
-        map.insert(idKey, u.isEmpty() ? 0 : x.uid[target].value(u, 0));
-    };
-    switch (kind) {
-    case KList: swapBack("group_uid", "group_id", KGroup); break;
-    case KTag: swapBack("group_uid", "group_id", KTagGroup); break;
-    case KAlarm: swapBack("task_uid", "task_id", KTask); break;
-    case KAttachment: swapBack("task_uid", "task_id", KTask); break;
-    case KSection: swapBack("list_uid", "list_id", KList); break;
-    case KTask: {
-        swapBack("list_uid", "list_id", KList);
-        swapBack("section_uid", "section_id", KSection);
-        swapBack("parent_uid", "parent_id", KTask);
-        map.remove("location_uids");
-        map.insert("location_ids", idList(obj.value("location_uids").toArray(), x.uid[KLocation]));
-        map.remove("tag_uids");
-        QStringList ids;
-        for (const auto &v : obj.value("tag_uids").toArray()) {
-            const qint64 tid = x.uid[KTag].value(v.toString(), 0);
-            if (tid)
-                ids << QString::number(tid);
+    QJsonObject pending;
+    for (const RefSpec &r : refsOf(kind)) {
+        if (r.list) {
+            QStringList ids;
+            QJsonArray unresolved;
+            for (const auto &v : obj.value(r.uidKey).toArray()) {
+                const QString u = v.toString();
+                if (u.isEmpty())
+                    continue;
+                if (const qint64 rid = x.uid[r.target].value(u, 0))
+                    ids << QString::number(rid);
+                else
+                    unresolved.append(u);
+            }
+            map.remove(r.uidKey);
+            map.insert(r.idKey, ids.join(','));
+            if (!unresolved.isEmpty())
+                pending.insert(r.uidKey, unresolved);
+            continue;
         }
-        map.insert("tag_ids", ids.join(','));
-        break;
+        const QString u = map.take(r.uidKey).toString();
+        const qint64 rid = u.isEmpty() ? 0 : x.uid[r.target].value(u, 0);
+        if (!u.isEmpty() && !rid)
+            pending.insert(r.uidKey, u);
+        map.insert(r.idKey, rid);
     }
-    default: break;
-    }
+    if (kind == KTask && pending.contains("list_uid"))
+        map.insert("list_id", defaultList);
+    map.insert("pending", pendingText(pending));
     map.insert("id", id);
     return map;
+}
+
+// Settles the pending references of `map` that name records now in `x`.
+// Returns whether anything changed.
+bool resolvePending(Kind kind, QVariantMap &map, const Maps &x) {
+    QJsonObject pending = pendingOf(map.value("pending").toString());
+    if (pending.isEmpty())
+        return false;
+    bool changed = false;
+    for (const RefSpec &r : refsOf(kind)) {
+        if (!pending.contains(r.uidKey))
+            continue;
+        if (!r.list) {
+            if (const qint64 rid = x.uid[r.target].value(pending.value(r.uidKey).toString(), 0)) {
+                map.insert(r.idKey, rid);
+                pending.remove(r.uidKey);
+                changed = true;
+            }
+            continue;
+        }
+        QStringList ids = map.value(r.idKey).toString().split(',', Qt::SkipEmptyParts);
+        QJsonArray rest;
+        const QJsonArray waiting = pending.value(r.uidKey).toArray();
+        for (const auto &v : waiting) {
+            const qint64 rid = x.uid[r.target].value(v.toString(), 0);
+            if (!rid)
+                rest.append(v);
+            else if (!ids.contains(QString::number(rid)))
+                ids << QString::number(rid);
+        }
+        if (rest.size() == waiting.size())
+            continue;
+        map.insert(r.idKey, ids.join(','));
+        if (rest.isEmpty())
+            pending.remove(r.uidKey);
+        else
+            pending.insert(r.uidKey, rest);
+        changed = true;
+    }
+    if (changed)
+        map.insert("pending", pendingText(pending));
+    return changed;
 }
 
 qint64 stampOf(const QDateTime &t) { return t.isValid() ? t.toSecsSinceEpoch() : 0; }
@@ -232,11 +294,17 @@ Exclusion exclusionOf(const Store &s) {
     e.lists = SyncTree::excludedListUids(s);
     if (e.lists.isEmpty())
         return e;
+    QHash<qint64, QString> listUids;
     for (const auto &l : s.lists())
-        if (!l.uid.isEmpty() && e.lists.contains(l.uid))
-            for (const auto &t : s.tasks())
-                if (t.listId == l.id && !t.uid.isEmpty())
-                    e.tasks.insert(t.uid);
+        if (!l.uid.isEmpty())
+            listUids.insert(l.id, l.uid);
+    for (const auto &t : s.tasks()) {
+        // A task whose list has not arrived yet sits in a stand-in list; its
+        // file still names the real one.
+        const QString raw = pendingOf(t.pending).value("list_uid").toString();
+        if (!t.uid.isEmpty() && e.lists.contains(raw.isEmpty() ? listUids.value(t.listId) : raw))
+            e.tasks.insert(t.uid);
+    }
     return e;
 }
 
@@ -246,9 +314,9 @@ bool localExcluded(Kind kind, const QString &uid, const QVariantMap &map, const 
     switch (kind) {
     case KList: return e.lists.contains(uid);
     case KSection:
-    case KTask: return e.lists.contains(x.rev[KList].value(map.value("list_id").toLongLong()));
+    case KTask: return e.lists.contains(refUid(map, "list_id", "list_uid", x.rev[KList]));
     case KAlarm:
-    case KAttachment: return e.tasks.contains(x.rev[KTask].value(map.value("task_id").toLongLong()));
+    case KAttachment: return e.tasks.contains(refUid(map, "task_id", "task_uid", x.rev[KTask]));
     default: return false;
     }
 }
@@ -264,6 +332,19 @@ bool incomingExcluded(Kind kind, const QString &uid, const QJsonObject &obj, con
     case KAttachment: return e.tasks.contains(obj.value("task_uid").toString());
     default: return false;
     }
+}
+
+// The list new tasks go to: the one chosen in Settings, else the first list in
+// sidebar order.
+qint64 defaultListId(const Store &store) {
+    qint64 preferred = store.setting("tasks.defaultList", 0).toLongLong();
+    if (preferred < 0)
+        preferred = store.setting("tasks.lastList", 0).toLongLong();
+    if (preferred && store.lists().contains(preferred) && !store.list(preferred).deleted)
+        return preferred;
+    const ViewBuilder views(store, QDateTime::currentDateTime(), ScheduleSettings::fromStore(store));
+    const auto lists = views.orderedLists();
+    return lists.isEmpty() ? 0 : lists.first().id;
 }
 
 struct Incoming {
@@ -379,12 +460,27 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
     Exclusion excl = exclusionOf(store);
     if (excl.any()) {
         QVector<Incoming> kept;
-        for (const auto &in : std::as_const(incoming))
+        QSet<QString> incomingTasks;
+        for (const auto &in : std::as_const(incoming)) {
+            if (in.kind == KTask)
+                incomingTasks.insert(in.uid);
             if (in.kind == KTask && incomingExcluded(in.kind, in.uid, in.obj, excl))
                 excl.tasks.insert(in.uid);
-        for (const auto &in : std::as_const(incoming))
-            if (!incomingExcluded(in.kind, in.uid, in.obj, excl))
+        }
+        // An alarm or attachment can arrive without its task when the task
+        // belongs to an excluded list and was never imported here.
+        auto taskExcluded = [&](const QString &taskUid) {
+            if (taskUid.isEmpty() || x.uid[KTask].contains(taskUid) || incomingTasks.contains(taskUid))
+                return false;
+            QFile f(root.filePath(QString("tasks/%1.json").arg(taskUid)));
+            return f.open(QIODevice::ReadOnly) &&
+                   excl.lists.contains(QJsonDocument::fromJson(f.readAll()).object().value("list_uid").toString());
+        };
+        for (const auto &in : std::as_const(incoming)) {
+            const bool owned = in.kind == KAlarm || in.kind == KAttachment;
+            if (!incomingExcluded(in.kind, in.uid, in.obj, excl) && !(owned && taskExcluded(in.obj.value("task_uid").toString())))
                 kept.append(in);
+        }
         incoming = kept;
     }
 
@@ -432,8 +528,6 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
                 continue;
             const qint64 existing = x.uid[k].value(in.uid, 0);
             if (!existing) {
-                if ((k == KAlarm || k == KAttachment) && !x.uid[KTask].contains(in.obj.value("task_uid").toString()))
-                    continue;  // its task is gone
                 const qint64 id = store.nextId(Tables[k]);
                 x.uid[k].insert(in.uid, id);
                 x.rev[k].insert(id, in.uid);
@@ -484,10 +578,18 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
     }
     apply[KTask] = orderedTasks;
 
+    // A task whose list has not arrived yet shows up in the default list.
+    qint64 standIn = 0;
+    for (const auto &in : std::as_const(apply[KTask]))
+        if (!in.obj.value("list_uid").toString().isEmpty() && !x.uid[KList].contains(in.obj.value("list_uid").toString())) {
+            standIn = defaultListId(store);
+            break;
+        }
+
     store.begin("Sync", false, true);
     for (int k = 0; k < KindCount; ++k) {
         for (const auto &in : std::as_const(apply[k])) {
-            const QVariantMap m = fromJson(Kind(k), in.obj, x, ids[k].value(in.uid));
+            const QVariantMap m = fromJson(Kind(k), in.obj, x, ids[k].value(in.uid), standIn);
             switch (k) {
             case KGroup: store.putGroup(ListGroup::fromMap(m)); break;
             case KList: store.putList(TaskList::fromMap(m)); break;
@@ -501,6 +603,25 @@ int readTree(Store &store, const QString &directory, const QStringList &onlyPath
             default: break;
             }
             ++changed;
+        }
+    }
+    // References that waited for a record that has now arrived.
+    for (int k = 0; k < KindCount; ++k) {
+        if (refsOf(Kind(k)).isEmpty())
+            continue;
+        for (const auto &rec : collect(store, Kind(k))) {
+            QVariantMap m = rec.map;
+            if (!resolvePending(Kind(k), m, x))
+                continue;
+            switch (k) {
+            case KList: store.putList(TaskList::fromMap(m)); break;
+            case KTag: store.putTag(Tag::fromMap(m)); break;
+            case KTask: store.putTask(Task::fromMap(m)); break;
+            case KAlarm: store.putAlarm(Alarm::fromMap(m)); break;
+            case KAttachment: store.putAttachment(Attachment::fromMap(m)); break;
+            case KSection: store.putSection(ListSection::fromMap(m)); break;
+            default: break;
+            }
         }
     }
     store.commit();

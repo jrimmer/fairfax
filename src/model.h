@@ -98,6 +98,7 @@ struct Task {
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
     QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
+    QString pending;  // JSON: uids of records this one names that Fairfax does not have yet.
 
     QVariantMap toMap() const;
     static Task fromMap(const QVariantMap &map);
@@ -162,6 +163,7 @@ struct TaskList {
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
     QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
+    QString pending;  // JSON: uids of records this one names that Fairfax does not have yet.
 
     QVariantMap toMap() const;
     static TaskList fromMap(const QVariantMap &map);
@@ -193,6 +195,7 @@ struct Tag {
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
     QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
+    QString pending;  // JSON: uids of records this one names that Fairfax does not have yet.
 
     QVariantMap toMap() const;
     static Tag fromMap(const QVariantMap &map);
@@ -217,6 +220,7 @@ struct Alarm {
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
     QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
+    QString pending;  // JSON: uids of records this one names that Fairfax does not have yet.
 
     QVariantMap toMap() const;
     static Alarm fromMap(const QVariantMap &map);
@@ -258,6 +262,7 @@ struct Attachment {
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
     QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
+    QString pending;  // JSON: uids of records this one names that Fairfax does not have yet.
 
     QVariantMap toMap() const;
     static Attachment fromMap(const QVariantMap &map);
@@ -275,6 +280,7 @@ struct ListSection {
     bool deleted = false;
     QString ext;  // Other writers' data, kept verbatim as JSON text and never interpreted.
     QString modifiedBy;  // Who last changed it: fairfax@<host> here, or whatever another writer put there.
+    QString pending;  // JSON: uids of records this one names that Fairfax does not have yet.
 
     QVariantMap toMap() const;
     static ListSection fromMap(const QVariantMap &map);

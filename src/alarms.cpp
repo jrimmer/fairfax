@@ -54,8 +54,8 @@ bool AlarmTimes::hasPending(const Store &store, const QDateTime &now) {
     Q_UNUSED(now);
     const int defaultDue = store.setting("tasks.defaultDueTime", 9 * 60).toInt();
     for (const auto &a : store.alarms()) {
-        if (a.deleted)
-            continue;
+        if (a.deleted || !store.tasks().contains(a.taskId))
+            continue;  // (an alarm can arrive before its task)
         const Task t = store.task(a.taskId);
         const QDateTime moment = fireTime(a, t, defaultDue);
         if (moment.isValid() && a.firedFor != moment && !store.list(t.listId).muteAlerts)
@@ -189,6 +189,8 @@ QVector<Alarm> AlarmService::due(const QDateTime &now) const {
     const int defaultDue = m_store->setting("tasks.defaultDueTime", 9 * 60).toInt();
     QVector<Alarm> result;
     for (const auto &a : m_store->alarms()) {
+        if (!m_store->tasks().contains(a.taskId))
+            continue;  // an alarm that arrived before its task
         const Task t = m_store->task(a.taskId);
         const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
         if (moment.isValid() && moment <= now && a.firedFor != moment && !m_store->list(t.listId).muteAlerts)
@@ -218,6 +220,8 @@ void AlarmService::schedule() {
     const QDateTime now = QDateTime::currentDateTime();
     QDateTime next;
     for (const auto &a : m_store->alarms()) {
+        if (!m_store->tasks().contains(a.taskId))
+            continue;
         const Task t = m_store->task(a.taskId);
         const QDateTime moment = AlarmTimes::fireTime(a, t, defaultDue);
         if (!moment.isValid() || a.firedFor == moment || m_store->list(t.listId).muteAlerts)
