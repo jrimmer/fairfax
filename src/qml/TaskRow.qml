@@ -378,20 +378,25 @@ Item {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 property bool held: false
                 onPressed: held = false
-                onPressAndHold: { held = true; priorityMenu.popup() }
+                onPressAndHold: { held = true; root.openMenu(priorityMenu) }
                 onClicked: (mouse) => {
-                    if (mouse.button === Qt.RightButton) priorityMenu.popup()
+                    if (mouse.button === Qt.RightButton) root.openMenu(priorityMenu)
                     else if (!held) backend.setStarred(root.r.starred ? 0 : 1, root.r.taskId)
                 }
             }
-            Menu {
+            // Built on first use: a menu per row made every row slow to create.
+            Loader {
                 id: priorityMenu
-                MenuItem { text: "None"; onTriggered: backend.setPriority(0, root.r.taskId) }
-                MenuItem { text: "High"; onTriggered: backend.setPriority(3, root.r.taskId) }
-                MenuItem { text: "Medium"; onTriggered: backend.setPriority(2, root.r.taskId) }
-                MenuItem { text: "Low"; onTriggered: backend.setPriority(1, root.r.taskId) }
-                MenuSeparator {}
-                MenuItem { text: root.r.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.r.starred ? 0 : 1, root.r.taskId) }
+                active: false
+                sourceComponent: Menu {
+                    parent: root
+                    MenuItem { text: "None"; onTriggered: backend.setPriority(0, root.r.taskId) }
+                    MenuItem { text: "High"; onTriggered: backend.setPriority(3, root.r.taskId) }
+                    MenuItem { text: "Medium"; onTriggered: backend.setPriority(2, root.r.taskId) }
+                    MenuItem { text: "Low"; onTriggered: backend.setPriority(1, root.r.taskId) }
+                    MenuSeparator {}
+                    MenuItem { text: root.r.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.r.starred ? 0 : 1, root.r.taskId) }
+                }
             }
         }
     }
@@ -464,9 +469,18 @@ Item {
             }
         }
         onReleased: dragOut = false
-        onClicked: (m) => { if (m.button === Qt.RightButton) contextMenu.popup() }
+        onClicked: (m) => { if (m.button === Qt.RightButton) root.openMenu(contextMenu) }
         onDoubleClicked: backend.beginEdit(root.r.taskId)
     }
 
-    TaskMenu { id: contextMenu; row: root.row }
+    // The menus are built when first opened, not with every row.
+    function openMenu(loader) {
+        loader.active = true
+        loader.item.popup()
+    }
+    Loader {
+        id: contextMenu
+        active: false
+        sourceComponent: TaskMenu { parent: root; row: root.row }
+    }
 }
