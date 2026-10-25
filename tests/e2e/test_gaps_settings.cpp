@@ -97,6 +97,28 @@ private slots:
     void cleanupTestCase() { QDesktopServices::unsetUrlHandler("https"); }
     void init() { seen().clear(); }
 
+    // Scrolling down one pane and then picking another opens the new pane at
+    // its top, not at the old pane's scroll position.
+    void switchingPanesScrollsToTop() {
+        App app(seedWorld);
+        QVERIFY(app.ok);
+        QQuickWindow *sw = nullptr;
+        openSettings(app, sw);
+        QVERIFY(sw);
+        sw->resize(720, 460);
+        selectPane(sw, "Tasks");
+        QQuickItem *scroll = findItem("settingsPaneScroll");
+        QVERIFY(scroll);
+        auto *flick = scroll->property("contentItem").value<QQuickItem *>();
+        QVERIFY(flick);
+        QTRY_VERIFY_WITH_TIMEOUT(flick->property("contentHeight").toReal() > flick->height() + 200, 5000);
+        flick->setProperty("contentY", 300);
+        QCOMPARE(flick->property("contentY").toReal(), 300.0);
+        selectPane(sw, "Alerts");
+        QTRY_COMPARE_WITH_TIMEOUT(flick->property("contentY").toReal(), 0.0, 5000);
+        closeSettings(app);
+    }
+
     // "Fairfax" block in the corner of Settings: the project address is a link.
     void aboutLinkOpensTheProjectPage() {
         App app;

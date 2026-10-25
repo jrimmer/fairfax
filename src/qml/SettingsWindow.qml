@@ -21,6 +21,8 @@ Window {
     Material.foreground: theme.foreground
 
     property int pane: 0
+    // A different pane starts at its top, not at the last pane's scroll position.
+    onPaneChanged: paneScroll.contentItem.contentY = 0
     property var hideable: backend.hideableLists()
     property bool inboxOn: backend.inboxEnabled()
     Connections {
@@ -215,6 +217,8 @@ Window {
         }
 
         ScrollView {
+            id: paneScroll
+            objectName: "settingsPaneScroll"
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: availableWidth
