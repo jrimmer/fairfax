@@ -290,11 +290,11 @@ Rectangle {
                     }
                 }
 
-                Menu {
+                ScrollingMenu {
                     id: tagMenu
                     MenuItem { text: row.model.paused ? "Resume…" : "Pause…"; onTriggered: backend.setTagPaused(row.model.tagId, !row.model.paused) }
                     MenuItem { text: "Rename…"; onTriggered: root.promptName("renameTag", row.model.tagId, row.model.title) }
-                    Menu {
+                    ScrollingMenu {
                         id: moveMenu
                         title: "Move to Group"
                         onAboutToShow: {
@@ -317,7 +317,7 @@ Rectangle {
                         onTriggered: backend.setTagGroup(row.model.tagId, groupId)
                     }
                 }
-                Menu {
+                ScrollingMenu {
                     id: groupMenu
                     MenuItem { text: root.collapsed[row.model.groupId] ? "Expand" : "Collapse"; onTriggered: root.toggleCollapsed(row.model.groupId) }
                     MenuItem { text: "Rename…"; onTriggered: root.promptName("renameGroup", row.model.groupId, row.model.title) }
@@ -430,7 +430,7 @@ Rectangle {
                         else backend.toggleLocationFilter(prow.model.locationId)
                     }
                 }
-                Menu {
+                ScrollingMenu {
                     id: placeMenu
                     MenuItem { text: prow.model.paused ? "Resume" : "Pause"; onTriggered: backend.setLocationPaused(prow.model.locationId, !prow.model.paused) }
                     MenuItem { text: "Edit…"; onTriggered: root.editLocation(prow.model) }
@@ -453,7 +453,7 @@ Rectangle {
                 icon: "plus"
                 tip: root.tab === 0 ? "New Tag or Tag Group" : "New Location"
                 onClicked: root.tab === 0 ? addMenu.popup() : root.editLocation(null)
-                Menu {
+                ScrollingMenu {
                     id: addMenu
                     MenuItem { text: "New Tag"; onTriggered: root.promptName("newTag", 0, "", 0) }
                     MenuItem { text: "New Tag Group"; onTriggered: root.promptName("newGroup", 0, "") }

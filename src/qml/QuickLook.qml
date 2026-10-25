@@ -76,7 +76,7 @@ Popup {
                     tip: "Copy"
                     checked: copyMenu.opened
                     onClicked: copyMenu.popup(copyButton, 0, copyButton.height + 2)
-                    Menu {
+                    ScrollingMenu {
                         id: copyMenu
                         MenuItem { text: "Copy Title"; onTriggered: backend.copyText(root.t.title || "", "Title copied.") }
                         MenuItem { text: "Copy Notes"; enabled: !!root.t.notes; onTriggered: backend.copyText(root.t.notes || "", "Notes copied.") }

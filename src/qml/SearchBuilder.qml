@@ -1147,7 +1147,7 @@ Popup {
         addMenu.popup(button, 0, button.height)
     }
 
-    Menu {
+    ScrollingMenu {
         id: addMenu
         property string path: ""
         MenuItem { objectName: "ruleAddMenuRule"; text: "Add Rule"; onTriggered: root.addRule(addMenu.path, false) }

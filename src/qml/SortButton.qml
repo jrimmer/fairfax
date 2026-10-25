@@ -42,7 +42,7 @@ Item {
     // The choices differ between the Done list, Smart Lists and lists with sections.
     // A Repeater whose model changes after the menu exists puts its new entries after
     // the static ones, so an Instantiator places each one at its own index instead.
-    Menu {
+    ScrollingMenu {
         id: menu
         MenuSeparator {}
         MenuItem {

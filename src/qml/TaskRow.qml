@@ -388,7 +388,7 @@ Item {
             Loader {
                 id: priorityMenu
                 active: false
-                sourceComponent: Menu {
+                sourceComponent: ScrollingMenu {
                     parent: root
                     MenuItem { text: "None"; onTriggered: backend.setPriority(0, root.r.taskId) }
                     MenuItem { text: "High"; onTriggered: backend.setPriority(3, root.r.taskId) }

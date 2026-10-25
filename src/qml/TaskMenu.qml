@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 
 // The right-click menu on tasks; it acts on the whole selection.
-Menu {
+ScrollingMenu {
     id: root
     property var row: ({})
     // What the menu needs to know about the task, read as it opens.
@@ -19,19 +19,6 @@ Menu {
     onAboutToShow: {
         info = backend.taskInfo(row.taskId || 0)
         untagChoices = backend.selectionTags()
-    }
-
-    // The style's own list, with its height held at the window's: it follows the list's
-    // contentHeight, which ListView re-estimates as the menu scrolls, and the menu
-    // then resized (and sprang back to the top) on every step. The cap leaves the
-    // height alone once the menu is taller than the window.
-    contentItem: ListView {
-        implicitHeight: Math.min(contentHeight, root.window ? root.window.height - root.topPadding - root.bottomPadding : contentHeight)
-        model: root.contentModel
-        interactive: root.window ? contentHeight + root.topPadding + root.bottomPadding > root.height : false
-        clip: true
-        currentIndex: root.currentIndex
-        ScrollIndicator.vertical: ScrollIndicator {}
     }
 
     function isoIn(days) {
@@ -51,7 +38,7 @@ Menu {
     MenuItem { text: "Due Today"; onTriggered: backend.setDueInDays(0) }
     MenuItem { text: "Due Tomorrow"; onTriggered: backend.setDueInDays(1) }
     MenuItem { text: "Start Today"; onTriggered: backend.setStartInDays(0) }
-    Menu {
+    ScrollingMenu {
         title: "Defer"
         Repeater {
             model: root.dateChoices
@@ -65,7 +52,7 @@ Menu {
         MenuItem { text: "Pick Date or Offset (+3d)…"; onTriggered: root.pickDate("defer") }
         MenuItem { text: "No Due Date"; onTriggered: backend.clearDue() }
     }
-    Menu {
+    ScrollingMenu {
         title: "Schedule"
         Repeater {
             model: root.dateChoices
@@ -79,7 +66,7 @@ Menu {
         MenuItem { text: "Pick Date…"; onTriggered: root.pickDate("schedule") }
         MenuItem { text: "No Start Date"; onTriggered: backend.clearStart() }
     }
-    Menu {
+    ScrollingMenu {
         id: timeMenu
         title: "Due Time"
         // The Due Time Shortcuts setting, read again each time the menu opens.
@@ -97,7 +84,7 @@ Menu {
         MenuItem { text: "Other…"; onTriggered: root.pickDate("time") }
         MenuItem { text: "No Time"; onTriggered: backend.setSelectionDueTime(-1) }
     }
-    Menu {
+    ScrollingMenu {
         title: "Duration"
         Repeater {
             model: [["15 mins", 15], ["30 mins", 30], ["45 mins", 45], ["1 hour", 60], ["2 hours", 120], ["4 hours", 240], ["1 day", 1440]]
@@ -111,7 +98,7 @@ Menu {
         MenuItem { text: "Other…"; onTriggered: root.pickDate("duration") }
         MenuItem { text: "No Duration"; onTriggered: backend.setSelectionDuration(0) }
     }
-    Menu {
+    ScrollingMenu {
         title: "Priority"
         MenuItem { text: "None"; onTriggered: backend.setPriority(0) }
         MenuItem { text: "Low"; onTriggered: backend.setPriority(1) }
@@ -142,7 +129,7 @@ Menu {
     }
     MenuItem { text: root.row.starred ? "Unstar" : "Star"; onTriggered: backend.setStarred(root.row.starred ? 0 : 1) }
     MenuSeparator {}
-    Menu {
+    ScrollingMenu {
         id: tagMenu
         title: "Tag"
         // Only the first dozen tags fit a menu; the palette finds the rest.
@@ -157,7 +144,7 @@ Menu {
         MenuSeparator {}
         MenuItem { text: "Choose Tags…"; onTriggered: root.pickDate("tag") }
     }
-    Menu {
+    ScrollingMenu {
         title: "Untag"
         enabled: root.untagChoices.length > 0
         Repeater {
@@ -172,7 +159,7 @@ Menu {
         MenuItem { text: "All Tags"; onTriggered: backend.untagSelection() }
     }
     MenuSeparator {}
-    Menu {
+    ScrollingMenu {
         title: "Move To"
         Repeater {
             model: backend.listChoices
@@ -183,7 +170,7 @@ Menu {
             }
         }
     }
-    Menu {
+    ScrollingMenu {
         title: "Copy To"
         Repeater {
             model: backend.listChoices
@@ -194,7 +181,7 @@ Menu {
             }
         }
     }
-    Menu {
+    ScrollingMenu {
         id: sectionMenu
         title: "Move to Section"
         // Read as the menu opens (root.info), so a section added since the row was
@@ -213,18 +200,18 @@ Menu {
         MenuItem { text: "No Section"; onTriggered: backend.moveSelectionToSection(0) }
     }
     MenuSeparator {}
-    Menu {
+    ScrollingMenu {
         title: "Convert"
         MenuItem { text: "To Task"; onTriggered: backend.convertSelection(0) }
         MenuItem { text: "To Project"; onTriggered: backend.convertSelection(1) }
         MenuItem { text: "To Checklist"; onTriggered: backend.convertSelection(2) }
     }
-    Menu {
+    ScrollingMenu {
         title: "New"
         MenuItem { text: "Project from Selection"; onTriggered: backend.newFromSelection(1) }
         MenuItem { text: "Checklist from Selection"; onTriggered: backend.newFromSelection(2) }
     }
-    Menu {
+    ScrollingMenu {
         title: root.row.type === 2 || root.info.parentType === 2 ? "Sort Checklist" : "Sort Project"
         enabled: root.projectId > 0
         Repeater {

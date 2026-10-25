@@ -92,7 +92,7 @@ Item {
                     acceptedButtons: Qt.RightButton
                     onClicked: newMenu.popup()
                 }
-                Menu {
+                ScrollingMenu {
                     id: newMenu
                     // A closing menu hands the keyboard back to what had it, which would take it
                     // from the title of the task the menu just made.
@@ -118,7 +118,7 @@ Item {
                 size: 10
                 tip: "Search Presets"
                 onClicked: presets.popup(0, presetsButton.height)
-                Menu {
+                ScrollingMenu {
                     id: presets
                     Repeater {
                         model: [["Overdue", "type: overdue"], ["Due Today", "type: duetoday"], ["Due This Week", "type: duethisweek"],

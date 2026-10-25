@@ -116,7 +116,7 @@ Item {
             IconButton {
                 objectName: "editorCopy"; icon: "copy"; size: 14; tip: "Copy"
                 onClicked: copyMenu.popup()
-                Menu {
+                ScrollingMenu {
                     id: copyMenu
                     MenuItem { text: "Copy"; onTriggered: backend.copySelection() }
                     MenuItem { text: "Copy Title"; onTriggered: { clip.text = root.e.title; clip.selectAll(); clip.copy() } }
@@ -139,7 +139,7 @@ Item {
             }
             IconButton { objectName: "editorDelete"; icon: "trash"; size: 14; color: theme.overdue; tip: "Delete"; onClicked: backend.deleteSelection() }
             TextEdit { id: clip; visible: false }
-            Menu {
+            ScrollingMenu {
                 id: shortcutsMenu
                 MenuItem { text: "Priority None\t" + (backend.shortcutMap, backend.shortcutText("edit.priorityNone")); onTriggered: backend.setPriority(0) }
                 MenuItem { text: "Priority Low\t" + (backend.shortcutMap, backend.shortcutText("edit.priorityLow")); onTriggered: backend.setPriority(1) }
@@ -250,7 +250,7 @@ Item {
                             filled: true
                             color: parent.color
                         }
-                        Menu {
+                        ScrollingMenu {
                             id: priorityMenu
                             Repeater {
                                 model: [["None", 0], ["High", 3], ["Medium", 2], ["Low", 1]]
@@ -340,7 +340,7 @@ Item {
                             implicitHeight: 32
                             pressedDown: listMenu.opened
                             onClicked: listMenu.popup(this, 0, height + 2)
-                            Menu {
+                            ScrollingMenu {
                                 id: listMenu
                                 Repeater {
                                     model: backend.listChoices
@@ -401,7 +401,7 @@ Item {
                         RibbonButton { id: alarmButton; objectName: "editorAlarm"; icon: "alarm"; tint: theme.priorityMedium; tip: "Alerts (Ctrl+')"; accessibleName: "Alerts"; active: (root.e.alarmOffsets || []).length > 0; enabled: !root.e.isChecklistItem; menu: alarmMenu }
                         RibbonButton { id: durationButton; objectName: "editorDuration"; icon: "duration"; tint: theme.duration; tip: "Duration (x)"; accessibleName: "Duration"; active: (root.e.duration || 0) > 0; menu: durationMenu }
 
-                        Menu {
+                        ScrollingMenu {
                             id: alarmMenu
                             Repeater {
                                 model: [[0, "At due time"], [5, "5 minutes before"], [15, "15 minutes before"], [30, "30 minutes before"],
@@ -420,7 +420,7 @@ Item {
                             MenuItem { text: "At a Date and Time…"; onTriggered: absoluteAlarm.open() }
                             MenuItem { text: "Remove All Alerts"; enabled: (root.e.alarms || []).length > 0; onTriggered: backend.clearAlarms(root.e.id) }
                         }
-                        Menu {
+                        ScrollingMenu {
                             id: locationMenu
                             Repeater {
                                 model: backend.locationChoices()
@@ -436,7 +436,7 @@ Item {
                             MenuItem { text: "New Location…"; onTriggered: newLocation.open() }
                         }
 
-                        Menu {
+                        ScrollingMenu {
                             id: actionMenu
                             Repeater {
                                 model: Icons.actionNames
@@ -454,7 +454,7 @@ Item {
                                 }
                             }
                         }
-                        Menu {
+                        ScrollingMenu {
                             id: repeatMenu
                             Repeater {
                                 model: ["Never", "Daily", "Weekly", "Every 2 Weeks", "Monthly", "Quarterly", "Yearly"]
@@ -473,7 +473,7 @@ Item {
                                 onTriggered: backend.setRepeatFromCompletion(root.e.id, !root.e.repeatFromCompletion)
                             }
                         }
-                        Menu {
+                        ScrollingMenu {
                             id: durationMenu
                             Repeater {
                                 model: [[30, "30 mins"], [60, "1 hour"], [120, "2 hours"], [15, "15 mins"], [45, "45 mins"], [240, "4 hours"], [1440, "1 day"], [0, "None"]]
@@ -783,7 +783,7 @@ Item {
 
     RepeatEditor { id: repeatEditor; objectName: "repeatEditor"; taskId: root.e.id }
 
-    Menu {
+    ScrollingMenu {
         id: alarmStyleMenu
         property int alarmId: 0
         property bool sound: true

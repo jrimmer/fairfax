@@ -431,7 +431,7 @@ Window {
 
     // ------------------------------------------------------------ menus
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -450,7 +450,7 @@ Window {
         CheckItem { text: "Star"; on: root.starred; onTriggered: { root.pin("starred"); root.starred = !root.starred } }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -467,7 +467,7 @@ Window {
         }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -485,7 +485,7 @@ Window {
         }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -503,7 +503,7 @@ Window {
         }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -524,7 +524,7 @@ Window {
         }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -551,7 +551,7 @@ Window {
         MenuItem { text: "Custom…"; onTriggered: root.openCustom("repeat") }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 
@@ -570,7 +570,7 @@ Window {
         MenuItem { text: "Remove All"; enabled: root.alerts.length > 0; onTriggered: { root.pin("alerts"); root.alerts = [] } }
     }
 
-    Menu {
+    ScrollingMenu {
 
         // A real popup window, so it can reach past the dialog's edges.
 

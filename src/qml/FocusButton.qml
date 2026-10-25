@@ -28,7 +28,7 @@ Row {
         size: 10
         tip: "Focus conditions"
         onClicked: menu.popup(0, height)
-        Menu {
+        ScrollingMenu {
             id: menu
             Repeater {
                 model: root.choices

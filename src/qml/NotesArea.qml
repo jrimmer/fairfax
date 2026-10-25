@@ -376,7 +376,7 @@ Rectangle {
     }
 
     // Insert Date & Time: the stamp formats, each with today's example.
-    Menu {
+    ScrollingMenu {
         id: stampMenu
         onAboutToShow: stamps.model = highlighter.stampFormats()
         Instantiator {
@@ -392,7 +392,7 @@ Rectangle {
         }
     }
 
-    Menu {
+    ScrollingMenu {
         id: contextMenu
         MenuItem { text: "Cut"; enabled: area.selectedText !== ""; onTriggered: area.cut() }
         MenuItem { text: "Copy"; enabled: area.selectedText !== ""; onTriggered: area.copy() }
@@ -403,7 +403,7 @@ Rectangle {
         MenuItem { text: "Copy Links from Notes"; enabled: root.detectedLinks.length > 0; onTriggered: root.copyLinks() }
     }
 
-    Menu {
+    ScrollingMenu {
         id: linksMenu
         MenuItem {
             text: "Open Links (" + root.detectedLinks.length + ")"

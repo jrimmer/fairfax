@@ -116,7 +116,7 @@ Item {
         onCancelled: root.renaming = false
     }
 
-    Menu {
+    ScrollingMenu {
         id: sectionMenu
         MenuItem { text: "Rename Section…"; onTriggered: root.renaming = true }
         MenuItem { text: "Move Section Up"; onTriggered: backend.moveSection(root.r.sectionId, -1) }

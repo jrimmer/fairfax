@@ -4,7 +4,7 @@ import QtQuick.Controls
 // The "Color" submenu shared by lists, Smart Lists and list groups: the theme
 // palette plus a custom colour. `current` is a TaskList.color value, so a
 // custom colour (0x1000000 | 0xRRGGBB) shows its own swatch.
-Menu {
+ScrollingMenu {
     id: root
 
     property int current: 0

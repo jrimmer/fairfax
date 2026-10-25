@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 // The right-click menu on a list: edit, rename, colour, focus-list exclusions,
 // archive, hide and delete, as in the Lists panel.
-Menu {
+ScrollingMenu {
     id: root
 
     property int listId: 0

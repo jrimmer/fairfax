@@ -315,7 +315,7 @@ Rectangle {
                 icon: "plus"
                 tip: "New List or Group"
                 onClicked: addMenu.popup()
-                Menu {
+                ScrollingMenu {
                     id: addMenu
                     MenuItem { text: "New List"; onTriggered: { backend.newList(); root.renameSelected() } }
                     MenuItem { text: "New List Group"; onTriggered: root.renamingGroupId = backend.newGroup() }
@@ -355,7 +355,7 @@ Rectangle {
                     tip: "Calendar Display Style"
                     checked: styleMenu.opened
                     onClicked: styleMenu.popup(styleButton, 0, -styleMenu.implicitHeight - 4)
-                    Menu {
+                    ScrollingMenu {
                         id: styleMenu
                         popupType: Popup.Window
                         readonly property string style: (backend.settingsRevision, String(backend.setting("appearance.calendarStyle").value || "heat"))
@@ -522,7 +522,7 @@ Rectangle {
                 }
                 onDoubleClicked: if (header.isGroup) root.renamingGroupId = header.row.groupId
             }
-            Menu {
+            ScrollingMenu {
                 id: groupMenu
                 MenuItem { text: "Rename…"; onTriggered: root.renamingGroupId = header.row.groupId }
                 MenuItem {
@@ -872,7 +872,7 @@ Rectangle {
             // The Inbox focus list's own menu: the agent's triage action and
             // the list's edit dialog. The triage entry shows only while the
             // agent is on, so the off-switch removes it.
-            Menu {
+            ScrollingMenu {
                 id: inboxMenu
                 MenuItem {
                     objectName: "triageInboxMenu"
@@ -884,7 +884,7 @@ Rectangle {
                 MenuSeparator { visible: backend.agentEnabled; height: visible ? implicitHeight : 0 }
                 MenuItem { text: "Edit List…"; onTriggered: editListDialog.edit(item.row.listId) }
             }
-            Menu {
+            ScrollingMenu {
                 id: smartMenu
                 MenuItem { text: "Edit Search…"; onTriggered: { backend.selectSource(item.row.sourceKey); root.editSmartListRequested() } }
                 MenuItem { text: "Edit List…"; onTriggered: editListDialog.edit(item.row.listId) }
