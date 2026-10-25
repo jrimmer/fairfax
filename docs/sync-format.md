@@ -3,6 +3,9 @@
 This is the reference for the files Fairfax shares between machines. A program that reads or writes
 them through the git repository behaves like another machine running Fairfax.
 
+This is the format Fairfax 1.0 and later read and write. Every machine sharing a repository should
+run 1.0 or later: earlier development builds merge whole records and drop `ext` and `modified_by`.
+
 Every ```` ```json ```` block that follows a `Sample:` line below is imported by the test suite
 (`tests/test_syncformat.cpp`) and compared with what Fairfax exports. If this document and the code
 disagree, that test fails.
