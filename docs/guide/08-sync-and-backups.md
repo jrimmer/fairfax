@@ -6,7 +6,7 @@ shows the options. It also covers backups, which are worth setting up either way
 
 Open **Settings → Sync** (**Ctrl+,**, then *Sync*) to begin.
 
-![The Sync pane of Settings, showing the git, Todoist, folder, WebDAV and CalDAV sections](img/settings-sync.png)
+![The Sync pane of Settings, showing the git, Todoist, folder, WebDAV and CalDAV sections](img/settings-sync.webp)
 
 ## How sync works
 
@@ -124,7 +124,7 @@ format is documented at
 Fairfax makes a backup of your whole database for you, and it takes one before it
 does anything risky such as an import or a restore.
 
-![The Backups pane of Settings, listing dated backups with Restore, Lists, Save a Copy and Delete buttons](img/settings-backups.png)
+![The Backups pane of Settings, listing dated backups with Restore, Lists, Save a Copy and Delete buttons](img/settings-backups.webp)
 
 Settings → **Backups** has:
 

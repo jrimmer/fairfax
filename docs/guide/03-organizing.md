@@ -19,7 +19,7 @@ the difference is how the pieces behave.
 
 A plain **sub-task** is a task nested under another task.
 
-![A project with its sub-tasks, and a checklist showing how many items are still open](img/project-and-checklist.png)
+![A project with its sub-tasks, and a checklist showing how many items are still open](img/project-and-checklist.webp)
 
 ### Make one
 
@@ -54,7 +54,7 @@ just one project's tasks. Projects also appear in the sidebar under their list.
 When a long list needs headings, use sections. A "Work" list might have *This
 Sprint* and *Backlog*.
 
-![A list divided into two sections called This Sprint and Backlog](img/sections.png)
+![A list divided into two sections called This Sprint and Backlog](img/sections.webp)
 
 - **Add a section:** right-click the list and choose **New Section**, or right-click the **+**
   button above the tasks and choose **New Section**.
@@ -77,7 +77,7 @@ A **tag** is a label that cuts across lists. "#call" can be on tasks in *Work*,
 - **Filter by a tag:** click it in the Tags panel. Click the clear icon at the top
   to return.
 
-![The Tags panel with three tag groups: Work, Home and Travel](img/tags-panel.png)
+![The Tags panel with three tag groups: Work, Home and Travel](img/tags-panel.webp)
 
 ### Tag groups
 

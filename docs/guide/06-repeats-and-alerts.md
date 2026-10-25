@@ -17,7 +17,7 @@ Pick whichever way suits you:
 - **Use the editor.** Open the task and click the repeat button, or press
   **Ctrl+;**.
 
-![The repeat editor, with presets, an interval, weekdays, an "after completion" option and end choices](img/repeat-editor.png)
+![The repeat editor, with presets, an interval, weekdays, an "after completion" option and end choices](img/repeat-editor.webp)
 
 The repeat editor offers presets (*Daily*, *Weekly*, *Every 2 weeks*, *Monthly*,
 *Quarterly*, *Yearly*) and a full custom rule:
@@ -73,7 +73,7 @@ choose. A task can have up to ten.
 | **At a Date and Time…** | One exact moment |
 | **Remove All Alerts** | Clears them |
 
-![The alerts menu in the task editor, listing the presets, Days Before at a Time, and At a Date and Time](img/editor-alerts.png)
+![The alerts menu in the task editor, listing the presets, Days Before at a Time, and At a Date and Time](img/editor-alerts.webp)
 
 Each alert is either a **Message** (shown once) or a **Message with Sound** (plays a
 sound, and can repeat; see *Nagging* below). Click an alert's chip in the editor to

@@ -19,7 +19,7 @@ Fairfax has a few finders, each for a different job.
 Quick Open is also available from outside the window with `fairfax --open`, and
 **Find a Task** is in the Omarchy menu.
 
-![Quick Open, a single box for finding any task or list from anywhere](img/quick-open.png)
+![Quick Open, a single box for finding any task or list from anywhere](img/quick-open.webp)
 
 In any of these bars, **↑** and **↓** move through the matches and wrap at the
 ends. The **✕** in the search field clears the search, like **Esc**. There is an
@@ -45,7 +45,7 @@ You can type plain words, or use a few small tricks to be exact. Fairfax never
 refuses a search. If part of it makes no sense, that part is treated as ordinary
 text, and a hint tells you what it ignored.
 
-![The search box with a search typed and the matching tasks shown in the list](img/search-results.png)
+![The search box with a search typed and the matching tasks shown in the list](img/search-results.webp)
 
 Words search a task's title, its notes and its tags.
 
@@ -107,7 +107,7 @@ If you would rather click than type, open **Search Options**. Press
 **Ctrl+Shift+Alt+F**, or use the menu beside the search box. The builder writes the
 search for you and shows it live at the bottom, where you can also edit it by hand.
 
-![The search builder with a rule row, name chips, and the query shown at the bottom](img/search-builder.png)
+![The search builder with a rule row, name chips, and the query shown at the bottom](img/search-builder.webp)
 
 The builder has sections, top to bottom:
 
@@ -136,7 +136,7 @@ A **Smart List** is a saved search that appears in your sidebar and updates itse
 as tasks change. Two lists in the demo data show the idea: *Important*
 (`type: hiprio OR starred`) and *Calls to make* (`type: call`).
 
-![A Smart List called Important with its saved search shown above the tasks](img/smart-list.png)
+![A Smart List called Important with its saved search shown above the tasks](img/smart-list.webp)
 
 To make one:
 

@@ -8,7 +8,7 @@ files. This chapter covers each one, and how to take your tasks back out again.
 Open **Settings → Import & Export** (**Ctrl+,**, then *Import & Export*). Every importer
 has a button there. Pick the one that matches your file and choose the file.
 
-![The Import and Export pane of Settings, with buttons for each importer and for exporting](img/settings-import-export.png)
+![The Import and Export pane of Settings, with buttons for each importer and for exporting](img/settings-import-export.webp)
 
 Importing from the Settings window is gentle on purpose:
 

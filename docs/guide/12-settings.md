@@ -14,7 +14,7 @@ licence (MIT).
 
 ## General
 
-![The General pane of Settings](img/settings-general.png)
+![The General pane of Settings](img/settings-general.webp)
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
@@ -46,7 +46,7 @@ On Linux the pane ends with a reminder of `fairfax setup omarchy`.
 
 ## Appearance
 
-![The Appearance pane of Settings](img/settings-appearance.png)
+![The Appearance pane of Settings](img/settings-appearance.webp)
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
@@ -65,7 +65,7 @@ On Linux the pane ends with a reminder of `fairfax setup omarchy`.
 
 ## Tasks
 
-![The Tasks pane of Settings](img/settings-tasks.png)
+![The Tasks pane of Settings](img/settings-tasks.webp)
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
@@ -107,7 +107,7 @@ lists finished tasks once you come back to it.
 
 ## Today & Lists
 
-![The Today and Lists pane of Settings](img/settings-today-lists.png)
+![The Today and Lists pane of Settings](img/settings-today-lists.webp)
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
@@ -126,7 +126,7 @@ lists finished tasks once you come back to it.
 
 ## Alerts
 
-![The Alerts pane of Settings](img/settings-alerts.png)
+![The Alerts pane of Settings](img/settings-alerts.webp)
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
@@ -150,7 +150,7 @@ time** in the Tasks pane are the same stored setting, so changing one changes th
 
 ## Sync
 
-![The Sync pane of Settings](img/settings-sync.png)
+![The Sync pane of Settings](img/settings-sync.webp)
 
 This pane is explained in full in [Sync and backups](08-sync-and-backups.md). In short:
 
@@ -171,7 +171,7 @@ When a machine first meets a place that already holds tasks, the pane asks wheth
 
 ## Mail
 
-![The Mail pane of Settings](img/settings-mail.png)
+![The Mail pane of Settings](img/settings-mail.webp)
 
 This pane is explained in [Mail to tasks](09-mail.md).
 
@@ -197,7 +197,7 @@ This pane is explained in [Mail to tasks](09-mail.md).
 
 ## Backups
 
-![The Backups pane of Settings](img/settings-backups.png)
+![The Backups pane of Settings](img/settings-backups.webp)
 
 | Setting | Default | What it does and when to change it |
 |---|---|---|
@@ -209,7 +209,7 @@ This pane is explained in [Mail to tasks](09-mail.md).
 
 ## Import & Export
 
-![The Import and Export pane of Settings](img/settings-import-export.png)
+![The Import and Export pane of Settings](img/settings-import-export.webp)
 
 | Button | What it does |
 |---|---|
@@ -236,7 +236,7 @@ No settings here, only a reminder of the commands in
 
 ## Shortcuts
 
-![The Shortcuts pane of Settings](img/settings-shortcuts.png)
+![The Shortcuts pane of Settings](img/settings-shortcuts.webp)
 
 A searchable list of every command with its key. Click a key to record a new one, and use
 **Reset All…** to go back to the defaults. See [The keyboard](07-keyboard.md).

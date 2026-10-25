@@ -103,7 +103,7 @@ group called *Personal*. Click *Home*, press **Ctrl+N** and type your first task
 Your tasks live in `~/.local/share/fairfax/fairfax.db`. If you ever need to open a
 different file, start Fairfax with `--db PATH`.
 
-![Fairfax's main window with the Lists panel on the left, a task list in the middle and the Tags panel on the right](img/main-window.png)
+![Fairfax's main window with the Lists panel on the left, a task list in the middle and the Tags panel on the right](img/main-window.webp)
 
 ## The three panels
 
@@ -122,7 +122,7 @@ You can hide the side panels when you want more room. **Ctrl+Alt+←** shows or
 hides Lists, and **Ctrl+Alt+→** shows or hides Tags. Fairfax remembers your
 choice.
 
-![The Lists panel with My Day, the five focus lists, two list groups and two Smart Lists](img/sidebar.png)
+![The Lists panel with My Day, the five focus lists, two list groups and two Smart Lists](img/sidebar.webp)
 
 ## Your first five minutes
 

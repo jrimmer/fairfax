@@ -8,7 +8,7 @@ There is nothing to maintain. My Day is built from the dates your tasks already
 have. It is not a separate list you have to fill in and clear out, which also means
 it survives every sync.
 
-![My Day, with Overdue, Today and Could do today sections and a capacity line in the header](img/my-day-plan.png)
+![My Day, with Overdue, Today and Could do today sections and a capacity line in the header](img/my-day-plan.webp)
 
 ## Open My Day
 
@@ -112,7 +112,7 @@ At the end of the day, **Wrap up day** helps you decide what to do with what is
 left. Click the **Wrap up day** button in My Day's header at any time. It also opens
 by itself if you open My Day after your work day has ended.
 
-![The end-of-day review, with a Not done yet section and a summary line](img/my-day-wrap-up.png)
+![The end-of-day review, with a Not done yet section and a summary line](img/my-day-wrap-up.webp)
 
 The review shows:
 

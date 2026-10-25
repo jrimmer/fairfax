@@ -20,7 +20,7 @@ change its name, colour and group, and to decide whether its tasks show up in
 *All*, *Today* and *Done*. You can also drag lists to reorder them and drop them
 into a group.
 
-![The Home list inside the Personal group, with its tasks in the middle panel](img/list-group.png)
+![The Home list inside the Personal group, with its tasks in the middle panel](img/list-group.webp)
 
 ### The Inbox
 
@@ -51,7 +51,7 @@ Quick Entry is a small window for capturing a thought without leaving what you
 are doing. Press your Quick Entry key (**Super+Shift+T** on Omarchy), type, and
 press **Return**. You can also run `fairfax --quick`.
 
-![Quick Entry with a task typed in plain language and labelled pills underneath showing what Fairfax understood](img/quick-entry.png)
+![Quick Entry with a task typed in plain language and labelled pills underneath showing what Fairfax understood](img/quick-entry.webp)
 
 Quick Entry is one line to type, with a row of labelled pills under it: list,
 due, start, repeat, alert, duration, tags, place, priority, star and attach. The
@@ -117,7 +117,7 @@ their own switch.
 
 The editor opens in place. Press **Esc** or **Ctrl+Return** to finish.
 
-![The task editor open on a task with a due date, a duration, tags, notes and an email action](img/task-editor.png)
+![The task editor open on a task with a due date, a duration, tags, notes and an email action](img/task-editor.webp)
 
 From the editor you can set:
 
@@ -234,7 +234,7 @@ Priority and stars affect sorting and show up in My Day's suggestions.
 Five lists near the top of the sidebar gather tasks from every list at once.
 They are called *focus lists* because each answers one question.
 
-![The Lists panel's five focus lists: All, Today, Starred, Scheduled and Done](img/focus-lists.png)
+![The Lists panel's five focus lists: All, Today, Starred, Scheduled and Done](img/focus-lists.webp)
 
 | List | Shortcut | What you will find |
 |---|---|---|
@@ -250,11 +250,11 @@ starred. Today's rules can be changed in
 [Settings → Today & Lists](12-settings.md#today--lists): for instance whether
 overdue and starred tasks are included.
 
-![Today, with overdue tasks in red at the top and the rest of the day's tasks below](img/focus-today.png)
+![Today, with overdue tasks in red at the top and the rest of the day's tasks below](img/focus-today.webp)
 
-![Scheduled, listing the tasks that are waiting for their start dates](img/focus-scheduled.png)
+![Scheduled, listing the tasks that are waiting for their start dates](img/focus-scheduled.webp)
 
-![Done, listing recently completed tasks](img/focus-done.png)
+![Done, listing recently completed tasks](img/focus-done.webp)
 
 ### Narrow any list with the Focus Filter
 

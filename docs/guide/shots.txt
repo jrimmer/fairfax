@@ -1,6 +1,7 @@
 # One line per screenshot the guide references:
 #   <file-name>.png | <what it shows> | <how to get it>
-# Every command uses the built-in sample data (--demo). Write the PNGs to docs/guide/img/.
+# Every command uses the built-in sample data (--demo). Capture at QT_SCALE_FACTOR=2 with QT_QPA_PLATFORM=offscreen,
+# crop where noted, then convert each PNG to WebP (quality 82) in docs/guide/img/; the chapters use the .webp files.
 # The sample data's ids: lists Home=1, Family=2, Errands=3, Work=4, Product Launch=5; Smart Lists Important=6, Calls to make=7;
 # tasks: 7 Daily mobility routine, 8 Call Alex about birthday dinner (has an alert), 9 Weekly review (repeats weekly),
 # 15 Clean kitchen pantry, 16 Email Sam school forms (notes and an email action), 18 Pick up library holds.
@@ -9,7 +10,7 @@
 main-window.png | The whole main window on Today: Lists panel, task list and Tags panel, in the dark scheme | fairfax --demo --screenshot main-window.png --size 1280x800 --scheme dark --source today
 sidebar.png | The Lists panel: My Day, the five focus lists, the Personal and Work groups, two Smart Lists, the mini calendar and sync footer | fairfax --demo --screenshot sidebar.png --size 1280x800 --scheme dark --source today ; then crop to the left 260 px
 list-group.png | The Home list (inside the Personal group) selected, with its tasks in the middle panel | fairfax --demo --screenshot list-group.png --size 1280x800 --scheme dark --source list:1
-quick-entry.png | Quick Entry with a plain-language task typed in and its pills filled in underneath | fairfax --demo --quick --quick-text "Call Sam tomorrow at 3pm #family !! every Monday [30m] /Work/" --screenshot quick-entry.png --size 1280x800 --scheme dark
+quick-entry.png | Quick Entry with a plain-language task typed in and its pills filled in underneath | fairfax --demo --quick --quick-text "Call Sam tomorrow at 3pm #family !! /Work/" --screenshot quick-entry.png --size 1280x800 --scheme dark
 task-editor.png | The task editor open on "Email Sam school forms": due date, tags, notes and an email action | fairfax --demo --screenshot task-editor.png --size 1280x800 --scheme dark --source list:2 --edit 16
 focus-lists.png | The five focus lists at the top of the Lists panel (All, Today, Starred, Scheduled, Done) | fairfax --demo --screenshot focus-lists.png --size 1280x800 --scheme dark --source today ; then crop to the top of the left panel
 focus-today.png | Today, with the overdue tasks in red at the top and the rest of the day's tasks below | fairfax --demo --screenshot focus-today.png --size 1280x800 --scheme dark --source today

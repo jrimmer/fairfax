@@ -10,7 +10,7 @@ be your everyday one.
 
 Mail is off until you turn it on in **Settings → Mail**.
 
-![The Mail pane of Settings with Gmail chosen, an app password field, and the plus-address guidance](img/settings-mail.png)
+![The Mail pane of Settings with Gmail chosen, an app password field, and the plus-address guidance](img/settings-mail.webp)
 
 ## How a message becomes a task
 
