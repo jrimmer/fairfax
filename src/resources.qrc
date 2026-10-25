@@ -21,6 +21,7 @@
         <file>qml/InlineEditor.qml</file>
         <file>qml/ListBadge.qml</file>
         <file>qml/ListMenu.qml</file>
+        <file>qml/MutedLink.qml</file>
         <file>qml/Main.qml</file>
         <file>qml/ProposalSheet.qml</file>
         <file>qml/AskSheet.qml</file>

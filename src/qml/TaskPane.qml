@@ -203,27 +203,6 @@ Item {
                 font.pixelSize: backend.fontSize + 5
                 Layout.alignment: Qt.AlignBaseline
             }
-            // The plan header's "Wrap up day" opens the end-of-day review at
-            // any time (it also opens by itself once the work day is over);
-            // "Back to plan" (or Return) leaves it.
-            Button {
-                objectName: "myDayReview"
-                visible: backend.sourceIsMyDay && !backend.myDayShutdown
-                text: "Wrap up day"
-                flat: true
-                Layout.alignment: Qt.AlignBaseline
-                font.pixelSize: backend.fontSize - 1
-                onClicked: backend.myDayReview()
-            }
-            Button {
-                objectName: "myDayFinish"
-                visible: backend.sourceIsMyDay && backend.myDayShutdown
-                text: "Back to plan"
-                flat: true
-                Layout.alignment: Qt.AlignBaseline
-                font.pixelSize: backend.fontSize - 1
-                onClicked: backend.myDayFinishReview()
-            }
             Item { Layout.fillWidth: true }
             Text {
                 visible: backend.selectionSummary !== "" && root.width > 640
@@ -267,6 +246,7 @@ Item {
 
             // My Day's capacity line: the day's tasks against the work day left.
             RowLayout {
+                id: myDayCapacity
                 objectName: "myDayCapacity"
                 visible: backend.sourceIsMyDay && !backend.myDayShutdown && (planned > 0 || without > 0)
                 spacing: 6
@@ -327,6 +307,33 @@ Item {
                     color: theme.muted
                     font.pixelSize: backend.fontSize + 1
                 }
+            }
+            // The way into the end-of-day review (it also opens by itself once the
+            // work day is over) and back out of it ("Back to plan", or Return).
+            // The separator shows only after numbers; with nothing planned the
+            // link stands alone.
+            Text {
+                text: "·"
+                visible: backend.sourceIsMyDay && (backend.myDayShutdown || myDayCapacity.visible)
+                color: theme.faint
+                font.pixelSize: backend.fontSize + 1
+                Layout.alignment: Qt.AlignBaseline
+            }
+            MutedLink {
+                objectName: "myDayReview"
+                visible: backend.sourceIsMyDay && !backend.myDayShutdown
+                text: "Wrap up day"
+                font.pixelSize: backend.fontSize + 1
+                Layout.alignment: Qt.AlignBaseline
+                onClicked: backend.myDayReview()
+            }
+            MutedLink {
+                objectName: "myDayFinish"
+                visible: backend.sourceIsMyDay && backend.myDayShutdown
+                text: "Back to plan"
+                font.pixelSize: backend.fontSize + 1
+                Layout.alignment: Qt.AlignBaseline
+                onClicked: backend.myDayFinishReview()
             }
             Item { Layout.fillWidth: true }
         }

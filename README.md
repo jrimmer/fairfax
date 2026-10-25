@@ -224,11 +224,11 @@ rest of the day. They are in Settings → Shortcuts under *My Day* and can be re
 ordinary list those bare keys do nothing. `fairfax ctl myday` opens a running window on My Day.
 
 The day does not only start with a plan: after the work day's end (or any time through
-*Wrap up day* in the plan header) My Day opens its shutdown review. It lists the tasks
+*Wrap up day*, the link at the end of the numbers line under the title) My Day opens its shutdown review. It lists the tasks
 still due today under *Not done yet*, and the header reports `Done today: N tasks · Xh Ym of Xh Ym`,
 where the first time sums the durations of the tasks completed today and the second the
 durations of the day's tasks. `y` moves a task to
-tomorrow, `d` picks a date, `r` takes it off today (its date moves to tomorrow, as in the plan), and Return (or *Back to plan*)
+tomorrow, `d` picks a date, `r` takes it off today (its date moves to tomorrow, as in the plan), and Return (or the *Back to plan* link)
 leaves the review. A switch in Settings → Tasks, *Remind me to review the day when work ends*,
 posts a "Review your day" notification at the work day's end that opens the review when
 clicked; it fires once a day.

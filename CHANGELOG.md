@@ -4,6 +4,10 @@
 
 - On My Day and Today the date now sits on the same baseline as the title
   instead of floating a little high.
+- Wrap up day is now a quiet link at the end of the numbers line under the
+  title, in place of a button in the title row; Back to plan is the same kind
+  of link in the review's summary line. Both work with the keyboard (Tab to
+  them, then Return or Space).
 - The task menu no longer has a blank band above Star when model suggestions
   are off; hidden entries (here and in the Inbox, search and place menus) take
   no room.

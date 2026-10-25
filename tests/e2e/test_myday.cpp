@@ -4,6 +4,7 @@
 // in a narrow window. My Day is on by default; a test that wants it off turns
 // the setting off before the app starts.
 
+#include <QAccessible>
 #include "alarms.h"
 
 #include "automation.h"
@@ -605,9 +606,9 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(capacityText().contains("30m of tasks"), 5000);
     }
 
-    // The date and the Wrap up day button share the title's row and stay
-    // inside the pane; the capacity line sits on its own line below, and also
-    // fits, at the default window and at a narrow one.
+    // The title and the date share one baseline, and the Wrap up day link ends
+    // the capacity line below, on that line's baseline and inside the pane, at
+    // the default window and at a narrow one.
     void headerFitsAtEveryWidth() {
         const QDate today = QDate::currentDate();
         ClockPin pin(QDateTime(today, QTime(9, 0)));
@@ -627,9 +628,9 @@ private slots:
             QVERIFY2(title && date && review && cap && line, where);
             const QRectF t = rect(title), r = rect(review), c = rect(cap), l = rect(line);
             QVERIFY2(qAbs(baselineSceneY(title) - baselineSceneY(date)) < 1.5, where);
-            QVERIFY2(qAbs(baselineSceneY(review) - baselineSceneY(date)) < 1.5, where);
-            QVERIFY2(r.left() >= rect(date).right() - 0.5, where);
-            QVERIFY2(r.right() <= l.right() + 0.5, qPrintable(QString("%1: button ends at %2, pane at %3").arg(where).arg(r.right()).arg(l.right())));
+            QVERIFY2(qAbs(baselineSceneY(review) - baselineSceneY(cap)) < 1.5, where);
+            QVERIFY2(r.left() >= c.right() - 0.5 && r.top() >= t.bottom() - 2, where);
+            QVERIFY2(r.right() <= l.right() + 0.5, qPrintable(QString("%1: link ends at %2, pane at %3").arg(where).arg(r.right()).arg(l.right())));
             QVERIFY2(c.top() >= t.bottom() - 2, qPrintable(QString("%1: capacity line not below the title").arg(where)));
             QVERIFY2(c.right() <= l.right() + 0.5, qPrintable(QString("%1: capacity line runs past the pane").arg(where)));
         };
@@ -654,6 +655,71 @@ private slots:
             QVERIFY2(qAbs(baselineSceneY(title) - baselineSceneY(date)) < 1.5,
                      qPrintable(QString("%1 vs %2").arg(baselineSceneY(title)).arg(baselineSceneY(date))));
         }
+    }
+
+    // Wrap up day and Back to plan are muted links in the numbers line: that
+    // line's size and colour, a pointing hand, an accessible name, and they work
+    // by mouse and by keyboard. With nothing planned the link still shows.
+    void reviewLinksAreMutedAndWorkByMouseAndKeyboard() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedOnePlanned);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QQuickItem *review = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((review = findItem("myDayReview")) != nullptr, 5000);
+        QQuickItem *cap = findItem("myDayCapacity");
+        QQuickItem *line = findItem("myDayLine");
+        QVERIFY(cap && line);
+        QVERIFY(line->isAncestorOf(review));
+        // The line's own muted colour and size (the first text is "0m of tasks", unwarned).
+        QQuickItem *firstText = cap->childItems().first();
+        const QColor muted = firstText->property("color").value<QColor>();
+        QCOMPARE(review->property("color").value<QColor>(), muted);
+        QCOMPARE(review->property("font").value<QFont>().pixelSize(), firstText->property("font").value<QFont>().pixelSize());
+        QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(review);
+        QVERIFY(iface);
+        QCOMPARE(iface->text(QAccessible::Name), QString("Wrap up day"));
+        QCOMPARE(iface->role(), QAccessible::Button);
+        QVERIFY(review->property("activeFocusOnTab").toBool());
+        // By mouse.
+        QVERIFY(tk::clickNamed("myDayReview"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+        QQuickItem *finish = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((finish = findItem("myDayFinish")) != nullptr && finish->isVisible(), 5000);
+        QVERIFY(line->isAncestorOf(finish));
+        QVERIFY(findItem("myDaySummary")->isVisible());
+        QCOMPARE(finish->property("color").value<QColor>(), muted);
+        QVERIFY(tk::clickNamed("myDayFinish"));
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
+        // By keyboard: focus the link, then Space and Return.
+        QTRY_VERIFY_WITH_TIMEOUT((review = findItem("myDayReview")) != nullptr && review->isVisible(), 5000);
+        review->forceActiveFocus();
+        QVERIFY(review->hasActiveFocus());
+        app.press(Qt::Key_Space);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT((finish = findItem("myDayFinish")) != nullptr && finish->isVisible(), 5000);
+        finish->forceActiveFocus();
+        QVERIFY(finish->hasActiveFocus());
+        app.press(Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().myDayShutdown(), 5000);
+    }
+
+    // With nothing planned there are no numbers, and the Wrap up day link stands
+    // alone in the line.
+    void reviewLinkShowsWithoutNumbers() {
+        const QDate today = QDate::currentDate();
+        ClockPin pin(QDateTime(today, QTime(9, 0)));
+        App app(seedBareWorld);
+        QVERIFY(app.ok);
+        QVERIFY(app.openSource("myday"));
+        QQuickItem *review = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((review = findItem("myDayReview")) != nullptr && review->isVisible(), 5000);
+        QVERIFY(findItem("myDayCapacity") == nullptr || !findItem("myDayCapacity")->isVisible());
+        QQuickItem *line = findItem("myDayLine");
+        QVERIFY(line && line->isVisible() && line->isAncestorOf(review));
+        QVERIFY(tk::clickNamed("myDayReview"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().myDayShutdown(), 5000);
     }
 
     // The right pane's Day title only shows with calendar sources; without any

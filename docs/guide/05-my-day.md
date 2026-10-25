@@ -109,7 +109,7 @@ Every one of these changes is undoable with **Ctrl+Z**.
 ## Wrap up the day
 
 At the end of the day, **Wrap up day** helps you decide what to do with what is
-left. Click the **Wrap up day** button in My Day's header at any time. It also opens
+left. Click **Wrap up day**, the link at the end of the numbers line under My Day's title, at any time. It also opens
 by itself if you open My Day after your work day has ended.
 
 ![The end-of-day review, with a Not done yet section and a summary line](img/my-day-wrap-up.webp)
@@ -131,7 +131,7 @@ Go through the list and decide each one with a single key:
 | **r** | Take it off today (today's date moves to tomorrow) |
 | **Return** | Leave the review |
 
-When you are done, press **Return** or click **Back to plan** to return to the plan.
+When you are done, press **Return** or click **Back to plan**, the link at the end of the summary line, to return to the plan.
 Leaving My Day also closes the review.
 
 ### A gentle reminder
