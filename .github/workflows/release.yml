@@ -199,10 +199,15 @@ jobs:
           else
             : >"$notes"
           fi
-          if [ ! -s "$notes" ]; then
-            cat >"$notes" <<EOF
-          A keyboard-first task manager for Omarchy.
-
+          # The changelog section (minus its heading: the release title names
+          # the version) comes first; the install notes always follow.
+          if [ -s "$notes" ]; then
+            sed -i '1d' "$notes"
+            printf '\n## Install\n\n' >>"$notes"
+          else
+            printf 'A keyboard-first task manager for Omarchy.\n\n' >"$notes"
+          fi
+          cat >>"$notes" <<EOF
           Install on Linux with one line:
 
               curl -fsSL https://github.com/jrimmer/fairfax/releases/latest/download/install.sh | bash
@@ -220,7 +225,6 @@ jobs:
           Every asset has a \`.sha256\` beside it, and \`SHA256SUMS\` covers the lot.
           On ARM, build from source: https://github.com/jrimmer/fairfax#from-source
           EOF
-          fi
 
       - name: Publish the release
         env:
