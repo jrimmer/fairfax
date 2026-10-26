@@ -194,10 +194,17 @@ if (-not $SkipTests) {
         if (-not $testExe) { Fail 'the build did not produce fairfax_tests.exe' }
         $env:QT_QPA_PLATFORM = 'offscreen'
         $env:FAIRFAX_KEYRING = 'memory'
+        # Each test class also writes its results to a file here; the console
+        # output alone has come back empty on Windows.
+        $classLogs = Join-Path $TestDir 'class-logs'
+        Remove-Item -Recurse -Force $classLogs -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $classLogs | Out-Null
+        $env:FAIRFAX_TEST_LOG_DIR = $classLogs
         Say 'Running the unit tests'
         $testLog = Join-Path $Out 'tests.log'
         Set-Content -Path $testLog -Value ''
         $testCode = Invoke-Logged $testExe.FullName @() $testLog
+        Get-ChildItem -Path $classLogs -Filter *.txt | Sort-Object Name | ForEach-Object { Get-Content $_.FullName } | Add-Content -Path $testLog
         Add-Content $Log (Get-Content $testLog)
         if ($testCode -ne 0) {
             Get-Content $testLog -Tail 30 | Write-Host
@@ -212,6 +219,7 @@ if (-not $SkipTests) {
         Pop-Location
         Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
         Remove-Item Env:FAIRFAX_KEYRING -ErrorAction SilentlyContinue
+        Remove-Item Env:FAIRFAX_TEST_LOG_DIR -ErrorAction SilentlyContinue
     }
 }
 
