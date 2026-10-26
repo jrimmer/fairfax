@@ -136,9 +136,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startDate, today.addDays(14), 5000);
         QCOMPARE(app.task(id).startTime, 5);
         // Not started, but still in the list, with the mark.
-        QTRY_VERIFY_WITH_TIMEOUT(badge("rowStart", id), 5000);
         QVERIFY(closeEditor(app));
-        QVERIFY(rowVisible(app, id));
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowStart", id), 5000);
         const QString mark = findItem("rowStart:" + QString::number(id))->property("text").toString();
         QVERIFY2(mark.startsWith("Starts "), qPrintable(mark));
         QVERIFY2(mark.contains(QLocale(QLocale::English).toString(today.addDays(14), "d MMM")), qPrintable(mark));

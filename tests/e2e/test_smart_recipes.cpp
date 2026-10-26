@@ -30,7 +30,7 @@ const SL Repeating{"Weekly repeat", "Daily repeat", "Repeating window"};
 const SL Dated{"Rent overdue", "Invoice overdue", "Milk today", "Dentist today", "Parcel tomorrow", "Report in 3 days",
                "Fence in 6 days", "Taxes in 9 days", "Passport in 14 days", "Began yesterday due in 2", "Two day window",
                "Fresh window", "Repeating window", "Starred urgent", "Weekly repeat", "Daily repeat", "Launch step one",
-               "Launch step later", "Archive item"};
+               "Launch step later", "Archive item", "Starts in 3 due in 5"};
 
 SL inLists(const SL &lists) {
     return specTitles([&](const Spec &s) { return shownInAll(s) && lists.contains(s.list); });

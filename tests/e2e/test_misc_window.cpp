@@ -559,9 +559,10 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 5000);
         QQuickItem *clock = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((clock = findItem("hideScheduledButton")) != nullptr, 5000);
+        settleLayout(clock);
         click(clock);
+        QTRY_VERIFY_WITH_TIMEOUT(app.backend().hideScheduled(), 5000);
         QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 4, 5000);
-        QVERIFY(app.backend().hideScheduled());
         click(findItem("hideScheduledButton"));
         QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 5000);
         QVERIFY(!app.backend().hideScheduled());

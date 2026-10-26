@@ -39,8 +39,8 @@ const SL Structure{"Launch project", "Launch step one", "Launch step later", "Em
 const SL Dated{"Rent overdue", "Invoice overdue", "Milk today", "Dentist today", "Parcel tomorrow", "Report in 3 days",
                "Fence in 6 days", "Taxes in 9 days", "Passport in 14 days", "Began yesterday due in 2", "Two day window",
                "Fresh window", "Repeating window", "Starred urgent", "Weekly repeat", "Daily repeat", "Launch step one", "Launch step later",
-               "Archive item"};
-const SL Started{"Starts today", "Began yesterday due in 2", "Began 5 days ago"};
+               "Archive item", "Starts in 3 due in 5"};
+const SL Started{"Starts today", "Starts tomorrow", "Starts in 3 due in 5", "Began yesterday due in 2", "Began 5 days ago"};
 
 SL doneThisWeek() {
     return specTitles([](const Spec &s) { return s.completed() && parentOk(s) && inThisWeek(doneOffset(s)); });
@@ -202,8 +202,8 @@ private slots:
         SMART_QUERY(*m_app, query, expected);
     }
 
-    // Date presets: `due`, `nodue`, `start` and `nostart`. A future start date
-    // makes a task scheduled, which is hidden unless asked for.
+    // Date presets: `due`, `nodue`, `start` and `nostart`. A task with a future
+    // start date has a start date like any other.
     void typeHasDate_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");

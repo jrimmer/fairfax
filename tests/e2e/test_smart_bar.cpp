@@ -148,7 +148,7 @@ private slots:
     void searchOptionsScopeAndScheduled() {
         App &app = *m_app;
         QVERIFY(pane(app, lk(listId("Work"))));
-        SMART_QUERY(app, "starts", SL{"Starts today"});
+        SMART_QUERY(app, "starts", (SL{"Starts today", "Starts tomorrow"}));
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         QVERIFY(pressBuilder("scopeAll"));
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 5000);

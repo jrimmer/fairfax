@@ -670,7 +670,8 @@ private slots:
         app.press(Qt::Key_K, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
         QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, homeBefore - 1, 5000);
-        QCOMPARE(badgeOf(app, "all").undone, allBefore - 1);
+        // All drops by every not-started task, this one and any already there.
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, "all").undone, allBefore - (scheduledBefore + 1), 5000);
         QCOMPARE(badgeOf(app, "scheduled").undone, scheduledBefore + 1);
         app.press(Qt::Key_K, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
