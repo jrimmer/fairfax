@@ -651,6 +651,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
         LIST_ITEM(mark, findItem(QString("rowStart:%1").arg(id)));
         QVERIFY2(mark->property("text").toString().startsWith("Starts "), qPrintable(mark->property("text").toString()));
+        // Not dimmed: the mark says it hasn't started, in words.
+        QCOMPARE(app.row(id)->opacity(), 1.0);
         QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, "scheduled").undone, scheduledBefore + 1, 5000);
         QCOMPARE(badgeOf(app, home).undone, homeBefore);
         QCOMPARE(badgeOf(app, "all").undone, allBefore);

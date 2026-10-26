@@ -5164,9 +5164,9 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         {"selected", m_selected.contains(t.id)},
         {"current", m_cursor == t.id},
         {"editing", m_editing == t.id},
-        // Hidden-by-default tasks shown on request read as dimmed, except in
-        // Scheduled, where being scheduled is the point.
-        {"dimmed", views.isPaused(t) || (Schedule::isScheduled(t, now) && m_source.kind != Source::Scheduled)},
+        // Paused tasks shown on request read as dimmed. A task that hasn't
+        // started isn't dimmed: its "Starts …" mark says so in words.
+        {"dimmed", views.isPaused(t)},
         {"progress", childLive ? childDone * 100 / childLive : 0},
         {"hasAlarm", !m_store->alarmsFor(t.id).isEmpty()},
         {"hasLocation", !t.locationIds.isEmpty()},
