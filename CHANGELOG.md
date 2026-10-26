@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.0.4 (2026-10-25)
 
-- Abandon a task: close it as "won't do" instead of completing it. Right-click
-  a task and choose Abandon, use the Abandon button in the editor, or press `w`
-  or Ctrl+Alt+A (the same again reopens it). An abandoned task leaves the
-  lists under the same "Show completed tasks for" setting, including Never, and
+### Abandon a task
+
+- Close a task as "won't do" instead of completing it. Right-click a task and
+  choose Abandon, use the Abandon button in the editor, or press `w` or
+  Ctrl+Alt+A (the same again reopens it). An abandoned task leaves the lists
+  under the same "Show completed tasks for" setting, including Never, and
   shows in Done struck through and dimmed with an Abandoned mark. It is never
   counted as done: not in My Day's Done today, not in the day's totals.
   Ctrl+Z undoes it like a completion.
@@ -20,29 +22,37 @@
   tasks report `abandoned`. `uncomplete_task` also reopens an abandoned task.
 - Sync: tasks have a new `abandoned` field (an abandoned task also has
   `completed: true`, so older versions and other programs see it closed),
-  documented in docs/sync-format.md. CalDAV writes `STATUS:CANCELLED` for an
+  documented in the sync format. CalDAV writes `STATUS:CANCELLED` for an
   abandoned task and reads it back; Todoist closes it and adds an "abandoned"
-  label (that label is not shown as a tag).
+  label (that label is not shown as a tag). If you sync between machines,
+  update them all: a machine still on 1.0.3 shows an abandoned task as
+  completed.
 - Imports: TickTick's "Won't Do" tasks, OmniFocus's `@dropped` items and
   Things' canceled items now come in as abandoned, instead of with an
   "abandoned" or "canceled" tag.
 - Done's list, exports and printouts show abandoned tasks as such: the CSV
   Completed column says Abandoned, text export uses `[-]`, and a printout
   crosses the box.
-- On My Day and Today the date now sits on the same baseline as the title
-  instead of floating a little high.
-- Wrap up day is now a quiet link at the end of the numbers line under the
-  title, in place of a button in the title row; Back to plan is the same kind
-  of link in the review's summary line. Both work with the keyboard (Tab to
-  them, then Return or Space).
+
+### My Day and Today
+
+- The date sits on the same baseline as the title instead of floating a
+  little high.
+- Wrap up day is a quiet link at the end of the numbers line under the title,
+  in place of a button in the title row; Back to plan is the same kind of link
+  in the review's summary line. Both work with the keyboard (Tab to them, then
+  Return or Space).
+
+### Fixes
+
 - Long menus (the task menu, lists, sidebar, sorting, search presets, tags and
   lists in the editor and Quick Entry) can be scrolled in a short window
   without jumping back to the top.
-- `--scheme dark` or `--scheme light` (for screenshots) now holds; the
-  Appearance setting used to switch it back as the app started.
 - The task menu no longer has a blank band above Star when model suggestions
   are off; hidden entries (here and in the Inbox, search and place menus) take
   no room.
+- `--scheme dark` or `--scheme light` (for screenshots) now holds; the
+  Appearance setting used to switch it back as the app started.
 
 ## 1.0.3 (2026-10-25)
 
