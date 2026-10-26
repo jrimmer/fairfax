@@ -38,6 +38,9 @@ private slots:
     }
 
     void playsRightFilesAndThrottles() {
+#ifdef Q_OS_WIN
+        QSKIP("Windows has no command-line player; Fairfax beeps instead");
+#endif
         QFile::remove(log);
         Sounds s(player, sounds);
         s.complete();

@@ -190,6 +190,9 @@ private slots:
     }
 
     void storedZipMatchesRaw() {
+#ifdef FAIRFAX_NO_ZLIB
+        QSKIP("built without zlib");
+#endif
         const QString z = writeFile("stored.zip", zip(backupMembers(storedMember("data.db", rawBytes()))));
         auto want = freshStore();
         QVERIFY(Exchange::importTaskDatabase(*want, m_raw).error.isEmpty());
@@ -220,6 +223,9 @@ private slots:
     }
 
     void memberChosenByContentNotName() {
+#ifdef FAIRFAX_NO_ZLIB
+        QSKIP("built without zlib");
+#endif
         // The database is not named .db; a decoy .db member is not SQLite; __MACOSX is skipped.
         const QList<Member> members{storedMember("notes.db", "just text"), storedMember("__MACOSX/._x.db", rawBytes()),
                                     storedMember("payload/tasks.bin", rawBytes())};
@@ -230,6 +236,9 @@ private slots:
     }
 
     void zipWithoutDatabaseFails() {
+#ifdef FAIRFAX_NO_ZLIB
+        QSKIP("built without zlib");
+#endif
         auto s = freshStore();
         const ImportResult r =
             Exchange::importTaskDatabase(*s, writeFile("none.zip", zip({storedMember("a.txt", "hello"), storedMember("b/", {})})));
@@ -239,6 +248,9 @@ private slots:
     }
 
     void truncatedZipFails() {
+#ifdef FAIRFAX_NO_ZLIB
+        QSKIP("built without zlib");
+#endif
         QByteArray bytes = zip(backupMembers(storedMember("data.db", rawBytes())));
         bytes.chop(30);
         auto s = freshStore();
@@ -249,6 +261,9 @@ private slots:
     }
 
     void corruptedCrcFails() {
+#ifdef FAIRFAX_NO_ZLIB
+        QSKIP("built without zlib");
+#endif
         QList<Member> members = backupMembers(storedMember("data.db", rawBytes()));
         members.last().crc ^= 0xDEADBEEF;
         auto s = freshStore();

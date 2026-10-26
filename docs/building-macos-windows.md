@@ -82,9 +82,15 @@ ticket. Unsigned builds open after right-click > Open, or
 1. Visual Studio 2022 Build Tools with the C++ workload:
    `winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive"`
 2. Qt 6.8 or later for MSVC 2022 64-bit, from the Qt online installer, or
-   `pip install aqtinstall` then `aqt install-qt windows desktop 6.12.0 win64_msvc2022_64 -O C:\Qt`.
-   Then `$env:QTDIR = "C:\Qt\6.12.0\msvc2022_64"` (or have `qmake6` on PATH).
-3. Optional: Inno Setup for the installer (`winget install JRSoftware.InnoSetup`),
+   `pip install aqtinstall` then `aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 -O C:\Qt`.
+   Then `$env:QTDIR = "C:\Qt\6.10.3\msvc2022_64"` (or have `qmake6` on PATH).
+   (aqtinstall cannot fetch Windows Qt 6.11 or later yet; the Qt online
+   installer can.)
+3. zlib, for importing zipped backups: with vcpkg,
+   `vcpkg install zlib:x64-windows-static-md`, then
+   `$env:ZLIB_DIR = "<vcpkg>\installed\x64-windows-static-md"`. Without it the
+   build works, but a zipped backup has to be unzipped before importing.
+4. Optional: Inno Setup for the installer (`winget install JRSoftware.InnoSetup`),
    `jom` for parallel compiles (it ships with Qt Creator), and ImageMagick
    (otherwise the app draws its own icon).
 

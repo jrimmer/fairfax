@@ -190,6 +190,9 @@ private slots:
     }
 
     void maildirMovesNewToCurAsSeen() {
+#ifdef Q_OS_WIN
+        QSKIP("maildir flags (\":2,S\") use a colon, which Windows file names cannot hold");
+#endif
         const QString md = path("maildir");
         write(md + "/new/1700000001.M1.host", mail("m1", "One"));
         write(md + "/new/1700000002.M2.host", mail("m2", "Two"));

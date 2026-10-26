@@ -23,6 +23,6 @@ win32 {
         DEFINES += FAIRFAX_NO_ZLIB
     } else {
         INCLUDEPATH += $$ZLIB_PREFIX/include
-        LIBS += -L$$ZLIB_PREFIX/lib -lz
+        LIBS += -L$$ZLIB_PREFIX/lib -lzlib
     }
 }

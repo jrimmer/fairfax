@@ -25,7 +25,8 @@ QMap<QString, QByteArray> docSamples(QString *error) {
         *error = "cannot open docs/sync-format.md";
         return samples;
     }
-    const QStringList lines = QString::fromUtf8(doc.readAll()).split('\n');
+    // A Windows checkout may have CRLF line endings; the samples are LF.
+    const QStringList lines = QString::fromUtf8(doc.readAll()).replace("\r\n", "\n").split('\n');
     static const QRegularExpression head(R"(^Sample: `([^`]+)`\s*$)");
     for (int i = 0; i < lines.size(); ++i) {
         const auto m = head.match(lines[i]);

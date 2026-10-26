@@ -1,6 +1,7 @@
 #include <QtQml>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
+#include <QTimeZone>
 #include <QtTest>
 #include <time.h>
 
@@ -29,6 +30,11 @@ QList<Ics::Event> expand(const QString &body, const QString &from, const QString
     return Ics::occurrences(comps, QDate::fromString(from, Qt::ISODate), QDate::fromString(to, Qt::ISODate));
 }
 
+#define PIN_ZONE(name) \
+    Zone z(name); \
+    if (!z.pinned(name)) \
+        QSKIP("TZ does not set the local time zone on this system")
+
 // Local time is whatever the machine says, so tests pin TZ to make
 // conversions and daylight saving behaviour deterministic.
 class Zone {
@@ -41,6 +47,17 @@ public:
         if (m_had) qputenv("TZ", m_old);
         else qunsetenv("TZ");
         tzset();
+    }
+    // Whether local time now follows the zone. TZ does on Linux and macOS;
+    // Windows takes local time from its own settings and ignores TZ.
+    bool pinned(const char *name) const {
+        const QTimeZone zone(name);
+        for (const QDate d : {QDate(2026, 1, 15), QDate(2026, 7, 15)}) {
+            const QDateTime local(d, QTime(12, 0));
+            if (local.offsetFromUtc() != zone.offsetFromUtc(local))
+                return false;
+        }
+        return true;
     }
 
 private:
@@ -65,7 +82,7 @@ class CalendarTest : public QObject {
 
 private slots:
     void parsesAllDay() {
-        Zone z("Europe/Berlin");
+        PIN_ZONE("Europe/Berlin");
         const auto events = Ics::parse(wrap(vevent("DTSTART;VALUE=DATE:20260715\nDTEND;VALUE=DATE:20260717")), "cal");
         QCOMPARE(events.size(), 1);
         QVERIFY(events[0].allDay);
@@ -74,13 +91,13 @@ private slots:
     }
 
     void parsesAllDayWithoutEndAsOneDay() {
-        Zone z("Europe/Berlin");
+        PIN_ZONE("Europe/Berlin");
         const auto events = Ics::parse(wrap(vevent("DTSTART;VALUE=DATE:20260715")), "cal");
         QCOMPARE(local(events[0].end), "2026-07-16 00:00");
     }
 
     void parsesUtc() {
-        Zone z("Europe/Berlin");
+        PIN_ZONE("Europe/Berlin");
         const auto events = Ics::parse(wrap(vevent("DTSTART:20260715T140000Z\nDTEND:20260715T150000Z")), "cal");
         QCOMPARE(local(events[0].start), "2026-07-15 16:00");
         QCOMPARE(local(events[0].end), "2026-07-15 17:00");
@@ -89,7 +106,7 @@ private slots:
     }
 
     void parsesTzid() {
-        Zone z("Europe/Berlin");
+        PIN_ZONE("Europe/Berlin");
         const auto events = Ics::parse(wrap(vevent("DTSTART;TZID=America/New_York:20260715T100000\nDTEND;TZID=America/New_York:20260715T113000")), "cal");
         QCOMPARE(events[0].start.toUTC().toString(Qt::ISODate), "2026-07-15T14:00:00Z");
         QCOMPARE(local(events[0].start), "2026-07-15 16:00");
@@ -97,7 +114,7 @@ private slots:
     }
 
     void parsesFloatingAsLocal() {
-        Zone z("America/Los_Angeles");
+        PIN_ZONE("America/Los_Angeles");
         const auto events = Ics::parse(wrap(vevent("DTSTART:20260715T100000\nDURATION:PT1H30M")), "cal");
         QCOMPARE(local(events[0].start), "2026-07-15 10:00");
         QCOMPARE(local(events[0].end), "2026-07-15 11:30");
@@ -128,56 +145,56 @@ private slots:
     }
 
     void weeklyByDayWithInterval() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260706T100000Z\nDTEND:20260706T110000Z\nRRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE"), "2026-07-01", "2026-07-31");
         QCOMPARE(starts(e), (QStringList{"2026-07-06 10:00", "2026-07-08 10:00", "2026-07-20 10:00", "2026-07-22 10:00"}));
     }
 
     void monthlySecondTuesday() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260113T090000Z\nDTEND:20260113T093000Z\nRRULE:FREQ=MONTHLY;BYDAY=2TU"), "2026-01-01", "2026-04-30");
         QCOMPARE(starts(e), (QStringList{"2026-01-13 09:00", "2026-02-10 09:00", "2026-03-10 09:00", "2026-04-14 09:00"}));
     }
 
     void monthlyLastFriday() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260130T090000Z\nDTEND:20260130T093000Z\nRRULE:FREQ=MONTHLY;BYDAY=-1FR"), "2026-01-01", "2026-04-30");
         QCOMPARE(starts(e), (QStringList{"2026-01-30 09:00", "2026-02-27 09:00", "2026-03-27 09:00", "2026-04-24 09:00"}));
     }
 
     void monthlyLastDayOfMonth() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260131T090000Z\nRRULE:FREQ=MONTHLY;BYMONTHDAY=-1"), "2026-01-01", "2026-03-31");
         QCOMPARE(starts(e), (QStringList{"2026-01-31 09:00", "2026-02-28 09:00", "2026-03-31 09:00"}));
     }
 
     void monthlySkipsMissingDays() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260131T090000Z\nRRULE:FREQ=MONTHLY"), "2026-01-01", "2026-04-30");
         QCOMPARE(starts(e), (QStringList{"2026-01-31 09:00", "2026-03-31 09:00"}));
     }
 
     void yearlyByMonth() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART;VALUE=DATE:20240305\nRRULE:FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=5"), "2026-01-01", "2027-12-31");
         QCOMPARE(starts(e), (QStringList{"2026-03-05 00:00", "2027-03-05 00:00"}));
         QVERIFY(e[0].allDay);
     }
 
     void countLimitsOccurrences() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260701T100000Z\nRRULE:FREQ=DAILY;COUNT=3"), "2026-06-01", "2026-08-01");
         QCOMPARE(starts(e), (QStringList{"2026-07-01 10:00", "2026-07-02 10:00", "2026-07-03 10:00"}));
     }
 
     void countIncludesExcludedDates() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260701T100000Z\nRRULE:FREQ=DAILY;COUNT=3\nEXDATE:20260702T100000Z"), "2026-06-01", "2026-08-01");
         QCOMPARE(starts(e), (QStringList{"2026-07-01 10:00", "2026-07-03 10:00"}));
     }
 
     void untilEndsSeries() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20260701T100000Z\nRRULE:FREQ=WEEKLY;UNTIL=20260715T100000Z"), "2026-06-01", "2026-08-31");
         QCOMPARE(starts(e), (QStringList{"2026-07-01 10:00", "2026-07-08 10:00", "2026-07-15 10:00"}));
         const auto d = expand(vevent("DTSTART:20260701T100000Z\nRRULE:FREQ=WEEKLY;UNTIL=20260714"), "2026-06-01", "2026-08-31");
@@ -185,13 +202,13 @@ private slots:
     }
 
     void exdateRemovesAnOccurrence() {
-        Zone z("America/New_York");
+        PIN_ZONE("America/New_York");
         const auto e = expand(vevent("DTSTART;TZID=America/New_York:20260706T100000\nRRULE:FREQ=WEEKLY\nEXDATE;TZID=America/New_York:20260713T100000"), "2026-07-01", "2026-07-31");
         QCOMPARE(starts(e), (QStringList{"2026-07-06 10:00", "2026-07-20 10:00", "2026-07-27 10:00"}));
     }
 
     void recurrenceIdOverrides() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const QString text = vevent("DTSTART:20260706T100000Z\nDTEND:20260706T110000Z\nRRULE:FREQ=WEEKLY")
                              + QStringLiteral("BEGIN:VEVENT\nUID:u1\nSUMMARY:Moved\nRECURRENCE-ID:20260713T100000Z\nDTSTART:20260713T150000Z\nDTEND:20260713T160000Z\nEND:VEVENT\n")
                              + QStringLiteral("BEGIN:VEVENT\nUID:u1\nSUMMARY:Off\nSTATUS:CANCELLED\nRECURRENCE-ID:20260720T100000Z\nDTSTART:20260720T100000Z\nEND:VEVENT\n");
@@ -202,14 +219,14 @@ private slots:
     }
 
     void occurrencesAreWindowed() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART:20200101T100000Z\nRRULE:FREQ=DAILY"), "2026-07-15", "2026-07-15");
         QCOMPARE(e.size(), 1);
         QCOMPARE(local(e[0].start), "2026-07-15 10:00");
     }
 
     void multiDayEventsAppearOnLaterDays() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const auto e = expand(vevent("DTSTART;VALUE=DATE:20260714\nDTEND;VALUE=DATE:20260717"), "2026-07-16", "2026-07-16");
         QCOMPARE(e.size(), 1);
         QVERIFY(expand(vevent("DTSTART;VALUE=DATE:20260714\nDTEND;VALUE=DATE:20260717"), "2026-07-17", "2026-07-17").isEmpty());
@@ -219,20 +236,20 @@ private slots:
     // (8 March), so for a Berlin viewer, still on winter time until 29 March,
     // the local hour must jump from 15:00 to 14:00.
     void recurringEventsFollowTheirOwnZoneAcrossDst() {
-        Zone z("Europe/Berlin");
+        PIN_ZONE("Europe/Berlin");
         const auto e = expand(vevent("DTSTART;TZID=America/New_York:20260301T090000\nDTEND;TZID=America/New_York:20260301T100000\nRRULE:FREQ=WEEKLY"), "2026-03-01", "2026-03-15");
         QCOMPARE(starts(e), (QStringList{"2026-03-01 15:00", "2026-03-08 14:00", "2026-03-15 14:00"}));
         QCOMPARE(e[1].start.secsTo(e[1].end), 3600);
     }
 
     void allDayStaysMidnightAcrossLocalDst() {
-        Zone z("America/New_York");
+        PIN_ZONE("America/New_York");
         const auto e = expand(vevent("DTSTART;VALUE=DATE:20260307\nRRULE:FREQ=DAILY;COUNT=3"), "2026-03-07", "2026-03-10");
         QCOMPARE(starts(e), (QStringList{"2026-03-07 00:00", "2026-03-08 00:00", "2026-03-09 00:00"}));
     }
 
     void feedTodayAndFreeSlots() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         CalendarFeed feed;
         feed.setPalette({"#ff0000", "#00ff00"});
         feed.setClock([] { return QDateTime(QDate(2026, 7, 15), QTime(8, 0)); });
@@ -264,7 +281,7 @@ private slots:
     }
 
     void captionFollowsTheClock() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         CalendarFeed feed;
         feed.setSources({"/tmp/none.ics"});
         feed.loadData("/tmp/none.ics", wrap(QStringLiteral("BEGIN:VEVENT\nUID:j\nSUMMARY:Call with Jeremy\nDTSTART:20260715T100000Z\nDTEND:20260715T103000Z\nEND:VEVENT\n")
@@ -309,7 +326,7 @@ private slots:
     }
 
     void feedUsesCalendarNameAndDisablesSources() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         CalendarFeed feed;
         feed.setSources({"/nonexistent/a.ics", "/nonexistent/b.ics"});
         feed.loadData("/nonexistent/a.ics", wrap(QStringLiteral("X-WR-CALNAME:Personal\n") + vevent("DTSTART:20260715T090000Z\nDTEND:20260715T100000Z")));
@@ -330,7 +347,7 @@ private slots:
     }
 
     void declinedEventsMatchMyAddresses() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         CalendarFeed feed;
         feed.setSources({"/nonexistent/d.ics"});
         feed.loadData("/nonexistent/d.ics", wrap(vevent("DTSTART:20260715T090000Z\nDTEND:20260715T100000Z\nATTENDEE;CN=Me;PARTSTAT=DECLINED:mailto:Me@Example.com\nATTENDEE;PARTSTAT=ACCEPTED:mailto:other@example.com")));
@@ -345,7 +362,7 @@ private slots:
     }
 
     void dayBarLoadsAndTimeBlocks() {
-        Zone z("UTC");
+        PIN_ZONE("UTC");
         const QString path = findQml();
         if (path.isEmpty()) QSKIP("DayBar.qml not found relative to the test sources");
 

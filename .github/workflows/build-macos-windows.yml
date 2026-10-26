@@ -122,6 +122,15 @@ jobs:
           arch: win64_msvc2022_64
           cache: true
 
+      # zlib for zipped backups, linked statically against the dynamic CRT
+      # (/MD) like the rest of the build; vcpkg comes with the runner.
+      - name: Install zlib
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install zlib:x64-windows-static-md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "ZLIB_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Install Inno Setup
         if: env.FAIRFAX_SKIP_INSTALLER == '0'
         shell: pwsh
