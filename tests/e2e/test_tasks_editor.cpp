@@ -268,9 +268,15 @@ private slots:
     // click to accept a suggestion... Chips shown in the order you added them".
     // Also a comma, Backspace on the empty field, and the chip's cross.
     // Clicks a chip's cross until the chip is gone: the chips reflow after an
-    // earlier removal, and a click landing mid-reflow misses.
+    // earlier removal, and a click landing mid-reflow misses. The reflow is a
+    // scheduled polish that runs on the next frame, and nothing is presented
+    // offscreen, so it is run before the cross is looked up: until then a chip
+    // can still sit in the slot the one before it has left, and a click there
+    // removes the wrong tag.
     static bool removeChip(const QString &tag) {
         for (int i = 0; i < 3; ++i) {
+            if (QQuickItem *chip = findItem("editorTagsChip:" + tag))
+                settleLayout(chip);
             QQuickItem *cross = findItem("editorTagsRemove:" + tag);
             if (!cross)
                 return !findItem("editorTagsChip:" + tag);
