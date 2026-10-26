@@ -24,6 +24,8 @@ RESOURCES += src/resources.qrc
 # macOS: a proper .app bundle named Fairfax; Windows: no console window.
 macx {
     TARGET = Fairfax
+    # Supported: Apple Silicon Macs on macOS 14.4 or later (Info.plist says the same).
+    QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.4
     # The bundle's Info.plist (bundle id, name, the fairfax:// URL scheme,
     # high resolution) lives in the repo, so bin/build-macos only fills in the
     # version and the icon.

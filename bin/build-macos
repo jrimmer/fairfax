@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Fairfax for macOS (13 or later): Fairfax.app and a DMG, in build-macos/.
+# Builds Fairfax for macOS (14.4 or later): Fairfax.app and a DMG, in build-macos/.
 # Best effort; see docs/building-macos-windows.md.
 #
 # Optional environment:

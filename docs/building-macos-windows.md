@@ -6,10 +6,14 @@ nothing in them changes how the Linux build behaves. There is no automatic
 CI for them; you run the scripts below on your own machines (or start the
 manual GitHub workflow, see the end of this page).
 
+Supported systems are deliberately recent: **Apple Silicon Macs on macOS 14.4
+(Sonoma) or later**, and **Windows 11, 64-bit**. Intel Macs, older macOS and
+Windows 10 are not supported; Windows 10 may still run it.
+
 Signing is optional. Without certificates the scripts produce unsigned
 builds.
 
-## macOS (13 or later)
+## macOS (14.4 or later, Apple Silicon)
 
 ### Prerequisites
 
@@ -35,7 +39,7 @@ variables:
 
 | Variable | Effect |
 |---|---|
-| `FAIRFAX_UNIVERSAL=1` | ask for an arm64 + x86_64 binary; if the Qt in use is not universal (Homebrew's is native only, the Qt online installer's is universal) the script builds natively instead |
+| `FAIRFAX_UNIVERSAL=1` | for your own builds only (Intel Macs are not supported): ask for an arm64 + x86_64 binary; if the Qt in use is not universal (Homebrew's is native only, the Qt online installer's is universal) the script builds natively instead |
 | `FAIRFAX_SKIP_TESTS=1` | skip the tests and the selftest |
 | `FAIRFAX_SKIP_DMG=1` | stop after `Fairfax.app` |
 | `FAIRFAX_JOBS=4` | compile jobs |
@@ -71,7 +75,7 @@ The script submits the DMG with `notarytool submit --wait` and staples the
 ticket. Unsigned builds open after right-click > Open, or
 `xattr -dr com.apple.quarantine Fairfax.app`.
 
-## Windows 10/11 (x64)
+## Windows 11 (x64)
 
 ### Prerequisites
 

@@ -17,7 +17,7 @@
 	<key>CFBundleSignature</key>
 	<string>${QMAKE_PKGINFO_TYPEINFO}</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
+	<string>14.4</string>
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSHighResolutionCapable</key>
