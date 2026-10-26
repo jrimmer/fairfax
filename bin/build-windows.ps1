@@ -201,6 +201,9 @@ if (-not $SkipTests) {
         Add-Content $Log (Get-Content $testLog)
         if ($testCode -ne 0) {
             Get-Content $testLog -Tail 30 | Write-Host
+            # A Windows status code says why a run printed nothing: 0xC0000135 is a
+            # missing DLL, 0xC0000005 a crash.
+            Say ('unit tests exited with code {0} (0x{1:X8})' -f $testCode, $testCode)
             Fail "unit tests failed (full output in $testLog)"
         }
         $totals = Select-String -Path $testLog -Pattern '^Totals:' | Select-Object -Last 1
