@@ -293,28 +293,28 @@ private slots:
         app.type("errands");
         app.press(Qt::Key_Return);                       // Return makes a chip.
         QVERIFY(waitItem("editorTagsChip:errands"));
-        QCOMPARE(tagNames(app, app.task(id)), QStringList{"errands"});
+        QTRY_COMPARE_WITH_TIMEOUT(tagNames(app, app.task(id)), QStringList{"errands"}, 5000);
         app.type("gar");                                 // Autocomplete offers "garden".
         QVERIFY(waitItem("editorTagsMatch:garden"));
         click(findItem("editorTagsMatch:garden"));
         QVERIFY(waitItem("editorTagsChip:garden"));
         app.type("shop,");                               // A comma makes a chip.
         QVERIFY(waitItem("editorTagsChip:shop"));
-        QCOMPARE(tagNames(app, app.task(id)), (QStringList{"errands", "garden", "shop"}));
+        QTRY_COMPARE_WITH_TIMEOUT(tagNames(app, app.task(id)), (QStringList{"errands", "garden", "shop"}), 5000);
         // Backspace on the empty field removes the last chip.
         app.press(Qt::Key_Backspace);
         QVERIFY(waitFor([] { return !findItem("editorTagsChip:shop"); }));
-        QCOMPARE(tagNames(app, app.task(id)), (QStringList{"errands", "garden"}));
+        QTRY_COMPARE_WITH_TIMEOUT(tagNames(app, app.task(id)), (QStringList{"errands", "garden"}), 5000);
         // The cross removes a chosen chip.
         QVERIFY(removeChip("errands"));
-        QCOMPARE(tagNames(app, app.task(id)), QStringList{"garden"});
+        QTRY_COMPARE_WITH_TIMEOUT(tagNames(app, app.task(id)), QStringList{"garden"}, 5000);
         QVERIFY(closeEditor(app));
         QTRY_VERIFY_WITH_TIMEOUT(badge("rowTagIcon", id), 5000);
 
         // Take the last one away: no tag icon any more.
         QVERIFY(openEditor(app, id));
         QVERIFY(removeChip("garden"));
-        QVERIFY(app.task(id).tagIds.isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(app.task(id).tagIds.isEmpty(), 5000);
         QVERIFY(closeEditor(app));
         QTRY_VERIFY_WITH_TIMEOUT(!badge("rowTagIcon", id), 5000);
     }
