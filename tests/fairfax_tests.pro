@@ -23,6 +23,10 @@ win32 {
         DEFINES += FAIRFAX_NO_ZLIB
     } else {
         INCLUDEPATH += $$ZLIB_PREFIX/include
-        LIBS += -L$$ZLIB_PREFIX/lib -lzlib
+        # vcpkg names its static Windows build zs.lib and its DLL import library
+        # zlib.lib; other builds use z.lib.
+        exists($$ZLIB_PREFIX/lib/zs.lib): LIBS += -L$$ZLIB_PREFIX/lib -lzs
+        else: exists($$ZLIB_PREFIX/lib/zlib.lib): LIBS += -L$$ZLIB_PREFIX/lib -lzlib
+        else: LIBS += -L$$ZLIB_PREFIX/lib -lz
     }
 }

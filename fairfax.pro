@@ -49,7 +49,7 @@ win32 {
 
 # Zipped task-database backups are read with zlib. Windows has no system zlib:
 # point ZLIB_DIR (an environment variable) at a prefix with include/zlib.h and
-# lib/zlib.lib, such as vcpkg's x64-windows-static-md install; without it the
+# the library in lib/, such as vcpkg's x64-windows-static-md install; without it the
 # zip path is compiled out and the importer asks for the backup to be unzipped
 # first.
 unix: LIBS += -lz
@@ -59,6 +59,10 @@ win32 {
         DEFINES += FAIRFAX_NO_ZLIB
     } else {
         INCLUDEPATH += $$ZLIB_PREFIX/include
-        LIBS += -L$$ZLIB_PREFIX/lib -lzlib
+        # vcpkg names its static Windows build zs.lib and its DLL import library
+        # zlib.lib; other builds use z.lib.
+        exists($$ZLIB_PREFIX/lib/zs.lib): LIBS += -L$$ZLIB_PREFIX/lib -lzs
+        else: exists($$ZLIB_PREFIX/lib/zlib.lib): LIBS += -L$$ZLIB_PREFIX/lib -lzlib
+        else: LIBS += -L$$ZLIB_PREFIX/lib -lz
     }
 }
