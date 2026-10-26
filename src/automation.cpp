@@ -960,7 +960,6 @@ struct Automation::Impl {
         if (args.contains("focus")) {
             const int kind = parseEnum(args["focus"], "focus", kFocusNames);
             ViewOptions o;
-            o.showScheduled = true;
             o.showPaused = paused != "hide";
             o.completedWindowMinutes = -1;
             o.search = search;
@@ -1522,6 +1521,7 @@ const QList<Command> &commands() {
         c << Command{"get_task", "Get one task by task_id.", {{"task_id", str("Task id or uid.")}}, {"task_id"}, &I::getTask};
         c << Command{"query_tasks",
                      "Search and filter tasks. Use at most one of list_id, list_group_id, smart_list_id or focus (default: all open tasks). "
+                     "Not-started tasks (a future start_date; scheduled is true) are included; narrow with start_on_or_before or search type: scheduled. "
                      "search uses the Fairfax search syntax: words, \"phrases\", OR, -word, type: hiprio, tags: work, lists: Home.",
                      {{"list_id", str("Only tasks in this list.")},
                       {"list_group_id", str("Only tasks in the lists of this list group.")},

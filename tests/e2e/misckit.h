@@ -507,23 +507,22 @@ inline QList<KeyRow> &keyRows() {
          [](App &a) { return a.task(a.ids.electricity).order < a.task(a.ids.plants).order; }});
 
     // ---- view toggles
-    // Plants start in five days, so the list hides it until scheduled tasks show.
+    // Plants start in five days: not started, so the list shows it until Ctrl+K hides not-started tasks.
     auto hidden = [](App &a) { return a.openSource(lk(a.ids.home)) && waitUntil([&] { return a.row(a.ids.plants) == nullptr; }); };
-    auto scheduled = [=](App &a) {
-        prep(a, a.ids.plants, [](Task &t) { t.startDate = day(5); });
-        return hidden(a);
-    };
     auto shown = [](App &a) { return a.row(a.ids.plants) != nullptr; };
-    add({"Ctrl+K", "a scheduled task hidden", scheduled, Qt::Key_K, ctrl, "",
-         [=](App &a) { return a.backend().showScheduled() && shown(a); }, KeyRow::Again,
-         [](App &a) { return !a.backend().showScheduled() && a.row(a.ids.plants) == nullptr; }});
+    auto notStarted = [=](App &a) {
+        prep(a, a.ids.plants, [](Task &t) { t.startDate = day(5); });
+        return a.openSource(lk(a.ids.home)) && waitUntil([&] { return shown(a); });
+    };
+    add({"Ctrl+K", "a not-started task shown", notStarted, Qt::Key_K, ctrl, "",
+         [=](App &a) { return a.backend().hideScheduled() && a.row(a.ids.plants) == nullptr; }, KeyRow::Again,
+         [=](App &a) { return !a.backend().hideScheduled() && shown(a); }});
     add({"Ctrl+U", "a task with a paused tag hidden", [=](App &a) { pauseEveryTag(a); return hidden(a); }, Qt::Key_U, ctrl, "",
          [=](App &a) { return a.backend().showPaused() && shown(a); }, KeyRow::Again,
          [](App &a) { return !a.backend().showPaused() && a.row(a.ids.plants) == nullptr; }});
-    add({"Ctrl+Shift+K", "scheduled and paused tasks hidden",
-         [=](App &a) { prep(a, a.ids.plants, [](Task &t) { t.startDate = day(5); }); pauseEveryTag(a); return hidden(a); },
-         Qt::Key_K, ctrlShift, "", [=](App &a) { return a.backend().showScheduled() && a.backend().showPaused() && shown(a); },
-         KeyRow::Again, [](App &a) { return !a.backend().showScheduled() && !a.backend().showPaused() && a.row(a.ids.plants) == nullptr; }});
+    add({"Ctrl+Shift+K", "a task with a paused tag hidden", [=](App &a) { pauseEveryTag(a); return hidden(a); },
+         Qt::Key_K, ctrlShift, "", [=](App &a) { return a.backend().showPaused() && shown(a); },
+         KeyRow::Again, [](App &a) { return !a.backend().showPaused() && a.row(a.ids.plants) == nullptr; }});
     add({"Ctrl+-", "list focused", [](App &a) { return homeWith(a, a.ids.plants); }, Qt::Key_Minus, ctrl, "",
          [](App &a) { return a.backend().textSize() == 1; }, KeyRow::Opposite,
          [](App &a) { return a.backend().textSize() == 2; }, Qt::Key_Equal, ctrl});

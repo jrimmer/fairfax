@@ -64,8 +64,8 @@ private slots:
         if (!m_app)
             return;
         // The next row types over this one's query; the list is only rebuilt
-        // when something else (Include Scheduled, another list) was changed.
-        showScheduled(*m_app, false);
+        // when something else (Hide Not-Started, another list) was changed.
+        hideScheduled(*m_app, false);
         if (m_app->backend().sourceKey() != "all") {
             escapeSearch(*m_app);
             m_app->openSource("all");
@@ -239,20 +239,22 @@ private slots:
 
     // "`starttoday` Starts today; `starttomorrow` Starts tomorrow;
     // `startthisweek` Starts this week" (type: Presets for Start Date). A task
-    // starting tomorrow is scheduled, so it needs Include Scheduled (Ctrl+K).
+    // starting tomorrow is not started, and shows unless Ctrl+K hides it.
     void typeStartDate() {
         App &app = *m_app;
         SMART_QUERY(app, "type: starttoday", SL{"Starts today"});
-        SMART_QUERY(app, "type: starttomorrow", SL{});
+        SMART_QUERY(app, "type: starttomorrow", SL{"Starts tomorrow"});
         SMART_QUERY(app, "type: startthisweek",
                     specTitles([](const Spec &s) { return shownInAll(s) && startInWeek(s); }));
-        QVERIFY(showScheduled(app, true));
-        SMART_SHOWS(app, specTitles([](const Spec &s) { return shownInAll(s, true) && startInWeek(s); }));
-        SMART_QUERY(app, "type: starttomorrow", SL{"Starts tomorrow"});
+        // With not-started tasks hidden, the future ones drop out.
+        QVERIFY(hideScheduled(app, true));
+        SMART_SHOWS(app, specTitles([](const Spec &s) { return shownInAllHidingScheduled(s) && startInWeek(s); }));
+        SMART_QUERY(app, "type: starttomorrow", SL{});
         SMART_QUERY(app, "type: starttoday", SL{"Starts today"});
-        // Reversed: scheduled tasks hide again.
-        QVERIFY(showScheduled(app, false));
+        // Reversed: they come back.
+        QVERIFY(hideScheduled(app, false));
         SMART_SHOWS(app, SL{"Starts today"});
+        SMART_QUERY(app, "type: starttomorrow", SL{"Starts tomorrow"});
     }
 
     // Start-or-due presets: `anytoday`, `anytomorrow`, `anythisweek` and its
@@ -262,18 +264,20 @@ private slots:
         App &app = *m_app;
         SMART_QUERY(app, "type: anytoday", DueToday + SL{"Starts today"});
         SMART_QUERY(app, "type: today", DueToday);
-        SMART_QUERY(app, "type: anytomorrow", DueTomorrow);
+        SMART_QUERY(app, "type: anytomorrow", DueTomorrow + SL{"Starts tomorrow"});
         SMART_QUERY(app, "type: tomorrow", DueTomorrow);
-        const auto week = [](bool inc) {
-            return specTitles([inc](const Spec &s) { return shownInAll(s, inc) && (dueWindowInWeek(s) || startInWeek(s)); });
+        const auto week = [](bool hiding) {
+            return specTitles([hiding](const Spec &s) {
+                return (hiding ? shownInAllHidingScheduled(s) : shownInAll(s)) && (dueWindowInWeek(s) || startInWeek(s));
+            });
         };
         SMART_QUERY(app, "type: anythisweek", week(false));
         SMART_QUERY(app, "type: thisweek", week(false));
-        QVERIFY(showScheduled(app, true));
-        SMART_QUERY(app, "type: anytomorrow", DueTomorrow + SL{"Starts tomorrow"});
+        QVERIFY(hideScheduled(app, true));
+        SMART_QUERY(app, "type: anytomorrow", DueTomorrow);
         SMART_QUERY(app, "type: anythisweek", week(true));
         SMART_QUERY(app, "type: thisweek", week(true));
-        QVERIFY(showScheduled(app, false));
+        QVERIFY(hideScheduled(app, false));
         SMART_SHOWS(app, week(false));
     }
 

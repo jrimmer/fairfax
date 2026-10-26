@@ -73,7 +73,8 @@ A few things worth knowing:
   `start_on_or_before`), a `sort` such as
   `{"field": "due_date", "direction": "descending"}`, and `limit` and `offset` for pages.
   Sort fields are title, due_date, start_date, priority, duration, created, modified,
-  completed.
+  completed. Tasks that have not started yet (a future `start_date`) are included, with
+  `scheduled: true`; narrow with `start_on_or_before` or a `type: scheduled` search.
 - `create_task` and `update_task` take `recurrence`
   (`{"frequency": "weekly", "weekdays": ["mon"]}`, or `{"frequency": "none"}` to clear it)
   and `location_update`.

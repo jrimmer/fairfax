@@ -275,12 +275,8 @@ ApplicationWindow {
     AppShortcut { sequences: backend.shortcutMap["task.abandon"] || []; enabled: !backend.recordingShortcut; onActivated: backend.toggleAbandon() }
     AppShortcut { sequences: backend.shortcutMap["task.duplicate"] || []; enabled: !backend.recordingShortcut; onActivated: backend.duplicateSelection() }
     AppShortcut { sequences: backend.shortcutMap["task.delete"] || []; enabled: !backend.recordingShortcut; onActivated: backend.deleteSelection() }
-    AppShortcut { sequences: backend.shortcutMap["view.showScheduled"] || []; enabled: !backend.recordingShortcut; onActivated: backend.showScheduled = !backend.showScheduled }
+    AppShortcut { sequences: backend.shortcutMap["view.hideScheduled"] || []; enabled: !backend.recordingShortcut; onActivated: backend.hideScheduled = !backend.hideScheduled }
     AppShortcut { sequences: backend.shortcutMap["view.showPaused"] || []; enabled: !backend.recordingShortcut; onActivated: backend.showPaused = !backend.showPaused }
-    AppShortcut {
-        sequences: backend.shortcutMap["view.showScheduledAndPaused"] || []; enabled: !backend.recordingShortcut
-        onActivated: { const on = !(backend.showScheduled && backend.showPaused); backend.showScheduled = on; backend.showPaused = on }
-    }
     AppShortcut { sequences: backend.shortcutMap["view.hideCompleted"] || []; enabled: !backend.recordingShortcut; onActivated: backend.hideCompleted = !backend.hideCompleted }
     AppShortcut { sequences: backend.shortcutMap["view.search"] || []; enabled: !backend.recordingShortcut; onActivated: pane.focusSearch() }
     AppShortcut { sequences: backend.shortcutMap["view.quickOpen"] || []; enabled: !backend.recordingShortcut; onActivated: win.openCommand("open") }

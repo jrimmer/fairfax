@@ -542,33 +542,29 @@ private slots:
         choose("completedDefault", 0, open);
     }
 
-    // Include Scheduled pulls in tasks that start later, and the choice is
-    // saved with the Smart List.
-    void includeScheduledSwitchOnSheet() {
+    // A Smart List shows tasks that start later, with no switch for it on the
+    // sheet; editing the list keeps whatever was stored in the old field.
+    void smartListShowsNotStartedTasks() {
         App &app = *m_app;
         QVERIFY(pane(app, "all"));
         const qint64 id = saveSearchAsSmart(app, "lists: Work");
         QVERIFY(id);
         const SL open = inLists(SL{"Work"});
         SMART_SHOWS(app, open);
-        QVERIFY(!paneTitles(app).contains("Starts tomorrow"));
-        auto choose = [&](const QString &segment, bool on, const SL &expected) {
-            QVERIFY(listMenu(app, id, "Edit Search…"));
-            QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
-            QVERIFY(pressBuilder(segment));
-            QVERIFY(pressBuilder("updateButton"));
-            QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
-            QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).includeScheduled, on, 5000);
-            SMART_SHOWS(app, expected);
-        };
-        choose("searchScheduledInclude", true, open + SL{"Starts tomorrow"});
-        choose("searchScheduledHide", false, open);
-        // Remembered: reopened, the switch reads as it was left.
-        choose("searchScheduledInclude", true, open + SL{"Starts tomorrow"});
+        QVERIFY(paneTitles(app).contains("Starts tomorrow"));
         QVERIFY(listMenu(app, id, "Edit Search…"));
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
-        QVERIFY(builder()->property("includeScheduled").toBool());
-        QVERIFY(closeBuilder(app));
+        QVERIFY(!findItem("searchScheduledInclude") && !findItem("searchScheduledHide"));
+        QVERIFY(pressBuilder("completedInclude"));
+        QVERIFY(pressBuilder("updateButton"));
+        QTRY_VERIFY_WITH_TIMEOUT(!builderOpen(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(app.store().list(id).completedMode, 1, 5000);
+        QVERIFY(!app.store().list(id).includeScheduled);
+        QVERIFY(paneTitles(app).contains("Starts tomorrow"));
+        // Ctrl+K hides them from the Smart List too.
+        QVERIFY(hideScheduled(app, true));
+        QVERIFY(waitUntil([&] { return !paneTitles(app).contains("Starts tomorrow"); }));
+        QVERIFY(hideScheduled(app, false));
     }
 
     // The sheet's due-date options, saved with the rule: no due date, a fixed

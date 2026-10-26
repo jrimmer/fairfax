@@ -38,7 +38,7 @@ const QLocale English(QLocale::English, QLocale::UnitedKingdom);
 const QStringList TaskRoles{
     "sectionId", "hasAlarm", "hasLocation", "hasAttachment", "pictureUrl", "kind", "taskId", "depth", "title", "notesPreview", "type", "childCount", "childOpen", "childDone", "childLive", "completed", "abandoned",
     "overdue", "starred", "priority", "repeating", "tags", "actionType", "durationText", "dueText", "dueTone",
-    "startText", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
+    "startText", "startSpoken", "listName", "listColor", "breadcrumb", "collapsed", "hasChildren", "selected", "current",
     "editing", "dimmed", "progress", "hasNotes", "sectionKey", "tone", "count", "durationTotal", "color",
     "isFirst", "reason",
 };
@@ -543,8 +543,8 @@ void Backend::setSeparated(bool on) {
     emit viewChanged();
 }
 
-void Backend::setShowScheduled(bool on) {
-    m_options.showScheduled = on;
+void Backend::setHideScheduled(bool on) {
+    m_options.hideScheduled = on;
     rebuild();
     emit viewChanged();
 }
@@ -2328,8 +2328,6 @@ void Backend::revealInList(qint64 taskId) {
     m_options.tagFilter.clear();
     if (t.completed)
         m_options.keepVisible.insert(t.id);
-    if (Schedule::isScheduled(t, QDateTime::currentDateTime()))
-        m_options.showScheduled = true;
     selectSource(Source{Source::List, t.listId}.key());
     if (t.parentId) {
         Task parent = m_store->task(t.parentId);
@@ -4986,14 +4984,14 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
     for (const auto &l : lists) {
         if (l.kind != ListKind::Inbox)
             continue;
-        const auto c = shown(views.countsForList(l.id));
+        const auto c = shown(views.countsForList(l.id, m_options.hideScheduled));
         const QString key = Source{Source::List, l.id}.key();
         rows.append({{"key", "inbox"}, {"kind", "focus"}, {"sourceKey", key}, {"title", "Inbox"}, {"icon", "inbox"},
                      {"overdue", c.overdue}, {"undone", c.undone}, {"selected", m_source.key() == key}, {"listId", l.id}});
         rows.append({{"key", "gap:inbox"}, {"kind", "gap"}});
     }
     for (int k = Source::All; k <= Source::Done; ++k) {
-        const auto c = shown(views.countsForFocus(k));
+        const auto c = shown(views.countsForFocus(k, m_options.hideScheduled));
         const bool showOverdue = k == Source::All || k == Source::Today;
         rows.append({{"key", focusKey(k)}, {"kind", "focus"}, {"sourceKey", focusKey(k)}, {"title", focusTitles[k]},
                      {"icon", focusIcons[k]}, {"overdue", showOverdue ? c.overdue : 0}, {"undone", c.undone},
@@ -5041,7 +5039,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         }
         if (groupId && g.collapsed)
             continue;
-        const auto raw = views.countsForList(l.id);
+        const auto raw = views.countsForList(l.id, m_options.hideScheduled);
         const auto c = shown(raw);
         const QString key = Source{Source::List, l.id}.key();
         QVector<Task> projects;
@@ -5082,6 +5080,7 @@ void Backend::rebuildSidebar(const ViewBuilder &views) {
         const Source source{Source::List, l.id};
         ViewOptions probe;
         probe.completedWindowMinutes = 0;
+        probe.hideScheduled = m_options.hideScheduled;
         int count = 0;
         for (const auto &section : views.build(source, SortSpec{SortField::Title, true, false}, probe))
             for (const auto &row : section.rows)
@@ -5118,7 +5117,16 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
     QString dueTone;
     if (t.dueDate.isValid())
         dueTone = overdue ? "overdue" : t.dueDate == today ? "today" : "future";
-    const bool futureStart = t.startDate.isValid() && (t.startDate > today || Schedule::isScheduled(t, now));
+    // A start date in the future means "not started yet": the row carries a
+    // muted "Starts 11 Mar" mark (with the year when it is not this year, and
+    // the time when one is set), and the reader hears "starts 11 March".
+    const bool futureStart = !t.completed && Schedule::isScheduled(t, now);
+    auto startWords = [&](bool spoken) {
+        const bool otherYear = t.startDate.year() != today.year();
+        const QString day = spoken ? QLocale(QLocale::English).toString(t.startDate, otherYear ? "d MMMM yyyy" : "d MMMM")
+                                   : QLocale(QLocale::English).toString(t.startDate, otherYear ? "d MMM yyyy" : "d MMM");
+        return t.startTime >= 0 ? day + ", " + Schedule::formatTime(t.startTime) : day;
+    };
     const Task parent = t.parentId ? m_store->task(t.parentId) : Task();
     const QString firstLine = t.notes.section('\n', 0, 0).trimmed();
 
@@ -5146,7 +5154,8 @@ QVariantMap Backend::taskRow(const Task &t, const TaskRow &row, const ViewBuilde
         {"durationText", Schedule::durationBadge(t.duration)},
         {"dueText", Schedule::friendlyDateTime(t.dueDate, t.dueTime, today, s.friendlyDates)},
         {"dueTone", dueTone},
-        {"startText", futureStart ? Schedule::friendlyDateTime(t.startDate, t.startTime, today, s.friendlyDates) : QString()},
+        {"startText", futureStart ? QStringLiteral("Starts ") + startWords(false) : QString()},
+        {"startSpoken", futureStart ? startWords(true) : QString()},
         {"listName", list.name},
         {"listColor", list.color},
         {"breadcrumb", row.breadcrumb ? parent.title : QString()},
@@ -5245,7 +5254,7 @@ void Backend::rebuildMyDayTasks(const ViewBuilder &views) {
     }
     m_visibleOrder = order;
     m_tasks.setRows(rows);
-    m_hasHidden = false;
+    m_hasNotStarted = false;
 }
 
 void Backend::rebuildTasks(const ViewBuilder &views) {
@@ -5297,17 +5306,18 @@ void Backend::rebuildTasks(const ViewBuilder &views) {
     m_visibleOrder = order;
     m_tasks.setRows(rows);
 
-    // Whether the sort bar should offer its reveal toggle: something here is
-    // hidden by a future start date or a paused tag.
+    // Whether the sort bar should offer its clock toggle: this view holds
+    // not-started tasks (a future start date), or they are being hidden.
     ViewOptions probe = m_options;
-    probe.showScheduled = true;
-    probe.showPaused = true;
-    int all = 0, now = 0;
+    probe.hideScheduled = false;
+    int all = 0, hiddenCount = 0;
+    ViewOptions hiding = m_options;
+    hiding.hideScheduled = true;
     for (const auto &s : views.build(m_source, sortSpec(), probe)) all += s.rows.size();
-    for (const auto &s : sections) now += s.rows.size();
-    const bool hidden = all != now || m_options.showScheduled || m_options.showPaused;
-    if (hidden != m_hasHidden) {
-        m_hasHidden = hidden;
+    for (const auto &s : views.build(m_source, sortSpec(), hiding)) hiddenCount += s.rows.size();
+    const bool notStarted = all != hiddenCount || m_options.hideScheduled;
+    if (notStarted != m_hasNotStarted) {
+        m_hasNotStarted = notStarted;
         emit viewChanged();
     }
 }

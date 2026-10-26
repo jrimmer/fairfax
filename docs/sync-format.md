@@ -213,7 +213,7 @@ Folder `lists/`. A list holds tasks. A list is normal, the Inbox, or a Smart Lis
 | `smart_query` | string | Search text of a Smart List; empty for other lists | no | `""` |
 | `smart_range` | string | Date filter of a Smart List: `""` none, `next:N:unit` (unit `d`, `w`, `m` or `y`), `fixed:yyyy-MM-dd:yyyy-MM-dd`, or `nodue` | no | `""` |
 | `completed_mode` | integer | Completed tasks in this list: `0` list default, `1` always show, `2` never show | no | `0` |
-| `include_scheduled` | bool | Smart Lists: also match scheduled tasks | no | `false` |
+| `include_scheduled` | bool | No longer used: Smart Lists always show not-started tasks. Read and kept so older versions sync unchanged, but ignored | no | `false` |
 | `mute_alerts` | bool | Alerts of this list's tasks stay silent | no | `false` |
 | `modified` | integer | Seconds since epoch, UTC | yes | |
 | `deleted` | bool | Tombstone | no | `false` |

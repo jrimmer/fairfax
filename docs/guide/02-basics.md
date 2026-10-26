@@ -211,9 +211,13 @@ Fairfax keeps two dates, and the difference is the most useful thing to learn.
 - The **due date** is when a task must be done.
 - The **start date** is when you want to see it.
 
-A task with a start date in the future stays out of the way. It waits in
-*Scheduled* and appears on the day it starts. That keeps today's list honest:
-"Plant the autumn bulbs" does not nag you in July.
+A task with a start date in the future is *not started yet*. It still shows in
+its list, in *All* and in search, with a muted "Starts 11 Mar" mark in its date
+area (the year is added when it is not this year). It stays out of *Today* and
+*My Day* until its start day, and it is also gathered in *Scheduled*. That keeps
+today's list honest: "Plant the autumn bulbs" does not nag you in July, but you
+can still find it. If you would rather not see not-started tasks in your lists
+at all, press **Ctrl+K** to hide them, and again to bring them back.
 
 Once the start date has passed, the task stays visible until it is done, even if
 it has no due date. Fairfax calls this "still working on".
@@ -259,13 +263,13 @@ They are called *focus lists* because each answers one question.
 
 | List | Shortcut | What you will find |
 |---|---|---|
-| **All** | Ctrl+1 | Every open task |
+| **All** | Ctrl+1 | Every open task, including ones that have not started yet |
 | **Today** | Ctrl+2 | What is due today, what is overdue, and what you have started |
 | **Starred** | Ctrl+3 | Every starred task |
-| **Scheduled** | Ctrl+4 | Tasks hidden until their start date |
+| **Scheduled** | Ctrl+4 | Tasks that have not started yet, soonest first |
 | **Done** | Ctrl+5 | Tasks you have completed, and the ones you abandoned |
 
-Tasks that wait in *Scheduled* come back by themselves on their start day. A
+Tasks that wait in *Scheduled* join *Today* by themselves on their start day. A
 task you add while *Today* is open is due today. A task you add in *Starred* is
 starred. Today's rules can be changed in
 [Settings → Today & Lists](12-settings.md#today--lists): for instance whether

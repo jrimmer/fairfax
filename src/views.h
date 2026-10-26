@@ -28,7 +28,7 @@ struct Source {
 };
 
 struct ViewOptions {
-    bool showScheduled = false;
+    bool hideScheduled = false;  // Leaves not-started (future start date) tasks out of lists and searches.
     bool showPaused = false;
     bool hideCompleted = false;
     int completedWindowMinutes = 24 * 60;  // -1 keeps completed tasks forever, 0 hides them at once.
@@ -96,8 +96,8 @@ public:
 
     // Sidebar counters: overdue and not-done top-level items, honouring the
     // same hiding rules as the views.
-    ListCounts countsForList(qint64 listId) const;
-    ListCounts countsForFocus(int kind) const;
+    ListCounts countsForList(qint64 listId, bool hideScheduled = false) const;
+    ListCounts countsForFocus(int kind, bool hideScheduled = false) const;
 
     // What the badge on the bar and in the tray counts: "overdue", "today"
     // (due today, not overdue), "both" or "none".

@@ -670,7 +670,7 @@ private slots:
         QCOMPARE(info.value("query").toString(), QString("type: hiprio"));
         QCOMPARE(info.value("range").toString(), QString("next:3:d"));
         QCOMPARE(info.value("completedMode").toInt(), 1);
-        QVERIFY(info.value("includeScheduled").toBool());
+        QVERIFY(info.value("includeScheduled").toBool());  // Stored, though no longer used.
         f.backend->updateSmartList(id, "", "starred", "nodue", 2, false);
         info = f.backend->smartListInfo(id);
         QCOMPARE(info.value("name").toString(), QString("Hot"));

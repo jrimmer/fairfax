@@ -626,6 +626,57 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(app.sidebarRow(lk(w.misc)) != nullptr, 5000);
     }
 
+    // A future start date means "not started", never "hidden": the task stays
+    // in its list, All, search and the counts, with a "Starts" mark; it is out
+    // of Today until its start day and in Scheduled; Ctrl+K hides it and the
+    // counts follow.
+    void notStartedTaskStaysVisibleAndCounted() {
+        App app(seedLists);
+        QVERIFY(app.ok);
+        const qint64 id = app.ids.plants;
+        const QString home = lk(app.ids.home);
+        QTRY_VERIFY_WITH_TIMEOUT(badgeOf(app, home).undone > 0, 5000);
+        const int homeBefore = badgeOf(app, home).undone;
+        const int allBefore = badgeOf(app, "all").undone;
+        const int scheduledBefore = badgeOf(app, "scheduled").undone;
+        Task t = app.store().task(id);
+        t.startDate = QDate::currentDate().addDays(9);
+        t.startTime = -1;
+        t.dueDate = QDate();
+        app.store().begin("Prepare", false, true);
+        app.store().putTask(t);
+        app.store().commit();
+
+        QVERIFY(pane(app, home));
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        LIST_ITEM(mark, findItem(QString("rowStart:%1").arg(id)));
+        QVERIFY2(mark->property("text").toString().startsWith("Starts "), qPrintable(mark->property("text").toString()));
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, "scheduled").undone, scheduledBefore + 1, 5000);
+        QCOMPARE(badgeOf(app, home).undone, homeBefore);
+        QCOMPARE(badgeOf(app, "all").undone, allBefore);
+        // All and a typed search show it; Today does not.
+        QVERIFY(pane(app, "all"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        app.backend().setSearch(t.title);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        app.backend().setSearch(QString());
+        QVERIFY(pane(app, "today"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
+        QVERIFY(pane(app, "scheduled"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+
+        // Ctrl+K: hidden from the list, and the counts follow.
+        QVERIFY(pane(app, home));
+        app.press(Qt::Key_K, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) == nullptr, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, homeBefore - 1, 5000);
+        QCOMPARE(badgeOf(app, "all").undone, allBefore - 1);
+        QCOMPARE(badgeOf(app, "scheduled").undone, scheduledBefore + 1);
+        app.press(Qt::Key_K, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(app.row(id) != nullptr, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(badgeOf(app, home).undone, homeBefore, 5000);
+    }
+
     // Each list shows an overdue count on its left and an undone count on its
     // right, and both follow the tasks live.
     void listCountsFollowTasks() {

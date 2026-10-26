@@ -899,26 +899,6 @@ Popup {
                     Segment { objectName: "scopeThis"; label: "This list"; accessibleName: "Search this list"; radio: true; active: !backend.searchAllLists; onClicked: backend.setSearchAllLists(false) }
                     Segment { objectName: "scopeAll"; label: "All lists"; accessibleName: "Search all lists"; radio: true; active: backend.searchAllLists; onClicked: backend.setSearchAllLists(true) }
                 }
-                RowLayout {
-                    spacing: 6
-                    Text { Layout.preferredWidth: 72; text: "Scheduled"; color: theme.foreground; font.pixelSize: backend.fontSize }
-                    Segment {
-                        objectName: "searchScheduledHide"
-                        label: "Hide"
-                        accessibleName: "Hide scheduled"
-                        radio: true
-                        active: root.editingListId ? !root.includeScheduled : !backend.showScheduled
-                        onClicked: { if (root.editingListId) root.includeScheduled = false; else backend.showScheduled = false }
-                    }
-                    Segment {
-                        objectName: "searchScheduledInclude"
-                        label: "Include"
-                        accessibleName: "Include scheduled"
-                        radio: true
-                        active: root.editingListId ? root.includeScheduled : backend.showScheduled
-                        onClicked: { if (root.editingListId) root.includeScheduled = true; else backend.showScheduled = true }
-                    }
-                }
 
                 Heading { text: "WITHIN THE LAST"; Layout.topMargin: 6 }
                 Repeater {

@@ -142,9 +142,8 @@ These are the defaults. Where two keys are listed, either one works.
 | Keys | Does |
 |---|---|
 | **Ctrl+J** | Turn the Focus Filter on or off |
-| **Ctrl+K** | Show or hide scheduled tasks |
-| **Ctrl+U** | Show or hide paused tasks |
-| **Ctrl+Shift+K** | Show or hide scheduled and paused together |
+| **Ctrl+K** | Hide or show not-started tasks (a future start date); they show by default |
+| **Ctrl+U** or **Ctrl+Shift+K** | Show or hide paused tasks |
 | **Ctrl+O** | Hide completed tasks |
 | **Ctrl+=** / **Ctrl+-** | Larger / smaller text |
 | **F11** | Full screen |

@@ -118,9 +118,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("nodue"), 5000);
     }
 
-    // Start dates: a future start makes a task Scheduled, hidden from the list
-    // until it begins ("Smart Scheduling"); the Scheduled view shows it, and
-    // clearing the start brings it back.
+    // Start dates: a future start makes a task Scheduled: not started, so it
+    // stays in its list with a "Starts" mark and is gathered in the Scheduled
+    // view; Ctrl+K hides it from the list, and clearing the start unmarks it.
     void startDateSchedulesTheTask() {
         App app;
         QVERIFY(app.ok);
@@ -128,16 +128,25 @@ private slots:
         const qint64 id = app.ids.plants;
         const QDate today = QDate::currentDate();
         QVERIFY(openEditor(app, id));
-        // The time first (it starts today, early enough that it has begun at any hour of the day); the date last, because a start in
-        // the future takes the task out of the list and the editor with it.
+        // The time first (it starts today, early enough that it has begun at any hour of the day), then the date.
         QVERIFY(typeDate("editorStartTime", "12:05am"));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startTime, 5, 5000);
         QCOMPARE(app.task(id).startDate, today);
         QVERIFY(typeDate("editorStart", "in 2w"));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startDate, today.addDays(14), 5000);
         QCOMPARE(app.task(id).startTime, 5);
+        // Not started, but still in the list, with the mark.
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowStart", id), 5000);
+        QVERIFY(closeEditor(app));
+        QVERIFY(rowVisible(app, id));
+        const QString mark = findItem("rowStart:" + QString::number(id))->property("text").toString();
+        QVERIFY2(mark.startsWith("Starts "), qPrintable(mark));
+        QVERIFY2(mark.contains(QLocale(QLocale::English).toString(today.addDays(14), "d MMM")), qPrintable(mark));
+        // Ctrl+K hides not-started tasks, and brings them back.
+        app.press(Qt::Key_K, Qt::ControlModifier);
         QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("editorCard"), 5000);
+        app.press(Qt::Key_K, Qt::ControlModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);
 
         app.press(Qt::Key_4, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("scheduled"), 5000);

@@ -115,8 +115,9 @@ offers your lists and `frfx done <Tab>` your open tasks.
 - **Focus lists.** *All*, *Today*, *Starred*, *Scheduled* and *Done* gather tasks from every list.
   *Today* holds what's due today, what's overdue, and what you've started; a task added
   while *Today* is open is due today, one added in *Starred* is starred.
-- **Start and due dates.** A future start date hides a task (it waits in *Scheduled*) until
-  that day. A duration with a due time makes the task show up ahead of its deadline.
+- **Start and due dates.** A future start date marks a task as not started: it still shows in
+  its list, *All*, search and Smart Lists with a "Starts 11 Mar" mark, joins *Today* and *My Day*
+  on that day, and is gathered in *Scheduled* (Ctrl+K hides not-started tasks). A duration with a due time makes the task show up ahead of its deadline.
 - **Projects and checklists.** A project's tasks keep their own dates and appear on their own
   in the focus lists; a checklist's items ride along with the checklist.
 - **Sections.** Split a list into headings (right-click a list → New Section, or + → New
@@ -130,12 +131,12 @@ offers your lists and `frfx done <Tab>` your open tasks.
   builder, a row per clause (Priority is High, Tag is not set…) with Match All or Any, [−] and
   [+], and Alt+click on [+] (or right-click) for a sub-filter; it also sets a due-date range
   (between two dates, in the next N days to years, or no due date) and whether the list
-  includes completed or scheduled tasks. `lists:`, `groups:` and `completed:` search every
+  includes completed tasks. `lists:`, `groups:` and `completed:` search every
   list, and `completed:` or `type: donetoday` find finished tasks, `type: abandoned` the
   abandoned ones and `type: completed` the done ones; `type: scheduled` and
-  `type: paused` find the tasks that are otherwise hidden. Parentheses can group
+  `type: paused` find the not-started and the paused tasks. Parentheses can group
   whole filters, `tags: home OR (lists: Work type: starred)`, and Search Options has a
-  group row, a This list / All lists scope, an Include Scheduled switch and a Sounds like
+  group row, a This list / All lists scope, a Sounds like
   switch that is remembered. The Find, Jump, Tag Search and Quick Open bars have an
   Exact words switch (Alt+E), remembered per bar, and ↑ / ↓ wrap at the ends; the search
   field's ✕ clears the search like Esc does; Defer also takes an offset such as
@@ -335,8 +336,8 @@ the table spells them Ctrl and Alt.
 | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` | Collapse / expand every project |
 | `Ctrl+Shift+Alt+↑` / `Ctrl+Shift+Alt+↓` | Collapse / expand every list group |
 | `Ctrl+F` / `Ctrl+Shift+O` | Search / Quick Open |
-| `Ctrl+K` / `Ctrl+U` / `Ctrl+O` | Show scheduled / show paused / hide completed |
-| `Ctrl+Shift+K` | Show scheduled and paused |
+| `Ctrl+K` / `Ctrl+U` / `Ctrl+O` | Hide not-started tasks / show paused / hide completed |
+| `Ctrl+Shift+K` | Show paused (a second binding of `Ctrl+U`) |
 | `Ctrl+Shift+E` | Ask in plain English… |
 | `Ctrl+Shift+D` | Export tasks |
 | `Ctrl+Shift+2` | Quick Entry |

@@ -67,8 +67,9 @@ struct Spec {
 };
 
 // The fixture: a hundred-odd properties across seventy tasks. Hidden from
-// All by default: the completed ones, the scheduled ones (future start), the
-// paused one, and children of checklists and plain tasks (they show nested).
+// All by default: the completed ones, the paused one, and children of
+// checklists and plain tasks (they show nested). The scheduled ones (future
+// start) show, marked "Starts ...", unless Ctrl+K hides them.
 inline const QList<Spec> &specs() {
     static const QList<Spec> all = [] {
         QList<Spec> v;
@@ -197,12 +198,15 @@ inline bool parentOk(const Spec &s) {
 }
 
 // What All shows when nothing is typed: open top-level tasks, project
-// children, no scheduled (future start) or paused ones unless asked for.
-inline bool shownInAll(const Spec &s, bool includeScheduled = false) {
-    if (s.completed() || s.paused() || (s.scheduled() && !includeScheduled))
+// children and not-started (future start) ones, but no paused ones.
+inline bool shownInAll(const Spec &s) {
+    if (s.completed() || s.paused())
         return false;
     return parentOk(s);
 }
+
+// The same with Ctrl+K's "Hide not-started tasks" on.
+inline bool shownInAllHidingScheduled(const Spec &s) { return shownInAll(s) && !s.scheduled(); }
 
 // Days from today a completed task was completed on.
 inline int doneOffset(const Spec &s) { return s.doneNow ? 0 : -s.doneDays; }
@@ -580,12 +584,12 @@ inline bool escapeSearch(App &app) {
     return waitUntil(closed);
 }
 
-// Ctrl+K (View > Show Scheduled Tasks) until the pane shows, or hides,
-// scheduled tasks.
-inline bool showScheduled(App &app, bool on) {
-    if (app.backend().showScheduled() != on)
+// Ctrl+K (Hide not-started tasks) until the pane hides, or shows again,
+// tasks with a future start date.
+inline bool hideScheduled(App &app, bool on) {
+    if (app.backend().hideScheduled() != on)
         app.press(Qt::Key_K, Qt::ControlModifier);
-    return waitUntil([&] { return app.backend().showScheduled() == on; });
+    return waitUntil([&] { return app.backend().hideScheduled() == on; });
 }
 
 // Changes a task behind the window's back, as a sync or the command line

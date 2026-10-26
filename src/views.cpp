@@ -292,7 +292,10 @@ bool ViewBuilder::passesFilters(const Task &t, const Source &source, const ViewO
     if (!o.showPaused && isPaused(t))
         return false;
     const bool scheduledView = source.kind == Source::Scheduled || source.kind == Source::Done;
-    if (!scheduledView && !o.showScheduled && Schedule::isScheduled(t, m_now) && !t.completed)
+    // A start date means "not started yet", not "hidden": not-started tasks
+    // show everywhere except Today (which takes a task on its start day), and
+    // anywhere when the view is told to hide them.
+    if (!scheduledView && !t.completed && Schedule::isScheduled(t, m_now) && (source.kind == Source::Today || o.hideScheduled))
         return false;
     // "Hide started tasks unless due today" covers All and the lists; Today
     // has its own "Still Working On" setting.
@@ -590,18 +593,12 @@ QVector<Section> ViewBuilder::build(const Source &source, const SortSpec &sort, 
     const bool flat = smart || wide || source.isFocus();
 
     ViewOptions o = options;
-    if (smart && smartList.includeScheduled)
-        o.showScheduled = true;
-    // Asking for scheduled or paused tasks by name brings them into view:
-    // they are hidden by default, so the search would otherwise find nothing.
+    // Asking for scheduled or paused tasks by name brings them into view,
+    // even with not-started tasks hidden or paused tags hidden.
     if (search.namesScheduled() || saved.namesScheduled())
-        o.showScheduled = true;
+        o.hideScheduled = false;
     if (search.namesPaused() || saved.namesPaused())
         o.showPaused = true;
-    // Sorting one of your own lists by Start Date shows its scheduled tasks,
-    // in the order they start.
-    if (!smart && sort.field == SortField::StartDate && (source.kind == Source::List || source.kind == Source::Project))
-        o.showScheduled = true;
     // Completed tasks: a query that asks for them shows them all; otherwise
     // the list's own Include/Exclude Completed switch decides.
     int policy = 0;
@@ -741,12 +738,12 @@ int ViewBuilder::badgeCount(const QString &metric) const {
     return today.overdue + dueToday;
 }
 
-ListCounts ViewBuilder::countsForList(qint64 listId) const {
+ListCounts ViewBuilder::countsForList(qint64 listId, bool hideScheduled) const {
     ListCounts c;
     for (const auto &t : m_store.tasks()) {
         if (t.listId != listId || t.parentId || t.completed || t.deleted || isPaused(t))
             continue;
-        if (Schedule::isScheduled(t, m_now) || Schedule::startedHidden(t, m_now, m_settings))
+        if ((hideScheduled && Schedule::isScheduled(t, m_now)) || Schedule::startedHidden(t, m_now, m_settings))
             continue;
         ++c.undone;
         if (Schedule::isOverdue(t, m_now, m_settings))
@@ -757,7 +754,7 @@ ListCounts ViewBuilder::countsForList(qint64 listId) const {
     return c;
 }
 
-ListCounts ViewBuilder::countsForFocus(int kind) const {
+ListCounts ViewBuilder::countsForFocus(int kind, bool hideScheduled) const {
     ListCounts c;
     if (kind == Source::Done)
         return c;
@@ -766,7 +763,7 @@ ListCounts ViewBuilder::countsForFocus(int kind) const {
             continue;
         if (t.parentId && m_store.task(t.parentId).type != TaskType::Project)
             continue;
-        if (kind != Source::Scheduled && Schedule::isScheduled(t, m_now))
+        if (Schedule::isScheduled(t, m_now) && (kind == Source::Today || (hideScheduled && kind != Source::Scheduled)))
             continue;
         if (kind == Source::All && Schedule::startedHidden(t, m_now, m_settings))
             continue;

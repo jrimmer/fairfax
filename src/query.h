@@ -47,7 +47,7 @@ public:
     // setting says.
     bool namesCompleted() const { return m_namesCompleted; }
     // Likewise for type: scheduled and type: paused, which would otherwise
-    // find nothing, as scheduled and paused tasks are hidden by default.
+    // find nothing while not-started tasks are hidden or paused ones are.
     bool namesScheduled() const { return m_namesScheduled; }
     bool namesPaused() const { return m_namesPaused; }
     // Whether the query names lists, groups or completed tasks. Such a search

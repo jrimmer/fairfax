@@ -212,14 +212,14 @@ Item {
                 font.pixelSize: backend.fontSize - 1
             }
             IconButton {
-                objectName: "showScheduledButton"
-                visible: backend.hasHidden
+                objectName: "hideScheduledButton"
+                visible: backend.hasNotStarted
                 icon: "clock"
-                checked: backend.showScheduled || backend.showPaused
-                tip: backend.showScheduled ? "Hide Scheduled (Ctrl+K)" : "Show Scheduled (Ctrl+K)"
-                onClicked: backend.showScheduled = !backend.showScheduled
+                checked: backend.hideScheduled
+                tip: backend.hideScheduled ? "Show not-started tasks (Ctrl+K)" : "Hide not-started tasks (Ctrl+K)"
+                onClicked: backend.hideScheduled = !backend.hideScheduled
             }
-            Rectangle { visible: backend.hasHidden; implicitWidth: 1; implicitHeight: 16; color: theme.divider }
+            Rectangle { visible: backend.hasNotStarted; implicitWidth: 1; implicitHeight: 16; color: theme.divider }
             FocusButton {}
             IconButton {
                 objectName: "sortReverse"

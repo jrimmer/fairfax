@@ -39,8 +39,8 @@ Item {
                 parts.push((root.r.childDone || 0) + " of " + (root.r.childLive || 0) + " done")
             parts.push(root.r.collapsed ? "collapsed" : "expanded")
         }
-        if (root.r.startText)
-            parts.push("starts " + root.r.startText)
+        if (root.r.startSpoken)
+            parts.push("starts " + root.r.startSpoken)
         if (root.r.dueText)
             parts.push((root.r.overdue ? "overdue since " : "due ") + root.r.dueText)
         if ((root.r.priority || 0) > 0)
@@ -340,7 +340,7 @@ Item {
                 visible: !!root.r.startText
                 anchors.right: parent.right
                 text: root.r.startText || ""
-                color: theme.start
+                color: theme.muted
                 font.pixelSize: root.r.dueText ? backend.fontSize - 3 : backend.fontSize - 2
             }
             Text {

@@ -61,10 +61,10 @@ class Backend : public QObject {
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY viewChanged)
     Q_PROPERTY(bool separated READ separated NOTIFY viewChanged)
     Q_PROPERTY(QVariantList sortChoices READ sortChoices NOTIFY viewChanged)
-    Q_PROPERTY(bool showScheduled READ showScheduled WRITE setShowScheduled NOTIFY viewChanged)
+    Q_PROPERTY(bool hideScheduled READ hideScheduled WRITE setHideScheduled NOTIFY viewChanged)
     Q_PROPERTY(bool showPaused READ showPaused WRITE setShowPaused NOTIFY viewChanged)
     Q_PROPERTY(bool hideCompleted READ hideCompleted WRITE setHideCompleted NOTIFY viewChanged)
-    Q_PROPERTY(bool hasHidden READ hasHidden NOTIFY viewChanged)
+    Q_PROPERTY(bool hasNotStarted READ hasNotStarted NOTIFY viewChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY viewChanged)
     Q_PROPERTY(bool soundex READ soundex WRITE setSoundex NOTIFY viewChanged)
     Q_PROPERTY(bool searchAllLists READ searchAllLists NOTIFY viewChanged)
@@ -161,10 +161,10 @@ public:
     bool sortAscending() const { return sortSpec().ascending; }
     bool separated() const { return sortSpec().separated; }
     QVariantList sortChoices() const;
-    bool showScheduled() const { return m_options.showScheduled; }
+    bool hideScheduled() const { return m_options.hideScheduled; }
     bool showPaused() const { return m_options.showPaused; }
     bool hideCompleted() const { return m_options.hideCompleted; }
-    bool hasHidden() const { return m_hasHidden; }
+    bool hasNotStarted() const { return m_hasNotStarted; }
     QString search() const { return m_options.search; }
     bool soundex() const { return m_options.soundex; }
     void setSoundex(bool on);
@@ -197,7 +197,7 @@ public:
     QString todayIso() const;
     QString statusMessage() const { return m_status; }
 
-    void setShowScheduled(bool on);
+    void setHideScheduled(bool on);
     void setShowPaused(bool on);
     void setHideCompleted(bool on);
     void setSearch(const QString &text);
@@ -769,7 +769,7 @@ private:
     // Whether the My Day screen is showing the shutdown review.
     bool m_myDayShutdown = false;
     qint64 m_noDetectTask = 0;
-    bool m_hasHidden = false;
+    bool m_hasNotStarted = false;
     QVariantMap m_editor;
     QString m_pendingField;
     bool m_dragCopy = false;

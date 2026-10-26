@@ -164,8 +164,19 @@ private slots:
         const auto got = titles(build(Source{Source::Scheduled}));
         QCOMPARE(got.size(), 2);
         QVERIFY(got.contains("future") && got.contains("laterToday"));
-        // The regular views hide them.
-        QVERIFY(!titles(build(Source{Source::All})).contains("future"));
+        // The regular views show them as not started.
+        QVERIFY(titles(build(Source{Source::All})).contains("future"));
+    }
+
+    void notStartedTaskJoinsTodayOnItsStartDay() {
+        const auto l = addList("L");
+        addTask(l, "future", [](Task &t) { t.startDate = day(3); });
+        addTask(l, "startsToday", [](Task &t) { t.startDate = Today; });
+        // Not in Today before its start day; there on it. Starred ones too.
+        QCOMPARE(titles(build(Source{Source::Today})), QStringList{"startsToday"});
+        addTask(l, "starredLater", [](Task &t) { t.startDate = day(2); t.starred = true; });
+        m_settings.todayIncludesStarred = true;
+        QCOMPARE(titles(build(Source{Source::Today})), QStringList{"startsToday"});
     }
 
     void doneFocusShowsCompleted() {
@@ -209,14 +220,52 @@ private slots:
 
     // ---- scheduled / paused ----
 
-    void scheduledHiddenUnlessShowScheduled() {
+    void notStartedTasksShowEverywhereUnlessHidden() {
         const auto l = addList("L");
         addTask(l, "future", [](Task &t) { t.startDate = day(4); });
         addTask(l, "now");
-        QCOMPARE(titles(build(list(l))), QStringList{"now"});
+        addTask(l, "starFuture", [](Task &t) { t.startDate = day(4); t.starred = true; });
+        QCOMPARE(sorted(titles(build(list(l)))), (QStringList{"future", "now", "starFuture"}));
+        QCOMPARE(sorted(titles(build(Source{Source::All}))), (QStringList{"future", "now", "starFuture"}));
+        QCOMPARE(titles(build(Source{Source::Starred})), QStringList{"starFuture"});
+        ViewOptions typed;
+        typed.search = "future";
+        QCOMPARE(sorted(titles(build(list(l), typed))), (QStringList{"future", "starFuture"}));
+        typed.search = "type: scheduled";
+        QCOMPARE(sorted(titles(build(list(l), typed))), (QStringList{"future", "starFuture"}));
         ViewOptions o;
-        o.showScheduled = true;
-        QCOMPARE(titles(build(list(l), o)).size(), 2);
+        o.hideScheduled = true;
+        QCOMPARE(titles(build(list(l), o)), QStringList{"now"});
+        QCOMPARE(titles(build(Source{Source::All}, o)), QStringList{"now"});
+        QVERIFY(titles(build(Source{Source::Starred}, o)).isEmpty());
+        // Scheduled keeps listing them, and asking for them by name wins.
+        QCOMPARE(sorted(titles(build(Source{Source::Scheduled}, o))), (QStringList{"future", "starFuture"}));
+        o.search = "type: scheduled";
+        QCOMPARE(sorted(titles(build(list(l), o))), (QStringList{"future", "starFuture"}));
+    }
+
+    void notStartedTaskInsideAProjectShows() {
+        const auto l = addList("L");
+        const auto proj = addTask(l, "proj", [](Task &t) { t.type = TaskType::Project; });
+        addTask(l, "kid", [&](Task &t) { t.parentId = proj; t.startDate = day(6); });
+        int rows = 0;
+        for (const auto &s : build(Source{Source::Project, proj}))
+            rows += s.rows.size();
+        QCOMPARE(rows, 2);  // The project and its not-started child.
+        ViewOptions o;
+        o.hideScheduled = true;
+        rows = 0;
+        for (const auto &s : build(Source{Source::Project, proj}, o))
+            rows += s.rows.size();
+        QCOMPARE(rows, 1);
+    }
+
+    void pausedStillHidesNotStartedTasks() {
+        const auto l = addList("L");
+        const auto paused = addTag("someday", true);
+        addTask(l, "pausedLater", [&](Task &t) { t.tagIds = {paused}; t.startDate = day(4); });
+        addTask(l, "later", [](Task &t) { t.startDate = day(4); });
+        QCOMPARE(titles(build(list(l))), QStringList{"later"});
     }
 
     void pausedTagHidesUnlessShowPaused() {
@@ -458,9 +507,10 @@ private slots:
         addTask(l, "paused", [&](Task &t) { t.tagIds = {paused}; });
         addTask(l, "done", [](Task &t) { t.completed = true; t.completedAt = Now; });
         const auto c = ViewBuilder(*m_store, Now, m_settings).countsForList(l);
-        QCOMPARE(c.undone, 3);  // proj, open, overdue
+        QCOMPARE(c.undone, 4);  // proj, open, overdue, scheduled
         QCOMPARE(c.overdue, 1);
         QVERIFY(!c.dueToday);
+        QCOMPARE(ViewBuilder(*m_store, Now, m_settings).countsForList(l, true).undone, 3);
     }
 
     void countsDueTodayFlag() {
@@ -480,7 +530,8 @@ private slots:
         const ViewBuilder vb(*m_store, Now, m_settings);
         QCOMPARE(vb.countsForFocus(Source::Today).undone, 2);
         QCOMPARE(vb.countsForFocus(Source::Today).overdue, 1);
-        QCOMPARE(vb.countsForFocus(Source::All).undone, 2);
+        QCOMPARE(vb.countsForFocus(Source::All).undone, 3);
+        QCOMPARE(vb.countsForFocus(Source::All, true).undone, 2);
         QCOMPARE(vb.countsForFocus(Source::Scheduled).undone, 1);
         QCOMPARE(vb.countsForFocus(Source::Done).undone, 0);
     }
@@ -592,7 +643,7 @@ private slots:
         QCOMPARE(titles(build(list(l), o)), QStringList{"voice"});
     }
 
-    void smartListHonoursCompletedAndScheduledSwitches() {
+    void smartListShowsNotStartedAndHonoursCompletedSwitch() {
         const auto l = addList("L");
         addTask(l, "open", [](Task &t) { t.priority = Priority::High; });
         addTask(l, "later", [](Task &t) { t.priority = Priority::High; t.startDate = day(5); });
@@ -602,12 +653,17 @@ private slots:
             t.completedAt = Now.addDays(-5);
         });
         const auto smart = addList("Hot", [](TaskList &sl) { sl.kind = ListKind::Smart; sl.smartQuery = "type: hiprio"; });
-        QCOMPARE(titles(build(list(smart))), QStringList{"open"});
+        // Not-started tasks always show in a Smart List; the stored
+        // include-scheduled flag is read and ignored.
+        QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"later", "open"}));
 
         TaskList sl = m_store->list(smart);
         sl.includeScheduled = true;
         storeList(sl);
         QCOMPARE(sorted(titles(build(list(smart)))), (QStringList{"later", "open"}));
+        ViewOptions hide;
+        hide.hideScheduled = true;
+        QCOMPARE(titles(build(list(smart), hide)), QStringList{"open"});
 
         sl.completedMode = 1;
         storeList(sl);

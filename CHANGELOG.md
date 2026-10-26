@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Not-started tasks stay visible
+
+- A future start date no longer hides a task. Not-started tasks now show in
+  their list, inside projects and checklists, in All, in Starred, in search
+  results and in Smart Lists, with a muted "Starts 11 Mar" mark (with the year
+  when it is not this year). A screen reader hears "starts 11 March".
+- Today and My Day work as before: a task joins them on its start day.
+  Scheduled still lists what is coming up, and `type: scheduled` still finds it.
+- Sidebar and Smart List counts include not-started tasks wherever the list
+  shows them. Today's count is unchanged.
+- Ctrl+K now hides not-started tasks (it showed them before) and is off by
+  default; the clock button in the sort bar does the same. Your own Ctrl+K
+  binding carries over. Ctrl+Shift+K is now a second binding for Show paused.
+- Smart Lists no longer have an Include scheduled option, since they always
+  show not-started tasks. Existing Smart Lists and sync keep working.
+- `frfx ls` and the scripting interface list not-started tasks too, with their
+  start date.
+
 ## 1.0.4 (2026-10-25)
 
 ### Abandon a task

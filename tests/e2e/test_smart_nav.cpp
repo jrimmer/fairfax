@@ -163,9 +163,8 @@ private slots:
         QVERIFY(listMenu(app, work, "Edit Search…"));
         QTRY_VERIFY_WITH_TIMEOUT(builderOpen(), 5000);
         QVERIFY(pressBuilder("completedInclude"));
-        QVERIFY(pressBuilder("searchScheduledInclude"));
         QVERIFY(pressBuilder("updateButton"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.store().list(work).completedMode == 1 && app.store().list(work).includeScheduled, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(app.store().list(work).completedMode == 1, 5000);
         // One built from the sheet with a date range.
         QVERIFY(pane(app, "all"));
         QVERIFY(openBuilder(app));
@@ -207,7 +206,6 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(smartRowNames(again), names, 4000);
         QCOMPARE(again.store().list(work).smartQuery, QString("lists: Work"));
         QCOMPARE(again.store().list(work).completedMode, 1);
-        QVERIFY(again.store().list(work).includeScheduled);
         QCOMPARE(again.store().list(soon).smartRange, QString("next:3:d"));
         QCOMPARE(again.store().list(soon).smartQuery, QString("type: hiprio OR medprio"));
         QCOMPARE(again.store().list(star).name, QString("Stars"));

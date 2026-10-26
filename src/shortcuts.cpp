@@ -17,6 +17,18 @@ const QString kQuickGroup = QStringLiteral("Quick Entry");
 
 QString settingKey(const QString &id) { return QStringLiteral("shortcuts.") + id; }
 
+// Ids that were renamed or folded into another command: what a user saved
+// under the old id keeps working. "Show scheduled" (Ctrl+K) became "Hide
+// not-started tasks"; "Show scheduled & paused" (Ctrl+Shift+K) became a second
+// binding of "Show paused".
+QString legacyId(const QString &id) {
+    if (id == QLatin1String("view.hideScheduled"))
+        return QStringLiteral("view.showScheduled");
+    if (id == QLatin1String("view.showPaused"))
+        return QStringLiteral("view.showScheduledAndPaused");
+    return {};
+}
+
 // The default binding list is written as the overlay and the README spell it;
 // it is parsed with fromString so a typo is caught by the tests.
 QStringList seqs(std::initializer_list<const char *> list) {
@@ -152,9 +164,8 @@ QList<Command> buildCommands() {
     // Both are remappable in the View group like the rest.
     add("view.askEnglish", "View", "Ask in plain English…", {"Ctrl+Shift+E"});
     add("view.searchScope", "View", "Search scope", {"Ctrl+Alt+F"});
-    add("view.showScheduled", "View", "Show scheduled", {"Ctrl+K"});
-    add("view.showPaused", "View", "Show paused", {"Ctrl+U"});
-    add("view.showScheduledAndPaused", "View", "Show scheduled & paused", {"Ctrl+Shift+K"});
+    add("view.hideScheduled", "View", "Hide not-started tasks", {"Ctrl+K"});
+    add("view.showPaused", "View", "Show paused", {"Ctrl+U", "Ctrl+Shift+K"});
     add("view.hideCompleted", "View", "Hide completed", {"Ctrl+O"});
     add("view.project", "View", "Project view", {"Ctrl+Alt+J"});
     add("view.listsPanel", "View", "Lists panel", {"Ctrl+Alt+Left"});
@@ -266,7 +277,24 @@ QStringList current(const Store &store, const QString &id) {
     const Command *cmd = command(id);
     if (!cmd)
         return {};
-    const QVariant stored = store.setting(settingKey(id));
+    QVariant stored = store.setting(settingKey(id));
+    const QString legacy = legacyId(id);
+    if ((!stored.isValid() || stored.isNull()) && !legacy.isEmpty()) {
+        const QVariant old = store.setting(settingKey(legacy));
+        if (old.isValid() && !old.isNull()) {
+            if (id == QLatin1String("view.hideScheduled")) {
+                stored = old;
+            } else {
+                // Show paused keeps its own default and takes whatever the
+                // user had given the old combined command as its extra binding.
+                QStringList out = cmd->defaults.mid(0, 1);
+                for (const QKeySequence &s : QKeySequence::listFromString(old.toString(), QKeySequence::PortableText))
+                    if (!s.isEmpty() && !out.contains(s.toString(QKeySequence::PortableText)))
+                        out << s.toString(QKeySequence::PortableText);
+                return out;
+            }
+        }
+    }
     if (!stored.isValid() || stored.isNull())
         return cmd->defaults;  // Never changed.
     QStringList out;
@@ -287,12 +315,16 @@ void set(Store &store, const QString &id, const QStringList &sequences) {
                                           QKeySequence::PortableText));
 }
 
-void reset(Store &store, const QString &id) { store.removeSetting(settingKey(id)); }
+void reset(Store &store, const QString &id) {
+    store.removeSetting(settingKey(id));
+    const QString legacy = legacyId(id);
+    if (!legacy.isEmpty())
+        store.removeSetting(settingKey(legacy));
+}
 
 void resetAll(Store &store) {
     for (const Command &c : commands())
-        if (store.setting(settingKey(c.id)).isValid())
-            store.removeSetting(settingKey(c.id));
+        reset(store, c.id);
 }
 
 QString conflict(const Store &store, const QString &id, const QString &sequence) {

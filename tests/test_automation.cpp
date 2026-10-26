@@ -230,6 +230,12 @@ private slots:
         QCOMPARE(ok("query_tasks", {{"focus", "starred"}})["total_count"].toInt(), 1);
         QCOMPARE(ok("query_tasks", {{"focus", "scheduled"}})["total_count"].toInt(), 1);
         QCOMPARE(ok("query_tasks", {{"focus", "done"}})["total_count"].toInt(), 1);
+        // Not-started tasks are returned by default, with their start date.
+        QCOMPARE(ok("query_tasks", {{"focus", "all"}})["total_count"].toInt(), 4);
+        const auto future = ok("query_tasks", {{"search", "future"}})["tasks"].toArray();
+        QCOMPARE(future.size(), 1);
+        QCOMPARE(future.first().toObject()["start_date"].toString(), "2026-09-01");
+        QVERIFY(future.first().toObject()["scheduled"].toBool());
         QCOMPARE(ok("query_tasks", {{"focus", "today"}})["total_count"].toInt(), 1);  // The overdue invoice.
         const auto page = ok("query_tasks", {{"limit", 2}, {"offset", 1}});
         QCOMPARE(page["item_count"].toInt(), 2);

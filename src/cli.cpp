@@ -85,6 +85,8 @@ QString line(const Store &store, const Task &t, const QDateTime &now, const Sche
         const QString due = Schedule::friendlyDateTime(t.dueDate, t.dueTime, now.date());
         extra << paint(due, overdue ? "31" : t.dueDate == now.date() ? "34" : "2");
     }
+    if (!t.completed && Schedule::isScheduled(t, now))
+        extra << paint(QStringLiteral("starts ") + Schedule::friendlyDate(t.startDate, now.date(), false), "2");
     if (t.priority > 0) extra << paint(QString(t.priority, '!'), t.priority == 3 ? "31" : "33");
     if (t.starred) extra << paint("★", "33");
     if (t.recurrence.isSet()) extra << paint("↻", "2");

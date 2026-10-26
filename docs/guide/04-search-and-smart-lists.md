@@ -74,7 +74,7 @@ Words search a task's title, its notes and its tags.
 | `type: note` | Tasks that have notes |
 | `type: duration` | Tasks with a duration |
 | `type: inprogress` | Started and not yet done |
-| `type: scheduled` | Tasks hidden until their start date |
+| `type: scheduled` | Tasks that have not started yet (a future start date) |
 | `type: paused` | Tasks hidden by a paused tag or place |
 | `type: donetoday` | Finished today (also `doneyesterday`, `donethisweek`) |
 | `type: completed` | Tasks you finished, not the abandoned ones |
@@ -102,8 +102,11 @@ A few notes:
 - `lists:`, `groups:` and `completed:` always search every list, and `completed:`
   or `type: donetoday` find finished tasks, as do `type: completed` and
   `type: abandoned`. In *Done*, those two narrow the list to one kind.
-- Scheduled and paused tasks are hidden from normal views. `type: scheduled` and
-  `type: paused` find them anyway.
+- Tasks that have not started yet (a future start date) show in lists, searches and
+  Smart Lists with a "Starts 11 Mar" mark. `type: scheduled` narrows a search to just
+  those, and **Ctrl+K** hides them from every view until you press it again.
+- Paused tasks are hidden from normal views. `type: paused` finds them anyway, and
+  **Ctrl+U** shows them.
 
 ## Build a search with the rule builder
 
@@ -126,8 +129,7 @@ The builder has sections, top to bottom:
   and *exclude*.
 - **Groups.** Combine whole filters, such as `tags: home OR type: starred`, and say
   whether each group is joined by *and*, *or* or *not*.
-- **Search scope.** **This list** or **All lists**, and whether to include
-  *Scheduled* tasks.
+- **Search scope.** **This list** or **All lists**.
 - **Within the last.** Modified, Created and Completed, each as a number and a unit.
 - **Sounds like.** A switch near the top that also matches words that sound alike.
   It is remembered.
@@ -164,7 +166,6 @@ what a plain search cannot:
   years* (a window that moves with today), or *no due date*.
 - **Completed.** Follow the usual setting, or always include or exclude finished
   tasks.
-- **Include scheduled.** Whether tasks that are waiting for a start date count.
 
 For example, "high priority, due in the next 2 weeks" is a Smart List with
 `type: hiprio` and a range of *next 2 weeks*. A Smart List with a range moves

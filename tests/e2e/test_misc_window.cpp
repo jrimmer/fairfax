@@ -543,7 +543,7 @@ private slots:
         QVERIFY(closeEditor(app));
     }
 
-    // The clock button beside the sort shows scheduled tasks (Ctrl+K), and the
+    // The clock button beside the sort hides not-started tasks (Ctrl+K), and the
     // Focus Filter's sun and its conditions narrow the list; each remembers
     // its state per list.
     void scheduledButtonAndFocusFilter() {
@@ -553,18 +553,20 @@ private slots:
         QVERIFY(app.openSource(lk(mw().sorting)));
         QVERIFY(setSeparated(app, false));
         QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 5000);
-        // Hide one task by scheduling it: the clock appears.
+        QVERIFY(!findItem("hideScheduledButton"));
+        // Not starting one task until later keeps it in the list; the clock appears.
         prep(app, mw().delta, [](Task &t) { t.startDate = day(6); });
-        QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 4, 5000);
-        QQuickItem *clock = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((clock = findItem("showScheduledButton")) != nullptr, 5000);
-        click(clock);
         QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 5000);
-        QVERIFY(app.backend().showScheduled());
-        click(findItem("showScheduledButton"));
+        QQuickItem *clock = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((clock = findItem("hideScheduledButton")) != nullptr, 5000);
+        click(clock);
         QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 4, 5000);
+        QVERIFY(app.backend().hideScheduled());
+        click(findItem("hideScheduledButton"));
+        QTRY_COMPARE_WITH_TIMEOUT(orderNow().size(), 5, 5000);
+        QVERIFY(!app.backend().hideScheduled());
         prep(app, mw().delta, [](Task &t) { t.startDate = QDate(); });
-        QTRY_VERIFY_WITH_TIMEOUT(!findItem("showScheduledButton"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!findItem("hideScheduledButton"), 5000);
 
         // Focus Filter: the sun turns it on, starting from Overdue and Today.
         QVERIFY(!app.backend().focusOn());

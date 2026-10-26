@@ -58,7 +58,7 @@ private slots:
         closeMenus(app);
         closeBuilder(app);
         escapeSearch(app);
-        showScheduled(app, false);
+        hideScheduled(app, false);
         app.store().setSetting("search.inheritInProject", false);
         if (app.backend().searchAllLists())
             app.backend().setSearchAllLists(false);
@@ -143,8 +143,8 @@ private slots:
         SMART_SHOWS(app, specTitles([](const Spec &s) { return shownInAll(s) && s.list == "Garden"; }));
     }
 
-    // Search Options offers a This List / All Lists scope and an Include
-    // Scheduled checkbox.
+    // Search Options offers a This List / All Lists scope. Not-started tasks
+    // show in the results, and Ctrl+K hides them.
     void searchOptionsScopeAndScheduled() {
         App &app = *m_app;
         QVERIFY(pane(app, lk(listId("Work"))));
@@ -152,15 +152,15 @@ private slots:
         app.press(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier);
         QVERIFY(pressBuilder("scopeAll"));
         QTRY_VERIFY_WITH_TIMEOUT(app.backend().searchAllLists(), 5000);
-        // "Starts in 3 due in 5" belongs to Website and is scheduled; "Starts
-        // tomorrow" is scheduled too: hidden until Include is chosen.
-        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Starts today"}), 5000);
-        QVERIFY(pressBuilder("searchScheduledInclude"));
-        QTRY_VERIFY_WITH_TIMEOUT(app.backend().showScheduled(), 5000);
+        // "Starts in 3 due in 5" belongs to Website and "Starts tomorrow" is
+        // not started: both show, until Ctrl+K hides them. The sheet has no
+        // scheduled switch any more.
         QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), sorted(SL{"Starts today", "Starts tomorrow", "Starts in 3 due in 5"}), 5000);
-        QVERIFY(pressBuilder("searchScheduledHide"));
-        QTRY_VERIFY_WITH_TIMEOUT(!app.backend().showScheduled(), 5000);
+        QVERIFY(!findItem("searchScheduledInclude") && !findItem("searchScheduledHide"));
+        QVERIFY(hideScheduled(app, true));
         QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), (SL{"Starts today"}), 5000);
+        QVERIFY(hideScheduled(app, false));
+        QTRY_COMPARE_WITH_TIMEOUT(paneTitles(app), sorted(SL{"Starts today", "Starts tomorrow", "Starts in 3 due in 5"}), 5000);
         QVERIFY(pressBuilder("scopeThis"));
         QTRY_VERIFY_WITH_TIMEOUT(!app.backend().searchAllLists(), 5000);
         QVERIFY(closeBuilder(app));
