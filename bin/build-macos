@@ -171,6 +171,9 @@ plist "Add :CFBundleVersion string $VERSION"
 
 # Bundle the Qt frameworks and plugins
 step "Running macdeployqt" macdeployqt "$APP" -qmldir="$ROOT/src/qml"
+# Fairfax only uses SQLite; the other SQL drivers link against client
+# libraries that are not in the bundle, and would only get in the way of signing.
+find "$APP/Contents/PlugIns/sqldrivers" -type f ! -name 'libqsqlite*' -delete 2>/dev/null || true
 
 # Sign
 SIGNED="unsigned"

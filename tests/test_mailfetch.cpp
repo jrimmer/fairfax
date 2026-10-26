@@ -13,7 +13,7 @@
 #include "testregistry.h"
 
 // The Mail to Fairfax connector against a fake IMAP server (tests/fakeimap.h),
-// with the keyring in memory (tests/main.cpp) and the OAuth HTTP calls through
+// with the keyring in memory (tests/test_main.cpp) and the OAuth HTTP calls through
 // MailFetch::setHttpTransport. Nothing here touches the network beyond the
 // loopback, or the real keyring.
 
