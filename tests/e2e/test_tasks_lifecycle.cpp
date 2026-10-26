@@ -307,8 +307,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(sectionOf(id), QString("nodue"), 5000);
     }
 
-    // "Schedule" sets the start date: a future start hides the task from the
-    // list into Scheduled until it begins; "No Start Date" brings it back.
+    // "Schedule" sets the start date: a future start marks the task as not
+    // started (it stays in the list and is gathered in Scheduled); "No Start
+    // Date" clears the mark.
     void scheduleMenuEntries() {
         App app;
         QVERIFY(app.ok);
@@ -323,7 +324,8 @@ private slots:
         QVERIFY(contextMenuOn(app, id));
         QVERIFY(clickSub("Schedule", "In 3 Days"));
         QTRY_COMPARE_WITH_TIMEOUT(app.task(id).startDate, today.addDays(3), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(rowGone(app, id), 5000);        // Scheduled: hidden from Home.
+        QTRY_VERIFY_WITH_TIMEOUT(rowVisible(app, id), 5000);     // Not started: still in Home, marked.
+        QTRY_VERIFY_WITH_TIMEOUT(badge("rowStart", id), 5000);
 
         app.press(Qt::Key_4, Qt::ControlModifier);
         QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("scheduled"), 5000);
@@ -485,7 +487,7 @@ private slots:
 
     // Rows move between Overdue, the day sections and No Due Date as the due
     // date changes (bare keys T and Y, Alt+[ to clear), and a start date moves a
-    // task out to Scheduled.
+    // task out of Today into Scheduled.
     void rowsMoveBetweenSections() {
         App app;
         QVERIFY(app.ok);

@@ -41,7 +41,7 @@ private slots:
             QList<qint64> shown, hidden;
         };
         const QList<Case> cases = {
-            {"all", Qt::Key_1, "All", {s.buyMilk, s.electricity, s.report, w.stamps, w.cables, w.triage}, {s.oldThing, w.trip}},
+            {"all", Qt::Key_1, "All", {s.buyMilk, s.electricity, s.report, w.stamps, w.cables, w.triage, w.trip}, {s.oldThing}},
             {"today", Qt::Key_2, "Today", {s.buyMilk, w.cables}, {s.report, s.studio, s.shelf, w.parcel}},
             {"starred", Qt::Key_3, "Starred", {s.shelf}, {s.buyMilk, s.report}},
             {"scheduled", Qt::Key_4, "Scheduled", {w.trip}, {s.buyMilk, s.report, s.shelf}},
@@ -100,8 +100,9 @@ private slots:
             for (qint64 id : c.hidden)
                 QVERIFY2(!shows(app, id), qPrintable(QString("%1 should not show %2").arg(c.title, app.task(id).title)));
         }
-        // A scheduled task stays out of its list until it starts.
-        QVERIFY(!shows(app, w.trip));
+        // A not-started task shows in All (marked "Starts ...") and in Scheduled, not in Today.
+        QVERIFY(pane(app, "all"));
+        QTRY_VERIFY_WITH_TIMEOUT(shows(app, w.trip), 5000);
         // Completed ones show in the list (within the window) as well as in Done.
         QVERIFY(pane(app, lk(s.work)));
         QTRY_VERIFY_WITH_TIMEOUT(shows(app, s.oldThing), 5000);

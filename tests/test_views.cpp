@@ -853,17 +853,20 @@ private slots:
         QCOMPARE(seen, (QStringList{"P", "noted", "plain"}));
     }
 
-    void sortingByStartDateRevealsScheduled() {
+    void sortingByStartDateOrdersNotStartedTasks() {
         const auto l = addList("L");
         addTask(l, "visible");
         addTask(l, "later", [](Task &t) { t.startDate = day(5); });
-        QCOMPARE(titles(build(list(l))), QStringList{"visible"});
+        addTask(l, "soon", [](Task &t) { t.startDate = day(2); });
         SortSpec byStart;
         byStart.field = SortField::StartDate;
         const auto shown = titles(build(list(l), {}, byStart));
-        QCOMPARE(sorted(shown), (QStringList{"later", "visible"}));
-        // Focus lists keep hiding them.
-        QVERIFY(!titles(build(Source{Source::All}, {}, byStart)).contains("later"));
+        QCOMPARE(sorted(shown), (QStringList{"later", "soon", "visible"}));
+        QVERIFY(shown.indexOf("soon") < shown.indexOf("later"));
+        // Hiding not-started tasks still applies when sorting by start date.
+        ViewOptions hide;
+        hide.hideScheduled = true;
+        QCOMPARE(titles(build(list(l), hide, byStart)), QStringList{"visible"});
     }
 
     // ---- settings that change what the views show ----

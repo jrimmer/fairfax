@@ -139,6 +139,26 @@ private slots:
         QCOMPARE(Shortcuts::current(*s, "view.today"), Shortcuts::command("view.today")->defaults);
     }
 
+    // "Show scheduled" (Ctrl+K) became "Hide not-started tasks", and "Show
+    // scheduled & paused" (Ctrl+Shift+K) a second binding of "Show paused":
+    // what a user saved under the old ids keeps working.
+    void renamedShortcutsKeepSavedBindings() {
+        auto s = open("legacy");
+        QCOMPARE(Shortcuts::current(*s, "view.hideScheduled"), QStringList{"Ctrl+K"});
+        QCOMPARE(Shortcuts::current(*s, "view.showPaused"), (QStringList{"Ctrl+U", "Ctrl+Shift+K"}));
+        QVERIFY(!Shortcuts::command("view.showScheduled") && !Shortcuts::command("view.showScheduledAndPaused"));
+        Shortcuts::set(*s, "view.showScheduled", {"Ctrl+Alt+K"});
+        Shortcuts::set(*s, "view.showScheduledAndPaused", {"Ctrl+Alt+P"});
+        QCOMPARE(Shortcuts::current(*s, "view.hideScheduled"), QStringList{"Ctrl+Alt+K"});
+        QCOMPARE(Shortcuts::current(*s, "view.showPaused"), (QStringList{"Ctrl+U", "Ctrl+Alt+P"}));
+        // A binding saved under the new id wins; reset clears the old key too.
+        Shortcuts::set(*s, "view.hideScheduled", {"Ctrl+Alt+H"});
+        QCOMPARE(Shortcuts::current(*s, "view.hideScheduled"), QStringList{"Ctrl+Alt+H"});
+        Shortcuts::resetAll(*s);
+        QCOMPARE(Shortcuts::current(*s, "view.hideScheduled"), QStringList{"Ctrl+K"});
+        QCOMPARE(Shortcuts::current(*s, "view.showPaused"), (QStringList{"Ctrl+U", "Ctrl+Shift+K"}));
+    }
+
     void conflictRules() {
         auto s = open("conflict");
         // App against App.
