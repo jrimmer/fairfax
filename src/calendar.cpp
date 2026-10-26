@@ -674,15 +674,22 @@ QVariantMap headline(const QVariantList &today, int nowMinute, bool *ongoing) {
 
 }  // namespace
 
-QString CalendarFeed::caption() const {
+QString CalendarFeed::captionText(bool shortForm) const {
     const QVariantList events = today();
     if (events.isEmpty()) return QStringLiteral("No events today");
     bool ongoing = false;
     const QVariantMap e = headline(events, nowMinute(), &ongoing);
     if (e.isEmpty()) return QStringLiteral("No more events today");
-    return ongoing ? QStringLiteral("%1 · ongoing until %2").arg(e.value(QStringLiteral("title")).toString(), clockText(e.value(QStringLiteral("end")).toInt()))
-                   : QStringLiteral("%1 · upcoming %2").arg(e.value(QStringLiteral("title")).toString(), clockText(e.value(QStringLiteral("start")).toInt()));
+    const QString title = e.value(QStringLiteral("title")).toString();
+    if (ongoing)
+        return QStringLiteral("%1 · %2%3").arg(title, shortForm ? QStringLiteral("until ") : QStringLiteral("ongoing until "), clockText(e.value(QStringLiteral("end")).toInt()));
+    return QStringLiteral("%1 · %2%3").arg(title, shortForm ? QString() : QStringLiteral("upcoming "), clockText(e.value(QStringLiteral("start")).toInt()));
 }
+
+QString CalendarFeed::caption() const { return captionText(false); }
+
+// The caption without its leading status word, for a narrow Day panel.
+QString CalendarFeed::captionShort() const { return captionText(true); }
 
 QColor CalendarFeed::captionColor() const {
     bool ongoing = false;
