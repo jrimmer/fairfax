@@ -110,7 +110,15 @@ QColor Theme::color(const QString &name) const {
     return it != m_colors.cend() ? *it : fallbackColors().value(name, QColor("#888888"));
 }
 
+void Theme::overrideScheme(const QString &scheme) {
+    m_schemeOverridden = false;
+    setScheme(scheme);
+    m_schemeOverridden = true;
+}
+
 void Theme::setScheme(const QString &scheme) {
+    if (m_schemeOverridden)
+        return;
     const QString next = scheme == "dark" || scheme == "light" ? scheme : QStringLiteral("system");
     if (next == m_scheme)
         return;

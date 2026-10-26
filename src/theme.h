@@ -50,6 +50,9 @@ public:
     bool dark() const { return m_scheme == "dark" ? true : m_scheme == "light" ? false : m_dark; }
     QString scheme() const { return m_scheme; }
     void setScheme(const QString &scheme);
+    // Pins the scheme for this run (--scheme): later setScheme calls, such as
+    // the Appearance setting being applied, no longer change it.
+    void overrideScheme(const QString &scheme);
     QColor accent() const { return color("accent"); }
     QColor accentForeground() const;
     QColor background() const { return color("background"); }
@@ -92,6 +95,7 @@ private:
     QHash<QString, QColor> m_colors;
     bool m_dark = true;  // What the Omarchy theme itself is.
     QString m_scheme = "system";
+    bool m_schemeOverridden = false;
     QFileSystemWatcher m_watcher;
     QTimer m_debounce;
 };

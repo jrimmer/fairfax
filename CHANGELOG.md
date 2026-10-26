@@ -38,6 +38,8 @@
 - Long menus (the task menu, lists, sidebar, sorting, search presets, tags and
   lists in the editor and Quick Entry) can be scrolled in a short window
   without jumping back to the top.
+- `--scheme dark` or `--scheme light` (for screenshots) now holds; the
+  Appearance setting used to switch it back as the app started.
 - The task menu no longer has a blank band above Star when model suggestions
   are off; hidden entries (here and in the Inbox, search and place menus) take
   no room.

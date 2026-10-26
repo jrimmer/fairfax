@@ -511,7 +511,7 @@ int main(int argc, char *argv[]) {
     Sounds &sounds = services.sounds;
     CalendarFeed &calendar = services.calendar;
     if (cli.isSet(schemeOption))
-        theme.setScheme(cli.value(schemeOption));
+        theme.overrideScheme(cli.value(schemeOption));
 
     // The same command set scripts and Claude use, wired to this window.
     Automation automation(store);
