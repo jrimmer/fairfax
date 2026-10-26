@@ -284,6 +284,72 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(dayBar() != nullptr, 5000);
     }
 
+    // In a narrow panel the caption shortens instead of running under the day arrows,
+    // and the expand chevron stays visible.
+    void dayBarCaptionStaysLeftOfDayArrows() {
+        QTemporaryDir dir;
+        App app;
+        QVERIFY(app.ok);
+        const QString path = writeCalendar(dir.path());
+        app.services().calendar.setClock([] { return QDateTime(QDate::currentDate(), QTime(8, 0)); });
+        app.press(Qt::Key_2, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(app.backend().sourceKey(), QString("today"), 5000);
+        app.services().calendar.setSources({path});
+        QQuickItem *bar = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((bar = dayBar()) != nullptr, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(bar->property("captionText").toString().startsWith("Standup · upcoming"), 5000);
+        QQuickItem *caption = findItem("dayBarCaption");
+        QQuickItem *chevron = findItem("dayBarChevron");
+        QQuickItem *prev = findItem("dayBarStep:-1");
+        QQuickItem *name = findItem("dayBarName");
+        QQuickItem *muted = findItem("dayBarMuted");
+        QVERIFY(caption && chevron && prev && name && muted);
+        auto right = [&](QQuickItem *i) { return bar->mapFromItem(i, QPointF(i->width(), 0)).x(); };
+        auto mutedText = [&] { return muted->property("text").toString(); };
+
+        // Plenty of room: the full text.
+        auto elided = [](QQuickItem *text) { return text->width() < text->implicitWidth() - 0.5; };
+        bar->setWidth(600);
+        settleLayout(bar);
+        QTRY_COMPARE_WITH_TIMEOUT(mutedText(), QString("upcoming 10 AM"), 5000);
+        QVERIFY(!elided(name) && !elided(muted));
+
+        // Narrowing: the status word goes first, with the name and the time intact.
+        bool sawShort = false;
+        for (int w = 600; w >= 170; w -= 2) {
+            bar->setWidth(w);
+            settleLayout(bar);
+            QVERIFY2(right(caption) <= bar->mapFromItem(prev, QPointF(0, 0)).x(), qPrintable(QString::number(w)));
+            QVERIFY(chevron->isVisible() && chevron->width() > 0 && right(chevron) <= right(caption) + 0.5);
+            QVERIFY2(name->isVisible() && name->width() > 0, qPrintable(QString::number(w)));
+            if (mutedText() == "10 AM" && !elided(name) && !elided(muted))
+                sawShort = true;
+            if (mutedText() == "upcoming 10 AM")
+                QVERIFY2(!elided(name) && !elided(muted), qPrintable(QString::number(w)));
+        }
+        QVERIFY2(sawShort, "never showed the short form with the name and time intact");
+
+        // At 170 pixels the name has shortened but never disappears.
+        bar->setWidth(170);
+        settleLayout(bar);
+        QVERIFY(name->isVisible() && name->width() >= 20);
+        QVERIFY(right(caption) <= bar->mapFromItem(prev, QPointF(0, 0)).x());
+
+        // Another day, with the Today link showing: the date keeps its full width, and
+        // the muted part gives way (or goes) instead.
+        bar->setProperty("dayOffset", 3);
+        QQuickItem *today = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((today = findItem("dayBarToday")) != nullptr && today->isVisible(), 5000);
+        for (int w = 300; w >= 210; w -= 10) {
+            bar->setWidth(w);
+            settleLayout(bar);
+            QVERIFY2(!elided(name) && name->width() > 0, qPrintable(QString::number(w)));
+            QVERIFY2(right(caption) <= bar->mapFromItem(today, QPointF(0, 0)).x(), qPrintable(QString::number(w)));
+            QVERIFY(chevron->isVisible() && right(chevron) <= right(caption) + 0.5);
+            QVERIFY2(!muted->isVisible() || muted->width() > 0, qPrintable(QString::number(w)));
+        }
+    }
+
     // "Drag a task onto the bar to block out time for it": dropped on the hour grid it
     // is due when the block ends, takes the block's half hour, and is dated today.
     void dayBarTimeBlocksADroppedTask() {

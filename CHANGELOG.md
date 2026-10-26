@@ -20,6 +20,12 @@
 - `frfx ls` and the scripting interface list not-started tasks too, with their
   start date.
 
+### Fixes
+
+- The Day panel's next-event line no longer runs under the day arrows in a
+  narrow panel: "upcoming 3 PM" first shrinks to "3 PM", then the event name
+  shortens with an ellipsis, and the expand chevron stays visible.
+
 ## 1.0.4 (2026-10-25)
 
 ### Abandon a task

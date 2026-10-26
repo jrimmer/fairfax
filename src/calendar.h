@@ -99,6 +99,7 @@ class CalendarFeed : public QObject {
     Q_PROPERTY(QVariantList sourceInfo READ sourceInfo NOTIFY sourceInfoChanged)
     Q_PROPERTY(QVariantList today READ today NOTIFY changed)
     Q_PROPERTY(QString caption READ caption NOTIFY changed)
+    Q_PROPERTY(QString captionShort READ captionShort NOTIFY changed)
     Q_PROPERTY(QColor captionColor READ captionColor NOTIFY changed)
     Q_PROPERTY(int nowMinute READ nowMinute NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -125,6 +126,7 @@ public:
     QVariantList sourceInfo() const;
     QVariantList today() const;
     QString caption() const;
+    QString captionShort() const;
     QColor captionColor() const;
     int nowMinute() const;
     QString error() const;
@@ -155,6 +157,7 @@ signals:
     void errorChanged();
 
 private:
+    QString captionText(bool shortForm) const;
     QDateTime now() const;
     QList<Ics::Component> components() const;
     QVariantList eventMaps(const QDate &day) const;

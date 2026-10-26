@@ -40,6 +40,8 @@ Item {
         const name = dayOffset === 1 ? "Tomorrow" : dayOffset === -1 ? "Yesterday" : Qt.formatDate(shownDate, "ddd, MMM d")
         return name + " · " + (n === 0 ? "no events" : n === 1 ? "1 event" : n + " events")
     }
+    // The same caption without its status word, for a narrow panel.
+    readonly property string captionShort: calendar && dayOffset === 0 ? calendar.captionShort : captionText
     property var detailEvent: null
 
     // Show 7:00-22:00 unless an event falls outside it, so a late meeting is
@@ -188,12 +190,40 @@ Item {
 
         // Caption: what is next (or on now), with the expand chevron.
         Item {
+            id: captionItem
             width: parent.width
             height: 20
 
             readonly property int sep: root.captionText.indexOf(" · ")
+            // The caption stops short of the day arrows. As room shrinks the muted
+            // part drops its status word ("upcoming 3 PM" becomes "3 PM"), then the
+            // event name shortens (never below a few letters), then the muted part
+            // does; the chevron always stays. On another day the date keeps its
+            // width and only the muted part gives way, hidden if even "…" won't fit.
+            readonly property real textRoom: Math.max(0, width - stepRow.width - 8 - (sep >= 0 ? 38 : 18))
+            readonly property string mutedFull: sep >= 0 ? root.captionText.substring(sep + 3) : root.captionText
+            readonly property string mutedShort: sep >= 0 ? root.captionShort.substring(root.captionShort.indexOf(" · ") + 3) : root.captionText
+            // Measured widths, rounded up with a pixel of slack: Text elides a string
+            // that is a hair wider than its box, so an exact fit would still elide.
+            readonly property real nameFit: Math.ceil(nameMetrics.width) + 1
+            readonly property real fullFit: Math.ceil(fullMetrics.width) + 1
+            readonly property real shortFit: Math.ceil(shortMetrics.width) + 1
+            readonly property real minNameFit: Math.ceil(minNameMetrics.width)
+            readonly property bool useShort: sep >= 0 && nameFit + fullFit > textRoom
+            readonly property real mutedNatural: useShort ? shortFit : fullFit
+            readonly property real nameWidth: sep < 0 ? 0 : root.isToday ? Math.min(nameFit, textRoom, Math.max(minNameFit, textRoom - mutedNatural))
+                                                                         : Math.min(nameFit, textRoom)
+            readonly property real mutedWidth: Math.min(mutedNatural, Math.max(0, textRoom - nameWidth))
+            readonly property bool mutedShown: root.isToday || mutedWidth >= Math.ceil(ellipsisMetrics.width)
+
+            TextMetrics { id: nameMetrics; font.pixelSize: root.pointSize; font.weight: Font.DemiBold; text: nameText.text }
+            TextMetrics { id: minNameMetrics; font: nameMetrics.font; text: nameText.text.substring(0, 4) + "…" }
+            TextMetrics { id: fullMetrics; font.pixelSize: root.pointSize; text: captionItem.mutedFull }
+            TextMetrics { id: shortMetrics; font.pixelSize: root.pointSize; text: captionItem.mutedShort }
+            TextMetrics { id: ellipsisMetrics; font.pixelSize: root.pointSize; text: "…" }
 
             Row {
+                objectName: "dayBarCaption"
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
                 Rectangle {
@@ -203,18 +233,28 @@ Item {
                     color: calendar && root.isToday && calendar.captionColor.valid ? calendar.captionColor : theme.accent
                 }
                 Text {
+                    id: nameText
+                    objectName: "dayBarName"
                     visible: parent.parent.sep >= 0
+                    width: parent.parent.nameWidth
+                    elide: Text.ElideRight
                     text: root.captionText.substring(0, parent.parent.sep)
                     color: theme.foreground
                     font.pixelSize: root.pointSize
                     font.weight: Font.DemiBold
                 }
                 Text {
-                    text: parent.parent.sep >= 0 ? root.captionText.substring(parent.parent.sep + 3) : root.captionText
+                    id: mutedText
+                    objectName: "dayBarMuted"
+                    visible: parent.parent.mutedShown
+                    width: parent.parent.mutedWidth
+                    elide: Text.ElideRight
+                    text: parent.parent.useShort ? parent.parent.mutedShort : parent.parent.mutedFull
                     color: theme.muted
                     font.pixelSize: root.pointSize
                 }
                 Icon {
+                    objectName: "dayBarChevron"
                     anchors.verticalCenter: parent.verticalCenter
                     name: "chevronDown"
                     size: 12
@@ -231,6 +271,7 @@ Item {
 
             // Browse other days: a "Today" link appears once away from today.
             Row {
+                id: stepRow
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
