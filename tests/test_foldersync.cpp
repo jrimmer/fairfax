@@ -102,7 +102,7 @@ private:
             QByteArray xml = "<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\">";
             auto entry = [&](const QString &href, bool collection, const QByteArray &etag, int size) {
                 xml += "<d:response><d:href>" + QUrl::toPercentEncoding(href, "/") + "</d:href><d:propstat><d:prop>";
-                xml += collection ? "<d:resourcetype><d:collection/></d:resourcetype>"
+                xml += collection ? QByteArray("<d:resourcetype><d:collection/></d:resourcetype>")
                                   : "<d:getetag>" + etag + "</d:getetag><d:getcontentlength>" + QByteArray::number(size) +
                                         "</d:getcontentlength><d:resourcetype/>";
                 xml += "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
