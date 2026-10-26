@@ -30,7 +30,10 @@ permissions:
   contents: read
 
 env:
-  QT_VERSION: "6.12.0"
+  # Windows stays on 6.10 until aqtinstall can read the newer Windows
+  # repository layout (6.11 and later fail with "Failed to locate XML data").
+  QT_VERSION_MACOS: "6.12.0"
+  QT_VERSION_WINDOWS: "6.10.3"
 
 jobs:
   macos:
@@ -48,7 +51,7 @@ jobs:
 
       - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
-          version: ${{ env.QT_VERSION }}
+          version: ${{ env.QT_VERSION_MACOS }}
           cache: true
 
       # Only when the signing secrets exist: import the certificate into a
@@ -115,7 +118,7 @@ jobs:
 
       - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
-          version: ${{ env.QT_VERSION }}
+          version: ${{ env.QT_VERSION_WINDOWS }}
           arch: win64_msvc2022_64
           cache: true
 

@@ -1,4 +1,5 @@
 #include <QCryptographicHash>
+#include <QStringDecoder>
 #include <QtTest>
 #include <memory>
 
@@ -232,6 +233,31 @@ private slots:
         // An unknown charset falls back to UTF-8; undeclared invalid UTF-8 falls back to Latin-1.
         QCOMPARE(MailTask::parse("Subject: x\nContent-Type: text/plain; charset=x-no-such\n\nna\xc3\xafve").body, QString::fromUtf8("naïve"));
         QCOMPARE(MailTask::parse("Subject: x\n\nna\xefve").body, QString::fromUtf8("naïve"));
+    }
+
+    // The built-in decoders, used on macOS and Windows where Qt lacks these
+    // charsets, agree byte for byte with Qt's own wherever Qt has them.
+    void builtInCharsetsMatchQt() {
+        QByteArray all;
+        for (int b = 0; b < 256; ++b)
+            all.append(char(b));
+        for (const char *name : {"ISO-8859-15", "windows-1252"}) {
+            const QString ours = MailTask::decodeBuiltInCharset(all, name);
+            QCOMPARE(ours.size(), 256);
+            QStringDecoder qt(name);
+            if (!qt.isValid())
+                continue;
+            for (int b = 0; b < 256; ++b) {
+                const QString theirs = qt.decode(QByteArray(1, char(b)));
+                // Bytes Windows-1252 leaves undefined differ between decoders.
+                if (theirs.size() != 1 || theirs.at(0) == QChar::ReplacementCharacter)
+                    continue;
+                QVERIFY2(ours.at(b) == theirs.at(0), qPrintable(QString("%1 byte %2").arg(name).arg(b, 2, 16)));
+            }
+        }
+        QCOMPARE(MailTask::decodeBuiltInCharset("price \xa4" "5", "latin9"), QString::fromUtf8("price €5"));
+        QVERIFY(MailTask::decodeBuiltInCharset("x", "koi8-r").isNull());
+        QVERIFY(!MailTask::decodeBuiltInCharset("", "cp1252").isNull());
     }
 
     void parseGarbageIsInvalid() {

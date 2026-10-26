@@ -31,6 +31,15 @@ struct Message {
 // fall back to UTF-8, then Latin-1). Never fails; garbage gives valid == false.
 Message parse(const QByteArray &rfc822);
 
+// Decodes bytes in the named charset. Qt knows more charsets on Linux than on
+// macOS and Windows; ISO-8859-15 and Windows-1252, both common in mail, are
+// decoded here wherever Qt lacks them. A null string means the charset is
+// unknown; *ok (when given) is false then and when the bytes are invalid in it.
+QString decodeNamedCharset(const QByteArray &bytes, const QString &charset, bool *ok = nullptr);
+// The built-in ISO-8859-15 and Windows-1252 decoders alone: a null string for
+// any other charset. (decodeNamedCharset prefers Qt's own.)
+QString decodeBuiltInCharset(const QByteArray &bytes, const QString &charset);
+
 struct Options {
     qint64 listId = 0;          // Where the task goes; 0 means the Inbox.
     bool naturalLanguage = false;  // Also read dates, tags and so on out of the subject, as Quick Entry does.

@@ -42,6 +42,27 @@ struct Part {
     }
 };
 
+// Windows-1252's 0x80 to 0x9F; 0 where the code page leaves a byte undefined,
+// which then reads as Latin-1 does.
+constexpr std::array<char16_t, 32> cp1252High{
+    0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
+    0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178};
+
+// ISO-8859-15 is Latin-1 with eight bytes changed, the euro sign among them.
+char16_t latin9(uchar b) {
+    switch (b) {
+    case 0xA4: return 0x20AC;
+    case 0xA6: return 0x0160;
+    case 0xA8: return 0x0161;
+    case 0xB4: return 0x017D;
+    case 0xB8: return 0x017E;
+    case 0xBC: return 0x0152;
+    case 0xBD: return 0x0153;
+    case 0xBE: return 0x0178;
+    default: return b;
+    }
+}
+
 QString text8(const QByteArray &bytes) {
     QStringDecoder utf8(QStringDecoder::Utf8);
     const QString s = utf8.decode(bytes);
@@ -149,9 +170,9 @@ Field parseField(const QByteArray &raw) {
             key.chop(1);
             const QStringList bits = value.split('\'');
             if (bits.size() >= 3) {
-                QStringDecoder decoder(bits.at(0).toLatin1().constData());
                 const QByteArray bytes = QByteArray::fromPercentEncoding(bits.mid(2).join('\'').toLatin1());
-                value = decoder.isValid() ? QString(decoder.decode(bytes)) : text8(bytes);
+                const QString decoded = decodeNamedCharset(bytes, bits.at(0));
+                value = decoded.isNull() ? text8(bytes) : decoded;
             }
         }
         field.params.insert(key, value);
@@ -202,12 +223,10 @@ QByteArray decodeTransfer(const QByteArray &body, const QString &encoding) {
 // UTF-8, else Latin-1 (which accepts anything).
 QString decodeCharset(const QByteArray &bytes, const QString &charset) {
     if (!charset.isEmpty()) {
-        QStringDecoder decoder(charset.toLatin1().constData());
-        if (decoder.isValid()) {
-            const QString s = decoder.decode(bytes);
-            if (!decoder.hasError())
-                return s;
-        }
+        bool ok = false;
+        const QString s = decodeNamedCharset(bytes, charset, &ok);
+        if (ok)
+            return s;
     }
     return text8(bytes);
 }
@@ -712,6 +731,36 @@ Result import(Store &store, const Message &message, const Options &options) {
     store.commit();
     result.taskId = task.id;
     return result;
+}
+
+QString decodeNamedCharset(const QByteArray &bytes, const QString &charset, bool *ok) {
+    QStringDecoder decoder(charset.toLatin1().constData());
+    if (decoder.isValid()) {
+        const QString s = decoder.decode(bytes);
+        if (ok)
+            *ok = !decoder.hasError();
+        return s;
+    }
+    const QString s = decodeBuiltInCharset(bytes, charset);
+    if (ok)
+        *ok = !s.isNull();
+    return s;
+}
+
+QString decodeBuiltInCharset(const QByteArray &bytes, const QString &charset) {
+    const QString name = charset.trimmed().toLower();
+    const bool cp1252 = name == "windows-1252" || name == "cp1252" || name == "x-cp1252";
+    const bool iso15 = name == "iso-8859-15" || name == "iso8859-15" || name == "iso_8859-15" || name == "latin-9" || name == "latin9" || name == "l9";
+    if (!cp1252 && !iso15)
+        return {};
+    QString out(u"");
+    out.reserve(bytes.size());
+    for (const char c : bytes) {
+        const uchar b = uchar(c);
+        const char16_t high = b >= 0x80 && b < 0xA0 ? cp1252High[b - 0x80] : 0;
+        out.append(QChar(cp1252 ? (high ? high : char16_t(b)) : latin9(b)));
+    }
+    return out;
 }
 
 }  // namespace MailTask

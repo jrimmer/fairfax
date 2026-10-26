@@ -8,7 +8,6 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QSaveFile>
-#include <QStringDecoder>
 #include <QSet>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -27,6 +26,7 @@
 #include <algorithm>
 #include <functional>
 
+#include "mailtask.h"
 #include "model.h"
 #include "recurrence.h"
 #include "store.h"
@@ -1781,8 +1781,8 @@ QString decodeMimeWords(const QString &raw) {
         }
         // The language suffix of RFC 2231 ("utf-8*en") is not part of the charset.
         const QByteArray charset = m.captured(1).section('*', 0, 0).toLatin1();
-        QStringDecoder decoder(charset.constData());
-        out += decoder.isValid() ? QString(decoder.decode(bytes)) : QString::fromUtf8(bytes);
+        const QString decoded = MailTask::decodeNamedCharset(bytes, QString::fromLatin1(charset));
+        out += decoded.isNull() ? QString::fromUtf8(bytes) : decoded;
         last = m.capturedEnd();
     }
     return out + raw.mid(last);

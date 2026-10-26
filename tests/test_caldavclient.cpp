@@ -363,7 +363,9 @@ private slots:
         m_client->setCredentials("jane", "app-password");
         m_client->setBaseUrl(m_server->baseUrl());
         CalDavClient::Timings t;
-        t.requestTimeout = 100;
+        // Long enough for a slow machine's server to read each request before
+        // the client gives up on it.
+        t.requestTimeout = 400;
         t.backoffBase = 20;
         t.backoffMax = 200;
         t.maxAttempts = 4;
@@ -385,7 +387,9 @@ private slots:
         QVERIFY(!ok);
         QVERIFY2(retries >= 2, "the timeout was not retried");
         QVERIFY(lastDelay >= 20);
-        QCOMPARE(m_server->countRequests("PROPFIND"), 4);   // maxAttempts, and no more.
+        QTRY_COMPARE_WITH_TIMEOUT(m_server->countRequests("PROPFIND"), 4, 2000);   // maxAttempts,
+        QTest::qWait(300);
+        QCOMPARE(m_server->countRequests("PROPFIND"), 4);                          // and no more.
     }
 
     void aDroppedConnectionIsRetried() {
