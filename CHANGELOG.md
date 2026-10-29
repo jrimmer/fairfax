@@ -20,6 +20,8 @@
 - `frfx ls` and the scripting interface list not-started tasks too, with their
   start date.
 
+## 1.0.5 (2026-10-28)
+
 ### Fixes
 
 - The Day panel's next-event line no longer runs under the day arrows in a
