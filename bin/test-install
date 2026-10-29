@@ -4,6 +4,7 @@ set -eu
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 
 "$ROOT/tests/install/run.sh"
+"$ROOT/tests/omarchy-setup/run.sh"
 
 if command -v shellcheck >/dev/null 2>&1; then
     shellcheck "$ROOT/install.sh"

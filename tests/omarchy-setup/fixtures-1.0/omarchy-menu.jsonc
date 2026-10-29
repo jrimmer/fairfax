@@ -1,0 +1,9 @@
+{
+  // fairfax: begin (added by `fairfax setup omarchy`)
+  "fairfax": {"icon":"󰄲","label":"Fairfax","description":"Tasks: new task, Today, Quick Open"},
+  "fairfax.new": {"icon":"󰐕","label":"New Task","action":"fairfax --quick","description":"Fairfax Quick Entry"},
+  "fairfax.today": {"icon":"󰃭","label":"Today","action":"fairfax fairfax://x-callback-url/showtoday"},
+  "fairfax.find": {"icon":"󰍉","label":"Find a Task","action":"fairfax --open","description":"Fairfax Quick Open"},
+  "fairfax.settings": {"icon":"󰒓","label":"Settings","action":"fairfax --settings"},
+  // fairfax: end
+}

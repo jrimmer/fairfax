@@ -55,7 +55,8 @@ macOS (Apple Silicon, 14.4 or later) and Windows 11 builds are best effort; see 
 
 ## On Omarchy
 
-After installing, wire Fairfax into Omarchy with one command (undo with `--remove`):
+After installing, wire Fairfax into Omarchy with one command (undo with `--remove`, which leaves
+anything you have edited since):
 
 ```sh
 fairfax setup omarchy
