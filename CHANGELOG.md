@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.5 (2026-10-28)
+
+### Fixes
+
+- The Day panel's next-event line no longer runs under the day arrows in a
+  narrow panel: "upcoming 3 PM" first shrinks to "3 PM", then the event name
+  shortens with an ellipsis, and the expand chevron stays visible.
+- `fairfax setup omarchy --remove` now undoes only what setup still owns. If you
+  have edited `~/.config/hypr/fairfax.lua` or the Fairfax section of the
+  Omarchy menu, that part stays and `--remove` says what it kept. An edited
+  `fairfax.lua` is no longer loaded, so nothing keeps starting a removed
+  Fairfax. Only setup's own marked line leaves `hyprland.lua`, never a line you
+  wrote. Setups made by 1.0 are recognised too. Thanks to @sawinyh for the
+  report and the suggested fix.
+- Setup's check for a key that is already taken missed every key with two or
+  more modifiers, because Omarchy lists them as `SUPER SHIFT + T`. It now
+  compares keys in any order and case. That showed Fairfax's default,
+  Super+Shift+T, is Omarchy's Activity key, so the default Quick Entry key is
+  now **Super+Alt+T**. If you set Fairfax up before, run `fairfax setup omarchy`
+  again to move Quick Entry there (or `--key` to pick your own). `--key` now
+  accepts only plain key names.
+
 ## 1.0.4 (2026-10-25)
 
 ### Abandon a task
