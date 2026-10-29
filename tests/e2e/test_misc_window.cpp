@@ -336,17 +336,21 @@ private slots:
         QVERIFY(right(caption) <= bar->mapFromItem(prev, QPointF(0, 0)).x());
 
         // Another day, with the Today link showing: the date keeps its full width, and
-        // the muted part gives way (or goes) instead.
-        bar->setProperty("dayOffset", 3);
-        QQuickItem *today = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((today = findItem("dayBarToday")) != nullptr && today->isVisible(), 5000);
-        for (int w = 300; w >= 210; w -= 10) {
-            bar->setWidth(w);
-            settleLayout(bar);
-            QVERIFY2(!elided(name) && name->width() > 0, qPrintable(QString::number(w)));
-            QVERIFY2(right(caption) <= bar->mapFromItem(today, QPointF(0, 0)).x(), qPrintable(QString::number(w)));
-            QVERIFY(chevron->isVisible() && right(chevron) <= right(caption) + 0.5);
-            QVERIFY2(!muted->isVisible() || muted->width() > 0, qPrintable(QString::number(w)));
+        // the muted part gives way (or goes) instead. A week of days, so every
+        // weekday name and a range of dates are measured, whatever today is.
+        for (int offset = 2; offset <= 8; ++offset) {
+            bar->setProperty("dayOffset", offset);
+            QQuickItem *today = nullptr;
+            QTRY_VERIFY_WITH_TIMEOUT((today = findItem("dayBarToday")) != nullptr && today->isVisible(), 5000);
+            for (int w = 300; w >= 210; w -= 10) {
+                bar->setWidth(w);
+                settleLayout(bar);
+                const QString at = name->property("text").toString() + " at " + QString::number(w);
+                QVERIFY2(!elided(name) && name->width() > 0, qPrintable(at));
+                QVERIFY2(right(caption) <= bar->mapFromItem(today, QPointF(0, 0)).x(), qPrintable(at));
+                QVERIFY(chevron->isVisible() && right(chevron) <= right(caption) + 0.5);
+                QVERIFY2(!muted->isVisible() || muted->width() > 0, qPrintable(at));
+            }
         }
     }
 
