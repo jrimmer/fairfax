@@ -68,7 +68,7 @@ or to pick a different Quick Entry key.
 
 It adds, each in a clearly marked place:
 
-- **Super+Shift+T** opens Quick Entry from anywhere (`--key "SUPER + ALT + T"` to pick
+- **Super+Alt+T** opens Quick Entry from anywhere (`--key "SUPER + ALT + N"` to pick
   another; it refuses a key that's already taken). Quick Entry and Settings float, centred.
 - **Super+Space → Fairfax**: New Task, Today, Find a Task and Settings in the Omarchy menu.
 - Fairfax starts in the background when you sign in, so alarms arrive and Quick Entry is

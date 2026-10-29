@@ -277,7 +277,7 @@ if $is_omarchy && [ -z "$have" ] && ! $no_setup; then
 fi
 
 if $setup_ran; then
-    echo "Start Fairfax with Super+Space → Fairfax, or 'fairfax'; press Super+Shift+T for Quick Entry."
+    echo "Start Fairfax with Super+Space → Fairfax, or 'fairfax'; press Super+Alt+T for Quick Entry."
 elif $arch_pacman || $is_omarchy; then
     echo "Start Fairfax with Super+Space → Fairfax, or run 'fairfax'."
 else

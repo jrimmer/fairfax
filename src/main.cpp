@@ -192,7 +192,7 @@ int runHeadless(int argc, char *argv[]) {
         // `fairfax setup omarchy [--remove] [--key …]` runs the packaged
         // script (or the repo's copy when running from a build).
         if (args.value(2) != "omarchy") {
-            QTextStream(stderr) << "usage: fairfax setup omarchy [--remove] [--key \"SUPER + SHIFT + T\"]" << Qt::endl;
+            QTextStream(stderr) << "usage: fairfax setup omarchy [--remove] [--key \"SUPER + ALT + T\"]" << Qt::endl;
             return 2;
         }
         const QString appDir = QCoreApplication::applicationDirPath();

@@ -13,15 +13,15 @@ FIX="$HERE/fixtures-1.0"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/bin"
-# `omarchy menu keybindings --print` finds no binding taken.
-printf '#!/bin/sh\nexit 0\n' >"$work/bin/omarchy"
+# `omarchy menu keybindings --print` prints $work/listing (empty: nothing taken).
+printf '#!/bin/sh\ncat "%s/listing" 2>/dev/null\nexit 0\n' "$work" >"$work/bin/omarchy"
 chmod +x "$work/bin/omarchy"
 
 failures=0
 fail() { echo "FAIL: $*" >&2; failures=$((failures + 1)); }
 pass() { echo "ok   $*"; }
 
-home= hypr= module= main= menu=
+home='' hypr='' module='' main='' menu=''
 fresh() {
   home="$work/home-$1"
   hypr="$home/.config/hypr"
@@ -57,8 +57,8 @@ pass "untouched setup is removed completely"
 
 # --- setup run twice (another key) is still setup's
 fresh twice
-run && run --key "SUPER + ALT + T" || fail "setup twice failed"
-grep -q 'SUPER + ALT + T' "$module" || fail "second key not written"
+run && run --key "SUPER + ALT + N" || fail "setup twice failed"
+grep -q 'SUPER + ALT + N' "$module" || fail "second key not written"
 run --remove
 [[ ! -e $module ]] && same "$main" "$work/main-twice.orig" && same "$menu" "$work/menu-twice.orig" \
   || fail "re-run setup not removed completely"
@@ -148,6 +148,44 @@ run --remove
 same "$module" "$work/module-legacyedit" || fail "edited 1.0 module was removed"
 same "$main" "$work/main-legacyedit.orig" || fail "1.0 marked line stayed beside an edited module"
 pass "edited 1.0 module stays"
+
+# --- a taken key is refused however it is written; Fairfax's own binding isn't
+fresh keys
+# The listing's format: modifiers space-separated, "+" only before the key.
+cat >"$work/listing" <<'LIST'
+SUPER + K                           → Keybindings
+SUPER SHIFT + RETURN                → Browser
+SUPER SHIFT + T                     → Activity
+SUPER CTRL + T                      → Theme menu
+SUPER ALT + J                       → Fairfax quick entry
+LIST
+for key in "SUPER + SHIFT + RETURN" "super + shift + return" "SHIFT + SUPER + RETURN" \
+           "SUPER + SHIFT + T" "SUPER + CONTROL + T" "SUPER + K"; do
+  if run --key "$key"; then
+    fail "taken key \"$key\" was accepted"
+  else
+    has "is already bound" || fail "no 'already bound' for \"$key\": $(cat "$work/out")"
+  fi
+  [[ ! -e $module ]] || { fail "a refused key \"$key\" still wrote $module"; rm -f "$module"; }
+done
+same "$main" "$work/main-keys.orig" || fail "a refused key changed hyprland.lua"
+run --key "SUPER + ALT + J" || fail "Fairfax's own binding counted as taken: $(cat "$work/out")"
+rm -f "$module"
+run || fail "the default key is taken in Omarchy's listing: $(cat "$work/out")"
+grep -qF 'o.bind("SUPER + ALT + T",' "$module" || fail "default key is not SUPER + ALT + T"
+rm -f "$work/listing"
+pass "taken keys are refused in any order and case; Fairfax's own and the default pass"
+
+# --- a key that isn't a plain key name is refused before anything is written
+fresh badkey
+for key in 'SUPER + "T' 'SUPER + T") os.execute("x' '' '+ +'; do
+  if run --key "$key"; then fail "bad key \"$key\" was accepted"; fi
+done
+run --key 2>/dev/null && fail "--key with no value was accepted"
+has "--key needs a key" || fail "no message for --key with no value"
+[[ ! -e $module ]] || fail "a bad key wrote $module"
+same "$main" "$work/main-badkey.orig" || fail "a bad key changed hyprland.lua"
+pass "keys that aren't plain key names are refused"
 
 if ((failures)); then
   echo "$failures failure(s)" >&2
