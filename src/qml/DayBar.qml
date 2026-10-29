@@ -203,12 +203,13 @@ Item {
             readonly property real textRoom: Math.max(0, width - stepRow.width - 8 - (sep >= 0 ? 38 : 18))
             readonly property string mutedFull: sep >= 0 ? root.captionText.substring(sep + 3) : root.captionText
             readonly property string mutedShort: sep >= 0 ? root.captionShort.substring(root.captionShort.indexOf(" · ") + 3) : root.captionText
-            // Measured widths, rounded up with a pixel of slack: Text elides a string
-            // that is a hair wider than its box, so an exact fit would still elide.
-            readonly property real nameFit: Math.ceil(nameMetrics.width) + 1
-            readonly property real fullFit: Math.ceil(fullMetrics.width) + 1
-            readonly property real shortFit: Math.ceil(shortMetrics.width) + 1
-            readonly property real minNameFit: Math.ceil(minNameMetrics.width)
+            // Natural widths from hidden Text items laid out like the visible ones
+            // (TextMetrics can come out most of a pixel narrower, which elides),
+            // rounded up with a pixel of slack.
+            readonly property real nameFit: Math.ceil(nameMeasure.implicitWidth) + 1
+            readonly property real fullFit: Math.ceil(fullMeasure.implicitWidth) + 1
+            readonly property real shortFit: Math.ceil(shortMeasure.implicitWidth) + 1
+            readonly property real minNameFit: Math.ceil(minNameMeasure.implicitWidth)
             readonly property bool useShort: sep >= 0 && nameFit + fullFit > textRoom
             readonly property real mutedNatural: useShort ? shortFit : fullFit
             readonly property real nameWidth: sep < 0 ? 0 : root.isToday ? Math.min(nameFit, textRoom, Math.max(minNameFit, textRoom - mutedNatural))
@@ -216,10 +217,10 @@ Item {
             readonly property real mutedWidth: Math.min(mutedNatural, Math.max(0, textRoom - nameWidth))
             readonly property bool mutedShown: root.isToday || mutedWidth >= Math.ceil(ellipsisMetrics.width)
 
-            TextMetrics { id: nameMetrics; font.pixelSize: root.pointSize; font.weight: Font.DemiBold; text: nameText.text }
-            TextMetrics { id: minNameMetrics; font: nameMetrics.font; text: nameText.text.substring(0, 4) + "…" }
-            TextMetrics { id: fullMetrics; font.pixelSize: root.pointSize; text: captionItem.mutedFull }
-            TextMetrics { id: shortMetrics; font.pixelSize: root.pointSize; text: captionItem.mutedShort }
+            Text { id: nameMeasure; visible: false; font: nameText.font; text: nameText.text }
+            Text { id: minNameMeasure; visible: false; font: nameText.font; text: nameText.text.substring(0, 4) + "…" }
+            Text { id: fullMeasure; visible: false; font.pixelSize: root.pointSize; text: captionItem.mutedFull }
+            Text { id: shortMeasure; visible: false; font.pixelSize: root.pointSize; text: captionItem.mutedShort }
             TextMetrics { id: ellipsisMetrics; font.pixelSize: root.pointSize; text: "…" }
 
             Row {
