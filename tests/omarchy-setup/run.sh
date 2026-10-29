@@ -64,18 +64,19 @@ run --remove
   || fail "re-run setup not removed completely"
 pass "setup run twice is removed completely"
 
-# --- an edited module stays, still loaded; the menu still goes
+# --- an edited module stays on disk but is no longer loaded; the menu goes
 fresh module
 run
 printf 'o.bind("SUPER + F", "my thing", "foot")\n' >>"$module"
 cp "$module" "$work/module-edited"
 run --remove
 same "$module" "$work/module-edited" || fail "edited module was changed or removed"
-grep -qF 'require("hypr.fairfax")' "$main" || fail "the line loading the edited module was removed"
+same "$main" "$work/main-module.orig" || fail "the marked line stayed beside an edited module"
 same "$menu" "$work/menu-module.orig" || fail "menu block not removed beside an edited module"
 has "Kept $module" || fail "no message about the kept module"
+has "no longer loaded" || fail "no word that the kept module is no longer loaded"
 has "except for what you changed" || fail "no summary of what was kept"
-pass "edited module stays and stays loaded"
+pass "edited module stays on disk, unloaded"
 
 # --- an edited module with its checksum line deleted is still edited
 fresh nosum
@@ -145,6 +146,7 @@ cp "$module" "$work/module-legacyedit"
 printf 'require("hypr.fairfax") -- fairfax: added by `fairfax setup omarchy`\n' >>"$main"
 run --remove
 same "$module" "$work/module-legacyedit" || fail "edited 1.0 module was removed"
+same "$main" "$work/main-legacyedit.orig" || fail "1.0 marked line stayed beside an edited module"
 pass "edited 1.0 module stays"
 
 if ((failures)); then

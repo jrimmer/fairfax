@@ -12,8 +12,10 @@
 #
 # --remove only undoes what setup still owns. The module and the menu block
 # carry a SHA-256 of what setup wrote (a 1.0 install, which has none, is
-# compared with the template instead): once you edit one, it is yours and stays.
-# Only the exact marked line leaves hyprland.lua.
+# compared with the template instead): once you edit one, it is yours and stays
+# on disk. The marked line in hyprland.lua is setup's, so it always goes (an
+# edited module is then no longer loaded, and nothing is left running a removed
+# Fairfax); a line you wrote that loads the module stays.
 
 set -euo pipefail
 
@@ -30,7 +32,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --remove) remove=true ;;
     --key) key="$2"; shift ;;
-    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "fairfax setup omarchy: unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -163,6 +165,7 @@ if $remove; then
     if ! module_owned; then
       module_stays=true
       echo "Kept $module: it has changed since setup wrote it, so it is yours now."
+      echo "  It is no longer loaded; to load it again, add require(\"hypr.fairfax\") to $main."
     elif [[ -n $others ]]; then
       module_stays=true
       echo "Kept $module: $main loads it with a line you wrote."
@@ -171,9 +174,8 @@ if $remove; then
       echo "Removed $module"
     fi
   fi
-  if $module_stays; then
-    kept=true
-  elif grep -qxF "$require_line" "$main"; then
+  $module_stays && kept=true
+  if grep -qxF "$require_line" "$main"; then
     backup "$main"
     tmp=$(mktemp)
     grep -vxF "$require_line" "$main" >"$tmp" || true

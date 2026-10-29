@@ -27,9 +27,10 @@
   shortens with an ellipsis, and the expand chevron stays visible.
 - `fairfax setup omarchy --remove` now undoes only what setup still owns. If you
   have edited `~/.config/hypr/fairfax.lua` or the Fairfax section of the
-  Omarchy menu, that part stays (and the file stays loaded), and `--remove`
-  says what it kept. Only setup's own marked line leaves `hyprland.lua`, never
-  a line you wrote. Setups made by 1.0 are recognised too. Thanks to @sawinyh
+  Omarchy menu, that part stays and `--remove` says what it kept. An edited
+  `fairfax.lua` is no longer loaded, so nothing keeps starting a removed
+  Fairfax. Only setup's own marked line leaves `hyprland.lua`, never a line you
+  wrote. Setups made by 1.0 are recognised too. Thanks to @sawinyh
   for the report and the suggested fix.
 
 ## 1.0.4 (2026-10-25)
