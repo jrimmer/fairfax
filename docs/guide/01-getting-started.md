@@ -64,10 +64,10 @@ fairfax setup omarchy
 
 It adds three things, each in a clearly marked place:
 
-- **A Quick Entry key.** Press **Super+Shift+T** anywhere to jot down a task
+- **A Quick Entry key.** Press **Super+Alt+T** anywhere to jot down a task
   without switching windows. To choose another key, run
-  `fairfax setup omarchy --key "SUPER + ALT + T"`. Fairfax refuses a key that is
-  already taken. Quick Entry and Settings open floating and centred.
+  `fairfax setup omarchy --key "SUPER + ALT + N"`. Fairfax refuses a key that is
+  already taken, whatever order or case you write it in. Quick Entry and Settings open floating and centred.
 - **Menu entries.** Press **Super+Space** and choose **Fairfax** for *New Task*,
   *Today*, *Find a Task* and *Settings*.
 - **Background start.** Fairfax starts quietly when you sign in. That is how

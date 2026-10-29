@@ -48,7 +48,7 @@ for new tasks**.
 ### With Quick Entry
 
 Quick Entry is a small window for capturing a thought without leaving what you
-are doing. Press your Quick Entry key (**Super+Shift+T** on Omarchy), type, and
+are doing. Press your Quick Entry key (**Super+Alt+T** on Omarchy), type, and
 press **Return**. You can also run `fairfax --quick`.
 
 ![Quick Entry with a task typed in plain language and labelled pills underneath showing what Fairfax understood](img/quick-entry.webp)

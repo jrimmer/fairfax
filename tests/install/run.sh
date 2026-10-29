@@ -174,8 +174,8 @@ cat >"$STUBS/fairfax" <<'STUB'
 #!/usr/bin/env bash
 printf 'fairfax %s\n' "$*" >>"$STUB_LOG"
 if [ "${FAIRFAX_SETUP_FAIL:-}" = "yes" ]; then
-    echo "SUPER + SHIFT + T is already bound" >&2
-    echo "Pick another with: fairfax setup omarchy --key \"SUPER + ALT + T\"" >&2
+    echo "SUPER + ALT + T is already bound" >&2
+    echo "Pick another with: fairfax setup omarchy --key \"SUPER + ALT + N\"" >&2
     exit 1
 fi
 exit 0
@@ -249,7 +249,7 @@ assert_contains "$OUT" "sudo pacman -U" "warns about sudo before pacman"
 assert_contains "$OUT" "fairfax-x86_64.pkg.tar.zst" "arch-named package used"
 log_has "sudo pacman -U --noconfirm" || fail "sudo used for pacman -U"
 log_has "fairfax setup omarchy" || fail "setup run on Omarchy fresh install"
-assert_contains "$OUT" "Super+Shift+T" "start line mentions Quick Entry when setup ran"
+assert_contains "$OUT" "Super+Alt+T" "start line mentions Quick Entry when setup ran"
 ok "fresh Arch install"
 
 # Arch as root with no sudo installed (a container, a minimal server): pacman
@@ -288,7 +288,7 @@ new_home
 run
 assert_eq "$STATUS" 0 "fresh Arch without Omarchy exits 0"
 log_lacks "fairfax setup omarchy" || fail "setup must not run without Omarchy"
-assert_not_contains "$OUT" "Super+Shift+T" "no Quick Entry line without setup"
+assert_not_contains "$OUT" "Super+Alt+T" "no Quick Entry line without setup"
 ok "fresh Arch without Omarchy"
 
 # fresh Arch on Omarchy but --no-setup

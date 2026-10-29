@@ -32,6 +32,13 @@
   Fairfax. Only setup's own marked line leaves `hyprland.lua`, never a line you
   wrote. Setups made by 1.0 are recognised too. Thanks to @sawinyh
   for the report and the suggested fix.
+- Setup's check for a key that is already taken missed every key with two or
+  more modifiers, because Omarchy lists them as `SUPER SHIFT + T`. It now
+  compares keys in any order and case. That showed Fairfax's default,
+  Super+Shift+T, is Omarchy's Activity key, so the default Quick Entry key is
+  now **Super+Alt+T**. If you set Fairfax up before, run `fairfax setup omarchy`
+  again to move Quick Entry there (or `--key` to pick your own). `--key` now
+  accepts only plain key names.
 
 ## 1.0.4 (2026-10-25)
 

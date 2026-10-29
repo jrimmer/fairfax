@@ -361,7 +361,7 @@ Window {
                     Hint { Layout.topMargin: 0; text: "Used by this-week searches and Focus Filter, the mini calendar, date pickers and weekly repeats. Fairfax is English only; month and day names are English and dates are laid out for the system locale (" + Qt.locale().name + ")." }
                     Toggle { key: "general.sounds"; fallback: true; label: "Play task completion sounds" }
                     Toggle { key: "general.celebrate"; fallback: true; label: "Celebrate when a list is cleared" }
-                    Hint { visible: backend.platformIsLinux; text: "On Omarchy, run  fairfax setup omarchy  in a terminal: it adds a Quick Entry key (Super+Shift+T), floating windows, a Fairfax section in the Super+Space menu, and starts Fairfax at sign-in so alarms arrive. Undo with  fairfax setup omarchy --remove." }
+                    Hint { visible: backend.platformIsLinux; text: "On Omarchy, run  fairfax setup omarchy  in a terminal: it adds a Quick Entry key (Super+Alt+T), floating windows, a Fairfax section in the Super+Space menu, and starts Fairfax at sign-in so alarms arrive. Undo with  fairfax setup omarchy --remove." }
                 }
 
                 // Appearance

@@ -3,7 +3,7 @@
 #
 #   fairfax setup omarchy             add Quick Entry key, window rules, autostart, menu entries
 #   fairfax setup omarchy --remove    undo it, except what you have edited since
-#   fairfax setup omarchy --key "SUPER + ALT + T"    use another Quick Entry key
+#   fairfax setup omarchy --key "SUPER + ALT + N"    use another Quick Entry key
 #
 # Everything Fairfax adds to Hyprland lives in ~/.config/hypr/fairfax.lua,
 # loaded by one marked line in hyprland.lua; launcher entries are a marked
@@ -25,18 +25,27 @@ main="$hypr/hyprland.lua"
 menu="$HOME/.config/omarchy/extensions/omarchy-menu.jsonc"
 require_line='require("hypr.fairfax") -- fairfax: added by `fairfax setup omarchy`'
 sum_tag='-- fairfax-setup-sha256: '
-key="SUPER + SHIFT + T"
+# Omarchy binds SUPER + SHIFT + T to Activity, so the default is next to it.
+key="SUPER + ALT + T"
 remove=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --remove) remove=true ;;
-    --key) key="$2"; shift ;;
+    --key)
+      [[ $# -ge 2 ]] || { echo "fairfax setup omarchy: --key needs a key, such as \"SUPER + ALT + N\"" >&2; exit 2; }
+      key="$2"; shift ;;
     -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "fairfax setup omarchy: unknown option $1" >&2; exit 2 ;;
   esac
   shift
 done
+
+# The key goes into a Lua string in fairfax.lua, so only plain key names pass.
+if [[ ! $key =~ ^[A-Za-z0-9_+\ ]+$ || ! $key =~ [A-Za-z0-9] ]]; then
+  echo "fairfax setup omarchy: \"$key\" is not a key like \"SUPER + ALT + N\" (letters, digits, spaces, + and _ only)" >&2
+  exit 2
+fi
 
 if [[ ! -f $main ]]; then
   echo "This doesn't look like Omarchy: $main is missing." >&2
@@ -208,13 +217,23 @@ if $remove; then
   exit 0
 fi
 
-# Refuse a key that's already taken, so nothing is silently overridden.
+# Refuse a key that's already taken, so nothing is silently overridden. The
+# listing writes "SUPER SHIFT + RETURN", so keys compare as sets of words, in
+# any order and case; a binding whose description names Fairfax is ours.
 if command -v omarchy >/dev/null; then
-  taken=$(omarchy menu keybindings --print 2>/dev/null | grep -i -E "^${key//+/\\+}[[:space:]]+→" || true)
-  taken=$(echo "$taken" | grep -v -i fairfax || true)
+  taken=$(omarchy menu keybindings --print 2>/dev/null | PYTHONIOENCODING=utf-8 python3 -c '
+import re, sys
+def words(s):
+    return sorted("CTRL" if w == "CONTROL" else w for w in re.split(r"[+\s]+", s.upper()) if w)
+want = words(sys.argv[1])
+for line in sys.stdin:
+    left, arrow, what = line.partition("→")
+    if arrow and words(left) == want and "fairfax" not in what.lower():
+        print(line.rstrip())
+' "$key" || true)
   if [[ -n $taken ]]; then
     echo "$key is already bound: $taken" >&2
-    echo "Pick another with: fairfax setup omarchy --key \"SUPER + ALT + T\"" >&2
+    echo "Pick another with: fairfax setup omarchy --key \"SUPER + ALT + N\"" >&2
     exit 1
   fi
 fi
