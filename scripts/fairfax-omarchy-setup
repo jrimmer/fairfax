@@ -2,13 +2,18 @@
 # Wires Fairfax into Omarchy, or takes it out again:
 #
 #   fairfax setup omarchy             add Quick Entry key, window rules, autostart, menu entries
-#   fairfax setup omarchy --remove    undo all of it
+#   fairfax setup omarchy --remove    undo it, except what you have edited since
 #   fairfax setup omarchy --key "SUPER + ALT + T"    use another Quick Entry key
 #
 # Everything Fairfax adds to Hyprland lives in ~/.config/hypr/fairfax.lua,
 # loaded by one marked line in hyprland.lua; launcher entries are a marked
 # block in ~/.config/omarchy/extensions/omarchy-menu.jsonc. Files are backed
 # up before they change, and Hyprland's config is validated afterwards.
+#
+# --remove only undoes what setup still owns. The module and the menu block
+# carry a SHA-256 of what setup wrote (a 1.0 install, which has none, is
+# compared with the template instead): once you edit one, it is yours and stays.
+# Only the exact marked line leaves hyprland.lua.
 
 set -euo pipefail
 
@@ -17,6 +22,7 @@ module="$hypr/fairfax.lua"
 main="$hypr/hyprland.lua"
 menu="$HOME/.config/omarchy/extensions/omarchy-menu.jsonc"
 require_line='require("hypr.fairfax") -- fairfax: added by `fairfax setup omarchy`'
+sum_tag='-- fairfax-setup-sha256: '
 key="SUPER + SHIFT + T"
 remove=false
 
@@ -24,7 +30,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --remove) remove=true ;;
     --key) key="$2"; shift ;;
-    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "fairfax setup omarchy: unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -38,26 +44,52 @@ fi
 backup() { [[ -f $1 ]] && cp "$1" "$1.bak.$(date +%s)"; }
 
 # The launcher's menu file is JSONC; Python edits it so commas stay valid.
+# `remove` exits 0 when it took the block out, 1 when there was none, and 3
+# when the block was edited and stays.
 edit_menu() {
   local mode="$1"
   mkdir -p "$(dirname "$menu")"
   [[ -f $menu ]] || printf '{\n}\n' >"$menu"
-  backup "$menu"
   python3 - "$menu" "$mode" <<'PY'
-import re, sys
+import hashlib, re, shutil, sys, time
 path, mode = sys.argv[1], sys.argv[2]
 text = open(path, encoding="utf-8").read()
 begin, end = "// fairfax: begin", "// fairfax: end"
-text = re.sub(r"\n?[ \t]*" + re.escape(begin) + r".*?" + re.escape(end) + r"[^\n]*\n?", "\n", text, flags=re.S)
-if mode == "add":
-    block = """  // fairfax: begin (added by `fairfax setup omarchy`)
-  "fairfax": {"icon":"󰄲","label":"Fairfax","description":"Tasks: new task, Today, Quick Open"},
+entries = """  "fairfax": {"icon":"󰄲","label":"Fairfax","description":"Tasks: new task, Today, Quick Open"},
   "fairfax.new": {"icon":"󰐕","label":"New Task","action":"fairfax --quick","description":"Fairfax Quick Entry"},
   "fairfax.today": {"icon":"󰃭","label":"Today","action":"fairfax fairfax://x-callback-url/showtoday"},
   "fairfax.find": {"icon":"󰍉","label":"Find a Task","action":"fairfax --open","description":"Fairfax Quick Open"},
   "fairfax.settings": {"icon":"󰒓","label":"Settings","action":"fairfax --settings"},
-  // fairfax: end
 """
+digest = lambda body: hashlib.sha256(body.encode("utf-8")).hexdigest()
+block_re = re.compile(r"\n?([ \t]*" + re.escape(begin) + r"[^\n]*)\n(.*?)^[ \t]*" + re.escape(end) + r"[^\n]*\n?", re.S | re.M)
+
+def owned(m):
+    # What setup wrote, unchanged: the checksum in the begin line matches, or
+    # (from 1.0, before the checksum) the entries are exactly the template's.
+    tag = re.search(r"sha256:([0-9a-f]{64})", m.group(1))
+    return digest(m.group(2)) == tag.group(1) if tag else m.group(2) == entries
+
+def save(new):
+    shutil.copy(path, f"{path}.bak.{int(time.time())}")
+    open(path, "w", encoding="utf-8").write(re.sub(r"\n{3,}", "\n\n", new))
+
+if mode == "remove":
+    m = block_re.search(text)
+    if not m:
+        sys.exit(3 if begin in text else 1)
+    if not owned(m):
+        sys.exit(3)
+    head, tail = text[:m.start()], text[m.end():]
+    # The comma setup put after your last entry goes too, when nothing follows.
+    if re.fullmatch(r"\s*\}\s*", tail):
+        head = re.sub(r",(\s*)$", r"\1", head)
+    save(head + "\n" + tail)
+    sys.exit(0)
+
+text = block_re.sub("\n", text)
+if mode == "add":
+    block = "  " + begin + " (added by `fairfax setup omarchy`) sha256:" + digest(entries) + "\n" + entries + "  " + end + "\n"
     close = text.rstrip().rfind("}")
     head = text[:close].rstrip()
     # Strip comments to see whether earlier entries need a separating comma.
@@ -65,8 +97,48 @@ if mode == "add":
     if bare and not bare.endswith(("{", ",")):
         head += ","
     text = head + "\n" + block + "}\n"
-open(path, "w", encoding="utf-8").write(re.sub(r"\n{3,}", "\n\n", text))
+save(text)
 PY
+}
+
+# The module for key $1, without its checksum line; $2 = 1.0 gives the 1.0 header.
+module_text() {
+  local key="$1" header
+  if [[ ${2:-} == 1.0 ]]; then
+    header='-- `fairfax setup omarchy --remove`, or edit freely.'
+  else
+    header='-- `fairfax setup omarchy --remove`, or edit freely: once you change this
+-- file it is yours, and --remove leaves it in place.'
+  fi
+  cat <<LUA
+-- Fairfax, added by \`fairfax setup omarchy\`. Remove with
+$header
+
+-- Quick Entry from anywhere: press it again to save and start the next task.
+o.bind("$key", "Fairfax quick entry", "fairfax --quick")
+
+-- Quick Entry and Settings float, centred, like the panels. Quick Entry
+-- sizes itself to its contents.
+o.window({ class = "^fairfax\$", title = "^Fairfax Quick Entry\$" }, { float = true, center = true })
+o.window({ class = "^fairfax\$", title = "^Fairfax Settings\$" }, { float = true, center = true, size = { 760, 580 } })
+
+
+-- Keep Fairfax running in the background after sign-in, so alarms arrive
+-- and Quick Entry opens instantly.
+o.launch_on_start("fairfax --background")
+LUA
+}
+
+# Is the module still exactly what setup wrote?
+module_owned() {
+  local tag key
+  tag=$(grep -m1 -e "^$sum_tag" "$module" || true)
+  if [[ -n $tag ]]; then
+    [[ $(grep -v -e "^$sum_tag" "$module" | sha256sum | cut -c1-64) == "${tag#"$sum_tag"}" ]]
+    return
+  fi
+  key=$(sed -n 's/^o\.bind("\(.*\)", "Fairfax quick entry", "fairfax --quick")$/\1/p' "$module" | head -n1)
+  [[ -n $key ]] && cmp -s "$module" <(module_text "$key" 1.0)
 }
 
 validate() {
@@ -83,15 +155,54 @@ validate() {
 }
 
 if $remove; then
-  [[ -f $module ]] && rm "$module" && echo "Removed $module"
-  if grep -qF 'require("hypr.fairfax")' "$main"; then
+  kept=false
+  # Lines that load the module other than setup's own marked one: yours.
+  others=$(grep -F 'require("hypr.fairfax")' "$main" | grep -vxF "$require_line" || true)
+  module_stays=false
+  if [[ -f $module ]]; then
+    if ! module_owned; then
+      module_stays=true
+      echo "Kept $module: it has changed since setup wrote it, so it is yours now."
+    elif [[ -n $others ]]; then
+      module_stays=true
+      echo "Kept $module: $main loads it with a line you wrote."
+    else
+      rm "$module"
+      echo "Removed $module"
+    fi
+  fi
+  if $module_stays; then
+    kept=true
+  elif grep -qxF "$require_line" "$main"; then
     backup "$main"
-    sed -i '/require("hypr.fairfax")/d' "$main"
+    tmp=$(mktemp)
+    grep -vxF "$require_line" "$main" >"$tmp" || true
+    cat "$tmp" >"$main"
+    rm -f "$tmp"
     echo "Removed Fairfax from $main"
   fi
-  [[ -f $menu ]] && edit_menu remove && echo "Removed Fairfax from the launcher menu"
+  if [[ -n $others ]]; then
+    kept=true
+    echo "Kept your own line in $main that loads hypr.fairfax."
+  fi
+  if [[ -f $menu ]]; then
+    rc=0
+    edit_menu remove || rc=$?
+    case $rc in
+      0) echo "Removed Fairfax from the launcher menu" ;;
+      1) ;;
+      3) kept=true
+         echo "Kept the Fairfax section of $menu: it has changed since setup wrote it." ;;
+      *) exit "$rc" ;;
+    esac
+  fi
   validate
-  echo "Fairfax is no longer wired into Omarchy (the app itself stays installed)."
+  if $kept; then
+    echo "Fairfax is unwired from Omarchy except for what you changed, listed above;"
+    echo "delete those parts by hand if you no longer want them. (The app stays installed.)"
+  else
+    echo "Fairfax is no longer wired into Omarchy (the app itself stays installed)."
+  fi
   exit 0
 fi
 
@@ -107,23 +218,12 @@ if command -v omarchy >/dev/null; then
 fi
 
 [[ -f $module ]] && backup "$module"
-cat >"$module" <<LUA
--- Fairfax, added by \`fairfax setup omarchy\`. Remove with
--- \`fairfax setup omarchy --remove\`, or edit freely.
-
--- Quick Entry from anywhere: press it again to save and start the next task.
-o.bind("$key", "Fairfax quick entry", "fairfax --quick")
-
--- Quick Entry and Settings float, centred, like the panels. Quick Entry
--- sizes itself to its contents.
-o.window({ class = "^fairfax\$", title = "^Fairfax Quick Entry\$" }, { float = true, center = true })
-o.window({ class = "^fairfax\$", title = "^Fairfax Settings\$" }, { float = true, center = true, size = { 760, 580 } })
-
-
--- Keep Fairfax running in the background after sign-in, so alarms arrive
--- and Quick Entry opens instantly.
-o.launch_on_start("fairfax --background")
-LUA
+tmp=$(mktemp)
+module_text "$key" >"$tmp"
+sum=$(sha256sum <"$tmp" | cut -c1-64)
+# The checksum goes after the header; it covers every other line.
+{ head -n3 "$tmp"; printf '%s%s\n' "$sum_tag" "$sum"; tail -n +4 "$tmp"; } >"$module"
+rm -f "$tmp"
 echo "Wrote $module"
 
 if ! grep -qF 'require("hypr.fairfax")' "$main"; then

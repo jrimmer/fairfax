@@ -77,7 +77,10 @@ It adds three things, each in a clearly marked place:
 Hyprland's part lives in `~/.config/hypr/fairfax.lua`, loaded by one line in
 `hyprland.lua`. The menu entries are a marked block in
 `~/.config/omarchy/extensions/omarchy-menu.jsonc`. Both files are backed up
-before they change. To undo everything, run `fairfax setup omarchy --remove`.
+before they change. To undo it, run `fairfax setup omarchy --remove`. It takes out
+only what setup still owns: if you have edited `fairfax.lua` or the menu section,
+that part is yours and stays (it says what it kept), and only setup's own marked
+line leaves `hyprland.lua`.
 
 If you lay out floating windows in thirds on Hyprland, Fairfax opens into the free
 third. You can turn that off in [Settings](12-settings.md).
